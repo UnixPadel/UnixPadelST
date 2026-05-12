@@ -1,0 +1,51 @@
+# Build outputs
+bin/
+obj/
+release/
+publish/
+dist/
+out/
+*.tsbuildinfo
+
+# Node / frontend
+node_modules/
+
+# Env files
+.env
+.env.*
+!.env.example
+
+# Secrets / certs
+secrets.json
+*.pfx
+*.key
+*.pem
+*.crt
+appsettings.Local.json
+appsettings.Secrets.json
+
+# Local user files
+*.user
+*.suo
+launchSettings.user.json
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+.claude/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs / local databases
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Stray captured-output files
+/CrmModern.Web/cd
+/CrmModern.Web/npm
+/CrmModern.Web/tsc
+/CrmModern.Web/crmmodern-web@0.1.0

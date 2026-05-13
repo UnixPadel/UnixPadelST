@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <LangVersion>12</LangVersion>
+    <RootNamespace>CrmModern.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- MySQL via Pomelo — matches existing Clever Cloud MySQL database -->
+    <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
+    <PackageReference Include="ClosedXML" Version="0.102.3" />
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
+    <!-- Pin EF Core packages to same version Pomelo 8.0.2 pulls in (8.0.2) to avoid MSB3277 warnings -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.2" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
+    <!-- JWT token generation lives in Infrastructure (AuthService) -->
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.11" />
+    <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CrmModern.Core\CrmModern.Core.csproj" />
+  </ItemGroup>
+
+</Project>

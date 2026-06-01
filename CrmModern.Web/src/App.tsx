@@ -1,0 +1,67 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { Layout } from '@/components/Layout'
+import { LoginPage } from '@/pages/LoginPage'
+import { DashboardPage } from '@/pages/DashboardPage'
+import { OrdersPage } from '@/pages/orders/OrdersPage'
+import { MyOrdersPage } from '@/pages/orders/MyOrdersPage'
+import { NewOrderPage } from '@/pages/orders/NewOrderPage'
+import { QualityControlPage } from '@/pages/quality-control/QualityControlPage'
+import { FactoryPage } from '@/pages/factory/FactoryPage'
+import { LogisticsReadyPage } from '@/pages/logistics/LogisticsReadyPage'
+import { LogisticsHistoryPage } from '@/pages/logistics/LogisticsHistoryPage'
+import { CarriersPage } from '@/pages/logistics/CarriersPage'
+import { AccountingPage } from '@/pages/accounting/AccountingPage'
+import { AccountingHistoryPage } from '@/pages/accounting/AccountingHistoryPage'
+import { CustomerBalancePage } from '@/pages/accounting/CustomerBalancePage'
+import { LogisticsApprovalsPage } from '@/pages/accounting/LogisticsApprovalsPage'
+import { NewPurchaseRequestPage } from '@/pages/purchase/NewPurchaseRequestPage'
+import { MyPurchaseRequestsPage } from '@/pages/purchase/MyPurchaseRequestsPage'
+import { AllPurchaseRequestsPage } from '@/pages/purchase/AllPurchaseRequestsPage'
+import { PreApprovalPage } from '@/pages/approval/PreApprovalPage'
+import { PaymentDetailsPage } from '@/pages/approval/PaymentDetailsPage'
+import { FinalApprovalPage } from '@/pages/approval/FinalApprovalPage'
+import { CustomersPage } from '@/pages/customers/CustomersPage'
+import { ProductCatalogPage } from '@/pages/product-catalog/ProductCatalogPage'
+import { UsersPage } from '@/pages/users/UsersPage'
+import { SearchPage } from '@/pages/search/SearchPage'
+import { UpdatesPage } from '@/pages/UpdatesPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
+import { RoleGuard } from '@/components/RoleGuard'
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route element={<Layout />}>
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/dashboard"       element={<DashboardPage />} />
+        <Route path="/orders"          element={<OrdersPage />} />
+        <Route path="/orders/my"       element={<MyOrdersPage />} />
+        <Route path="/orders/new"      element={<RoleGuard roles={['Yonetici','Temsilci']}><NewOrderPage /></RoleGuard>} />
+        <Route path="/quality-control" element={<QualityControlPage />} />
+        <Route path="/factory"         element={<FactoryPage />} />
+        <Route path="/logistics"           element={<Navigate to="/logistics/ready" replace />} />
+        <Route path="/logistics/ready"     element={<RoleGuard roles={['Yonetici','Lojistik']}><LogisticsReadyPage /></RoleGuard>} />
+        <Route path="/logistics/history"   element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci','Muhasebe']} usernames={['elshan.rasulov']}><LogisticsHistoryPage /></RoleGuard>} />
+        <Route path="/logistics/carriers"  element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci']} usernames={['elshan.rasulov']}><CarriersPage /></RoleGuard>} />
+        <Route path="/accounting"          element={<RoleGuard roles={['Yonetici','Muhasebe']}><AccountingPage /></RoleGuard>} />
+        <Route path="/accounting/logistics-approvals" element={<RoleGuard roles={['Yonetici','Muhasebe']} usernames={['elshan.rasulov']}><LogisticsApprovalsPage /></RoleGuard>} />
+        <Route path="/accounting/history"  element={<RoleGuard roles={['Yonetici','Muhasebe','Gozlemci']}><AccountingHistoryPage /></RoleGuard>} />
+        <Route path="/accounting/balance"  element={<RoleGuard roles={['Yonetici','Muhasebe']}><CustomerBalancePage /></RoleGuard>} />
+        <Route path="/purchase"             element={<Navigate to="/purchase/mine" replace />} />
+        <Route path="/purchase/new"         element={<RoleGuard roles={['Yonetici','Lojistik','Fabrika','Gozlemci','Temsilci']}><NewPurchaseRequestPage /></RoleGuard>} />
+        <Route path="/purchase/mine"        element={<MyPurchaseRequestsPage />} />
+        <Route path="/purchase/all"         element={<AllPurchaseRequestsPage />} />
+        <Route path="/approval/pre"         element={<PreApprovalPage />} />
+        <Route path="/approval/payment"     element={<RoleGuard roles={['Yonetici','Muhasebe']}><PaymentDetailsPage /></RoleGuard>} />
+        <Route path="/approval/final"       element={<FinalApprovalPage />} />
+        <Route path="/customers"       element={<CustomersPage />} />
+        <Route path="/product-catalog" element={<ProductCatalogPage />} />
+        <Route path="/users"           element={<RoleGuard roles={['Yonetici']}><UsersPage /></RoleGuard>} />
+        <Route path="/search"          element={<SearchPage />} />
+        <Route path="/updates"         element={<UpdatesPage />} />
+        <Route path="*"                element={<NotFoundPage />} />
+      </Route>
+    </Routes>
+  )
+}

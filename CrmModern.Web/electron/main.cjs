@@ -20,6 +20,12 @@ async function createWindow() {
     },
   });
 
+  // F12 / Ctrl+Shift+I ile DevTools açılabilsin (kurumsal kullanım için
+  // engelli değil; ileride istersen Menu/accelerator ile kapatabilirsin).
+  // GEÇİCİ DEBUG: paketlenmiş .exe'de de DevTools'u otomatik aç.
+  // Sorun çözüldükten sonra bu satırı sileceğiz.
+  win.webContents.openDevTools({ mode: 'detach' });
+
   if (app.isPackaged) {
     await win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   } else {

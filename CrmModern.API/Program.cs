@@ -57,14 +57,21 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options 
     };
 });
 
-// ── CORS — allow React dev server (localhost:5173) ─────────────────────────
+// ── CORS ──────────────────────────────────────────────────────────────────
+// İki istemci senaryosu:
+//   1. Vite dev server (npm run dev) → http://localhost:5173
+//   2. Electron paketlenmiş UnixPadelST.exe → file:// origin (Origin: "null")
+// Electron file:// için SetIsOriginAllowed ile null/file origin'lere izin
+// veriyoruz. JWT header'da gittiği için AllowCredentials gerekmiyor.
 builder.Services.AddCors(options =>
-    options.AddPolicy("ReactDevServer", policy =>
+    options.AddPolicy("UnixPadelClients", policy =>
         policy
-            .WithOrigins("http://localhost:5173")
+            .SetIsOriginAllowed(origin =>
+                string.IsNullOrEmpty(origin)               // file:// origin null gelir
+                || origin.StartsWith("file://")
+                || origin == "http://localhost:5173")
             .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials()));
+            .AllowAnyMethod()));
 
 // ── Swagger (with JWT support) ─────────────────────────────────────────────
 builder.Services.AddEndpointsApiExplorer();
@@ -133,7 +140,7 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-app.UseCors("ReactDevServer");                 // 2. CORS before auth
+app.UseCors("UnixPadelClients");               // 2. CORS before auth
 app.UseAuthentication();                       // 3. identify who the user is
 app.UseAuthorization();                        // 4. check permissions
 app.MapControllers();

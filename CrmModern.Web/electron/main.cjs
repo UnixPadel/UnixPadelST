@@ -1,20 +1,23 @@
-const { app, BrowserWindow } = require('electron');
-const { spawn } = require('child_process');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 
-let apiProcess;
-
-function startApi() {
-  if (!app.isPackaged) return;
-  const apiPath = path.join(process.resourcesPath, 'api', 'CrmModern.API.exe');
-  apiProcess = spawn(apiPath, [], { detached: false });
-}
+// UnixPadelST masaüstü istemcisi.
+// API merkezi olarak Render.com'da host edilir (.env.production'daki VITE_API_URL).
+// Bu wrapper sadece derlenmiş React build'ini gösterir; yerel API başlatmaz.
 
 async function createWindow() {
+  // Kurumsal kullanım için menü barını tamamen gizle.
+  Menu.setApplicationMenu(null);
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
-    webPreferences: { nodeIntegration: false, contextIsolation: true }
+    title: 'UnixPadelST',
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
   });
 
   if (app.isPackaged) {
@@ -26,15 +29,9 @@ async function createWindow() {
   }
 }
 
-app.whenReady().then(() => {
-  startApi();
-  createWindow();
-});
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
-  if (apiProcess) {
-    try { apiProcess.kill(); } catch (_) {}
-  }
   if (process.platform !== 'darwin') app.quit();
 });
 

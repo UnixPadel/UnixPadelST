@@ -1,5 +1,5 @@
 {
-  "name": "crmmodern-web",
+  "name": "unixpadelst",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -9,7 +9,34 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder",
+    "dist": "npm run build && electron-builder"
+  },
+  "build": {
+    "appId": "com.unixpadelst.app",
+    "productName": "UnixPadelST",
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "UnixPadelST-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "UnixPadelST"
+    },
+    "directories": {
+      "output": "release"
+    }
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",

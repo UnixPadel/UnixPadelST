@@ -1,0 +1,14 @@
+**/bin
+**/obj
+**/node_modules
+**/dist
+**/release
+**/.vs
+**/.vscode
+**/.idea
+**/.git
+**/.env.local
+**/.env.*.local
+CrmModern.Web
+_tools
+*.md

@@ -121,12 +121,12 @@ using (var startupScope = app.Services.CreateScope())
 // ── Middleware pipeline (order matters) ───────────────────────────────────
 app.UseMiddleware<ErrorHandlingMiddleware>();   // 1. catch all exceptions first
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "CrmModern v1"));
-}
-else
+// Swagger her ortamda açık — iç ağda Electron istemciden gelen istekleri debug etmek için.
+// İleride public domain + auth korumalı API olursa Production'da kapatılabilir.
+app.UseSwagger();
+app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "CrmModern v1"));
+
+if (!app.Environment.IsDevelopment())
 {
     // Faz 8.12 — Production-only güvenlik header'ları
     app.UseHsts();

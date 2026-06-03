@@ -72,7 +72,7 @@ async function createWindow() {
 
   // GEÇİCİ DEBUG: paketlenmiş .exe'de de DevTools'u otomatik aç.
   // Sorun çözüldükten sonra bu satırı sileceğiz.
-  // mainWindow.webContents.openDevTools({ mode: 'detach' });
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
 
   if (app.isPackaged) {
     await mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));

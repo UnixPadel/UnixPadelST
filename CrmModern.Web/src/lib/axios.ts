@@ -30,7 +30,15 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      window.location.href = '/login'
+      // HashRouter + Electron file:// uyumlu yönlendirme:
+      // - window.location.href = '/login' file:// içinde "/login" dosyasını
+      //   arar ve ERR_FILE_NOT_FOUND verir → beyaz ekran. Hash route'a gitmek
+      //   tarayıcı navigasyonu tetiklemez, sadece HashRouter'ı bilgilendirir.
+      // - Zaten login sayfasındaysak yeniden yönlendirme yapma (yoksa form
+      //   submit edip 401 alınca toast'lar/hata mesajları yok olur).
+      if (!window.location.hash.startsWith('#/login')) {
+        window.location.hash = '#/login'
+      }
       return Promise.reject(error)
     }
 

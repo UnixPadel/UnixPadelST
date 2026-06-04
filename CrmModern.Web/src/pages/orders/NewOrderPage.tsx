@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   createOrder, createQuote, getCategories, expandRecipe, uploadAttachment,
@@ -31,6 +32,7 @@ const blank = (): CreateOrderDto => ({
 
 export function NewOrderPage() {
   const nav = useNavigate()
+  const { t } = useTranslation()
   const { toast } = useToast()
   const [params] = useSearchParams()
   const reviseFrom = params.get('revise')
@@ -93,7 +95,7 @@ export function NewOrderPage() {
   return (
     <div>
       <PageHeader
-        title="Yeni Sipariş / Teklif"
+        title={t('orders.newOrderTitle')}
         description={reviseFrom ? `Revize: ${reviseFrom}` : 'SiparisForm.cs portu (5-sekme wizard)'}
         actions={
           <div className="flex gap-2">

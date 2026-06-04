@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { Outlet, Navigate } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar'
 import { GlobalSearch } from './GlobalSearch'
 import { UpdatesModal } from './UpdatesModal'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { PageLoader } from './PageLoader'
 import { useAuth } from '@/hooks/useAuth'
 import { me } from '@/api/auth'
 
@@ -38,7 +39,7 @@ export function Layout() {
   }, [])
 
   if (!isLoggedIn()) return <Navigate to="/login" replace />
-  if (!bootstrapped) return null
+  if (!bootstrapped) return <PageLoader />
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -59,8 +60,10 @@ export function Layout() {
             <LanguageSwitcher />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto">
-          <Outlet />
+        <main className="flex-1 overflow-auto">
+          <Suspense fallback={<PageLoader />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
       <UpdatesModal />

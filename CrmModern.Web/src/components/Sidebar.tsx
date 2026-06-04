@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, CheckSquare, Factory, Truck,
   Calculator, FileText, Users, Package, Search, LogOut, ChevronRight, Sparkles, X,
@@ -24,6 +24,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/dashboard',       i18nKey: 'nav.dashboard',         icon: <LayoutDashboard className="h-4 w-4" /> },
   { path: '/orders',          i18nKey: 'nav.orders',            icon: <ShoppingCart className="h-4 w-4" /> },
+  { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci'] },
   { path: '/orders/my',       i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" /> },
   { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, roles: ['Yonetici'] },
   { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },
@@ -49,6 +50,7 @@ const navItems: NavItem[] = [
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
+  const navigate = useNavigate()
   const { t } = useTranslation()
   const { getUser, logout } = useAuth()
   const user = getUser()
@@ -61,10 +63,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     return roleOk || userOk
   })
 
+  // HashRouter altında window.location.href = '/login' yanlış URL üretir.
+  // navigate(..., { replace: true }) hem doğru hash route'una gider hem de
+  // mevcut history entry'sini değiştirir → back tuşu auth'lı sayfaya dönmez.
   const handleLogout = async () => {
     await apiLogout()
     logout()
-    window.location.href = '/login'
+    navigate('/login', { replace: true })
   }
 
   return (

@@ -84,6 +84,7 @@
   "nav": {
     "dashboard": "Dashboard",
     "orders": "Orders",
+    "createOrderQuote": "Create Order / Quote",
     "myOrders": "My Orders",
     "qualityControl": "Quality Control",
     "factory": "Factory / Production",
@@ -151,7 +152,7 @@
     "myTitle": "My Orders",
     "mySubtitle": "Orders and quotes you created",
     "newOrder": "New Order",
-    "newOrderTitle": "New Order / Quote",
+    "newOrderTitle": "Create Order / Quote",
     "saveOrder": "Save Order",
     "saveAsQuote": "Save as Quote",
     "orderApproved": "Approved",

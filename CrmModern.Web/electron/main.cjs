@@ -70,9 +70,13 @@ async function createWindow() {
     },
   });
 
-  // GEÇİCİ DEBUG: paketlenmiş .exe'de de DevTools'u otomatik aç.
-  // Sorun çözüldükten sonra bu satırı sileceğiz.
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  // F12 ile DevTools toggle — menü kaldırıldığı için (Menu.setApplicationMenu(null))
+  // default accelerator çalışmıyor; manuel olarak before-input-event ile bind ediyoruz.
+  mainWindow.webContents.on('before-input-event', (_event, input) => {
+    if (input.type === 'keyDown' && input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools();
+    }
+  });
 
   if (app.isPackaged) {
     await mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));

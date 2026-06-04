@@ -84,6 +84,7 @@
   "nav": {
     "dashboard": "Panel",
     "orders": "Siparişler",
+    "createOrderQuote": "Sipariş/Teklif Oluştur",
     "myOrders": "Siparişlerim",
     "qualityControl": "Kalite Kontrol",
     "factory": "Fabrika / Üretim",
@@ -151,7 +152,7 @@
     "myTitle": "Siparişlerim",
     "mySubtitle": "Sizin oluşturduğunuz sipariş ve teklifler",
     "newOrder": "Yeni Sipariş",
-    "newOrderTitle": "Yeni Sipariş / Teklif",
+    "newOrderTitle": "Sipariş/Teklif Oluştur",
     "saveOrder": "Sipariş Kaydı",
     "saveAsQuote": "Teklif olarak Kaydet",
     "orderApproved": "Onaylandı",

@@ -52,7 +52,12 @@ export function NewPurchaseRequestPage() {
         <div className="space-y-1"><Label>Ürün Türü *</Label><Input value={form.urunTuru} onChange={(e) => setForm((f) => ({ ...f, urunTuru: e.target.value }))} /></div>
         <div className="space-y-1"><Label>Maliyet *</Label><Input type="number" step="0.01" value={form.urunMaliyeti} onChange={(e) => setForm((f) => ({ ...f, urunMaliyeti: Number(e.target.value) }))} /></div>
         <div className="space-y-1"><Label>Alınan Yer *</Label><Input value={form.alinanYer} onChange={(e) => setForm((f) => ({ ...f, alinanYer: e.target.value }))} /></div>
-        <div className="space-y-1"><Label>Departman *</Label><Input value={form.departman} onChange={(e) => setForm((f) => ({ ...f, departman: e.target.value }))} /></div>
+        {/* Departman — giriş yapan kullanıcının rolünden otomatik dolar, değiştirilemez. */}
+        <div className="space-y-1">
+          <Label>Departman *</Label>
+          <Input value={form.departman} disabled readOnly />
+          <p className="text-xs text-muted-foreground">Rolünüzden otomatik atanır.</p>
+        </div>
         <div className="space-y-1"><Label>Notlar</Label><Textarea rows={3} value={form.notlar} onChange={(e) => setForm((f) => ({ ...f, notlar: e.target.value }))} /></div>
 
         <div className="pt-2 flex gap-2">

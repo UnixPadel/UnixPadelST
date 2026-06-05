@@ -16,12 +16,16 @@ public sealed class FactoryController(IFactoryService factoryService, IOrderServ
     /// Returns orders in production stages (Planlama/Uretim/Hazir/Lojistik/Tamamlandi).
     /// Maps to the Fabrika form DataGrid.
     /// </summary>
-    /// <remarks>Paket 2 — opsiyonel `asama` query param: SiparisMiTeklifMi enum değeri.</remarks>
+    /// <remarks>
+    /// Faz-fix 2.2 — Fabrika.cs araButtonInTab_Click filtreleri port edildi:
+    /// SiparisNo, MusteriAd, MUlke, KullaniciID (Temsilci), Asama,
+    /// BaslangicTarih, BitisTarih.
+    /// </remarks>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<FactoryOrderListDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetOrders([FromQuery] string? asama = null)
+    public async Task<IActionResult> GetOrders([FromQuery] OrderFilterDto filter)
     {
-        var result = await factoryService.GetProductionOrdersAsync(asama);
+        var result = await factoryService.GetProductionOrdersAsync(filter);
         return Ok(ApiResponse<IReadOnlyList<FactoryOrderListDto>>.Ok(result));
     }
 

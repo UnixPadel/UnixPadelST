@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, CheckSquare, Factory, Truck,
-  Calculator, FileText, Users, Package, Search, LogOut, ChevronRight, Sparkles, X,
+  Calculator, FileText, Users, Search, LogOut, ChevronRight, Sparkles, X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -23,9 +23,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: '/dashboard',       i18nKey: 'nav.dashboard',         icon: <LayoutDashboard className="h-4 w-4" /> },
-  { path: '/orders',          i18nKey: 'nav.orders',            icon: <ShoppingCart className="h-4 w-4" /> },
   { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci'] },
-  { path: '/orders/my',       i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" /> },
   { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, roles: ['Yonetici'] },
   { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },
   { path: '/logistics/ready',     i18nKey: 'nav.logisticsReady',     icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
@@ -41,8 +39,6 @@ const navItems: NavItem[] = [
   { path: '/approval/pre',     i18nKey: 'nav.approvalPre',     icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['omur.caliskan'] },
   { path: '/approval/payment', i18nKey: 'nav.approvalPayment', icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Muhasebe'] },
   { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
-  { path: '/customers',       i18nKey: 'nav.customers',       icon: <Users className="h-4 w-4" /> },
-  { path: '/product-catalog', i18nKey: 'nav.productCatalog',  icon: <Package className="h-4 w-4" />, roles: ['Yonetici', 'Fabrika'] },
   { path: '/users',           i18nKey: 'nav.users',           icon: <Users className="h-4 w-4" />,   roles: ['Yonetici'] },
   { path: '/search',          i18nKey: 'nav.search',          icon: <Search className="h-4 w-4" /> },
   { path: '/updates',         i18nKey: 'nav.updates',         icon: <Sparkles className="h-4 w-4" /> },

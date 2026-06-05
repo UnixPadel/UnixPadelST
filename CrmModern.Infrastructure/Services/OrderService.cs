@@ -492,6 +492,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         FabrikaNot:        o.FabrikaNot,
         LojistikNot:       o.LojistikNot,
         Tarih:             o.Tarih,
+        STarih:            o.STarih,   // 2.5 stage-history timeline buradan beslenir
         KullaniciAdi:      null,   // populated by controller if needed
         Items:             o.Items.Select(i => new OrderItemDto(
                                i.KategoriID, i.BilesenID,

@@ -5,6 +5,7 @@ import { formatCurrency, formatDate } from '@/lib/utils'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
+import { OrderStageTimeline } from '@/components/OrderStageTimeline'
 import { useToast } from '@/components/ToastProvider'
 
 interface Props {
@@ -147,6 +148,15 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
                 {order.lojistikNot && <p><span className="font-semibold">Lojistik Notu:</span> {order.lojistikNot}</p>}
               </div>
             )}
+
+            {/* 2.5 — Aşama Geçmişi: Tarih + STarih + currentStage'den türetildi */}
+            <div className="border rounded-md p-3">
+              <OrderStageTimeline
+                tarih={order.tarih}
+                sTarih={order.sTarih}
+                currentStage={order.siparisMiTeklifMi}
+              />
+            </div>
 
             {/* Approval timeline (Faz 3) */}
             <div className="border rounded-md p-3">

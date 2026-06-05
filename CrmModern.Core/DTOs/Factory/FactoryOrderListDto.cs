@@ -7,4 +7,6 @@ public sealed record FactoryOrderListDto(
     string  SiparisMiTeklifMi,
     string? FabrikaNot,
     DateTime? STarih,
-    DateTime Tarih);
+    DateTime Tarih,
+    int     KullaniciID,
+    string? Kullanici);     // "Ad Soyad" — Fabrika "Temsilci" sütunu / filtresi

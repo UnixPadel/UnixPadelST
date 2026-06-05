@@ -62,8 +62,12 @@ public sealed record OrderDetailDto(
     string? FabrikaNot,
     string? LojistikNot,
 
-    // ── Tarih ─────────────────────────────────────────────────────────────
+    // ── Tarih + son fabrika işlem tarihi (STarih) ─────────────────────────
+    // Faz-fix 2.4/2.5: STarih artık "son fabrika işlem tarihi" rolünü de
+    // üstlenir (MoveToProduction → seçilen üretim tarihi; MarkAsReady → Now).
+    // 2.5'in stage history timeline'ı bu iki timestamp'ten türetilir.
     DateTime? Tarih,
+    DateTime? STarih,
 
     // ── KullaniciAdi (salesperson) ────────────────────────────────────────
     string? KullaniciAdi,

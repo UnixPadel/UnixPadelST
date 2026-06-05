@@ -27,6 +27,18 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
             .AsReadOnly();
     }
 
+    // Slim lookup — Fabrika filter "Temsilci" dropdown'u için.
+    // Tüm authenticated kullanıcılara açık (no role restriction in controller).
+    public async Task<IReadOnlyList<UserLookupDto>> GetLookupAsync()
+    {
+        var users = await uow.Kullanicilar.GetAllAsync();
+        return users
+            .OrderBy(u => u.Ad).ThenBy(u => u.Soyad)
+            .Select(u => new UserLookupDto(u.KullaniciID, u.Ad, u.Soyad))
+            .ToList()
+            .AsReadOnly();
+    }
+
     public async Task<UserListDto> GetByIdAsync(int kullaniciId)
     {
         var entity = await uow.Kullanicilar.GetByIdAsync(kullaniciId)

@@ -71,6 +71,11 @@ internal sealed class OrderRepository(AppDbContext context)
             .OrderByDescending(o => o.SiparisAlID)
             .ToListAsync();
 
+    // Faz-fix 2.4 — Fabrika tarafındaki her aşama geçişinde STarih güncellenir;
+    // STarih artık "son fabrika işlem tarihi" (legacy "İşlem Tarihi") rolünü
+    // de üstlenir. MoveToProduction kullanıcı tarafından seçilen "üretim tarihi"
+    // ile yazar (anlamlı bir tarih); MarkAsReady ise gerçek işlem zamanı (Now)
+    // ile yazar.
     public async Task<int> MoveToProductionAsync(string siparisNo, DateTime stTarih, string fabrikaNot) =>
         await _context.SiparisAlTablo
             .Where(o => o.SiparisNo == siparisNo)
@@ -83,7 +88,8 @@ internal sealed class OrderRepository(AppDbContext context)
         await _context.SiparisAlTablo
             .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "Uretim")
             .ExecuteUpdateAsync(s => s
-                .SetProperty(o => o.SiparisMiTeklifMi, "Hazir"));
+                .SetProperty(o => o.SiparisMiTeklifMi, "Hazir")
+                .SetProperty(o => o.STarih, (DateTime?)DateTime.Now));
 
     // ── Logistics ─────────────────────────────────────────────────────────────
 

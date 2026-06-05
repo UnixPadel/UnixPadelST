@@ -2,8 +2,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from '@/components/Layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
-import { OrdersPage } from '@/pages/orders/OrdersPage'
-import { MyOrdersPage } from '@/pages/orders/MyOrdersPage'
 import { NewOrderPage } from '@/pages/orders/NewOrderPage'
 import { QualityControlPage } from '@/pages/quality-control/QualityControlPage'
 import { FactoryPage } from '@/pages/factory/FactoryPage'
@@ -20,8 +18,6 @@ import { AllPurchaseRequestsPage } from '@/pages/purchase/AllPurchaseRequestsPag
 import { PreApprovalPage } from '@/pages/approval/PreApprovalPage'
 import { PaymentDetailsPage } from '@/pages/approval/PaymentDetailsPage'
 import { FinalApprovalPage } from '@/pages/approval/FinalApprovalPage'
-import { CustomersPage } from '@/pages/customers/CustomersPage'
-import { ProductCatalogPage } from '@/pages/product-catalog/ProductCatalogPage'
 import { UsersPage } from '@/pages/users/UsersPage'
 import { SearchPage } from '@/pages/search/SearchPage'
 import { UpdatesPage } from '@/pages/UpdatesPage'
@@ -35,8 +31,6 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard"       element={<DashboardPage />} />
-        <Route path="/orders"          element={<OrdersPage />} />
-        <Route path="/orders/my"       element={<MyOrdersPage />} />
         <Route path="/orders/new"      element={<RoleGuard roles={['Yonetici','Temsilci']}><NewOrderPage /></RoleGuard>} />
         <Route path="/quality-control" element={<QualityControlPage />} />
         <Route path="/factory"         element={<FactoryPage />} />
@@ -55,8 +49,6 @@ export default function App() {
         <Route path="/approval/pre"         element={<PreApprovalPage />} />
         <Route path="/approval/payment"     element={<RoleGuard roles={['Yonetici','Muhasebe']}><PaymentDetailsPage /></RoleGuard>} />
         <Route path="/approval/final"       element={<FinalApprovalPage />} />
-        <Route path="/customers"       element={<CustomersPage />} />
-        <Route path="/product-catalog" element={<ProductCatalogPage />} />
         <Route path="/users"           element={<RoleGuard roles={['Yonetici']}><UsersPage /></RoleGuard>} />
         <Route path="/search"          element={<SearchPage />} />
         <Route path="/updates"         element={<UpdatesPage />} />

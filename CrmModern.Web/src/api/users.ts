@@ -1,8 +1,15 @@
 import api from '@/lib/axios'
-import type { ApiResponse, CreateUserDto, UpdateUserDto, UserListDto } from '@/types'
+import type { ApiResponse, CreateUserDto, UpdateUserDto, UserListDto, UserLookupDto } from '@/types'
 
 export const getUsers = async (): Promise<UserListDto[]> => {
   const res = await api.get<ApiResponse<UserListDto[]>>('/api/users')
+  return res.data.data
+}
+
+// Slim list — Fabrika "Temsilci" filtresi gibi dropdown'lar için.
+// /api/users 'Yonetici-only' iken /api/users/lookup tüm authenticated kullanıcılara açık.
+export const getUsersLookup = async (): Promise<UserLookupDto[]> => {
+  const res = await api.get<ApiResponse<UserLookupDto[]>>('/api/users/lookup')
   return res.data.data
 }
 

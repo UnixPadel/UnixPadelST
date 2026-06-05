@@ -1,4 +1,5 @@
 using CrmModern.Core.DTOs.Factory;
+using CrmModern.Core.DTOs.Order;
 
 namespace CrmModern.Core.Interfaces.Services;
 
@@ -7,7 +8,7 @@ namespace CrmModern.Core.Interfaces.Services;
 /// </summary>
 public interface IFactoryService
 {
-    Task<IReadOnlyList<FactoryOrderListDto>> GetProductionOrdersAsync(string? asama = null);
+    Task<IReadOnlyList<FactoryOrderListDto>> GetProductionOrdersAsync(OrderFilterDto filter);
     Task MoveToProductionAsync(string siparisNo, DateTime stTarih, string fabrikaNot);
     Task MarkAsReadyAsync(string siparisNo);
 }

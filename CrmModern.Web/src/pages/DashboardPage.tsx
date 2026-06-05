@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   ShoppingCart, CheckSquare, Factory, Truck, Calculator,
-  FileText, Users, Package, Search,
+  FileText, Users, Search,
   Activity, Clock, AlertCircle, Wallet,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
@@ -29,17 +29,18 @@ interface ModuleCard {
   roles?: string[]
 }
 
+// 2.3 — Müşteriler / Ürün Kataloğu / Siparişler / Siparişlerim sayfaları silindi;
+// dashboard modül kartları da kaldırıldı (ölü route'a tıklatamayız).
+// Phase 2.7'de panel sadece fabrika data'sına indirilirken bu liste tamamen
+// kaldırılacak; şimdilik sadece geçerli route'lara işaret ediyor.
 const modules: ModuleCard[] = [
-  { path: '/orders',          titleKey: 'nav.myOrders',        descKey: 'dashboard.moduleCard.orders',         icon: <ShoppingCart className="h-6 w-6" />, color: 'text-blue-500'   },
-  { path: '/quality-control', titleKey: 'nav.qualityControl',  descKey: 'dashboard.moduleCard.qc',             icon: <CheckSquare className="h-6 w-6" />,  color: 'text-purple-500', roles: ['Yonetici', 'Gozlemci'] },
-  { path: '/factory',         titleKey: 'nav.factory',         descKey: 'dashboard.moduleCard.factory',        icon: <Factory className="h-6 w-6" />,     color: 'text-orange-500', roles: ['Yonetici', 'Fabrika'] },
-  { path: '/logistics/ready', titleKey: 'nav.logisticsReady',  descKey: 'dashboard.moduleCard.logistics',      icon: <Truck className="h-6 w-6" />,       color: 'text-green-500',  roles: ['Yonetici', 'Lojistik'] },
-  { path: '/accounting',      titleKey: 'nav.accounting',      descKey: 'dashboard.moduleCard.accounting',     icon: <Calculator className="h-6 w-6" />,  color: 'text-yellow-500', roles: ['Yonetici', 'Muhasebe'] },
-  { path: '/purchase/mine',   titleKey: 'nav.purchaseMine',    descKey: 'dashboard.moduleCard.purchase',       icon: <FileText className="h-6 w-6" />,    color: 'text-indigo-500' },
-  { path: '/customers',       titleKey: 'nav.customers',       descKey: 'dashboard.moduleCard.customers',      icon: <Users className="h-6 w-6" />,       color: 'text-pink-500'   },
-  { path: '/product-catalog', titleKey: 'nav.productCatalog',  descKey: 'dashboard.moduleCard.productCatalog', icon: <Package className="h-6 w-6" />,     color: 'text-teal-500',  roles: ['Yonetici', 'Fabrika'] },
-  { path: '/users',           titleKey: 'nav.users',           descKey: 'dashboard.moduleCard.users',          icon: <Users className="h-6 w-6" />,       color: 'text-red-500',   roles: ['Yonetici'] },
-  { path: '/search',          titleKey: 'nav.search',          descKey: 'dashboard.moduleCard.search',         icon: <Search className="h-6 w-6" />,      color: 'text-cyan-500'   },
+  { path: '/quality-control', titleKey: 'nav.qualityControl',  descKey: 'dashboard.moduleCard.qc',         icon: <CheckSquare className="h-6 w-6" />, color: 'text-purple-500', roles: ['Yonetici', 'Gozlemci'] },
+  { path: '/factory',         titleKey: 'nav.factory',         descKey: 'dashboard.moduleCard.factory',    icon: <Factory className="h-6 w-6" />,    color: 'text-orange-500', roles: ['Yonetici', 'Fabrika'] },
+  { path: '/logistics/ready', titleKey: 'nav.logisticsReady',  descKey: 'dashboard.moduleCard.logistics',  icon: <Truck className="h-6 w-6" />,      color: 'text-green-500',  roles: ['Yonetici', 'Lojistik'] },
+  { path: '/accounting',      titleKey: 'nav.accounting',      descKey: 'dashboard.moduleCard.accounting', icon: <Calculator className="h-6 w-6" />, color: 'text-yellow-500', roles: ['Yonetici', 'Muhasebe'] },
+  { path: '/purchase/mine',   titleKey: 'nav.purchaseMine',    descKey: 'dashboard.moduleCard.purchase',   icon: <FileText className="h-6 w-6" />,   color: 'text-indigo-500' },
+  { path: '/users',           titleKey: 'nav.users',           descKey: 'dashboard.moduleCard.users',      icon: <Users className="h-6 w-6" />,      color: 'text-red-500',    roles: ['Yonetici'] },
+  { path: '/search',          titleKey: 'nav.search',          descKey: 'dashboard.moduleCard.search',     icon: <Search className="h-6 w-6" />,     color: 'text-cyan-500'   },
 ]
 
 /** Formats money to "12.345,67 €" style with currency symbol. */

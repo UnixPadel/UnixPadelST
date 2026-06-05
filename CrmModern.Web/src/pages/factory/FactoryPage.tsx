@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getFactoryOrders, moveToProduction, markReady } from '@/api/factory'
+import { getFactoryOrders, moveToProduction, markReady, type FactoryFilter } from '@/api/factory'
+import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -10,15 +11,15 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
-// Paket 2 — FactoryService.GetProductionStagesAsync 5 aşama dönüyor
-const FACTORY_ASAMALAR = ['Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi'] as const
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { formatDate } from '@/lib/utils'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { downloadExcel } from '@/api/orders'
 import type { FactoryOrderListDto } from '@/types'
+
+// FactoryService.GetProductionStagesAsync 5 aşama dönüyor.
+const FACTORY_ASAMALAR = ['Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi'] as const
 
 export function FactoryPage() {
   const qc = useQueryClient()
@@ -28,12 +29,19 @@ export function FactoryPage() {
   const [fabrikaNot, setFabrikaNot] = useState('')
   const [sTarih, setSTarih] = useState(() => new Date().toISOString().slice(0, 16))
   const [detailNo, setDetailNo] = useState<string | null>(null)
-  const [asama, setAsama] = useState<string | undefined>(undefined)
 
-  // Paket 2 — aşama dropdown değişimi sorguyu yeniden tetikler
+  // Faz-fix 2.2 — Fabrika.cs çoklu filtre. Boş alanlar query'ye gönderilmez.
+  const [filter, setFilter] = useState<FactoryFilter>({})
+  const updateFilter = <K extends keyof FactoryFilter>(k: K, v: FactoryFilter[K]) =>
+    setFilter((f) => ({ ...f, [k]: v }))
+
+  // Temsilci dropdown — /api/users/lookup (Yonetici-only değil; herkes çekebilir)
+  const { data: users = [] } = useQuery({ queryKey: ['users-lookup'], queryFn: getUsersLookup })
+
+  // Aşama veya herhangi bir filtre değişimi sorguyu tetikler
   const { data = [], isLoading } = useQuery({
-    queryKey: ['factory', asama ?? 'all'],
-    queryFn: () => getFactoryOrders(asama),
+    queryKey: ['factory', filter],
+    queryFn: () => getFactoryOrders(filter),
   })
 
   const toProductionMut = useMutation({
@@ -68,12 +76,14 @@ export function FactoryPage() {
 
   const columns: Column<FactoryOrderListDto & Record<string, unknown>>[] = [
     { key: 'siparisNo',         header: t('common.orderNo'),  sortable: true },
-    { key: 'musteriAd',         header: t('common.customer'),     sortable: true },
-    { key: 'mUlke',             header: t('common.country'),      sortable: true },
-    { key: 'siparisMiTeklifMi', header: t('common.stage'),        sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
-    { key: 'fabrikaNot',        header: t('common.note'),         render: (r) => <span className="text-sm text-muted-foreground">{(r.fabrikaNot as string) ?? '—'}</span> },
-    { key: 'sTarih',            header: t('common.startDate'),    render: (r) => r.sTarih ? formatDate(r.sTarih as string) : '—' },
-    { key: 'tarih',             header: t('common.date'),         sortable: true, render: (r) => formatDate(r.tarih as string) },
+    { key: 'musteriAd',         header: t('common.customer'), sortable: true },
+    { key: 'mUlke',             header: t('common.country'),  sortable: true },
+    // 2.2 — legacy "Temsilci" (CONCAT(Ad, Soyad)) sütunu
+    { key: 'kullanici',         header: t('factory.temsilci'), sortable: true, render: (r) => (r.kullanici as string) ?? '—' },
+    { key: 'siparisMiTeklifMi', header: t('common.stage'),    sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
+    { key: 'fabrikaNot',        header: t('common.note'),     render: (r) => <span className="text-sm text-muted-foreground">{(r.fabrikaNot as string) ?? '—'}</span> },
+    { key: 'sTarih',            header: t('common.startDate'),render: (r) => r.sTarih ? formatDate(r.sTarih as string) : '—' },
+    { key: 'tarih',             header: t('common.date'),     sortable: true, render: (r) => formatDate(r.tarih as string) },
     {
       key: 'actions',
       header: t('common.actions'),
@@ -100,10 +110,38 @@ export function FactoryPage() {
     <div>
       <PageHeader title={t('factory.title')} />
       <div className="p-6 space-y-4">
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="space-y-1 w-48">
+        {/* Filter grid — Fabrika.cs araButtonInTab port'u */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-md border bg-card p-3">
+          <div className="space-y-1">
+            <Label>{t('common.orderNo')}</Label>
+            <Input value={filter.siparisNo ?? ''} onChange={(e) => updateFilter('siparisNo', e.target.value || undefined)} />
+          </div>
+          <div className="space-y-1">
+            <Label>{t('common.customer')}</Label>
+            <Input value={filter.musteriAd ?? ''} onChange={(e) => updateFilter('musteriAd', e.target.value || undefined)} />
+          </div>
+          <div className="space-y-1">
+            <Label>{t('common.country')}</Label>
+            <Input value={filter.mUlke ?? ''} onChange={(e) => updateFilter('mUlke', e.target.value || undefined)} />
+          </div>
+          <div className="space-y-1">
+            <Label>{t('factory.temsilci')}</Label>
+            <Select
+              value={filter.kullaniciID ? String(filter.kullaniciID) : 'all'}
+              onValueChange={(v) => updateFilter('kullaniciID', v === 'all' ? undefined : Number(v))}
+            >
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>{`${u.ad} ${u.soyad}`.trim()}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
             <Label>{t('common.stage')}</Label>
-            <Select value={asama ?? 'all'} onValueChange={(v) => setAsama(v === 'all' ? undefined : v)}>
+            <Select value={filter.asama ?? 'all'} onValueChange={(v) => updateFilter('asama', v === 'all' ? undefined : v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
@@ -111,7 +149,19 @@ export function FactoryPage() {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-1">
+            <Label>{t('common.startDate')}</Label>
+            <Input type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => updateFilter('baslangicTarih', e.target.value || undefined)} />
+          </div>
+          <div className="space-y-1">
+            <Label>{t('common.endDate')}</Label>
+            <Input type="date" value={filter.bitisTarih ?? ''} onChange={(e) => updateFilter('bitisTarih', e.target.value || undefined)} />
+          </div>
+          <div className="flex items-end">
+            <Button variant="outline" onClick={() => setFilter({})}>{t('factory.filterReset')}</Button>
+          </div>
         </div>
+
         <DataTable
           columns={columns}
           data={data as (FactoryOrderListDto & Record<string, unknown>)[]}

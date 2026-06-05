@@ -1,4 +1,5 @@
 using CrmModern.Core.DTOs.Factory;
+using CrmModern.Core.DTOs.Order;
 using CrmModern.Core.Exceptions;
 using CrmModern.Core.Interfaces;
 using CrmModern.Core.Interfaces.Services;
@@ -12,16 +13,49 @@ namespace CrmModern.Infrastructure.Services;
 /// </summary>
 internal sealed class FactoryService(IUnitOfWork uow) : IFactoryService
 {
-    public async Task<IReadOnlyList<FactoryOrderListDto>> GetProductionOrdersAsync(string? asama = null)
+    // Faz-fix 2.2 — Fabrika.cs `araButtonInTab_Click` filtrelerinin portu.
+    // OrderFilterDto kullanır (OrdersPage ile aynı DTO).
+    public async Task<IReadOnlyList<FactoryOrderListDto>> GetProductionOrdersAsync(OrderFilterDto filter)
     {
         var orders = await uow.Orders.GetProductionStagesAsync();
-        // Paket 2 — opsiyonel aşama filtresi (Fabrika sayfası dropdown)
-        if (!string.IsNullOrWhiteSpace(asama))
-            orders = orders.Where(o => o.SiparisMiTeklifMi == asama).ToList().AsReadOnly();
+
+        if (!string.IsNullOrWhiteSpace(filter.Asama))
+            orders = orders.Where(o => o.SiparisMiTeklifMi == filter.Asama).ToList().AsReadOnly();
+
+        if (!string.IsNullOrWhiteSpace(filter.SiparisNo))
+            orders = orders.Where(o => o.SiparisNo.Contains(filter.SiparisNo, StringComparison.OrdinalIgnoreCase))
+                .ToList().AsReadOnly();
+
+        if (!string.IsNullOrWhiteSpace(filter.MusteriAd))
+            orders = orders.Where(o => o.MusteriAd.Contains(filter.MusteriAd, StringComparison.OrdinalIgnoreCase))
+                .ToList().AsReadOnly();
+
+        if (!string.IsNullOrWhiteSpace(filter.MUlke))
+            orders = orders.Where(o => o.MUlke != null && o.MUlke.Contains(filter.MUlke, StringComparison.OrdinalIgnoreCase))
+                .ToList().AsReadOnly();
+
+        if (filter.KullaniciID is int uid && uid > 0)
+            orders = orders.Where(o => o.KullaniciID == uid).ToList().AsReadOnly();
+
+        if (filter.BaslangicTarih is DateTime b)
+            orders = orders.Where(o => o.Tarih >= b).ToList().AsReadOnly();
+
+        if (filter.BitisTarih is DateTime e)
+            orders = orders.Where(o => o.Tarih <= e).ToList().AsReadOnly();
+
+        // Temsilci adı için tek seferlik join (Kullanici tablosu); legacy
+        // sorgusu CONCAT(Ad, ' ', Soyad) AS Kullanici döndürüyordu.
+        var userIds = orders.Select(o => o.KullaniciID).Distinct().ToList();
+        var users   = (await uow.Kullanicilar.GetAllAsync())
+            .Where(u => userIds.Contains(u.KullaniciID))
+            .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
+
         return orders
             .Select(o => new FactoryOrderListDto(
                 o.SiparisNo, o.MusteriAd, o.MUlke,
-                o.SiparisMiTeklifMi, o.FabrikaNot, o.STarih, o.Tarih))
+                o.SiparisMiTeklifMi, o.FabrikaNot, o.STarih, o.Tarih,
+                o.KullaniciID,
+                users.TryGetValue(o.KullaniciID, out var name) ? name : null))
             .ToList()
             .AsReadOnly();
     }

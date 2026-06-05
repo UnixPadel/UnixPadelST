@@ -23,6 +23,20 @@ public sealed class UserController(IUserService userService) : ControllerBase
         return Ok(ApiResponse<IReadOnlyList<UserListDto>>.Ok(result));
     }
 
+    /// <summary>
+    /// Slim user list (id + ad + soyad) — for dropdowns/filters across the app.
+    /// Open to any authenticated role (overrides class-level Yonetici restriction)
+    /// because Fabrika filter "Temsilci" dropdown needs it.
+    /// </summary>
+    [HttpGet("lookup")]
+    [Authorize]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<UserLookupDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetLookup()
+    {
+        var result = await userService.GetLookupAsync();
+        return Ok(ApiResponse<IReadOnlyList<UserLookupDto>>.Ok(result));
+    }
+
     [HttpGet("{kullaniciId:int}")]
     [ProducesResponseType(typeof(ApiResponse<UserListDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]

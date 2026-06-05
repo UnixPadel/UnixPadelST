@@ -115,6 +115,7 @@ export interface OrderDetail {
   fabrikaNot?: string
   lojistikNot?: string
   tarih?: string
+  sTarih?: string   // 2.5 stage-history timeline için (son fabrika işlem tarihi)
   kullaniciAdi?: string
   // items
   items: OrderDetailItem[]
@@ -213,6 +214,8 @@ export interface FactoryOrderListDto {
   fabrikaNot?: string
   sTarih?: string
   tarih: string
+  kullaniciID: number
+  kullanici?: string  // "Ad Soyad" — Temsilci sütunu / filtresi (2.2)
 }
 
 export interface MoveToProductionDto {
@@ -382,6 +385,13 @@ export interface UserListDto {
   telefon: string
   yetkiTuru: string
   durum: string
+}
+
+/** Slim user record for dropdowns/filters — Fabrika "Temsilci" gibi. */
+export interface UserLookupDto {
+  kullaniciID: number
+  ad: string
+  soyad: string
 }
 
 export interface CreateUserDto {

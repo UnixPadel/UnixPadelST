@@ -7,10 +7,11 @@ namespace CrmModern.Core.Interfaces.Services;
 /// </summary>
 public interface IUserService
 {
-    Task<IReadOnlyList<UserListDto>> GetAllAsync();
-    Task<UserListDto>                GetByIdAsync(int kullaniciId);
-    Task                             CreateAsync(CreateUserDto dto);
-    Task                             UpdateAsync(int kullaniciId, UpdateUserDto dto);
-    Task                             DeleteAsync(int kullaniciId);
-    Task                             ChangePasswordAsync(int kullaniciId, string newPassword);
+    Task<IReadOnlyList<UserListDto>>   GetAllAsync();
+    Task<IReadOnlyList<UserLookupDto>> GetLookupAsync();
+    Task<UserListDto>                  GetByIdAsync(int kullaniciId);
+    Task                               CreateAsync(CreateUserDto dto);
+    Task                               UpdateAsync(int kullaniciId, UpdateUserDto dto);
+    Task                               DeleteAsync(int kullaniciId);
+    Task                               ChangePasswordAsync(int kullaniciId, string newPassword);
 }

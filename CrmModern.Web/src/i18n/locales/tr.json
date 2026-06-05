@@ -83,9 +83,7 @@
   },
   "nav": {
     "dashboard": "Panel",
-    "orders": "Siparişler",
     "createOrderQuote": "Sipariş/Teklif Oluştur",
-    "myOrders": "Siparişlerim",
     "qualityControl": "Kalite Kontrol",
     "factory": "Fabrika / Üretim",
     "logisticsReady": "Lojistik · Hazır",
@@ -101,8 +99,6 @@
     "approvalPre": "Onay · Ön Onay",
     "approvalPayment": "Onay · Ödeme Detayı",
     "approvalFinal": "Onay · Nihai Onay",
-    "customers": "Müşteriler",
-    "productCatalog": "Ürün Kataloğu",
     "users": "Kullanıcılar",
     "search": "Ara",
     "updates": "Neler Yeni"
@@ -134,49 +130,18 @@
     "revenue": "Son 30 gün ciro (para birimi bazında)",
     "modules": "Modüller",
     "moduleCard": {
-      "orders": "Sipariş ve tekliflerinizi yönetin",
       "qc": "Bekleyen kontrol onayları",
       "factory": "Üretim aşamalarını takip edin",
       "logistics": "Sevkiyat ve teslimat takibi",
       "accounting": "Ödeme ve hesap işlemleri",
       "purchase": "Satın alma talepleri",
-      "customers": "Müşteri bilgileri",
-      "productCatalog": "Kategoriler ve bileşenler",
       "users": "Kullanıcı yönetimi",
       "search": "Sipariş ve teklif arama"
     }
   },
   "orders": {
-    "title": "Siparişler",
-    "subtitle": "Çoklu filtre + döviz bazlı toplamlar",
-    "myTitle": "Siparişlerim",
-    "mySubtitle": "Sizin oluşturduğunuz sipariş ve teklifler",
-    "newOrder": "Yeni Sipariş",
     "newOrderTitle": "Sipariş/Teklif Oluştur",
-    "saveOrder": "Sipariş Kaydı",
-    "saveAsQuote": "Teklif olarak Kaydet",
-    "orderApproved": "Onaylandı",
-    "orderRejected": "Reddedildi",
-    "approveFailed": "Onay başarısız",
-    "rejectFailed": "Red başarısız",
-    "cloneFailed": "Klon başarısız",
-    "cloned": "Klonlandı",
-    "convertFailed": "Siparişe çevrilemedi",
-    "convertSuccess": "Siparişe çevrildi",
-    "submitFailed": "Onaya gönderilemedi",
-    "submitSuccess": "Onaya gönderildi",
     "excelDownloaded": "Excel indirildi",
-    "excelFailed": "Excel indirilemedi",
-    "quickFilterPlaceholder": "Sipariş no veya müşteri ile filtrele...",
-    "filters": {
-      "orderNo": "Sipariş No",
-      "customer": "Müşteri",
-      "country": "Ülke",
-      "stage": "Aşama",
-      "currency": "Döviz",
-      "start": "Başlangıç",
-      "end": "Bitiş"
-    },
     "form": {
       "musteri": "Müşteri",
       "musteriSec": "Müşteri seç",
@@ -225,17 +190,6 @@
       "siparisOlusturuldu": "Sipariş oluşturuldu",
       "teklifOlusturuldu": "Teklif oluşturuldu",
       "receteAcildi": "Reçete açıldı"
-    },
-    "table": {
-      "submit": "Onaya Gönder",
-      "revise": "Revize",
-      "convert": "Siparişe Çevir",
-      "form": "Form",
-      "detail": "Detay",
-      "excel": "Excel",
-      "clone": "Klonla",
-      "approve": "Onayla",
-      "reject": "Reddet"
     }
   },
   "qc": {
@@ -257,23 +211,6 @@
       "remaining": "Kalan",
       "stage": "Aşama",
       "date": "Tarih"
-    }
-  },
-  "customers": {
-    "title": "Müşteriler",
-    "subtitle": "Müşteri kayıtları",
-    "newCustomer": "Yeni Müşteri",
-    "editCustomer": "Müşteriyi Düzenle",
-    "createSuccess": "Müşteri eklendi",
-    "updateSuccess": "Müşteri güncellendi",
-    "deleteSuccess": "Müşteri silindi",
-    "deleteConfirm": "Bu müşteriyi silmek istediğinize emin misiniz?",
-    "columns": {
-      "musteriAd": "Müşteri Adı",
-      "ulke": "Ülke",
-      "telefon": "Telefon",
-      "email": "E-posta",
-      "vat": "VAT"
     }
   },
   "users": {
@@ -298,10 +235,6 @@
       "durum": "Durum"
     }
   },
-  "productCatalog": {
-    "title": "Ürün Kataloğu",
-    "subtitle": "Kategoriler ve bileşenler"
-  },
   "search": {
     "title": "Ara",
     "subtitle": "Sipariş ve teklif arama",
@@ -320,7 +253,9 @@
     "carriersTitle": "Lojistik · Taşıyıcılar"
   },
   "factory": {
-    "title": "Fabrika / Üretim"
+    "title": "Fabrika / Üretim",
+    "temsilci": "Temsilci",
+    "filterReset": "Filtreleri Temizle"
   },
   "purchase": {
     "newTitle": "Satın Alma · Yeni Talep",
@@ -344,5 +279,16 @@
   "validation": {
     "required": "Bu alan zorunludur",
     "fixErrors": "Lütfen işaretli alanları doldurun"
+  },
+  "orderStage": {
+    "title": "Aşama Geçmişi",
+    "created": "Oluşturuldu",
+    "current": "Mevcut",
+    "movedToProduction": "Üretime Alındı",
+    "markedReady": "Hazır Olarak İşaretlendi",
+    "movedToLogistics": "Lojistiğe Alındı",
+    "completed": "Tamamlandı",
+    "planning": "Planlamada",
+    "noHistoryNote": "Detaylı aşama geçiş geçmişi tutulmuyor; yalnız son işlem tarihi gösterilir."
   }
 }

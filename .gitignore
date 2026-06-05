@@ -14,8 +14,11 @@ node_modules/
 .env
 .env.*
 !.env.example
-!.env.production    # public API URL — commit'lenir, sır yok
-.env.*.local         # her zaman lokal kalsın
+# .env.production public API URL içerir, sır yok → commit'lenir.
+# CI runner build alırken VITE_API_URL bu dosyadan okunur.
+!.env.production
+# Her zaman lokal kalsın:
+.env.*.local
 
 # Secrets / certs
 secrets.json

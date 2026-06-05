@@ -3,72 +3,60 @@
 ## Mimari özet
 
 ```
-┌───────────────────────────┐         ┌──────────────────────────────┐
-│ esrselin/UnixPadelST      │         │ esrselin/UnixPadelST-Releases│
-│ (private)                 │         │ (public)                     │
-│ Kaynak kod                │ release │ Sadece installer binary'leri │
-│ + Dockerfile (API deploy) │ ───────►│ (.exe, .blockmap, latest.yml)│
-└───────────────────────────┘         └──────────────────────────────┘
-         │                                       │
-         │ git push                              │ electron-updater
-         ▼                                       │ (her açılışta kontrol)
-   Render.com (API)                              ▼
-   https://unixpadelst.onrender.com      Fabrika / Merkez PC'leri
-                                          (UnixPadelST.exe)
+┌──────────────────────────────────┐         ┌──────────────────────────────────┐
+│ UnixPadel/UnixPadelST            │         │ UnixPadel/UnixPadelST-Releases   │
+│ (private)                        │         │ (public)                         │
+│ Kaynak kod + GitHub Actions      │ Actions │ Sadece installer binary'leri     │
+│ workflow + Dockerfile (API)      │ ──────► │ (.exe, .blockmap, latest.yml)    │
+└──────────────────────────────────┘         └──────────────────────────────────┘
+         │                                                 │
+         │ git push                                        │ electron-updater
+         ▼                                                 │ (her açılışta kontrol)
+   Render.com (API)                                        ▼
+   https://unixpadelst-jcxy.onrender.com           Fabrika / Merkez PC'leri
+                                                    (UnixPadelST.exe)
 ```
 
-- **Kaynak kod** `UnixPadelST` (private) repo'sunda kalır.
-- **Installer'lar** `UnixPadelST-Releases` (public) repo'suna release olarak yüklenir — kullanıcıların auto-update yapabilmesi için public olması zorunlu (private releases token gerektirir).
-- API her zaman Render'da merkezi; frontend ise her bilgisayardaki .exe'nin içinde paketli.
+- **Kaynak kod** `UnixPadel/UnixPadelST` (private) repo'sunda.
+- **Installer'lar** `UnixPadel/UnixPadelST-Releases` (public) repo'sunda — auto-update için public olması zorunlu.
+- **Build & publish** GitHub Actions ile otomatik (Windows runner). Sen lokal makinende electron-builder çalıştırmıyorsun.
+- API her zaman Render'da merkezi.
 
 ---
 
-## İLK KURULUM (bir kerelik)
+## İLK KURULUM (bir kerelik — şirket org'unda)
 
 ### 1. Public release repo'sunu oluştur
 
-GitHub'da yeni bir repo aç:
+GitHub'da `UnixPadel` org altında:
 - **Name:** `UnixPadelST-Releases`
-- **Visibility:** **Public**
-- **Initialize with README:** isteğe bağlı (boş da olabilir)
-
-Bu repo'ya kod **PUSH ETMEYECEKSİN** — sadece electron-builder release artifact'leri yükleyecek.
+- **Visibility:** **Public** (electron-updater için zorunlu)
+- **Initialize with README:** ✅ (boş repo'ya release yüklenemez)
 
 ### 2. Personal Access Token (PAT) üret
 
-electron-builder release oluşturabilmek için yetkili bir token gerekir.
+GitHub Actions'ın release repo'suna yazabilmesi için bir token gerekir.
 
 1. GitHub → sağ üst profil → **Settings**
-2. Sol menü en altta **Developer settings**
-3. **Personal access tokens** → **Tokens (classic)** → **Generate new token (classic)**
-4. **Note:** `UnixPadelST release publish`
-5. **Expiration:** 90 days (veya istediğin)
-6. **Scopes:** sadece `public_repo` yeterli (tüm `repo` da olur ama daha geniş)
-7. **Generate token** → çıkan değeri **kopyala** (bir daha gösterilmez)
+2. **Developer settings** → **Personal access tokens** → **Tokens (classic)**
+3. **Generate new token (classic)**
+4. **Note:** `UnixPadelST Actions release`
+5. **Expiration:** 1 year
+6. **Scopes:** `public_repo` (sadece public repo'lara yazma)
+7. **Generate token** → değeri kopyala (bir daha gösterilmez)
 
-### 3. Token'ı lokal makinene kaydet
+> Fine-grained token kullanıyorsan: sadece `UnixPadelST-Releases` repo'suna **Contents: Read and write** yetkisi yeterli.
 
-PowerShell'de **kalıcı** env var olarak:
+### 3. Token'ı Actions secret olarak ekle
 
-```powershell
-[System.Environment]::SetEnvironmentVariable('GH_TOKEN', 'ghp_xxxYOUR_TOKENxxx', 'User')
-```
+1. `UnixPadel/UnixPadelST` repo'suna git
+2. **Settings** → **Secrets and variables** → **Actions**
+3. **New repository secret**
+4. **Name:** `RELEASES_TOKEN`
+5. **Value:** Az önce kopyaladığın token (`ghp_...`)
+6. **Add secret**
 
-> **Not:** Yeni bir PowerShell penceresi açtığında env var aktif olur. Aynı pencerede hemen kullanmak için `$env:GH_TOKEN = 'ghp_xxx'` de yapabilirsin (oturumluk).
-
-Token'ı doğrula:
-```powershell
-echo $env:GH_TOKEN
-```
-
-### 4. `electron-updater` paketini yükle
-
-```powershell
-cd CrmModern.Web
-npm install
-```
-
-(`package.json` zaten güncel, sadece paketi indirir.)
+> Workflow `secrets.RELEASES_TOKEN`'a referansla bu değeri okuyacak. Token kod tabanına asla girmez.
 
 ---
 
@@ -78,65 +66,81 @@ npm install
 
 `CrmModern.Web/package.json` içinde:
 ```json
-"version": "0.1.0"  →  "version": "0.1.1"
+"version": "0.2.0"  →  "version": "0.2.1"
 ```
 
-SemVer kuralı:
-- **0.1.x** — küçük UI değişikliği, bug fix
-- **0.x.0** — yeni özellik
-- **x.0.0** — büyük yapısal değişiklik
+SemVer:
+- `0.2.x` — bug fix, küçük UI değişikliği
+- `0.x.0` — yeni özellik
+- `x.0.0` — büyük yapısal değişiklik
 
-### 2. Release komutu
+### 2. Commit + tag + push
 
 ```powershell
-cd CrmModern.Web
-npm run release
+git commit -am "release: v0.2.1"
+git tag v0.2.1
+git push && git push --tags
 ```
 
-Bu komut:
-1. Vite ile frontend'i build eder (`dist/`)
-2. electron-builder ile installer'ı paketler (`release/UnixPadelST-Setup-0.1.1.exe`)
-3. `GH_TOKEN` ile `UnixPadelST-Releases` repo'sunda yeni bir release oluşturur (draft)
-4. `.exe`, `.blockmap`, `latest.yml` dosyalarını release'e yükler
+Tag push edilir edilmez GitHub Actions otomatik tetiklenir.
 
-### 3. Release'i yayına al
+### 3. Build'i izle
 
-1. https://github.com/esrselin/UnixPadelST-Releases/releases adresine git
-2. Yeni oluşan **draft release**'i bul (örn. `v0.1.1`)
-3. **Edit** → release notes yaz (opsiyonel) → **Publish release** tıkla
+`UnixPadel/UnixPadelST` repo'sunda **Actions** sekmesi → çalışan workflow'u takip et (~8-12 dk).
 
-> ⚠️ Draft kaldığı sürece kullanıcılar güncelleme almaz. **Publish** etmeyi unutma.
+### 4. Draft release'i yayına al
 
-### 4. Otomatik güncellemeyi izle
+Workflow başarılı olunca `UnixPadelST-Releases` repo'sunda **draft release** oluşur.
 
-- Mevcut kullanıcılar uygulamayı bir sonraki açışlarında 5 sn içinde update kontrolü yapar
-- Yeni sürüm arka planda indirilir (genelde 1-2 dk)
-- İndirme bitince kullanıcıya küçük dialog çıkar: "Şimdi Yeniden Başlat / Sonra"
-- "Sonra" → bir sonraki kapanışta otomatik uygulanır
+1. https://github.com/UnixPadel/UnixPadelST-Releases/releases
+2. Draft `v0.2.1`'i bul → **Edit** → release notes yaz (opsiyonel)
+3. **Publish release** ← bu butona basmadan kullanıcılar güncelleme almaz
+
+### 5. Auto-update sessizce yayılır
+
+- Mevcut kullanıcılar bir sonraki açılışta 5 sn içinde kontrol yapar
+- Yeni sürüm arka planda iner (~1-2 dk)
+- Bittiğinde küçük dialog: "Şimdi Yeniden Başlat / Sonra"
+- "Sonra" → bir sonraki kapanışta otomatik kurulur
+
+---
+
+## MANUEL TETİKLEME (tag kullanmadan)
+
+Eğer tag push etmek istemiyorsan, Actions sayfasından manuel tetikleyebilirsin:
+
+1. `UnixPadel/UnixPadelST` → **Actions** sekmesi
+2. Sol menüden **Release UnixPadelST** workflow'u
+3. Sağ üstte **Run workflow** → version gir → **Run**
+
+Yine de package.json'daki version doğru olmalı; manuel tetikleme sadece tag pipeline'ını atlatır.
 
 ---
 
 ## SIK SORULAN SORUNLAR
 
-### "Sürüm yükselttim ama kullanıcılar yeni sürümü görmüyor"
+### "Actions başarılı ama Releases'te yeni sürüm yok"
+- `secrets.RELEASES_TOKEN` doğru ayarlanmış mı? Token expire olmuş olabilir.
+- Workflow loguna bak: "publishing → github" satırının altında 401 / 403 varsa token sorunu.
+
+### "Kullanıcılar güncelleme almıyor"
 - GitHub'da release **Publish** edilmiş mi (Draft değil)?
-- Kullanıcı uygulamayı kapatıp tekrar açtı mı? (Update kontrolü 5 sn sonra çalışır)
-- `package.json` versiyonu gerçekten arttırıldı mı?
+- Kullanıcı uygulamayı kapatıp tekrar açtı mı? Kontrol 5 sn sonra çalışır.
+- `package.json` versiyonu kurulu olandan büyük mü?
 
-### "GH_TOKEN bulunamadı hatası"
-- PowerShell penceresini kapatıp yeniden açtın mı? (env var oturuma yansır)
-- `echo $env:GH_TOKEN` boş dönüyorsa `SetEnvironmentVariable` adımını tekrar yap
+### "Build başarısız: native dependency error"
+- `npm ci` cache'i bozulmuş olabilir. Workflow'da `cache: 'npm'` satırını geçici kaldır, tekrar dene.
 
-### "electron-updater HTTP 404"
-- `UnixPadelST-Releases` repo gerçekten **public** mi?
-- `package.json` içindeki `publish.owner` ve `publish.repo` doğru mu?
-- En az bir release publish edilmiş mi? (İlk release manuel publish gerekir)
-
-### "Kullanıcıyı dialog ile rahatsız etmek istemiyorum"
-`electron/main.cjs` içinde `update-downloaded` handler'ındaki `dialog.showMessageBox` çağrısını sil; sadece `autoInstallOnAppQuit = true` kalsın. O zaman güncelleme tamamen sessiz, kullanıcı bir sonraki açılışta yeni sürümü görür.
+### "API URL değişti, ne yapacağım?"
+1. `CrmModern.Web/.env.production` → yeni URL
+2. Version bump
+3. Tag + push → Actions otomatik yeni .exe çıkarır
 
 ---
 
 ## API DEPLOY (referans)
 
-API tarafı bu süreçten bağımsız — kaynak kod ana repo'ya push edilir, Render otomatik redeploy yapar. Bkz: ana repo'daki `Dockerfile` ve Render dashboard.
+API tarafı Actions'tan bağımsız:
+- Render `UnixPadel/UnixPadelST` repo'sunu otomatik build ediyor (Dockerfile)
+- main'e her push → Render otomatik redeploy
+- Mevcut URL: https://unixpadelst-jcxy.onrender.com

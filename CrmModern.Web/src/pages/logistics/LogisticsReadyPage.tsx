@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
+import { FieldError } from '@/components/FieldError'
 import { useToast } from '@/components/ToastProvider'
 import { formatDate } from '@/lib/utils'
 import type { LogisticsOrderListDto } from '@/types'
@@ -28,6 +29,14 @@ export function LogisticsReadyPage() {
   const [target, setTarget] = useState<string | null>(null)
   const [form, setForm] = useState(blank())
   const [detailNo, setDetailNo] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+
+  const valid = !!(form.firmaAdi.trim() && form.lojistikCesit.trim())
+  const onSubmit = () => {
+    setSubmitted(true)
+    if (!valid) return
+    createMut.mutate()
+  }
 
   const { data: ready = [], isLoading } = useQuery({
     queryKey: ['logistics-ready'], queryFn: getReadyForShipment,
@@ -43,7 +52,7 @@ export function LogisticsReadyPage() {
       qc.invalidateQueries({ queryKey: ['logistics-pending-approval'] })
       qc.invalidateQueries({ queryKey: ['carriers'] })
       qc.invalidateQueries({ queryKey: ['cesitler'] })
-      setTarget(null); setForm(blank())
+      setTarget(null); setForm(blank()); setSubmitted(false)
       // Paket 3: yeni akış — sevk talebi muhasebe onayını bekler.
       toast({ title: 'Sevk talebi oluşturuldu — Muhasebe onayı bekliyor.' })
     },
@@ -61,7 +70,7 @@ export function LogisticsReadyPage() {
       render: (r) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>Detay</Button>
-          <Button size="sm" onClick={() => { setTarget(r.siparisNo as string); setForm(blank()) }}>Sevkiyat Oluştur</Button>
+          <Button size="sm" onClick={() => { setTarget(r.siparisNo as string); setForm(blank()); setSubmitted(false) }}>Sevkiyat Oluştur</Button>
         </div>
       ),
     },
@@ -79,14 +88,16 @@ export function LogisticsReadyPage() {
           <DialogHeader><DialogTitle>Sevkiyat Oluştur — {target}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Taşıyıcı / Firma</Label>
+              <Label>Taşıyıcı / Firma *</Label>
               <Input list="carriers-list" value={form.firmaAdi} onChange={(e) => setForm((f) => ({ ...f, firmaAdi: e.target.value }))} placeholder="Yeni firma yazabilirsiniz" />
               <datalist id="carriers-list">{carriers.map((c) => <option key={c} value={c} />)}</datalist>
+              {submitted && !form.firmaAdi.trim() && <FieldError message={t('validation.required')} />}
             </div>
             <div className="space-y-1">
-              <Label>Taşıma Türü</Label>
+              <Label>Taşıma Türü *</Label>
               <Input list="cesitler-list" value={form.lojistikCesit} onChange={(e) => setForm((f) => ({ ...f, lojistikCesit: e.target.value }))} placeholder="Kargo, Tır, Hava..." />
               <datalist id="cesitler-list">{cesitler.map((c) => <option key={c} value={c} />)}</datalist>
+              {submitted && !form.lojistikCesit.trim() && <FieldError message={t('validation.required')} />}
             </div>
             <div className="space-y-1"><Label>Fiyat</Label><Input type="number" value={form.fiyat} onChange={(e) => setForm((f) => ({ ...f, fiyat: Number(e.target.value) }))} /></div>
             <div className="space-y-1"><Label>Sevkiyat Tarihi</Label><Input type="date" value={form.sTarih} onChange={(e) => setForm((f) => ({ ...f, sTarih: e.target.value }))} /></div>
@@ -95,7 +106,7 @@ export function LogisticsReadyPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTarget(null)}>İptal</Button>
-            <Button disabled={!form.firmaAdi || !form.lojistikCesit || createMut.isPending} onClick={() => createMut.mutate()}>Sevk et</Button>
+            <Button disabled={createMut.isPending} onClick={onSubmit}>Sevk et</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

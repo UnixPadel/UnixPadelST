@@ -12,6 +12,7 @@ import { DynamicPaymentForm } from '@/components/DynamicPaymentForm'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
+import { FieldError } from '@/components/FieldError'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
@@ -23,6 +24,14 @@ export function PaymentDetailsPage() {
   const { t } = useTranslation()
   const [target, setTarget] = useState<number | null>(null)
   const [form, setForm] = useState<SetPaymentDetailsRequest>(empty)
+  const [submitted, setSubmitted] = useState(false)
+
+  const valid = !!form.odemeTuru
+  const onSubmit = () => {
+    setSubmitted(true)
+    if (!valid) return
+    saveMut.mutate()
+  }
 
   const { data: pending = [], isLoading } = useQuery({
     queryKey: ['payment-pending'], queryFn: getPendingPayment,
@@ -39,7 +48,7 @@ export function PaymentDetailsPage() {
       qc.invalidateQueries({ queryKey: ['payment-pending'] })
       qc.invalidateQueries({ queryKey: ['preapproval'] })
       qc.invalidateQueries({ queryKey: ['final-pending'] })
-      setTarget(null); setForm(empty)
+      setTarget(null); setForm(empty); setSubmitted(false)
       toast({ title: 'Ödeme detayı kaydedildi (Muhasebe Tamamlandı)' })
     },
     onError: (e: unknown) => toast({ title: 'Kayıt başarısız', description: (e as Error).message, variant: 'destructive' }),
@@ -56,7 +65,7 @@ export function PaymentDetailsPage() {
     {
       key: 'actions', header: 'İşlem',
       render: (r) => (
-        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(empty) }}>
+        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(empty); setSubmitted(false) }}>
           Ödeme Detayı Gir
         </Button>
       ),
@@ -90,10 +99,11 @@ export function PaymentDetailsPage() {
           )}
 
           <DynamicPaymentForm value={form} onChange={setForm} disabled={saveMut.isPending} />
+          {submitted && !valid && <FieldError message={t('validation.required')} />}
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setTarget(null)}>İptal</Button>
-            <Button disabled={!form.odemeTuru || saveMut.isPending} onClick={() => saveMut.mutate()}>
+            <Button disabled={saveMut.isPending} onClick={onSubmit}>
               {saveMut.isPending ? 'Kaydediliyor...' : 'Kaydet'}
             </Button>
           </DialogFooter>

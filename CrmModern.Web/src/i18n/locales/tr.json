@@ -340,5 +340,9 @@
     "title": "Sayfa Bulunamadı",
     "description": "Aradığınız sayfa mevcut değil.",
     "goHome": "Ana sayfaya dön"
+  },
+  "validation": {
+    "required": "Bu alan zorunludur",
+    "fixErrors": "Lütfen işaretli alanları doldurun"
   }
 }

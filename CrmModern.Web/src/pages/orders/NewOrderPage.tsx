@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { useToast } from '@/components/ToastProvider'
+import { FieldError } from '@/components/FieldError'
 import type { CreateOrderDto } from '@/types'
 
 const PARA_TIPLERI = ['Euro', 'Dolar', 'TL', 'Sterlin']
@@ -39,6 +40,20 @@ export function NewOrderPage() {
 
   const [form, setForm] = useState<CreateOrderDto>(blank())
   const [createdNo, setCreatedNo] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+
+  const valid = !!form.musteriAd.trim()
+
+  const submitOrder = () => {
+    setSubmitted(true)
+    if (!valid) { toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return }
+    orderMut.mutate()
+  }
+  const submitQuote = () => {
+    setSubmitted(true)
+    if (!valid) { toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return }
+    quoteMut.mutate()
+  }
 
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers })
   const { data: ulkeler   = [] } = useQuery({ queryKey: ['ulkeler'],   queryFn: getUlkeler })
@@ -100,8 +115,8 @@ export function NewOrderPage() {
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => nav(-1)}>Vazgeç</Button>
-            <Button variant="secondary" disabled={quoteMut.isPending} onClick={() => quoteMut.mutate()}>Teklif olarak Kaydet</Button>
-            <Button disabled={orderMut.isPending} onClick={() => orderMut.mutate()}>Sipariş Kaydı</Button>
+            <Button variant="secondary" disabled={quoteMut.isPending} onClick={submitQuote}>Teklif olarak Kaydet</Button>
+            <Button disabled={orderMut.isPending} onClick={submitOrder}>Sipariş Kaydı</Button>
           </div>
         }
       />
@@ -129,7 +144,11 @@ export function NewOrderPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Müşteri Adı *</Label><Input value={form.musteriAd} onChange={(e) => setForm((f) => ({ ...f, musteriAd: e.target.value }))} /></div>
+              <div className="space-y-1">
+                <Label>Müşteri Adı *</Label>
+                <Input value={form.musteriAd} onChange={(e) => setForm((f) => ({ ...f, musteriAd: e.target.value }))} />
+                {submitted && !form.musteriAd.trim() && <FieldError message={t('validation.required')} />}
+              </div>
               <div className="space-y-1"><Label>Telefon</Label><Input value={form.mTelefon ?? ''} onChange={(e) => setForm((f) => ({ ...f, mTelefon: e.target.value }))} /></div>
               <div className="space-y-1"><Label>E-posta</Label><Input value={form.mMail ?? ''} onChange={(e) => setForm((f) => ({ ...f, mMail: e.target.value }))} /></div>
               <div className="space-y-1">

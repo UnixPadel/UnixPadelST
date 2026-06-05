@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { FieldError } from '@/components/FieldError'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -17,6 +18,7 @@ export function LoginPage() {
   const { toast } = useToast()
   const { t } = useTranslation()
   const [form, setForm] = useState({ kullaniciAdi: '', sifre: '' })
+  const [submitted, setSubmitted] = useState(false)
 
   const mutation = useMutation({
     mutationFn: login,
@@ -31,7 +33,9 @@ export function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.kullaniciAdi || !form.sifre) return
+    setSubmitted(true)
+    // Boş alan varsa sessiz dönme — submitted=true ile alan altı hata mesajları görünür.
+    if (!form.kullaniciAdi.trim() || !form.sifre.trim()) return
     mutation.mutate(form)
   }
 
@@ -59,6 +63,7 @@ export function LoginPage() {
                 onChange={(e) => setForm({ ...form, kullaniciAdi: e.target.value })}
                 autoFocus
               />
+              {submitted && !form.kullaniciAdi.trim() && <FieldError message={t('validation.required')} />}
             </div>
             <div className="space-y-2">
               <Label htmlFor="sifre">{t('login.password')}</Label>
@@ -69,6 +74,7 @@ export function LoginPage() {
                 value={form.sifre}
                 onChange={(e) => setForm({ ...form, sifre: e.target.value })}
               />
+              {submitted && !form.sifre.trim() && <FieldError message={t('validation.required')} />}
             </div>
             <Button type="submit" className="w-full" disabled={mutation.isPending}>
               {mutation.isPending ? `${t('login.submit')}...` : t('login.submit')}

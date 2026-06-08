@@ -103,12 +103,12 @@ export function FactoryPage() {
           <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
           {(r.siparisMiTeklifMi as string) === 'Planlama' && (
             <Button size="sm" onClick={() => { setProductionTarget(r.siparisNo as string) }}>
-              Üretime Al
+              {t('factory.moveToProduction')}
             </Button>
           )}
           {(r.siparisMiTeklifMi as string) === 'Uretim' && (
             <Button size="sm" variant="secondary" onClick={() => readyMut.mutate(r.siparisNo as string)} disabled={readyMut.isPending}>
-              Hazır
+              {t('factory.ready')}
             </Button>
           )}
         </div>
@@ -185,17 +185,17 @@ export function FactoryPage() {
       <Dialog open={!!productionTarget} onOpenChange={() => setProductionTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Üretime Al — {productionTarget}</DialogTitle>
+            <DialogTitle>{t('factory.moveToProductionTitle', { siparisNo: productionTarget ?? '' })}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Üretim Tarihi</Label>
+              <Label>{t('factory.uretimTarihi')}</Label>
               <Input type="datetime-local" value={sTarih} onChange={(e) => setSTarih(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Fabrika Notu</Label>
+              <Label>{t('factory.fabrikaNot')}</Label>
               <Textarea
-                placeholder="Fabrika notu girin..."
+                placeholder={t('factory.fabrikaNotPlaceholder')}
                 value={fabrikaNot}
                 onChange={(e) => setFabrikaNot(e.target.value)}
                 rows={3}

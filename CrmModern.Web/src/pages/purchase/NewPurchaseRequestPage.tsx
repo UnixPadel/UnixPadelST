@@ -38,10 +38,10 @@ export function NewPurchaseRequestPage() {
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchase-mine'] })
-      toast({ title: 'Talep oluşturuldu' })
+      toast({ title: t('purchase.createSuccess') })
       nav('/purchase/mine')
     },
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onError: () => toast({ title: t('purchase.createError'), variant: 'destructive' }),
   })
 
   const valid = !!(form.urunAdi.trim() && form.urunMaliyeti > 0 && form.departman.trim() && form.alinanYer.trim() && form.urunTuru.trim())
@@ -57,40 +57,40 @@ export function NewPurchaseRequestPage() {
       <PageHeader title={t('purchase.newTitle')} />
       <div className="p-6 max-w-2xl space-y-3">
         <div className="space-y-1">
-          <Label>Ürün Adı *</Label>
+          <Label>{t('purchase.urunAdi')} *</Label>
           <Input value={form.urunAdi} onChange={(e) => setForm((f) => ({ ...f, urunAdi: e.target.value }))} />
           {submitted && !form.urunAdi.trim() && <FieldError message={t('validation.required')} />}
         </div>
         <div className="space-y-1">
-          <Label>Ürün Türü *</Label>
+          <Label>{t('purchase.urunTuru')} *</Label>
           <Input value={form.urunTuru} onChange={(e) => setForm((f) => ({ ...f, urunTuru: e.target.value }))} />
           {submitted && !form.urunTuru.trim() && <FieldError message={t('validation.required')} />}
         </div>
         <div className="space-y-1">
-          <Label>Maliyet *</Label>
+          <Label>{t('purchase.maliyet')} *</Label>
           <Input type="number" step="0.01" value={form.urunMaliyeti} onChange={(e) => setForm((f) => ({ ...f, urunMaliyeti: Number(e.target.value) }))} />
           {submitted && !(form.urunMaliyeti > 0) && <FieldError message={t('validation.required')} />}
         </div>
         <div className="space-y-1">
-          <Label>Alınan Yer *</Label>
+          <Label>{t('purchase.alinanYer')} *</Label>
           <Input value={form.alinanYer} onChange={(e) => setForm((f) => ({ ...f, alinanYer: e.target.value }))} />
           {submitted && !form.alinanYer.trim() && <FieldError message={t('validation.required')} />}
         </div>
         {/* Departman — giriş yapan kullanıcının rolünden otomatik dolar, değiştirilemez. */}
         <div className="space-y-1">
-          <Label>Departman *</Label>
+          <Label>{t('purchase.departman')} *</Label>
           <Input value={form.departman} disabled readOnly />
-          <p className="text-xs text-muted-foreground">Rolünüzden otomatik atanır.</p>
+          <p className="text-xs text-muted-foreground">{t('purchase.departmanHint')}</p>
         </div>
-        <div className="space-y-1"><Label>Notlar</Label><Textarea rows={3} value={form.notlar} onChange={(e) => setForm((f) => ({ ...f, notlar: e.target.value }))} /></div>
+        <div className="space-y-1"><Label>{t('purchase.notlar')}</Label><Textarea rows={3} value={form.notlar} onChange={(e) => setForm((f) => ({ ...f, notlar: e.target.value }))} /></div>
 
         <div className="pt-2 flex gap-2">
-          <Button variant="outline" onClick={() => nav(-1)}>Vazgeç</Button>
+          <Button variant="outline" onClick={() => nav(-1)}>{t('purchase.cancel')}</Button>
           <Button disabled={createMut.isPending} onClick={onSubmit}>
-            {createMut.isPending ? 'Gönderiliyor...' : 'Talep Oluştur'}
+            {createMut.isPending ? t('purchase.creating') : t('purchase.create')}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">Talep "Bekliyor" durumunda kaydedilir, ön onay için omur.caliskan'a düşer.</p>
+        <p className="text-xs text-muted-foreground">{t('purchase.approvalFlowNote')}</p>
       </div>
     </div>
   )

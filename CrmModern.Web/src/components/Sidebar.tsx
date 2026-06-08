@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, CheckSquare, Factory, Truck,
-  Calculator, FileText, Users, Search, LogOut, ChevronRight, Sparkles, X,
+  Calculator, FileText, Users, UserPlus, Search, LogOut, ChevronRight, Sparkles, X,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -23,11 +23,12 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { path: '/dashboard',       i18nKey: 'nav.dashboard',         icon: <LayoutDashboard className="h-4 w-4" /> },
-  { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci'] },
+  { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci','Gozlemci'] },
+  { path: '/orders/mine',     i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci','Gozlemci'] },
   { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, roles: ['Yonetici'] },
   { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },
   { path: '/logistics/ready',     i18nKey: 'nav.logisticsReady',     icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
-  { path: '/logistics/history',   i18nKey: 'nav.logisticsHistory',   icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci', 'Muhasebe'], usernames: ['elshan.rasulov'] },
+  { path: '/logistics/history',   i18nKey: 'nav.logisticsHistory',   icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
   { path: '/logistics/carriers',  i18nKey: 'nav.logisticsCarriers',  icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
   { path: '/accounting',         i18nKey: 'nav.accounting',                       icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },
   { path: '/accounting/logistics-approvals', i18nKey: 'nav.accountingLogisticsApprovals', icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'], usernames: ['elshan.rasulov'] },
@@ -36,9 +37,10 @@ const navItems: NavItem[] = [
   { path: '/purchase/new',     i18nKey: 'nav.purchaseNew',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Lojistik','Fabrika','Gozlemci','Temsilci'] },
   { path: '/purchase/mine',    i18nKey: 'nav.purchaseMine',  icon: <FileText className="h-4 w-4" /> },
   { path: '/purchase/all',     i18nKey: 'nav.purchaseAll',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Gozlemci','Muhasebe'], usernames: ['elshan.rasulov'] },
-  { path: '/approval/pre',     i18nKey: 'nav.approvalPre',     icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['omur.caliskan'] },
-  { path: '/approval/payment', i18nKey: 'nav.approvalPayment', icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Muhasebe'] },
+  { path: '/approval/pre',     i18nKey: 'nav.approvalPre',     icon: <FileText className="h-4 w-4" />, usernames: ['omur.caliskan'] },
+  { path: '/approval/payment', i18nKey: 'nav.approvalPayment', icon: <FileText className="h-4 w-4" />, roles: ['Muhasebe'] },
   { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
+  { path: '/customers',       i18nKey: 'nav.customers',       icon: <UserPlus className="h-4 w-4" />,roles: ['Yonetici','Temsilci','Gozlemci','Muhasebe'] },
   { path: '/users',           i18nKey: 'nav.users',           icon: <Users className="h-4 w-4" />,   roles: ['Yonetici'] },
   { path: '/search',          i18nKey: 'nav.search',          icon: <Search className="h-4 w-4" /> },
   { path: '/updates',         i18nKey: 'nav.updates',         icon: <Sparkles className="h-4 w-4" /> },

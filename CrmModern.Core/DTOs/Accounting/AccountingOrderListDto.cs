@@ -18,4 +18,12 @@ public sealed record AccountingOrderListDto(
     string?  MuhasebeDurumu,
     int?     MuhasebeTalepID,
     string?  MuhasebeRedNotu,
+    // PROMPT.md ACCOUNTING #14 — legacy Muhasebe.cs grid columns that were
+    // missing from the modern DTO.
+    string?  Sirket,
+    int      PesinYuzde,
+    string?  TeslimatCesiti,
+    // Kontrol kolonu legacy grid'te gizli; row colouring ve "Muhasebe Onayla"
+    // butonu için frontend buna ihtiyaç duyuyor.
+    string?  Kontrol,
     DateTime Tarih);

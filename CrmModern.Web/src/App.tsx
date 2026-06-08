@@ -3,6 +3,9 @@ import { Layout } from '@/components/Layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { NewOrderPage } from '@/pages/orders/NewOrderPage'
+import { MyOrdersPage } from '@/pages/orders/MyOrdersPage'
+import { CustomersPage } from '@/pages/customers/CustomersPage'
+import { CustomerFormPage } from '@/pages/customers/CustomerFormPage'
 import { QualityControlPage } from '@/pages/quality-control/QualityControlPage'
 import { FactoryPage } from '@/pages/factory/FactoryPage'
 import { LogisticsReadyPage } from '@/pages/logistics/LogisticsReadyPage'
@@ -31,7 +34,16 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard"       element={<DashboardPage />} />
-        <Route path="/orders/new"      element={<RoleGuard roles={['Yonetici','Temsilci']}><NewOrderPage /></RoleGuard>} />
+        <Route path="/orders/new"      element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><NewOrderPage /></RoleGuard>} />
+        {/* PROMPT.md #20 — Siparişlerim: only roles that can create orders. */}
+        <Route path="/orders/mine"     element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><MyOrdersPage /></RoleGuard>} />
+        {/* PROMPT.md #16 + #19 — Müşteri CRUD. Per-row matrix:
+              list   — Yonetici, Temsilci, Gozlemci, Muhasebe (read-only)
+              new    — Yonetici, Temsilci, Gozlemci
+              edit   — Yonetici, Gozlemci  (Temsilci can add but not edit) */}
+        <Route path="/customers"            element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci','Muhasebe']}><CustomersPage /></RoleGuard>} />
+        <Route path="/customers/new"        element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><CustomerFormPage /></RoleGuard>} />
+        <Route path="/customers/:id/edit"   element={<RoleGuard roles={['Yonetici','Gozlemci']}><CustomerFormPage /></RoleGuard>} />
         <Route path="/quality-control" element={<QualityControlPage />} />
         <Route path="/factory"         element={<FactoryPage />} />
         <Route path="/logistics"           element={<Navigate to="/logistics/ready" replace />} />

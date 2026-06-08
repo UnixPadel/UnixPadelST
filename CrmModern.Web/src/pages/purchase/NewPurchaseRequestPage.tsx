@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FieldError } from '@/components/FieldError'
@@ -68,7 +69,7 @@ export function NewPurchaseRequestPage() {
         </div>
         <div className="space-y-1">
           <Label>{t('purchase.maliyet')} *</Label>
-          <Input type="number" step="0.01" value={form.urunMaliyeti} onChange={(e) => setForm((f) => ({ ...f, urunMaliyeti: Number(e.target.value) }))} />
+          <DecimalInput value={form.urunMaliyeti} onValueChange={(v) => setForm((f) => ({ ...f, urunMaliyeti: v === '' ? 0 : v }))} />
           {submitted && !(form.urunMaliyeti > 0) && <FieldError message={t('validation.required')} />}
         </div>
         <div className="space-y-1">
@@ -90,7 +91,6 @@ export function NewPurchaseRequestPage() {
             {createMut.isPending ? t('purchase.creating') : t('purchase.create')}
           </Button>
         </div>
-        <p className="text-xs text-muted-foreground">{t('purchase.approvalFlowNote')}</p>
       </div>
     </div>
   )

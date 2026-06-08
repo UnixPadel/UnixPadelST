@@ -7,6 +7,7 @@ import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -99,7 +100,7 @@ export function LogisticsReadyPage() {
               <datalist id="cesitler-list">{cesitler.map((c) => <option key={c} value={c} />)}</datalist>
               {submitted && !form.lojistikCesit.trim() && <FieldError message={t('validation.required')} />}
             </div>
-            <div className="space-y-1"><Label>Fiyat</Label><Input type="number" value={form.fiyat} onChange={(e) => setForm((f) => ({ ...f, fiyat: Number(e.target.value) }))} /></div>
+            <div className="space-y-1"><Label>Fiyat</Label><DecimalInput value={form.fiyat} onValueChange={(v) => setForm((f) => ({ ...f, fiyat: v === '' ? 0 : v }))} /></div>
             <div className="space-y-1"><Label>Sevkiyat Tarihi</Label><Input type="date" value={form.sTarih} onChange={(e) => setForm((f) => ({ ...f, sTarih: e.target.value }))} /></div>
             <div className="space-y-1"><Label>Lojistik Notu</Label><Textarea rows={2} value={form.lojistikNot} onChange={(e) => setForm((f) => ({ ...f, lojistikNot: e.target.value }))} /></div>
             <div className="space-y-1"><Label>Ek Not</Label><Input value={form.lNot} onChange={(e) => setForm((f) => ({ ...f, lNot: e.target.value }))} /></div>

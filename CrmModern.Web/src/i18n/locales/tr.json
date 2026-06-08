@@ -8,6 +8,7 @@
     "search": "Ara",
     "close": "Kapat",
     "loading": "Yükleniyor...",
+    "saving": "Kaydediliyor...",
     "error": "Hata",
     "success": "Başarılı",
     "yes": "Evet",
@@ -99,9 +100,39 @@
     "approvalPre": "Onay · Ön Onay",
     "approvalPayment": "Onay · Ödeme Detayı",
     "approvalFinal": "Onay · Nihai Onay",
+    "customers": "Müşteriler",
+    "myOrders": "Siparişlerim",
     "users": "Kullanıcılar",
     "search": "Ara",
     "updates": "Neler Yeni"
+  },
+  "customers": {
+    "title": "Müşteriler",
+    "addTitle": "Yeni Müşteri",
+    "editTitle": "Müşteri Düzenle",
+    "searchPlaceholder": "Ad, telefon, e-posta, VAT, ülke...",
+    "addCountry": "Ülke Ekle",
+    "addCountryTitle": "Yeni Ülke",
+    "fields": {
+      "musteriAd": "Müşteri Adı",
+      "telefon": "Telefon",
+      "zipKod": "Posta Kodu",
+      "email": "E-Posta",
+      "vat": "VAT Numarası",
+      "adres": "Adres",
+      "ulke": "Ülke",
+      "ulkeSec": "Ülke seç",
+      "bolge": "Bölge",
+      "ulkeAdi": "Ülke Adı",
+      "numaraBirimi": "Numara Birimi"
+    },
+    "toast": {
+      "created": "Müşteri eklendi.",
+      "updated": "Müşteri güncellendi.",
+      "saveFailed": "Kayıt başarısız.",
+      "ulkeCreated": "Ülke eklendi.",
+      "ulkeFailed": "Ülke eklenemedi."
+    }
   },
   "topbar": {
     "toggleMenu": "Menüyü aç/kapat",
@@ -133,14 +164,51 @@
       "qc": "Bekleyen kontrol onayları",
       "factory": "Üretim aşamalarını takip edin",
       "logistics": "Sevkiyat ve teslimat takibi",
+      "logisticsHistory": "Sevkiyat geçmişi",
       "accounting": "Ödeme ve hesap işlemleri",
+      "accountingHistory": "Tahsilat ve işlem geçmişi",
       "purchase": "Satın alma talepleri",
+      "createOrderQuote": "Yeni sipariş veya teklif oluştur",
+      "myOrders": "Oluşturduğum sipariş ve teklifler",
       "users": "Kullanıcı yönetimi",
       "search": "Sipariş ve teklif arama"
     }
   },
+  "myOrders": {
+    "title": "Siparişlerim",
+    "cols": {
+      "numara": "Numara",
+      "musteriAd": "Müşteri Adı",
+      "asama": "Aşama",
+      "durum": "Durum",
+      "tarih": "Tarih",
+      "actions": "İşlemler"
+    },
+    "actions": {
+      "formGoster": "Form Göster",
+      "sipariseCevir": "Siparişe Çevir",
+      "redNotu": "Red Notu",
+      "revize": "Revize"
+    },
+    "disabled": {
+      "convert": "Yalnızca reddedilmemiş teklifler siparişe çevrilebilir.",
+      "redNote": "Bu sipariş reddedilmediği için not gösterilemez.",
+      "revise": "Onaylı kayıtlar revize edilemez."
+    },
+    "redNote": {
+      "title": "Red Notu",
+      "empty": "Red notu bulunamadı."
+    },
+    "toast": {
+      "converted": "Teklif siparişe çevrildi.",
+      "convertFailed": "Çevirme başarısız."
+    }
+  },
   "orders": {
     "newOrderTitle": "Sipariş/Teklif Oluştur",
+    "reviseTitle": "Revize",
+    "reviseSave": "Revizeyi Kaydet",
+    "reviseBanner": "Revize ediliyor",
     "excelDownloaded": "Excel indirildi",
     "form": {
       "musteri": "Müşteri",
@@ -241,11 +309,58 @@
     "placeholder": "Sipariş no, müşteri, ülke...",
     "noResults": "Sonuç bulunamadı"
   },
+  "accountingFull": {
+    "tabs": {
+      "detay": "Sipariş Detayı",
+      "musteri": "Müşteri",
+      "teslimat": "Teslimat",
+      "temsilci": "Satış Temsilcisi",
+      "maliyet": "Maliyet"
+    },
+    "cols": {
+      "sirket": "Şirket",
+      "kaparo": "Kapora Bakiyesi",
+      "pesinYuzde": "Peşin Yüzde",
+      "maliyet": "Maliyet",
+      "kar": "Kar",
+      "teslimatCesiti": "Teslimat Çeşidi",
+      "asama": "Aşama",
+      "muhasebeDurum": "Durum"
+    },
+    "maliyet": {
+      "maliyet": "Maliyet",
+      "notu": "Maliyet Notu",
+      "kar": "Kar (otomatik)",
+      "lastStatus": "Son talep durumu"
+    },
+    "actions": {
+      "talepGonder": "Talep Gönder",
+      "muhasebeOnayla": "Muhasebe Onayla"
+    },
+    "disabled": {
+      "approve": "Sipariş 'Siparis' aşamasında ve Kontrol='Onay' olmalı."
+    },
+    "toast": {
+      "maliyetSent": "Muhasebe talebi gönderildi (Onay Bekliyor).",
+      "approved": "Muhasebe onayı verildi — sipariş Planlama aşamasında."
+    }
+  },
   "accounting": {
     "title": "Muhasebe · Tahsilat",
     "historyTitle": "Muhasebe · Geçmiş",
     "balanceTitle": "Muhasebe · Bakiye",
-    "logisticsApprovalsTitle": "Muhasebe · Lojistik Onayları"
+    "logisticsApprovalsTitle": "Muhasebe · Lojistik Onayları",
+    "filter": {
+      "all": "— Tümü —",
+      "ulke": "Ülke",
+      "temsilci": "Temsilci",
+      "odemeDurumu": "Ödenen Bakiye",
+      "odemePlaceholder": "Tam tutar",
+      "musteriPlaceholder": "Müşteri seç veya yaz",
+      "reset": "Sıfırla",
+      "totalsLabel": "Filtre sonucu toplam ödeme (para birimi bazında)",
+      "rowCount": "Bulunan kayıt"
+    }
   },
   "logistics": {
     "readyTitle": "Lojistik · Hazır",
@@ -300,7 +415,8 @@
   },
   "validation": {
     "required": "Bu alan zorunludur",
-    "fixErrors": "Lütfen işaretli alanları doldurun"
+    "fixErrors": "Lütfen işaretli alanları doldurun",
+    "emptyOrder": "En az bir kalem ekleyin (Detaylar veya Setler boş olamaz)."
   },
   "orderStage": {
     "title": "Aşama Geçmişi",

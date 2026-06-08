@@ -8,6 +8,7 @@
     "search": "Search",
     "close": "Close",
     "loading": "Loading...",
+    "saving": "Saving...",
     "error": "Error",
     "success": "Success",
     "yes": "Yes",
@@ -99,9 +100,39 @@
     "approvalPre": "Approval · Pre-Approval",
     "approvalPayment": "Approval · Payment Details",
     "approvalFinal": "Approval · Final Approval",
+    "customers": "Customers",
+    "myOrders": "My Orders",
     "users": "Users",
     "search": "Search",
     "updates": "What's New"
+  },
+  "customers": {
+    "title": "Customers",
+    "addTitle": "New Customer",
+    "editTitle": "Edit Customer",
+    "searchPlaceholder": "Name, phone, email, VAT, country...",
+    "addCountry": "Add Country",
+    "addCountryTitle": "New Country",
+    "fields": {
+      "musteriAd": "Customer Name",
+      "telefon": "Phone",
+      "zipKod": "ZIP Code",
+      "email": "Email",
+      "vat": "VAT Number",
+      "adres": "Address",
+      "ulke": "Country",
+      "ulkeSec": "Select country",
+      "bolge": "Region",
+      "ulkeAdi": "Country Name",
+      "numaraBirimi": "Dialing Code"
+    },
+    "toast": {
+      "created": "Customer added.",
+      "updated": "Customer updated.",
+      "saveFailed": "Save failed.",
+      "ulkeCreated": "Country added.",
+      "ulkeFailed": "Could not add country."
+    }
   },
   "topbar": {
     "toggleMenu": "Toggle menu",
@@ -133,14 +164,51 @@
       "qc": "Pending QC approvals",
       "factory": "Track production stages",
       "logistics": "Shipment and delivery tracking",
+      "logisticsHistory": "Shipment history",
       "accounting": "Payments and account operations",
+      "accountingHistory": "Collection and transaction history",
       "purchase": "Purchase requests",
+      "createOrderQuote": "Create a new order or quote",
+      "myOrders": "Orders and quotes I created",
       "users": "User management",
       "search": "Order and quote search"
     }
   },
+  "myOrders": {
+    "title": "My Orders",
+    "cols": {
+      "numara": "Number",
+      "musteriAd": "Customer Name",
+      "asama": "Stage",
+      "durum": "Status",
+      "tarih": "Date",
+      "actions": "Actions"
+    },
+    "actions": {
+      "formGoster": "Show Form",
+      "sipariseCevir": "Convert to Order",
+      "redNotu": "Rejection Note",
+      "revize": "Revise"
+    },
+    "disabled": {
+      "convert": "Only non-rejected quotes can be converted to orders.",
+      "redNote": "This order was not rejected so no note is available.",
+      "revise": "Approved records cannot be revised."
+    },
+    "redNote": {
+      "title": "Rejection Note",
+      "empty": "No rejection note found."
+    },
+    "toast": {
+      "converted": "Quote converted to order.",
+      "convertFailed": "Conversion failed."
+    }
+  },
   "orders": {
     "newOrderTitle": "Create Order / Quote",
+    "reviseTitle": "Revise",
+    "reviseSave": "Save Revision",
+    "reviseBanner": "Editing revision",
     "excelDownloaded": "Excel downloaded",
     "form": {
       "musteri": "Customer",
@@ -241,11 +309,58 @@
     "placeholder": "Order no, customer, country...",
     "noResults": "No results found"
   },
+  "accountingFull": {
+    "tabs": {
+      "detay": "Order Detail",
+      "musteri": "Customer",
+      "teslimat": "Delivery",
+      "temsilci": "Sales Rep",
+      "maliyet": "Cost"
+    },
+    "cols": {
+      "sirket": "Company",
+      "kaparo": "Deposit Balance",
+      "pesinYuzde": "Down Payment %",
+      "maliyet": "Cost",
+      "kar": "Profit",
+      "teslimatCesiti": "Delivery Type",
+      "asama": "Stage",
+      "muhasebeDurum": "Status"
+    },
+    "maliyet": {
+      "maliyet": "Cost",
+      "notu": "Cost Note",
+      "kar": "Profit (auto)",
+      "lastStatus": "Last request status"
+    },
+    "actions": {
+      "talepGonder": "Submit Request",
+      "muhasebeOnayla": "Approve & Move to Planning"
+    },
+    "disabled": {
+      "approve": "Order must be in 'Siparis' stage with Kontrol='Onay'."
+    },
+    "toast": {
+      "maliyetSent": "Accounting request submitted (Pending Approval).",
+      "approved": "Accounting approved — order moved to Planning."
+    }
+  },
   "accounting": {
     "title": "Accounting · Collections",
     "historyTitle": "Accounting · History",
     "balanceTitle": "Accounting · Balance",
-    "logisticsApprovalsTitle": "Accounting · Logistics Approvals"
+    "logisticsApprovalsTitle": "Accounting · Logistics Approvals",
+    "filter": {
+      "all": "— All —",
+      "ulke": "Country",
+      "temsilci": "Sales Rep",
+      "odemeDurumu": "Paid Amount",
+      "odemePlaceholder": "Exact amount",
+      "musteriPlaceholder": "Select or type a customer",
+      "reset": "Reset",
+      "totalsLabel": "Total payments in the filtered result (by currency)",
+      "rowCount": "Records found"
+    }
   },
   "logistics": {
     "readyTitle": "Logistics · Ready",
@@ -281,8 +396,7 @@
     "create": "Create Request",
     "creating": "Submitting...",
     "createSuccess": "Request created",
-    "createError": "Error",
-    "approvalFlowNote": "The request is saved in \"Pending\" status and routed to omur.caliskan for pre-approval."
+    "createError": "Error"
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",
@@ -300,7 +414,8 @@
   },
   "validation": {
     "required": "This field is required",
-    "fixErrors": "Please fill in the highlighted fields"
+    "fixErrors": "Please fill in the highlighted fields",
+    "emptyOrder": "Add at least one line item (Details or Sets cannot be empty)."
   },
   "orderStage": {
     "title": "Stage History",

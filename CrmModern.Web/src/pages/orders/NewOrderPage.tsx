@@ -4,11 +4,14 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   createOrder, createQuote, getCategories, expandRecipe, uploadAttachment,
+  // PROMPT.md #20: revise wire-up — pre-load + swap save mutation.
+  getOrderDetail, reviseOrder,
 } from '@/api/orders'
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -42,16 +45,76 @@ export function NewOrderPage() {
   const [createdNo, setCreatedNo] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
 
-  const valid = !!form.musteriAd.trim()
+  // PROMPT.md #20: when ?revise=NO is present we pre-load that order and
+  // hydrate the form so the user sees the existing values; save fires
+  // POST /api/orders/{eskiNo}/revise instead of createOrder/createQuote.
+  const isReviseMode = !!reviseFrom
+  const { data: reviseSource, isLoading: reviseLoading } = useQuery({
+    queryKey: ['order-detail', reviseFrom],
+    queryFn: () => getOrderDetail(reviseFrom!),
+    enabled: isReviseMode,
+  })
+  useEffect(() => {
+    if (!reviseSource) return
+    // Hydrate every editable field on CreateOrderDto from OrderDetail.
+    // Items aren't editable here (added via Reçeteden Aç after save), so we
+    // copy `details` strings and leave `sets` empty — matches the legacy
+    // SiparisForm revise flow which lets the user re-expand recipe lines.
+    setForm({
+      musteriAd:    reviseSource.musteriAd,
+      siparisNotu:  reviseSource.siparisNotu ?? '',
+      sTelefon:     reviseSource.sTelefon ?? '',
+      sFax:         reviseSource.sFax ?? '',
+      sWeb:         reviseSource.sWeb ?? '',
+      sE_Mail:      reviseSource.sE_Mail ?? '',
+      sVatNumarasi: reviseSource.sVatNumarasi ?? '',
+      sUlke:        reviseSource.sUlke ?? '',
+      sAdres:       reviseSource.sAdres ?? '',
+      montajVar:    reviseSource.montajVar,
+      montajFiyat:  reviseSource.montajFiyat ?? 0,
+      mAdet:        reviseSource.mAdet,
+      teslimatVar:  reviseSource.teslimatVar,
+      teslimatFiyat: reviseSource.teslimatFiyat ?? 0,
+      mTeslimat:    reviseSource.mTeslimat ?? 1,
+      teslimatCesiti: reviseSource.teslimatCesiti ?? '',
+      tTeslimAlanAdi: reviseSource.tTeslimAlanAdi ?? '',
+      tIlgiliKisi:  reviseSource.tIlgiliKisi ?? '',
+      tTelefon:     reviseSource.tTelefon ?? '',
+      tAltTelefon:  reviseSource.tAltTelefon ?? '',
+      tE_Mail:      reviseSource.tE_Mail ?? '',
+      tVATNumarasi: reviseSource.tVATNumarasi ?? '',
+      tZipKod:      reviseSource.tZipKod ?? '',
+      tUlke:        reviseSource.tUlke ?? '',
+      tAdres:       reviseSource.tAdres ?? '',
+      mTelefon:     reviseSource.mTelefon ?? '',
+      mMail:        reviseSource.mMail ?? '',
+      mUlke:        reviseSource.mUlke ?? '',
+      mVATNumarasi: reviseSource.mVATNumarasi ?? '',
+      mZipKod:      reviseSource.mZipKod ?? '',
+      mAdres:       reviseSource.mAdres ?? '',
+      paraTipi:     reviseSource.paraTipi || 'Euro',
+      indirim:      reviseSource.indirim ?? 0,
+      kdv:          reviseSource.kdv ?? 0,
+      pesinYuzde:   reviseSource.pesinYuzde,
+      sirket:       reviseSource.sirket ?? 'Unixpadel',
+      sets:         [],
+      details:      reviseSource.details ?? [],
+    })
+  }, [reviseSource])
+
+  const hasLineItems = (form.details?.length ?? 0) > 0 || (form.sets?.length ?? 0) > 0
+  const valid = !!form.musteriAd.trim() && hasLineItems
 
   const submitOrder = () => {
     setSubmitted(true)
-    if (!valid) { toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return }
+    if (!form.musteriAd.trim()) { toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return }
+    if (!hasLineItems) { toast({ title: t('validation.emptyOrder'), variant: 'destructive' }); return }
     orderMut.mutate()
   }
   const submitQuote = () => {
     setSubmitted(true)
-    if (!valid) { toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return }
+    if (!form.musteriAd.trim()) { toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return }
+    if (!hasLineItems) { toast({ title: t('validation.emptyOrder'), variant: 'destructive' }); return }
     quoteMut.mutate()
   }
 
@@ -75,14 +138,23 @@ export function NewOrderPage() {
     }))
   }
 
+  // In revise mode both Sipariş and Teklif buttons hit POST /{eskiNo}/revise
+  // — the backend chooses the resulting type based on the source. The
+  // CreateOrderDto body still travels through unchanged.
   const orderMut = useMutation({
-    mutationFn: () => createOrder(form),
-    onSuccess: (no) => { toast({ title: 'Sipariş oluşturuldu', description: no }); setCreatedNo(no) },
+    mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createOrder(form),
+    onSuccess: (no) => {
+      toast({ title: isReviseMode ? 'Revize edildi' : 'Sipariş oluşturuldu', description: no })
+      setCreatedNo(no)
+    },
     onError: () => toast({ title: 'Hata', variant: 'destructive' }),
   })
   const quoteMut = useMutation({
-    mutationFn: () => createQuote(form),
-    onSuccess: (no) => { toast({ title: 'Teklif oluşturuldu', description: no }); setCreatedNo(no) },
+    mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createQuote(form),
+    onSuccess: (no) => {
+      toast({ title: isReviseMode ? 'Revize edildi' : 'Teklif oluşturuldu', description: no })
+      setCreatedNo(no)
+    },
     onError: () => toast({ title: 'Hata', variant: 'destructive' }),
   })
 
@@ -103,24 +175,33 @@ export function NewOrderPage() {
   const [expandKategori, setExpandKategori] = useState<number | null>(null)
   const [expandAdet, setExpandAdet] = useState(1)
 
-  useEffect(() => {
-    if (reviseFrom) toast({ title: 'Revize modu', description: `Kaynak: ${reviseFrom}` })
-  }, [reviseFrom])
-
   return (
     <div>
       <PageHeader
-        title={t('orders.newOrderTitle')}
-        description={reviseFrom ? `Revize: ${reviseFrom}` : 'SiparisForm.cs portu (5-sekme wizard)'}
+        title={isReviseMode ? `${t('orders.reviseTitle')} — ${reviseFrom}` : t('orders.newOrderTitle')}
+        description={isReviseMode ? undefined : 'SiparisForm.cs portu (5-sekme wizard)'}
         actions={
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => nav(-1)}>Vazgeç</Button>
-            <Button variant="secondary" disabled={quoteMut.isPending} onClick={submitQuote}>Teklif olarak Kaydet</Button>
-            <Button disabled={orderMut.isPending} onClick={submitOrder}>Sipariş Kaydı</Button>
+            <Button variant="secondary" disabled={quoteMut.isPending || reviseLoading} onClick={submitQuote}>
+              {isReviseMode ? t('orders.reviseSave') : 'Teklif olarak Kaydet'}
+            </Button>
+            <Button disabled={orderMut.isPending || reviseLoading} onClick={submitOrder}>
+              {isReviseMode ? t('orders.reviseSave') : 'Sipariş Kaydı'}
+            </Button>
           </div>
         }
       />
       <div className="p-6">
+        {/* PROMPT.md #20: prominent revise indicator — replaces the previous
+            one-shot toast so the user always sees they're editing a revision. */}
+        {isReviseMode && (
+          <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
+            <strong>{t('orders.reviseBanner')}:</strong>{' '}
+            <span className="font-mono">{reviseFrom}</span>
+            {reviseLoading && <span className="ml-2 text-muted-foreground">({t('common.loading')})</span>}
+          </div>
+        )}
         <Tabs defaultValue="header">
           <TabsList>
             <TabsTrigger value="header">1. Üst Bilgi</TabsTrigger>
@@ -176,9 +257,9 @@ export function NewOrderPage() {
                   <SelectContent>{SIRKETLER.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>İndirim %</Label><Input type="number" value={form.indirim} onChange={(e) => setForm((f) => ({ ...f, indirim: Number(e.target.value) }))} /></div>
-              <div className="space-y-1"><Label>KDV %</Label><Input type="number" value={form.kdv} onChange={(e) => setForm((f) => ({ ...f, kdv: Number(e.target.value) }))} /></div>
-              <div className="space-y-1"><Label>Peşin %</Label><Input type="number" value={form.pesinYuzde} onChange={(e) => setForm((f) => ({ ...f, pesinYuzde: Number(e.target.value) }))} /></div>
+              <div className="space-y-1"><Label>İndirim %</Label><DecimalInput value={form.indirim} onValueChange={(v) => setForm((f) => ({ ...f, indirim: v === '' ? 0 : v }))} /></div>
+              <div className="space-y-1"><Label>KDV %</Label><DecimalInput value={form.kdv} onValueChange={(v) => setForm((f) => ({ ...f, kdv: v === '' ? 0 : v }))} /></div>
+              <div className="space-y-1"><Label>Peşin %</Label><DecimalInput value={form.pesinYuzde} onValueChange={(v) => setForm((f) => ({ ...f, pesinYuzde: v === '' ? 0 : v }))} /></div>
               <div className="space-y-1 col-span-3"><Label>Sipariş Notu</Label><Input value={form.siparisNotu ?? ''} onChange={(e) => setForm((f) => ({ ...f, siparisNotu: e.target.value }))} /></div>
             </div>
           </TabsContent>
@@ -231,7 +312,7 @@ export function NewOrderPage() {
                   <SelectContent><SelectItem value="false">Yok</SelectItem><SelectItem value="true">Var</SelectItem></SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1"><Label>Teslimat Fiyat</Label><Input type="number" value={form.teslimatFiyat} onChange={(e) => setForm((f) => ({ ...f, teslimatFiyat: Number(e.target.value) }))} /></div>
+              <div className="space-y-1"><Label>Teslimat Fiyat</Label><DecimalInput value={form.teslimatFiyat} onValueChange={(v) => setForm((f) => ({ ...f, teslimatFiyat: v === '' ? 0 : v }))} /></div>
               <div className="space-y-1"><Label>Teslimat Adet</Label><Input type="number" value={form.mTeslimat} onChange={(e) => setForm((f) => ({ ...f, mTeslimat: Number(e.target.value) }))} /></div>
             </div>
             <p className="text-xs text-muted-foreground">

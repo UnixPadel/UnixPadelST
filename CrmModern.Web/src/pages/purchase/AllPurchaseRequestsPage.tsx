@@ -14,6 +14,11 @@ import type { PurchaseRequestListDto } from '@/types'
 
 const DURUMLAR = ['Bekliyor', 'Onay Bekliyor', 'Ön Onaylandı', 'Muhasebe Tamamlandı', 'Onaylandı', 'Reddedildi'] as const
 const TIPLER = ['SatinAlma', 'Muhasebe'] as const
+// PROMPT.md ACCOUNTING #13: Departman is now a dropdown.
+// Values mirror the YetkiTuru set used elsewhere (UsersPage). Strict equality on the
+// backend (`p.Departman == departman`) was the root cause of the "kayıt bulunamadı"
+// behaviour (#12) — typo'd / case-mismatched free-text values never matched.
+const DEPARTMANLAR = ['Yonetici', 'Muhasebe', 'Fabrika', 'Gozlemci', 'Temsilci', 'Lojistik'] as const
 
 export function AllPurchaseRequestsPage() {
   const { t } = useTranslation()
@@ -55,7 +60,16 @@ export function AllPurchaseRequestsPage() {
       <div className="p-6 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-md border bg-card p-3">
           <div className="space-y-1"><Label>Talep Eden</Label><Input value={filter.talepEden ?? ''} onChange={(e) => update('talepEden', e.target.value || undefined)} /></div>
-          <div className="space-y-1"><Label>Departman</Label><Input value={filter.departman ?? ''} onChange={(e) => update('departman', e.target.value || undefined)} /></div>
+          <div className="space-y-1">
+            <Label>Departman</Label>
+            <Select value={filter.departman ?? 'all'} onValueChange={(v) => update('departman', v === 'all' ? undefined : v)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">— Tümü —</SelectItem>
+                {DEPARTMANLAR.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1">
             <Label>Durum</Label>
             <Select value={filter.durum ?? 'all'} onValueChange={(v) => update('durum', v === 'all' ? undefined : v)}>

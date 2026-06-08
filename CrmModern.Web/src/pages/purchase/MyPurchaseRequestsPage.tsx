@@ -6,12 +6,19 @@ import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/useAuth'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
+
+// Roles that can create a new purchase request (mirror /purchase/new gate).
+const CAN_CREATE_ROLES = new Set(['Yonetici', 'Lojistik', 'Fabrika', 'Gozlemci', 'Temsilci'])
 
 export function MyPurchaseRequestsPage() {
   const nav = useNavigate()
   const { t } = useTranslation()
+  const { getUser } = useAuth()
+  const user = getUser()
+  const canCreate = !!user && CAN_CREATE_ROLES.has(user.yetkiTuru)
   const { data = [], isLoading } = useQuery({ queryKey: ['purchase-mine'], queryFn: getMyPurchaseRequests })
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
@@ -30,7 +37,7 @@ export function MyPurchaseRequestsPage() {
     <div>
       <PageHeader
         title={t('purchase.mineTitle')}
-        actions={<Button onClick={() => nav('/purchase/new')}>{t('common.add')}</Button>}
+        actions={canCreate ? <Button onClick={() => nav('/purchase/new')}>{t('common.add')}</Button> : undefined}
       />
       <div className="p-6">
         <DataTable columns={cols} data={data as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />

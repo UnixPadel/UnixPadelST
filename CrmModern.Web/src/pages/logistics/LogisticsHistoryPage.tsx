@@ -44,6 +44,9 @@ export function LogisticsHistoryPage() {
     { key: 'siparisNo',    header: 'Sipariş No',  sortable: true },
     { key: 'firmaAdi',     header: 'Firma',       sortable: true },
     { key: 'lojistikCesit',header: 'Tür',         sortable: true },
+    // PROMPT.md OBSERVER #18: operatör Ad Soyad kolonu.
+    { key: 'kullaniciAdSoyad', header: 'Operatör', sortable: true,
+      render: (r) => (r.kullaniciAdSoyad as string) || '—' },
     { key: 'fiyat',        header: 'Fiyat',       render: (r) => formatCurrency((r.fiyat as number) ?? 0) },
     { key: 'siparisMiTeklifMi', header: 'Durum',
       render: (r) => <LogisticsStatusBadge value={(r.siparisMiTeklifMi as string) ?? ''} /> },

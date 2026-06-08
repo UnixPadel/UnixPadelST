@@ -23,12 +23,20 @@ interface DataTableProps<T> {
    * eventler skip edilir.
    */
   onRowClick?: (row: T) => void
+  /** PROMPT.md ACCOUNTING #14 — double-click → "Talep Detayları" dialog. */
+  onRowDoubleClick?: (row: T) => void
+  /**
+   * Per-row class hook — used by Muhasebe to colour rows by muhasebeDurumu
+   * (legacy SiparisAlDataGridRenklendir).
+   */
+  rowClassName?: (row: T) => string | undefined
 }
 
 type SortDir = 'asc' | 'desc' | null
 
 export function DataTable<T extends Record<string, unknown>>({
-  columns, data, keyField, loading, emptyMessage, onRowClick,
+  columns, data, keyField, loading, emptyMessage,
+  onRowClick, onRowDoubleClick, rowClassName,
 }: DataTableProps<T>) {
   const { t, i18n } = useTranslation()
   const effectiveEmpty = emptyMessage ?? t('common.noData')
@@ -116,7 +124,8 @@ export function DataTable<T extends Record<string, unknown>>({
                   key={String(row[keyField as string])}
                   className={cn(
                     'border-t hover:bg-muted/30 transition-colors',
-                    onRowClick && 'cursor-pointer'
+                    (onRowClick || onRowDoubleClick) && 'cursor-pointer',
+                    rowClassName?.(row),
                   )}
                   onClick={
                     onRowClick
@@ -125,6 +134,15 @@ export function DataTable<T extends Record<string, unknown>>({
                           const el = e.target as HTMLElement
                           if (el.closest('button,a,input,select,textarea,[role="button"]')) return
                           onRowClick(row)
+                        }
+                      : undefined
+                  }
+                  onDoubleClick={
+                    onRowDoubleClick
+                      ? (e) => {
+                          const el = e.target as HTMLElement
+                          if (el.closest('button,a,input,select,textarea,[role="button"]')) return
+                          onRowDoubleClick(row)
                         }
                       : undefined
                   }

@@ -17,7 +17,11 @@ export interface LoginResponse {
   token: string
   kullaniciAdi: string
   kullaniciID: number
+  ad: string
+  soyad: string
   yetkiTuru: string
+  canApprovePurchase?: boolean
+  canViewPurchaseRequests?: boolean
 }
 
 // ── Musteri ───────────────────────────────────────────────────────────────────
@@ -255,6 +259,8 @@ export interface LogisticsHistoryDto {
   kullaniciID: number
   // Paket 3: Order.SiparisMiTeklifMi join'li gelir; durum rozeti için.
   siparisMiTeklifMi?: string | null
+  // PROMPT.md OBSERVER #18: operatörün Ad Soyad'ı (KullaniciBilgileri join'li).
+  kullaniciAdSoyad?: string | null
 }
 
 // Paket 3: Muhasebe onayı bekleyen sevk talepleri.
@@ -291,6 +297,12 @@ export interface AccountingOrderListDto {
   muhasebeDurumu?: string
   muhasebeTalepID?: number
   muhasebeRedNotu?: string
+  // PROMPT.md ACCOUNTING #14 — legacy Muhasebe.cs grid columns.
+  sirket?: string
+  pesinYuzde: number
+  teslimatCesiti?: string
+  // Row colouring + "Muhasebe Onayla" enable rule needs Kontrol.
+  kontrol?: string
   tarih: string
 }
 
@@ -507,6 +519,8 @@ export interface ChangelogEntry {
 export interface AuthUser {
   kullaniciAdi: string
   kullaniciID: number
+  ad: string
+  soyad: string
   yetkiTuru: string
   token: string
 }

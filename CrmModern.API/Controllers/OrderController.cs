@@ -116,6 +116,7 @@ public sealed class OrderController(
     /// Returns the generated TeklifNo.
     /// </summary>
     [HttpPost("quote")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateQuote([FromBody] CreateOrderDto dto)
     {
@@ -130,6 +131,7 @@ public sealed class OrderController(
     /// Returns the generated SiparisNo.
     /// </summary>
     [HttpPost("order")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto dto)
     {
@@ -148,7 +150,10 @@ public sealed class OrderController(
     /// Maps to the WinForms revizeEtButton_Click handler.
     /// Returns the new SiparisNo or TeklifNo.
     /// </summary>
+    // PROMPT.md #20: same role set as CreateOrder/CreateQuote — only roles
+    // that can create orders should be able to revise them.
     [HttpPost("{eskiNo}/revise")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Revise(string eskiNo, [FromBody] CreateOrderDto dto)
@@ -165,7 +170,9 @@ public sealed class OrderController(
     /// Converts a quote to an order by setting SiparisMiTeklifMi = 'Siparis'.
     /// Maps to the WinForms SipariseCevirButton click.
     /// </summary>
+    // PROMPT.md #20: same role set as CreateOrder/CreateQuote.
     [HttpPut("{teklifNo}/convert-to-order")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -258,7 +265,7 @@ public sealed class OrderController(
 
     /// <summary>SiparisForm "Reçeteden Aç": kategori BoM'unu siparişe ekler.</summary>
     [HttpPost("{no}/expand-recipe")]
-    [Authorize(Roles = "Yonetici,Temsilci")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ExpandRecipe(string no, [FromBody] ExpandRecipeRequest dto)
     {
@@ -268,7 +275,7 @@ public sealed class OrderController(
 
     /// <summary>Ek dosya yükle. type=ek (kullanıcı eki). MuhasebeEk Faz 5'te muhasebe modülünden.</summary>
     [HttpPost("{no}/attachments")]
-    [Authorize(Roles = "Yonetici,Temsilci,Muhasebe")]
+    [Authorize(Roles = "Yonetici,Temsilci,Muhasebe,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UploadAttachment(string no, [FromQuery] string type, IFormFile file)
     {

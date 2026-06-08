@@ -46,6 +46,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 MuhasebeDurumu:   pr?.Durum,
                 MuhasebeTalepID:  pr?.TalepID,
                 MuhasebeRedNotu:  pr?.RedNotu,
+                Sirket:           o.Sirket,
+                PesinYuzde:       o.PesinYüzde,
+                TeslimatCesiti:   o.TeslimatÇeşiti,
+                Kontrol:          o.Kontrol,
                 Tarih:            o.Tarih));
         }
 
@@ -82,6 +86,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             MuhasebeDurumu:   pr?.Durum,
             MuhasebeTalepID:  pr?.TalepID,
             MuhasebeRedNotu:  pr?.RedNotu,
+            Sirket:           o.Sirket,
+            PesinYuzde:       o.PesinYüzde,
+            TeslimatCesiti:   o.TeslimatÇeşiti,
+            Kontrol:          o.Kontrol,
             Tarih:            o.Tarih);
     }
 
@@ -132,6 +140,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         return transactions.Select(MapTx).ToList().AsReadOnly();
     }
 
+    // PROMPT.md ACCOUNTING #15 — legacy MuhasebeGecmis.cs filter strip.
+    // SearchAsync still handles SiparisNo / KullaniciID / date range; MUlke,
+    // MusteriAd and OdenenMiktar are post-processed against the Order join,
+    // matching how MusteriAd worked before.
     public async Task<TransactionPageDto> GetTransactionHistoryPagedAsync(TransactionFilterDto filter)
     {
         var rows = await uow.Accounting.SearchAsync(
@@ -140,16 +152,21 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         var users = (await uow.Kullanicilar.GetAllAsync())
             .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
 
-        var allOrders = (await uow.Orders.GetAllAsync())
+        // Per-SiparisNo order metadata: MusteriAd / MUlke / ParaTipi.
+        // Used by the row projection AND by the MUlke filter below.
+        var orderMeta = (await uow.Orders.GetAllAsync())
             .Where(o => !string.IsNullOrEmpty(o.SiparisNo))
             .GroupBy(o => o.SiparisNo)
-            .ToDictionary(g => g.Key, g => (g.First().MusteriAd, g.First().ParaTipi));
+            .ToDictionary(
+                g => g.Key,
+                g => (g.First().MusteriAd, MUlke: g.First().MUlke, g.First().ParaTipi));
 
+        // Row projection — joins user + order meta to the transaction.
         IEnumerable<TransactionListItemDto> projected = rows.Select(t =>
         {
-            var ord = !string.IsNullOrEmpty(t.SiparisNo) && allOrders.TryGetValue(t.SiparisNo, out var v)
+            var ord = !string.IsNullOrEmpty(t.SiparisNo) && orderMeta.TryGetValue(t.SiparisNo, out var v)
                 ? v
-                : (MusteriAd: (string?)null, ParaTipi: (string?)null);
+                : (MusteriAd: (string?)null, MUlke: (string?)null, ParaTipi: (string?)null);
             return new TransactionListItemDto(
                 t.ID, t.SiparisNo ?? string.Empty, t.MusteriID,
                 ord.MusteriAd, t.KullaniciID,
@@ -163,13 +180,53 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             projected = projected.Where(t => (t.MusteriAd ?? "").ToLower().Contains(f));
         }
 
+        if (!string.IsNullOrWhiteSpace(filter.MUlke))
+        {
+            // Legacy used `sat.MUlke = @MUlke` (exact). Compare case-insensitive
+            // so the dropdown-supplied value matches stored capitalisation
+            // variants without surprises.
+            var u = filter.MUlke.Trim();
+            projected = projected.Where(t =>
+            {
+                var no = t.SiparisNo;
+                if (string.IsNullOrEmpty(no) || !orderMeta.TryGetValue(no, out var meta))
+                    return false;
+                return string.Equals(meta.MUlke ?? string.Empty, u, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
+        if (filter.OdenenMiktar.HasValue)
+        {
+            // Exact decimal match — legacy `mit.OdenenMiktar = @OdemeDurum`.
+            var target = filter.OdenenMiktar.Value;
+            projected = projected.Where(t => t.OdenenMiktar == target);
+        }
+
         var list = projected.ToList();
         int total = list.Count;
-        int page  = Math.Max(1, filter.Page);
-        int size  = Math.Clamp(filter.PageSize, 1, 200);
+
+        // Currency totals computed across the FULL filtered set (not the page).
+        // All four legacy buckets are always present so the UI strip stays stable.
+        var totals = new Dictionary<string, decimal>
+        {
+            ["Euro"]    = 0m,
+            ["Dolar"]   = 0m,
+            ["TL"]      = 0m,
+            ["Sterlin"] = 0m,
+        };
+        foreach (var item in list)
+        {
+            if (item.OdenenMiktar is null) continue;
+            var key = (item.ParaTipi ?? string.Empty).Trim();
+            if (totals.ContainsKey(key))
+                totals[key] += item.OdenenMiktar.Value;
+        }
+
+        int page = Math.Max(1, filter.Page);
+        int size = Math.Clamp(filter.PageSize, 1, 200);
 
         var pageItems = list.Skip((page - 1) * size).Take(size).ToList().AsReadOnly();
-        return new TransactionPageDto(pageItems, total, page, size);
+        return new TransactionPageDto(pageItems, total, page, size, totals);
     }
 
     public async Task<CustomerBalanceDto> GetCustomerBalanceAsync(int musteriId)
@@ -233,6 +290,102 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         using var ms = new MemoryStream();
         wb.SaveAs(ms);
         return ms.ToArray();
+    }
+
+    // ── PROMPT.md ACCOUNTING #14 ─────────────────────────────────────────────
+
+    public async Task SubmitMaliyetTalepAsync(string siparisNo, SubmitMaliyetTalepDto dto, string currentUserName)
+    {
+        if (dto.Maliyet < 0m)
+            throw new BusinessException("Maliyet 0'dan küçük olamaz.");
+
+        // Sipariş gerçekten var mı? (Hatalı SiparisNo'larda NotFound vermek
+        // ileride duplicate Muhasebe satırı oluşmasından çok daha güvenli.)
+        var no = NormalizeNo(siparisNo);
+        var order = await uow.Orders.GetByNoAsync(no)
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        // Türetilmiş alanlar — legacy Muhasebe.cs satır 2078-2079, 2104.
+        string urunAdi = (order.MusteriAd ?? "").Trim() + " Muhasebe";
+        decimal kar    = (dto.ToplamSiparis ?? 0m) - dto.Maliyet;
+
+        var existing = await uow.PurchaseRequests.GetMuhasebeBySiparisNoAsync(no);
+        if (existing is not null)
+        {
+            // Re-arm: legacy UPDATE branch (lines 2100-2108) — kullanıcı talebi
+            // yeniden gönderebilir, RedNotu ve önceki İslemYapanKullanici
+            // resetlenir, Durum 'Onay Bekliyor' yapılır.
+            existing.UrunAdi               = urunAdi;
+            existing.MusteriAdi            = order.MusteriAd;
+            existing.ToplamSiparis         = dto.ToplamSiparis;
+            existing.KaporaBakiyesi        = dto.KaporaBakiyesi;
+            existing.KalanBakiyeTalep      = dto.KalanBakiyeTalep;
+            existing.PesinYuzde            = dto.PesinYuzde;
+            existing.Maliyet               = dto.Maliyet;
+            existing.MaliyetDetayi         = dto.MaliyetDetayi;
+            existing.Kar                   = kar;
+            existing.TalepEdenKullaniciAdi = currentUserName;
+            existing.TalepTarihi           = DateTime.Now;
+            existing.Durum                 = "Onay Bekliyor";
+            existing.RedNotu               = null;
+            existing.IslemYapanKullanici   = null;
+            existing.IslemTarihi           = null;
+            uow.PurchaseRequests.Update(existing);
+        }
+        else
+        {
+            // INSERT branch (lines 2128-2152).
+            var entity = new PurchaseRequest
+            {
+                TalepTipi             = "Muhasebe",
+                SiparisNo             = no,
+                UrunAdi               = urunAdi,
+                UrunTuru              = string.Empty,
+                UrunMaliyeti          = 0m,
+                AlinanYer             = string.Empty,
+                MusteriAdi            = order.MusteriAd,
+                ToplamSiparis         = dto.ToplamSiparis,
+                KaporaBakiyesi        = dto.KaporaBakiyesi,
+                KalanBakiyeTalep      = dto.KalanBakiyeTalep,
+                PesinYuzde            = dto.PesinYuzde,
+                Maliyet               = dto.Maliyet,
+                MaliyetDetayi         = dto.MaliyetDetayi,
+                Kar                   = kar,
+                TalepEdenKullaniciAdi = currentUserName,
+                Departman             = "Muhasebe",
+                TalepTarihi           = DateTime.Now,
+                Durum                 = "Onay Bekliyor",
+            };
+            await uow.PurchaseRequests.AddAsync(entity);
+        }
+
+        await uow.SaveChangesAsync();
+    }
+
+    public async Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo)
+    {
+        var no = NormalizeNo(siparisNo);
+        var order = await uow.Orders.GetByNoAsync(no)
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        // Legacy Muhasebe.cs 2229-2245: aşama gates.
+        if (order.Kontrol != "Onay")
+            throw new BusinessException(
+                "Sipariş henüz Kontrol onayı almamış. Önce Kontrol aşamasında onaylanmalı.");
+
+        if (order.SiparisMiTeklifMi != "Siparis")
+            throw new BusinessException(
+                $"Sipariş zaten '{order.SiparisMiTeklifMi}' aşamasında. " +
+                "Muhasebe onayı yalnız 'Siparis' aşamasındaki kayıtlara uygulanır.");
+
+        // Siparis → Planlama. Legacy ayrıca `Muhasebe=1` flag'i yazıyordu
+        // (lines 2251-2252) ama modern Order entity'sinde bu kolon
+        // modellenmiyor ve downstream hiçbir servis okumuyor — stage
+        // transition'ı tek başına semantik etki. Idempotent: aynı butona
+        // ikinci basışta state aynı kalır.
+        order.SiparisMiTeklifMi = "Planlama";
+        uow.Orders.Update(order);
+        await uow.SaveChangesAsync();
     }
 
     public async Task UploadMuhasebeEkAsync(string siparisNo, byte[] data, int currentUserId)

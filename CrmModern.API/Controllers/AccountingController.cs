@@ -16,6 +16,10 @@ public sealed class AccountingController(IAccountingService accountingService) :
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("KullaniciID claim missing."));
 
+    private string CurrentUserName =>
+        User.FindFirstValue(ClaimTypes.Name)
+            ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
+
     [HttpGet("orders")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<AccountingOrderListDto>>), StatusCodes.Status200OK)]
@@ -92,6 +96,36 @@ public sealed class AccountingController(IAccountingService accountingService) :
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "muhasebe.xlsx");
+    }
+
+    /// <summary>
+    /// PROMPT.md ACCOUNTING #14 — Muhasebe ekranı "Talep Gönder" butonu.
+    /// SatinAlmaTalep (TalepTipi='Muhasebe') için upsert.
+    /// </summary>
+    [HttpPost("orders/{siparisNo}/maliyet")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> SubmitMaliyet(string siparisNo, [FromBody] SubmitMaliyetTalepDto dto)
+    {
+        await accountingService.SubmitMaliyetTalepAsync(siparisNo, dto, CurrentUserName);
+        return Ok(ApiResponse<object>.Ok(null!, "Muhasebe talebi gönderildi (Onay Bekliyor)."));
+    }
+
+    /// <summary>
+    /// PROMPT.md ACCOUNTING #14 — Muhasebe ekranı "Muhasebe Onayla" butonu.
+    /// Siparis → Planlama. Kontrol='Onay' AND SiparisMiTeklifMi='Siparis' guards.
+    /// </summary>
+    [HttpPut("orders/{siparisNo}/approve-and-move-to-planning")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ApproveMuhasebeAndMoveToPlanning(string siparisNo)
+    {
+        await accountingService.ApproveMuhasebeAndMoveToPlanningAsync(siparisNo);
+        return Ok(ApiResponse<object>.Ok(null!, "Muhasebe onayı verildi — sipariş Planlama aşamasında."));
     }
 
     /// <summary>MuhasebeEk yükle (Faz 3 blok kaldırıldı, yetki: Yonetici, Muhasebe).</summary>

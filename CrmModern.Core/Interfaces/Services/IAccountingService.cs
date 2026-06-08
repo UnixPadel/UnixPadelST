@@ -27,4 +27,26 @@ public interface IAccountingService
 
     /// <summary>SiparisAlTablo.MuhasebeEk = byte[]. Faz 3'teki blok bu metodla kaldırıldı.</summary>
     Task UploadMuhasebeEkAsync(string siparisNo, byte[] data, int currentUserId);
+
+    // ── PROMPT.md ACCOUNTING #14 ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Muhasebe ekranı "Talep Gönder": SatinAlmaTalep (TalepTipi='Muhasebe')
+    /// için upsert. Aynı SiparisNo'lu Muhasebe-talep varsa güncelle ve Durum'u
+    /// 'Onay Bekliyor' yap (re-arm); yoksa yeni satır ekle.
+    ///
+    /// Server-side türetilen alanlar:
+    ///   UrunAdi               = "{MusteriAd} Muhasebe"
+    ///   Departman             = "Muhasebe"
+    ///   TalepEdenKullaniciAdi = mevcut JWT kullanıcı adı
+    ///   Kar                   = ToplamSiparis - Maliyet  (ToplamSiparis varsa)
+    /// </summary>
+    Task SubmitMaliyetTalepAsync(string siparisNo, SubmitMaliyetTalepDto dto, string currentUserName);
+
+    /// <summary>
+    /// Muhasebe ekranı "Muhasebe Onayla" butonu: SiparisAlTablo durumunu
+    /// 'Siparis' → 'Planlama' yap ve Muhasebe=1 set et. Yalnız Kontrol='Onay'
+    /// olanlar geçer; aksi halde BusinessException.
+    /// </summary>
+    Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo);
 }

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useTranslation } from 'react-i18next'
 import {
   getPendingPayment, getPurchaseById, setPaymentDetails,
   type SetPaymentDetailsRequest,
@@ -8,22 +7,44 @@ import {
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
-import { DynamicPaymentForm } from '@/components/DynamicPaymentForm'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { FieldError } from '@/components/FieldError'
+import { ODEME_TURLERI } from '@/components/DynamicPaymentForm'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
-const empty: SetPaymentDetailsRequest = { odemeTuru: '' }
+// PROMPT.md ACCOUNTING #10 (revised): "keep only the text `Ödeme Detayı`" +
+// user follow-up: "keep odemeTuru as a single dropdown visible, no hardcoded
+// default. Just drop the dynamic sub-fields underneath it."
+//
+// So this dialog now shows:
+//   • Heading            "Ödeme Detayı"
+//   • Ödeme Türü         dropdown (required)
+//   • İşlem Tarihi       defaulted to DateTime.Now on open (task #11)
+// No more amount / vade / kart-tipi sub-fields conditional on the type.
+
+// `yyyy-MM-ddTHH:mm` in the user's local time, suitable for <input type="datetime-local" />.
+function nowForDatetimeLocal(): string {
+  const d = new Date()
+  const tzOffsetMs = d.getTimezoneOffset() * 60_000
+  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 16)
+}
+
+const buildEmpty = (): SetPaymentDetailsRequest => ({
+  odemeTuru: '',
+  odemeIslemTarihi: nowForDatetimeLocal(),
+})
 
 export function PaymentDetailsPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
-  const { t } = useTranslation()
   const [target, setTarget] = useState<number | null>(null)
-  const [form, setForm] = useState<SetPaymentDetailsRequest>(empty)
+  const [form, setForm] = useState<SetPaymentDetailsRequest>(buildEmpty())
   const [submitted, setSubmitted] = useState(false)
 
   const valid = !!form.odemeTuru
@@ -48,7 +69,7 @@ export function PaymentDetailsPage() {
       qc.invalidateQueries({ queryKey: ['payment-pending'] })
       qc.invalidateQueries({ queryKey: ['preapproval'] })
       qc.invalidateQueries({ queryKey: ['final-pending'] })
-      setTarget(null); setForm(empty); setSubmitted(false)
+      setTarget(null); setForm(buildEmpty()); setSubmitted(false)
       toast({ title: 'Ödeme detayı kaydedildi (Muhasebe Tamamlandı)' })
     },
     onError: (e: unknown) => toast({ title: 'Kayıt başarısız', description: (e as Error).message, variant: 'destructive' }),
@@ -65,7 +86,7 @@ export function PaymentDetailsPage() {
     {
       key: 'actions', header: 'İşlem',
       render: (r) => (
-        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(empty); setSubmitted(false) }}>
+        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()); setSubmitted(false) }}>
           Ödeme Detayı Gir
         </Button>
       ),
@@ -74,7 +95,7 @@ export function PaymentDetailsPage() {
 
   return (
     <div>
-      <PageHeader title="Ödeme Detayı (Muhasebe)" description="SatinAlmaTakipForm portu — Aşama 2, dinamik panel" />
+      <PageHeader title="Ödeme Detayı (Muhasebe)" />
       <div className="p-6">
         <DataTable columns={cols} data={pending as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
       </div>
@@ -98,8 +119,34 @@ export function PaymentDetailsPage() {
             </div>
           )}
 
-          <DynamicPaymentForm value={form} onChange={setForm} disabled={saveMut.isPending} />
-          {submitted && !valid && <FieldError message={t('validation.required')} />}
+          {/* PROMPT.md ACCOUNTING #10 (revised): heading + Ödeme Türü dropdown +
+              İşlem Tarihi (defaults to DateTime.Now — task #11). No sub-fields. */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-medium">Ödeme Detayı</h3>
+            <div className="space-y-1">
+              <Label>Ödeme Türü *</Label>
+              <Select
+                value={form.odemeTuru}
+                onValueChange={(s) => setForm((f) => ({ ...f, odemeTuru: s }))}
+                disabled={saveMut.isPending}
+              >
+                <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                <SelectContent>
+                  {ODEME_TURLERI.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              {submitted && !form.odemeTuru && <FieldError message="Bu alan zorunludur" />}
+            </div>
+            <div className="space-y-1">
+              <Label>İşlem Tarihi *</Label>
+              <Input
+                type="datetime-local"
+                value={form.odemeIslemTarihi ?? ''}
+                onChange={(e) => setForm((f) => ({ ...f, odemeIslemTarihi: e.target.value || undefined }))}
+                disabled={saveMut.isPending}
+              />
+            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setTarget(null)}>İptal</Button>

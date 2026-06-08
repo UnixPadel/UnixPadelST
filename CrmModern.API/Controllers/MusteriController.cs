@@ -35,8 +35,11 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
         return Ok(ApiResponse<MusteriDto>.Ok(data));
     }
 
+    // PROMPT.md #16 + #19: Gozlemci (observer) and Temsilci (rep) both
+    // need to create customers; Temsilci is intentionally not in the
+    // Update role list — they can add but not modify existing records.
     [HttpPost]
-    [Authorize(Roles = "Yonetici,Temsilci")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<MusteriDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>),     StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateMusteriDto dto)
@@ -49,7 +52,7 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
     }
 
     [HttpPut("{id:int}")]
-    [Authorize(Roles = "Yonetici,Temsilci")]
+    [Authorize(Roles = "Yonetici,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<MusteriDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>),     StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateMusteriDto dto)
@@ -78,7 +81,11 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
         return Ok(ApiResponse<IEnumerable<UlkeDto>>.Ok(data));
     }
 
+    // PROMPT.md #16 (flag 2): pre-existing "any auth user" gap tightened to
+    // the same role set that can create a customer — only roles that can
+    // submit a customer form ever need the inline "add country" affordance.
     [HttpPost("ulkeler")]
+    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<UlkeDto>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ApiResponse<object>),  StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> CreateUlke([FromBody] CreateUlkeDto dto)

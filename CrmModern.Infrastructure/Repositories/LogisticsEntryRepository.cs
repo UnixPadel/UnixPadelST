@@ -42,12 +42,23 @@ internal sealed class LogisticsEntryRepository(AppDbContext context)
 
     public async Task<IReadOnlyList<LogisticsHistoryDto>> SearchHistoryAsync(string? siparisNo, string? firmaAdi)
     {
+        // PROMPT.md OBSERVER #18: KullaniciBilgileri ile sol-join — Ad/Soyad
+        // history satırlarıyla aynı sorguda gelsin (N+1 önlenir).
         var q =
             from l in _context.LojistikTablo.AsNoTracking()
             join o in _context.SiparisAlTablo.AsNoTracking()
                 on l.SiparisNo equals o.SiparisNo into og
             from o in og.DefaultIfEmpty()
-            select new { l, Stage = o != null ? o.SiparisMiTeklifMi : null };
+            join k in _context.KullaniciBilgileri.AsNoTracking()
+                on l.KullaniciAdi equals k.KullaniciID into kg
+            from k in kg.DefaultIfEmpty()
+            select new
+            {
+                l,
+                Stage = o != null ? o.SiparisMiTeklifMi : null,
+                Ad    = k != null ? k.Ad    : null,
+                Soyad = k != null ? k.Soyad : null,
+            };
 
         if (!string.IsNullOrWhiteSpace(siparisNo))
             q = q.Where(x => x.l.SiparisNo.Contains(siparisNo));
@@ -59,7 +70,8 @@ internal sealed class LogisticsEntryRepository(AppDbContext context)
             .OrderByDescending(x => x.l.ID)
             .Select(x => new LogisticsHistoryDto(
                 x.l.ID, x.l.SiparisNo, x.l.FirmaAdi, x.l.LojistikCesit,
-                x.l.Fiyat, x.l.LNot, x.l.KullaniciAdi, x.Stage))
+                x.l.Fiyat, x.l.LNot, x.l.KullaniciAdi, x.Stage,
+                ((x.Ad ?? "") + " " + (x.Soyad ?? "")).Trim()))
             .ToListAsync();
     }
 

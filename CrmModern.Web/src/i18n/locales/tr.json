@@ -255,7 +255,10 @@
   "factory": {
     "title": "Fabrika / Üretim",
     "temsilci": "Temsilci",
-    "filterReset": "Filtreleri Temizle"
+    "filterReset": "Filtreleri Temizle",
+    "excelDownloading": "İndiriliyor...",
+    "excelDownloaded": "İndirildi",
+    "excelFailed": "İndirme başarısız"
   },
   "purchase": {
     "newTitle": "Satın Alma · Yeni Talep",

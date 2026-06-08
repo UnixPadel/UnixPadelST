@@ -23,7 +23,7 @@ const FACTORY_ASAMALAR = ['Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi
 
 export function FactoryPage() {
   const qc = useQueryClient()
-  const { toast } = useToast()
+  const { toast, dismiss } = useToast()
   const { t } = useTranslation()
   const [productionTarget, setProductionTarget] = useState<string | null>(null)
   const [fabrikaNot, setFabrikaNot] = useState('')
@@ -65,12 +65,22 @@ export function FactoryPage() {
     onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
   })
 
+  // 2.6 — Excel akışı: önce persistent "İndiriliyor..." toast'u; promise
+  // resolve olunca onu kapatıp "İndirildi" toast'u (otomatik kapanır).
+  // Reddedilirse aynısı + destructive variant.
   const handleExcel = async (siparisNo: string) => {
+    const loadingId = toast({
+      title: t('factory.excelDownloading'),
+      description: siparisNo,
+      persistent: true,
+    })
     try {
       await downloadExcel(siparisNo)
-      toast({ title: t('orders.excelDownloaded') })
+      dismiss(loadingId)
+      toast({ title: t('factory.excelDownloaded'), description: siparisNo })
     } catch {
-      toast({ title: t('common.error'), variant: 'destructive' })
+      dismiss(loadingId)
+      toast({ title: t('factory.excelFailed'), description: siparisNo, variant: 'destructive' })
     }
   }
 
@@ -162,11 +172,13 @@ export function FactoryPage() {
           </div>
         </div>
 
+        {/* 2.5 — Satır tıklamasında detay modalı açılır (aşama geçmişi dahil) */}
         <DataTable
           columns={columns}
           data={data as (FactoryOrderListDto & Record<string, unknown>)[]}
           keyField="siparisNo"
           loading={isLoading}
+          onRowClick={(r) => setDetailNo(r.siparisNo as string)}
         />
       </div>
 

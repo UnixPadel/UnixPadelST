@@ -255,7 +255,10 @@
   "factory": {
     "title": "Factory / Production",
     "temsilci": "Representative",
-    "filterReset": "Clear Filters"
+    "filterReset": "Clear Filters",
+    "excelDownloading": "Downloading...",
+    "excelDownloaded": "Downloaded",
+    "excelFailed": "Download failed"
   },
   "purchase": {
     "newTitle": "Purchase · New Request",

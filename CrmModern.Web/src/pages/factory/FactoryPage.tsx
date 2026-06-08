@@ -23,7 +23,7 @@ const FACTORY_ASAMALAR = ['Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi
 
 export function FactoryPage() {
   const qc = useQueryClient()
-  const { toast } = useToast()
+  const { toast, dismiss } = useToast()
   const { t } = useTranslation()
   const [productionTarget, setProductionTarget] = useState<string | null>(null)
   const [fabrikaNot, setFabrikaNot] = useState('')
@@ -65,12 +65,22 @@ export function FactoryPage() {
     onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
   })
 
+  // 2.6 — Excel akışı: önce persistent "İndiriliyor..." toast'u; promise
+  // resolve olunca onu kapatıp "İndirildi" toast'u (otomatik kapanır).
+  // Reddedilirse aynısı + destructive variant.
   const handleExcel = async (siparisNo: string) => {
+    const loadingId = toast({
+      title: t('factory.excelDownloading'),
+      description: siparisNo,
+      persistent: true,
+    })
     try {
       await downloadExcel(siparisNo)
-      toast({ title: t('orders.excelDownloaded') })
+      dismiss(loadingId)
+      toast({ title: t('factory.excelDownloaded'), description: siparisNo })
     } catch {
-      toast({ title: t('common.error'), variant: 'destructive' })
+      dismiss(loadingId)
+      toast({ title: t('factory.excelFailed'), description: siparisNo, variant: 'destructive' })
     }
   }
 
@@ -93,12 +103,12 @@ export function FactoryPage() {
           <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
           {(r.siparisMiTeklifMi as string) === 'Planlama' && (
             <Button size="sm" onClick={() => { setProductionTarget(r.siparisNo as string) }}>
-              Üretime Al
+              {t('factory.moveToProduction')}
             </Button>
           )}
           {(r.siparisMiTeklifMi as string) === 'Uretim' && (
             <Button size="sm" variant="secondary" onClick={() => readyMut.mutate(r.siparisNo as string)} disabled={readyMut.isPending}>
-              Hazır
+              {t('factory.ready')}
             </Button>
           )}
         </div>
@@ -162,28 +172,30 @@ export function FactoryPage() {
           </div>
         </div>
 
+        {/* 2.5 — Satır tıklamasında detay modalı açılır (aşama geçmişi dahil) */}
         <DataTable
           columns={columns}
           data={data as (FactoryOrderListDto & Record<string, unknown>)[]}
           keyField="siparisNo"
           loading={isLoading}
+          onRowClick={(r) => setDetailNo(r.siparisNo as string)}
         />
       </div>
 
       <Dialog open={!!productionTarget} onOpenChange={() => setProductionTarget(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Üretime Al — {productionTarget}</DialogTitle>
+            <DialogTitle>{t('factory.moveToProductionTitle', { siparisNo: productionTarget ?? '' })}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label>Üretim Tarihi</Label>
+              <Label>{t('factory.uretimTarihi')}</Label>
               <Input type="datetime-local" value={sTarih} onChange={(e) => setSTarih(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Fabrika Notu</Label>
+              <Label>{t('factory.fabrikaNot')}</Label>
               <Textarea
-                placeholder="Fabrika notu girin..."
+                placeholder={t('factory.fabrikaNotPlaceholder')}
                 value={fabrikaNot}
                 onChange={(e) => setFabrikaNot(e.target.value)}
                 rows={3}

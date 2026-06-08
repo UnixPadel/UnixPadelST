@@ -255,12 +255,34 @@
   "factory": {
     "title": "Factory / Production",
     "temsilci": "Representative",
-    "filterReset": "Clear Filters"
+    "filterReset": "Clear Filters",
+    "excelDownloading": "Downloading...",
+    "excelDownloaded": "Downloaded",
+    "excelFailed": "Download failed",
+    "moveToProduction": "Move to Production",
+    "moveToProductionTitle": "Move to Production — {{siparisNo}}",
+    "ready": "Ready",
+    "uretimTarihi": "Production Date",
+    "fabrikaNot": "Factory Note",
+    "fabrikaNotPlaceholder": "Enter factory note..."
   },
   "purchase": {
     "newTitle": "Purchase · New Request",
     "mineTitle": "Purchase · My Requests",
-    "allTitle": "Purchase · All Requests"
+    "allTitle": "Purchase · All Requests",
+    "urunAdi": "Product Name",
+    "urunTuru": "Product Type",
+    "maliyet": "Cost",
+    "alinanYer": "Source",
+    "departman": "Department",
+    "departmanHint": "Auto-assigned from your role.",
+    "notlar": "Notes",
+    "cancel": "Cancel",
+    "create": "Create Request",
+    "creating": "Submitting...",
+    "createSuccess": "Request created",
+    "createError": "Error",
+    "approvalFlowNote": "The request is saved in \"Pending\" status and routed to omur.caliskan for pre-approval."
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",

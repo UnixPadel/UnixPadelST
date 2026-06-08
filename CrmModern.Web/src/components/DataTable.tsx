@@ -17,12 +17,18 @@ interface DataTableProps<T> {
   keyField: keyof T
   loading?: boolean
   emptyMessage?: string
+  /**
+   * Faz-fix 2.5 — Satır tıklamasıyla detay aç.
+   * Buton/link tıklamaları bubble etmesin diye <button> içinden gelen
+   * eventler skip edilir.
+   */
+  onRowClick?: (row: T) => void
 }
 
 type SortDir = 'asc' | 'desc' | null
 
 export function DataTable<T extends Record<string, unknown>>({
-  columns, data, keyField, loading, emptyMessage,
+  columns, data, keyField, loading, emptyMessage, onRowClick,
 }: DataTableProps<T>) {
   const { t, i18n } = useTranslation()
   const effectiveEmpty = emptyMessage ?? t('common.noData')
@@ -106,7 +112,23 @@ export function DataTable<T extends Record<string, unknown>>({
               </tr>
             ) : (
               sorted.map((row) => (
-                <tr key={String(row[keyField as string])} className="border-t hover:bg-muted/30 transition-colors">
+                <tr
+                  key={String(row[keyField as string])}
+                  className={cn(
+                    'border-t hover:bg-muted/30 transition-colors',
+                    onRowClick && 'cursor-pointer'
+                  )}
+                  onClick={
+                    onRowClick
+                      ? (e) => {
+                          // Buton / link / input içinden gelen click row-click'i tetiklemesin.
+                          const el = e.target as HTMLElement
+                          if (el.closest('button,a,input,select,textarea,[role="button"]')) return
+                          onRowClick(row)
+                        }
+                      : undefined
+                  }
+                >
                   {columns.map((col) => (
                     <td key={String(col.key)} className={cn('px-4 py-3', col.className)}>
                       {(() => {

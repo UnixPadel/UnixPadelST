@@ -255,12 +255,34 @@
   "factory": {
     "title": "Fabrika / Üretim",
     "temsilci": "Temsilci",
-    "filterReset": "Filtreleri Temizle"
+    "filterReset": "Filtreleri Temizle",
+    "excelDownloading": "İndiriliyor...",
+    "excelDownloaded": "İndirildi",
+    "excelFailed": "İndirme başarısız",
+    "moveToProduction": "Üretime Al",
+    "moveToProductionTitle": "Üretime Al — {{siparisNo}}",
+    "ready": "Hazır",
+    "uretimTarihi": "Üretim Tarihi",
+    "fabrikaNot": "Fabrika Notu",
+    "fabrikaNotPlaceholder": "Fabrika notu girin..."
   },
   "purchase": {
     "newTitle": "Satın Alma · Yeni Talep",
     "mineTitle": "Satın Alma · Taleplerim",
-    "allTitle": "Satın Alma · Tüm Talepler"
+    "allTitle": "Satın Alma · Tüm Talepler",
+    "urunAdi": "Ürün Adı",
+    "urunTuru": "Ürün Türü",
+    "maliyet": "Maliyet",
+    "alinanYer": "Alınan Yer",
+    "departman": "Departman",
+    "departmanHint": "Rolünüzden otomatik atanır.",
+    "notlar": "Notlar",
+    "cancel": "Vazgeç",
+    "create": "Talep Oluştur",
+    "creating": "Gönderiliyor...",
+    "createSuccess": "Talep oluşturuldu",
+    "createError": "Hata",
+    "approvalFlowNote": "Talep \"Bekliyor\" durumunda kaydedilir, ön onay için omur.caliskan'a düşer."
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",

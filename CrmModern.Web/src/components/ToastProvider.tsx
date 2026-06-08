@@ -7,31 +7,61 @@ interface Toast {
   title: string
   description?: string
   variant?: 'default' | 'destructive'
+  /**
+   * Faz-fix 2.6 — true ise toast otomatik kapanmaz; manuel `dismiss(id)`
+   * çağrılana kadar görünür kalır. Excel "İndiriliyor..." gibi async
+   * işlemlerin progress göstergesi için kullanılır.
+   */
+  persistent?: boolean
+}
+
+interface ToastInput {
+  title: string
+  description?: string
+  variant?: 'default' | 'destructive'
+  persistent?: boolean
 }
 
 interface ToastContextValue {
-  toast: (t: Omit<Toast, 'id'>) => void
+  /** Toast oluşturur; oluşturulan toast'un id'sini döner (dismiss/update için). */
+  toast: (t: ToastInput) => string
+  /** Verilen id'li toast'u hemen kapatır. */
+  dismiss: (id: string) => void
 }
 
-const ToastContext = createContext<ToastContextValue>({ toast: () => {} })
+const ToastContext = createContext<ToastContextValue>({
+  toast: () => '',
+  dismiss: () => {},
+})
 
 export function useToast() {
   return useContext(ToastContext)
 }
 
 let _id = 0
+const DEFAULT_TTL = 4500
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
-  const toast = useCallback((t: Omit<Toast, 'id'>) => {
+  const dismiss = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((x) => x.id !== id))
+  }, [])
+
+  const toast = useCallback((input: ToastInput): string => {
     const id = String(++_id)
-    setToasts((prev) => [...prev, { ...t, id }])
-    setTimeout(() => setToasts((prev) => prev.filter((x) => x.id !== id)), 4500)
+    setToasts((prev) => [...prev, { ...input, id }])
+    // persistent: otomatik kapanmaz — caller dismiss(id) çağırmalı.
+    if (!input.persistent) {
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((x) => x.id !== id))
+      }, DEFAULT_TTL)
+    }
+    return id
   }, [])
 
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastContext.Provider value={{ toast, dismiss }}>
       {children}
       <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 w-80">
         {toasts.map((t) => (
@@ -51,7 +81,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               )}
             </div>
             <button
-              onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+              onClick={() => dismiss(t.id)}
               className="text-muted-foreground hover:text-foreground"
             >
               <X className="h-4 w-4" />

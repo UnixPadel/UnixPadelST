@@ -1,7 +1,9 @@
 namespace CrmModern.Core.Entities;
 
 /// <summary>
-/// Maps to MusteriBilgileri table — schema unchanged.
+/// Maps to MusteriBilgileri table.
+/// PROMPT-v2 §7: CreatedByKullaniciID kolonu Temsilci sahiplenmesini taşır
+/// (DatabaseSchemaMigrator idempotent ALTER + earliest-order backfill).
 /// </summary>
 public sealed class Musteri
 {
@@ -13,6 +15,13 @@ public sealed class Musteri
     public string Adres        { get; set; } = string.Empty;
     public string VATNumarasi  { get; set; } = string.Empty;
     public int    UlkelerID    { get; set; }
+
+    /// <summary>
+    /// Müşteriyi sisteme ekleyen kullanıcının id'si (PROMPT-v2 §7).
+    /// Geçmişte yaratılmış kayıtlarda ilk SiparisAlTablo.KullaniciID'sinden
+    /// doldurulur; hiç sipariş yoksa NULL kalır (yalnız Yonetici görür).
+    /// </summary>
+    public int? CreatedByKullaniciID { get; set; }
 
     // Navigation property
     public Ulke? Ulke { get; set; }

@@ -32,6 +32,11 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<OrderListPageDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrders([FromQuery] OrderFilterDto filter)
     {
+        // PROMPT-v2 §6: Temsilci yalnız kendi siparişlerini görür.
+        // Filtre KullaniciID'si zorla kendi user id'sine sabitlenir.
+        if (User.IsInRole("Temsilci"))
+            filter = filter with { KullaniciID = CurrentUserId };
+
         var result = await orderService.GetOrdersAsync(filter);
         return Ok(ApiResponse<OrderListPageDto>.Ok(result));
     }
@@ -51,6 +56,10 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<OrderTotalsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTotals([FromQuery] OrderFilterDto filter)
     {
+        // PROMPT-v2 §6: Temsilci toplamları kendi siparişlerinden hesaplanır.
+        if (User.IsInRole("Temsilci"))
+            filter = filter with { KullaniciID = CurrentUserId };
+
         var result = await orderService.GetTotalsByCurrencyAsync(filter);
         return Ok(ApiResponse<OrderTotalsDto>.Ok(result));
     }
@@ -82,8 +91,9 @@ public sealed class OrderController(
     }
 
     /// <summary>UrunMaliyetTablo'dan sipariş başına maliyet özeti.</summary>
+    // PROMPT-v2 §2: Fabrika dışlandı — fabrika rolüne hiçbir parasal değer açılmıyor.
     [HttpGet("{no}/material-cost")]
-    [Authorize(Roles = "Yonetici,Muhasebe,Fabrika")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(ApiResponse<MaterialCostDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMaterialCost(string no)
     {
@@ -308,8 +318,9 @@ public sealed class OrderController(
     /// Form3.excelYaz_Click davranışıyla birebir placeholder substitution yapılır. Aksi
     /// halde hard-coded ClosedXML fallback'e düşülür.
     /// </summary>
+    // PROMPT-v2 §2: Proforma fiyatlar içerdiği için Fabrika dışlandı.
     [HttpGet("{no}/excel")]
-    [Authorize(Roles = "Yonetici,Fabrika,Muhasebe")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Excel(string no)
     {

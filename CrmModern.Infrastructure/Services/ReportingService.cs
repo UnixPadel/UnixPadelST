@@ -613,6 +613,15 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         decimal tl      = ciro.TryGetValue("TL",      out var t) ? t : 0m;
         decimal sterlin = ciro.TryGetValue("Sterlin", out var s) ? s : 0m;
 
+        // PROMPT-v2 §2: Parasal görünürlüğü olmayan roller için ciro alanları
+        // sıfırlanır — backend gate'in frontend `ROLE_LAYOUT.revenue=false` ile
+        // uyumlu kalması için. (Yonetici/Muhasebe/Gozlemci tam ciro görür.)
+        bool revenueHidden = role is "Fabrika" or "Lojistik" or "Temsilci";
+        if (revenueHidden)
+        {
+            euro = 0m; dolar = 0m; tl = 0m; sterlin = 0m;
+        }
+
         var result = new DashboardKpiDto(
             Son30GunSiparisSayisi:        siparis30,
             Son30GunCiroEuro:             euro,

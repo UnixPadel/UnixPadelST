@@ -15,6 +15,8 @@ public interface ISearchService
     /// Faz 7 — Topbar global arama. Tek query → birden çok kategori (Sipariş, Müşteri,
     /// Bileşen, Kategori, Kullanıcı, Satın Alma Talep) üzerinde paralel LIKE.
     /// Yetki: rol bazlı kategori filtresi.
+    /// PROMPT-v2 §6/§7: Temsilci için sipariş + müşteri sonuçları kendi user id'sine
+    /// kısıtlanır; <paramref name="currentUserId"/> null ise kısıtlama uygulanmaz.
     /// </summary>
-    Task<UnifiedSearchResultDto> UnifiedSearchAsync(string query, string role);
+    Task<UnifiedSearchResultDto> UnifiedSearchAsync(string query, string role, int? currentUserId = null);
 }

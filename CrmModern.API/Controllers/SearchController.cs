@@ -14,6 +14,11 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
 {
     private string CurrentRole =>
         User.FindFirstValue(ClaimTypes.Role) ?? "Temsilci";
+
+    private int CurrentUserId =>
+        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new InvalidOperationException("KullaniciID claim missing."));
+
     /// <summary>
     /// Searches orders/quotes with optional filters.
     /// All parameters are optional — omitting all returns every record.
@@ -32,6 +37,11 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
         [FromQuery] DateTime? baslangic   = null,
         [FromQuery] DateTime? bitis       = null)
     {
+        // PROMPT-v2 §6: Temsilci yalnız kendi siparişlerini arar — istemci
+        // kullaniciID gönderse bile kendi id'sine zorlanır.
+        if (User.IsInRole("Temsilci"))
+            kullaniciID = CurrentUserId;
+
         var filter = new SearchFilterDto(
             siparisNo, musteriAd, kullaniciID, ulke,
             asama, kontrol, odemeDurum, baslangic, bitis);
@@ -48,7 +58,12 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
     [ProducesResponseType(typeof(ApiResponse<UnifiedSearchResultDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UnifiedSearch([FromQuery] string q)
     {
-        var result = await searchService.UnifiedSearchAsync(q ?? string.Empty, CurrentRole);
+        // PROMPT-v2 §6/§7: Temsilci için kullanıcı id'sini geçiriyoruz; servis
+        // sipariş + müşteri sonuçlarını rol bazında kısıtlar.
+        var result = await searchService.UnifiedSearchAsync(
+            q ?? string.Empty,
+            CurrentRole,
+            User.IsInRole("Temsilci") ? CurrentUserId : null);
         return Ok(ApiResponse<UnifiedSearchResultDto>.Ok(result));
     }
 }

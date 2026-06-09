@@ -16,6 +16,7 @@ import { useToast } from '@/components/ToastProvider'
 import { formatDate } from '@/lib/utils'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { downloadExcel } from '@/api/orders'
+import { useAuth } from '@/hooks/useAuth'
 import type { FactoryOrderListDto } from '@/types'
 
 // FactoryService.GetProductionStagesAsync 5 aşama dönüyor.
@@ -25,6 +26,9 @@ export function FactoryPage() {
   const qc = useQueryClient()
   const { toast, dismiss } = useToast()
   const { t } = useTranslation()
+  // PROMPT-v2 §2: Excel proforma fiyat içerir; Fabrika için gizli.
+  const { getUser } = useAuth()
+  const isFabrika = getUser()?.yetkiTuru === 'Fabrika'
   const [productionTarget, setProductionTarget] = useState<string | null>(null)
   const [fabrikaNot, setFabrikaNot] = useState('')
   const [sTarih, setSTarih] = useState(() => new Date().toISOString().slice(0, 16))
@@ -100,7 +104,9 @@ export function FactoryPage() {
       render: (r) => (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.form')}</Button>
-          <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
+          {!isFabrika && (
+            <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
+          )}
           {(r.siparisMiTeklifMi as string) === 'Planlama' && (
             <Button size="sm" onClick={() => { setProductionTarget(r.siparisNo as string) }}>
               {t('factory.moveToProduction')}

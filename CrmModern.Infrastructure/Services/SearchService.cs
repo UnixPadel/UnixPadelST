@@ -45,11 +45,15 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
     // WinForms'ta yoktu — modern UI özelliği.
     // ─────────────────────────────────────────────────────────────────────────────
 
-    public async Task<UnifiedSearchResultDto> UnifiedSearchAsync(string query, string role)
+    public async Task<UnifiedSearchResultDto> UnifiedSearchAsync(string query, string role, int? currentUserId = null)
     {
         var trimmed = (query ?? string.Empty).Trim();
         if (trimmed.Length < 2)
             return new UnifiedSearchResultDto(trimmed, 0, Array.Empty<UnifiedSearchHitDto>());
+
+        // PROMPT-v2 §6/§7: Temsilci sipariş + müşteri sonuçlarında kendi user
+        // id'sine kısıtlanır. ScopeUserId null ise (diğer roller) hiç filtre uygulanmaz.
+        int? scopeUserId = role == "Temsilci" ? currentUserId : null;
 
         // ── Rol bazlı kategori yetkileri ──────────────────────────────────────
         bool canSeeOrders     = true;
@@ -78,7 +82,12 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
         // ── Map → DTO ─────────────────────────────────────────────────────────
         var hits = new List<UnifiedSearchHitDto>();
 
-        foreach (var o in orderTask.Result)
+        // PROMPT-v2 §6: Temsilci ise kendi user id'sine ait olmayan sipariş kayıtlarını ele.
+        var scopedOrders = scopeUserId is int uid
+            ? orderTask.Result.Where(o => o.KullaniciID == uid)
+            : orderTask.Result;
+
+        foreach (var o in scopedOrders)
         {
             string numara = o.SiparisMiTeklifMi == "Teklif" && !string.IsNullOrEmpty(o.TeklifNo)
                 ? o.TeklifNo : o.SiparisNo;
@@ -90,7 +99,13 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
                 NavigateUrl: $"/orders/{Uri.EscapeDataString(o.SiparisNo)}"));
         }
 
-        foreach (var m in musteriTask.Result)
+        // PROMPT-v2 §7: Temsilci ise CreatedByKullaniciID kendi user id'si olmayan
+        // müşteri kayıtlarını ele.
+        var scopedMusteri = scopeUserId is int muid
+            ? musteriTask.Result.Where(m => m.CreatedByKullaniciID == muid)
+            : musteriTask.Result;
+
+        foreach (var m in scopedMusteri)
         {
             hits.Add(new UnifiedSearchHitDto(
                 Kategori:    "Müşteri",

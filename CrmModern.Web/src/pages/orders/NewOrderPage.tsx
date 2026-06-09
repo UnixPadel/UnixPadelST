@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import {
   createOrder, createQuote, getCategories, expandRecipe, uploadAttachment,
-  getDeliveryAddresses,
+  getDeliveryAddresses, getComponentsByCategory,
   // PROMPT.md #20: revise wire-up — pre-load + swap save mutation.
   getOrderDetail, reviseOrder,
 } from '@/api/orders'
@@ -53,13 +53,31 @@ const blank = (): CreateOrderDto => ({
   sets: [], details: [], sirket: 'Unixpadel',
 })
 
+/**
+ * PROMPT-v2 §1b: Bileşen tablosunda her satırın editlenebilir state'i.
+ * Adet ve Birim Fiyat kullanıcı tarafından değiştirilir; Toplam computed.
+ */
+interface ComponentRow {
+  bilesenID: number
+  bilesenAdi: string
+  birim: string
+  oznitelikSecili: string
+  oznitelikSecenekler: string[]
+  adet: number
+  birimFiyat: number
+}
+
 /** Local UI state for the Sipariş 1..5 tabs (legacy "Çarp" → push set). */
 interface SetTabState {
   kategoriID: number | null
   kategoriFiyat: number   // tekil fiyat
   adet: number
+  // PROMPT-v2 §1b: Ana Ürün seçilince getComponentsByCategory ile dolar.
+  // Çarp basılınca form.sets[i].components'a kopyalanır.
+  components: ComponentRow[]
 }
-const emptySetTab = (): SetTabState => ({ kategoriID: null, kategoriFiyat: 0, adet: 1 })
+const emptySetTab = (): SetTabState =>
+  ({ kategoriID: null, kategoriFiyat: 0, adet: 1, components: [] })
 
 export function NewOrderPage() {
   const nav = useNavigate()
@@ -208,6 +226,39 @@ export function NewOrderPage() {
     setSetTabs((s) => s.map((t, i) => i === idx ? { ...t, ...patch } : t))
 
   /**
+   * PROMPT-v2 §1b: Legacy anaUrunComboBox_SelectedIndexChanged portu.
+   * Kategori seçilince ilgili bileşenler API'den çekilir ve alt tabloyu
+   * editlenebilir satırlarla doldurur. Çarp'a kadar form payload'una etkisi yok.
+   */
+  const onCategorySelect = async (idx: number, kategoriID: number) => {
+    const kategoriFiyat = categories.find((c) => c.kategoriID === kategoriID)?.fiyat ?? 0
+    // Pre-update: kullanıcı UI'ı responsive görsün — bileşenler arkadan gelir.
+    updateTab(idx, { kategoriID, kategoriFiyat, components: [] })
+    try {
+      const list = await getComponentsByCategory(kategoriID)
+      const rows: ComponentRow[] = (list ?? []).map((c: any) => ({
+        bilesenID:           c.bilesenID,
+        bilesenAdi:          c.bilesenAdi ?? '',
+        birim:               c.birim ?? '',
+        oznitelikSecenekler: (c.attributes ?? []) as string[],
+        oznitelikSecili:     (c.attributes?.[0] as string | undefined) ?? '',
+        adet:                c.defaultAdet ?? 1,
+        birimFiyat:          c.defaultFiyat ?? 0,
+      }))
+      updateTab(idx, { components: rows })
+    } catch {
+      toast({ title: 'Bileşenler yüklenemedi', variant: 'destructive' })
+    }
+  }
+
+  /** PROMPT-v2 §1b: Tek bir bileşen satırını (Adet / Birim Fiyat / Öznitelik) düzeltir. */
+  const updateComponent = (tabIdx: number, rowIdx: number, patch: Partial<ComponentRow>) =>
+    setSetTabs((s) => s.map((t, i) => i !== tabIdx ? t : {
+      ...t,
+      components: t.components.map((c, k) => k === rowIdx ? { ...c, ...patch } : c),
+    }))
+
+  /**
    * Legacy "Çarp" button: persists the current tab's selection into form.sets[idx].
    * Components are populated post-save via the "Reçeteden Aç" (expandRecipe) call.
    */
@@ -217,11 +268,17 @@ export function NewOrderPage() {
       toast({ title: 'Ana ürün seçin', variant: 'destructive' })
       return
     }
+    // PROMPT-v2 §1b: Editlenmiş bileşen satırları payload'a kopyalanır.
     const set: OrderSetInput = {
       kategoriID:    tab.kategoriID,
       adet:          tab.adet,
       kategoriFiyat: tab.kategoriFiyat,
-      components:    [],
+      components:    tab.components.map((c) => ({
+        bilesenID:    c.bilesenID,
+        oznitelikAdi: c.oznitelikSecili || undefined,
+        adet:         c.adet,
+        fiyat:        c.birimFiyat,
+      })),
     }
     setForm((f) => {
       const next = [...(f.sets ?? [])]
@@ -289,11 +346,16 @@ export function NewOrderPage() {
           </div>
         )}
 
-        {/* ── 3-COLUMN GRID (legacy SiparisForm layout) ──────────────── */}
+        {/* ── 3-COLUMN GRID (legacy SiparisForm layout) ────────────────
+            PROMPT-v2 §1a: 1920×1080 (100% zoom) yatay scroll'suz sığar;
+            13" 1366×768'de de aksiyon bar görünür. Tüm kolonlara `min-w-0`
+            verildi, böylece grid çocukları kendi içerikleriyle taşmaz —
+            yatay scroll yalnız ortadaki bileşen tablosunda lazım olur.
+        */}
         <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_380px] gap-4">
 
           {/* ╔══════════ LEFT: MÜŞTERİ + TEMSİLCİ ══════════════════════ */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             <section className="rounded-md border bg-card">
               <h3 className="text-center text-base font-semibold py-2 border-b">Müşteri</h3>
               <div className="p-3 space-y-2">
@@ -401,7 +463,9 @@ export function NewOrderPage() {
           </div>
 
           {/* ╔══════════ CENTER: SET TABS + DETAY ═════════════════════════ */}
-          <section className="rounded-md border bg-card min-h-[600px]">
+          {/* PROMPT-v2 §1a: min-w-0 grid çocuğunun iç tablosunun overflow
+              container'ı olarak davranmasını mümkün kılar. */}
+          <section className="rounded-md border bg-card min-h-[600px] min-w-0">
             <Tabs defaultValue="set-0">
               <div className="border-b px-2">
                 <TabsList className="bg-transparent h-auto py-1">
@@ -424,10 +488,8 @@ export function NewOrderPage() {
                       <Label className="text-xs text-right block">Ana Ürün</Label>
                       <Select
                         value={setTabs[i].kategoriID ? String(setTabs[i].kategoriID) : ''}
-                        onValueChange={(v) => updateTab(i, {
-                          kategoriID: Number(v),
-                          kategoriFiyat: categories.find((c) => c.kategoriID === Number(v))?.fiyat ?? 0,
-                        })}
+                        // PROMPT-v2 §1b: Kategori değişimi bileşen tablosunu yükler.
+                        onValueChange={(v) => onCategorySelect(i, Number(v))}
                       >
                         <SelectTrigger><SelectValue placeholder="Ana ürün seç" /></SelectTrigger>
                         <SelectContent>
@@ -483,7 +545,12 @@ export function NewOrderPage() {
                       : <>Ana ürün seçip "Çarp" basın</>}
                   </div>
 
-                  {/* Bileşen tablosu — kaydetten sonra "Reçeteden Aç" ile dolar */}
+                  {/*
+                    PROMPT-v2 §1b: Ana Ürün seçilince bu tablo yüklenir;
+                    Adet / Birim Fiyat satır bazında editlenebilir, Toplam
+                    canlı hesaplanır. Çarp basılınca payload'a alınır.
+                    §1a viewport: overflow-x-auto yalnız bu iç tabloda.
+                  */}
                   <div className="rounded border overflow-x-auto">
                     <table className="w-full text-xs">
                       <thead className="bg-muted/30">
@@ -492,23 +559,48 @@ export function NewOrderPage() {
                           <th className="text-left px-2 py-1">Öznitelik</th>
                           <th className="text-left px-2 py-1">Bileşen Adı</th>
                           <th className="text-left px-2 py-1">Birim</th>
-                          <th className="text-right px-2 py-1">Adet</th>
-                          <th className="text-right px-2 py-1">Birim Fiyat</th>
-                          <th className="text-right px-2 py-1">Toplam</th>
+                          <th className="text-right px-2 py-1 w-20">Adet</th>
+                          <th className="text-right px-2 py-1 w-28">Birim Fiyat</th>
+                          <th className="text-right px-2 py-1 w-24">Toplam</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {(form.sets?.[i]?.components ?? []).length === 0
-                          ? <tr><td colSpan={7} className="text-center text-muted-foreground px-2 py-6">— Henüz bileşen yok —</td></tr>
-                          : form.sets![i].components.map((cmp, k) => (
-                            <tr key={k} className="border-t">
+                        {setTabs[i].components.length === 0
+                          ? <tr><td colSpan={7} className="text-center text-muted-foreground px-2 py-6">
+                              {setTabs[i].kategoriID ? 'Bu kategoride bileşen yok.' : 'Önce Ana Ürün seçin.'}
+                            </td></tr>
+                          : setTabs[i].components.map((cmp, k) => (
+                            <tr key={`${cmp.bilesenID}-${k}`} className="border-t">
                               <td className="px-2 py-1">{cmp.bilesenID}</td>
-                              <td className="px-2 py-1">{cmp.oznitelikAdi ?? '—'}</td>
-                              <td className="px-2 py-1">—</td>
-                              <td className="px-2 py-1">—</td>
-                              <td className="px-2 py-1 text-right">{cmp.adet}</td>
-                              <td className="px-2 py-1 text-right">{fmt(cmp.fiyat ?? 0)}</td>
-                              <td className="px-2 py-1 text-right">{fmt((cmp.fiyat ?? 0) * cmp.adet)}</td>
+                              <td className="px-2 py-1">
+                                {cmp.oznitelikSecenekler.length > 0 ? (
+                                  <select
+                                    value={cmp.oznitelikSecili}
+                                    onChange={(e) => updateComponent(i, k, { oznitelikSecili: e.target.value })}
+                                    className="w-full bg-transparent border rounded px-1 py-0.5 text-xs"
+                                  >
+                                    {cmp.oznitelikSecenekler.map((o) => <option key={o} value={o}>{o}</option>)}
+                                  </select>
+                                ) : '—'}
+                              </td>
+                              <td className="px-2 py-1">{cmp.bilesenAdi}</td>
+                              <td className="px-2 py-1">{cmp.birim || '—'}</td>
+                              <td className="px-2 py-1 text-right">
+                                <Input
+                                  type="number" min={1}
+                                  value={cmp.adet}
+                                  onChange={(e) => updateComponent(i, k, { adet: Math.max(1, Number(e.target.value)) })}
+                                  className="h-7 text-xs text-right"
+                                />
+                              </td>
+                              <td className="px-2 py-1 text-right">
+                                <DecimalInput
+                                  value={cmp.birimFiyat}
+                                  onValueChange={(v) => updateComponent(i, k, { birimFiyat: v === '' ? 0 : v })}
+                                  className="h-7 text-xs text-right"
+                                />
+                              </td>
+                              <td className="px-2 py-1 text-right tabular-nums">{fmt(cmp.adet * cmp.birimFiyat)}</td>
                             </tr>
                           ))}
                       </tbody>
@@ -535,7 +627,7 @@ export function NewOrderPage() {
           </section>
 
           {/* ╔══════════ RIGHT: CARI BİLGİ + TESLİMAT / MONTAJ ════════════ */}
-          <div className="space-y-4">
+          <div className="space-y-4 min-w-0">
             {/* Teklif / Sipariş No header */}
             <div className="rounded-md border bg-card p-3 space-y-2">
               <Field label="Teklif No">

@@ -120,13 +120,15 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
 
         return cat.CategoryComponents
             .Select(cc => new ComponentDto(
-                BilesenID:   cc.BilesenID,
-                BilesenAdi:  cc.Component!.BilesenAdi,
-                Birim:       cc.Component.Birim,
-                DefaultAdet: cc.Adet,
-                Attributes:  cc.Component.Attributes
-                               .Select(a => a.OznitelikAdı)
-                               .ToList()))
+                BilesenID:    cc.BilesenID,
+                BilesenAdi:   cc.Component!.BilesenAdi,
+                Birim:        cc.Component.Birim,
+                DefaultAdet:  cc.Adet,
+                // PROMPT-v2 §1b: Bileşen master fiyatı default Birim Fiyat olur.
+                DefaultFiyat: cc.Component.Fiyat,
+                Attributes:   cc.Component.Attributes
+                                .Select(a => a.OznitelikAdı)
+                                .ToList()))
             .ToList();
     }
 

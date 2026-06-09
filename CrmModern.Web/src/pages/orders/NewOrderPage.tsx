@@ -47,7 +47,9 @@ const blank = (): CreateOrderDto => ({
   teslimatCesiti: '', tTeslimAlanAdi: '', tIlgiliKisi: '',
   tTelefon: '', tAltTelefon: '', tE_Mail: '', tVATNumarasi: '', tZipKod: '', tUlke: '', tAdres: '',
   mTelefon: '', mMail: '', mUlke: '', mVATNumarasi: '', mZipKod: '', mAdres: '',
-  paraTipi: 'Euro', indirim: 0, kdv: 0, pesinYuzde: 0,
+  // PROMPT-v2 §3: İndirim/KDV/Peşin başlangıçta boş — "henüz karar vermedi"
+  // semantiği. Backend null → 0 coercion'ını total hesaplamada uygular.
+  paraTipi: 'Euro', indirim: null, kdv: null, pesinYuzde: null,
   sets: [], details: [], sirket: 'Unixpadel',
 })
 
@@ -124,9 +126,10 @@ export function NewOrderPage() {
       mZipKod:      reviseSource.mZipKod ?? '',
       mAdres:       reviseSource.mAdres ?? '',
       paraTipi:     reviseSource.paraTipi || 'Euro',
-      indirim:      reviseSource.indirim ?? 0,
-      kdv:          reviseSource.kdv ?? 0,
-      pesinYuzde:   reviseSource.pesinYuzde,
+      // PROMPT-v2 §3: Kaynak NULL ise boş (null) olarak hidrate edilir.
+      indirim:      reviseSource.indirim ?? null,
+      kdv:          reviseSource.kdv ?? null,
+      pesinYuzde:   reviseSource.pesinYuzde ?? null,
       sirket:       reviseSource.sirket ?? 'Unixpadel',
       sets:         [],
       details:      reviseSource.details ?? [],
@@ -573,18 +576,19 @@ export function NewOrderPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
+                  {/* PROMPT-v2 §3: boş → null (display blank); coercion yalnız hesapta. */}
                   <Field label="İndirim" suffix="%">
-                    <DecimalInput value={form.indirim} onValueChange={(v) => setForm((f) => ({ ...f, indirim: v === '' ? 0 : v }))} />
+                    <DecimalInput value={form.indirim ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, indirim: v === '' ? null : v }))} />
                   </Field>
                   <Field label="KDV" suffix="%">
-                    <DecimalInput value={form.kdv} onValueChange={(v) => setForm((f) => ({ ...f, kdv: v === '' ? 0 : v }))} />
+                    <DecimalInput value={form.kdv ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, kdv: v === '' ? null : v }))} />
                   </Field>
 
                   <Field label="Toplam Fiyat" prefix={sym}>
                     <Input readOnly disabled value={fmt(toplamFiyat)} />
                   </Field>
                   <Field label="Peşin" suffix="%">
-                    <DecimalInput value={form.pesinYuzde} onValueChange={(v) => setForm((f) => ({ ...f, pesinYuzde: v === '' ? 0 : v }))} />
+                    <DecimalInput value={form.pesinYuzde ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, pesinYuzde: v === '' ? null : v }))} />
                   </Field>
 
                   <Field label="Kapora Miktarı" prefix={sym}>

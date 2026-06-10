@@ -127,9 +127,8 @@ const ROLE_LAYOUT: Record<string, RoleLayout> = {
     charts:  ['trend', 'stage', 'topCustomers'],
     tiles:   ['/quality-control', '/logistics/history', '/accounting/history', '/purchase/mine', '/search'],
   },
-  // Note: tiles include only existing routes. /orders/new is gated on the route
-  // side (Yonetici/Temsilci); Temsilci sees it here as a shortcut. My Orders
-  // tile to land alongside task #20.
+  // Note: tiles include only existing routes. /orders/new is Temsilci-only
+  // (PROMPT-v3 §1) — no other role layout may list it.
   Temsilci: {
     kpis:    ['myOpenOrders', 'pendingPurchase'],
     revenue: false,

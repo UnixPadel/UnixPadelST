@@ -21,6 +21,9 @@ internal sealed class ProductCategoryRepository(AppDbContext context)
             .AsNoTracking()
             .Include(c => c.CategoryComponents)
                 .ThenInclude(cc => cc.Component)
+                    // PROMPT-v3 §2.1: arayüz sözleşmesi Component.Attributes'ı da
+                    // vaat eder — eksik Include Öznitelik'lerin boş gelmesine yol açıyordu.
+                    .ThenInclude(c => c!.Attributes)
             .FirstOrDefaultAsync(c => c.KategoriID == kategoriID);
 
     public async Task<IReadOnlyList<ProductCategory>> QuickFindAsync(string query, int limit)

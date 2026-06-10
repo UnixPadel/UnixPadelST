@@ -306,6 +306,9 @@ export interface AccountingOrderListDto {
   // Row colouring + "Muhasebe Onayla" enable rule needs Kontrol.
   kontrol?: string
   tarih: string
+  // PROMPT-v2 §10.2: Maliyet Reçetesi Net Kar math için.
+  indirim?: number | null
+  kdv?: number | null
 }
 
 export interface AccountingTransactionDto {

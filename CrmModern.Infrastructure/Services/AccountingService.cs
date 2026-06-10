@@ -50,7 +50,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 PesinYuzde:       o.PesinYüzde,
                 TeslimatCesiti:   o.TeslimatÇeşiti,
                 Kontrol:          o.Kontrol,
-                Tarih:            o.Tarih));
+                Tarih:            o.Tarih,
+                // PROMPT-v2 §10.2: Maliyet Reçetesi math için.
+                Indirim:          o.Indirim,
+                Kdv:              o.Kdv));
         }
 
         return result.AsReadOnly();
@@ -90,7 +93,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             PesinYuzde:       o.PesinYüzde,
             TeslimatCesiti:   o.TeslimatÇeşiti,
             Kontrol:          o.Kontrol,
-            Tarih:            o.Tarih);
+            Tarih:            o.Tarih,
+            // PROMPT-v2 §10.2: Maliyet Reçetesi math için.
+            Indirim:          o.Indirim,
+            Kdv:              o.Kdv);
     }
 
     public async Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(string siparisNo)
@@ -149,6 +155,15 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         var rows = await uow.Accounting.SearchAsync(
             filter.SiparisNo, filter.KullaniciID, filter.BaslangicTarih, filter.BitisTarih);
 
+        // PROMPT-v2 §10.1: SiparisNo başına 1-based installment index. Filtre
+        // uygulanmış kümeden hesaplanır — global indeksleme date-range filtresi
+        // varken yanıltıcı olabilir; spec'in kabul ettiği basitleştirme.
+        var installmentIndex = rows
+            .Where(t => !string.IsNullOrEmpty(t.SiparisNo))
+            .GroupBy(t => t.SiparisNo!)
+            .SelectMany(g => g.OrderBy(t => t.Tarih).Select((t, i) => (t.ID, Index: i + 1)))
+            .ToDictionary(x => x.ID, x => x.Index);
+
         var users = (await uow.Kullanicilar.GetAllAsync())
             .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
 
@@ -171,7 +186,9 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 t.ID, t.SiparisNo ?? string.Empty, t.MusteriID,
                 ord.MusteriAd, t.KullaniciID,
                 users.TryGetValue(t.KullaniciID, out var n) ? n : null,
-                ord.ParaTipi, t.OdenenMiktar, t.Tarih);
+                ord.ParaTipi, t.OdenenMiktar, t.Tarih,
+                // PROMPT-v2 §10.1: SiparisNo'su boş satırlar 0; geri kalanlar lookup'tan.
+                installmentIndex.TryGetValue(t.ID, out var ix) ? ix : 0);
         });
 
         if (!string.IsNullOrWhiteSpace(filter.MusteriAd))

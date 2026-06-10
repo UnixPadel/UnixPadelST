@@ -22,7 +22,11 @@ public sealed record TransactionListItemDto(
     string?  Kullanici,
     string?  ParaTipi,
     decimal? OdenenMiktar,
-    DateTime Tarih);
+    DateTime Tarih,
+    // PROMPT-v2 §10.1: 1-based, per-SiparisNo, ordered by Tarih asc. Frontend
+    // bu indeksi kullanarak peşinatları "1. Peşinat / 2. Peşinat / …" sütunlarına
+    // dağıtır ve Fark (1→2) hesaplar. Filtre uygulanmış set üzerinden hesaplanır.
+    int      InstallmentIndex);
 
 // CurrencyTotals: PROMPT.md ACCOUNTING #15 — sum of OdenenMiktar per ParaTipi
 // across the FULL filtered result (not just the current page), so the UI

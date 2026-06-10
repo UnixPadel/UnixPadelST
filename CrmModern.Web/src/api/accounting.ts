@@ -48,6 +48,8 @@ export interface TransactionListItem {
   paraTipi?: string
   odenenMiktar: number | null
   tarih: string
+  // PROMPT-v2 §10.1: SiparisNo başına 1-based; 0 = sahipsiz (SiparisNo boş).
+  installmentIndex: number
 }
 
 export interface TransactionPage {

@@ -115,18 +115,31 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
 
     public async Task<IReadOnlyList<ComponentDto>> GetComponentsByCategoryAsync(int kategoriID)
     {
+        // PROMPT-v3 §2.1 — legacy comboBoxKategori_SelectedIndexChanged sorgusu:
+        //   SELECT bb.* FROM BilesenBilgileri bb
+        //   LEFT JOIN KategoriBilesenleri kb ON bb.BilesenID = kb.BilesenID
+        //                                   AND kb.KategoriID = @KategoriID
+        // Tüm bileşenler döner; reçetede olanlar InRecipe=true + kb.Adet taşır.
         var cat = await uow.ProductCategories.GetWithComponentsAsync(kategoriID)
             ?? throw new NotFoundException("Category", kategoriID);
 
-        return cat.CategoryComponents
-            .Select(cc => new ComponentDto(
-                BilesenID:    cc.BilesenID,
-                BilesenAdi:   cc.Component!.BilesenAdi,
-                Birim:        cc.Component.Birim,
-                DefaultAdet:  cc.Adet,
+        var recipe = cat.CategoryComponents.ToDictionary(cc => cc.BilesenID, cc => cc.Adet);
+
+        // GetAllWithAttributesAsync: Attributes Include'lu gelir — Öznitelik
+        // dropdown'larının boş kalması (v2'deki sessiz hata) burada kapanır.
+        var components = await uow.Components.GetAllWithAttributesAsync();
+
+        return components
+            .OrderBy(c => c.BilesenID)   // legacy liste sırası
+            .Select(c => new ComponentDto(
+                BilesenID:    c.BilesenID,
+                BilesenAdi:   c.BilesenAdi,
+                Birim:        c.Birim,
+                InRecipe:     recipe.ContainsKey(c.BilesenID),
+                DefaultAdet:  recipe.TryGetValue(c.BilesenID, out int adet) ? adet : 1,
                 // PROMPT-v2 §1b: Bileşen master fiyatı default Birim Fiyat olur.
-                DefaultFiyat: cc.Component.Fiyat,
-                Attributes:   cc.Component.Attributes
+                DefaultFiyat: c.Fiyat,
+                Attributes:   c.Attributes
                                 .Select(a => a.OznitelikAdı)
                                 .ToList()))
             .ToList();

@@ -7,6 +7,8 @@ import {
   getDeliveryAddresses, getComponentsByCategory,
   // PROMPT.md #20: revise wire-up — pre-load + swap save mutation.
   getOrderDetail, reviseOrder,
+  // PROMPT-v3 §6: Formu Getir — kendi siparişlerinden seçip forma yükleme.
+  getMyOrders,
 } from '@/api/orders'
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
@@ -17,14 +19,18 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/components/ToastProvider'
 import { FieldError } from '@/components/FieldError'
-import type { CreateOrderDto, OrderSetInput } from '@/types'
+import type { CreateOrderDto, OrderDetail, OrderSetInput } from '@/types'
 
 const PARA_TIPLERI_RADIO = ['Euro', 'Dolar', 'TL'] as const
 const PARA_TIPLERI_DIGER = ['Sterlin'] as const
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk'] as const
+
+// PROMPT-v3 §4.1: legacy teslimatCesiti1 combobox seçenekleri — sıra birebir.
+const INCOTERMS = ['EXW', 'FCA', 'CPT', 'CIP', 'DAT', 'DAP', 'DDP', 'FAS', 'FOB', 'MCFR', 'CIF', 'CFR', 'CNF'] as const
 
 /** Currency symbol for any selected paraTipi (Euro/Dolar/TL/Sterlin). */
 function currencySymbol(paraTipi: string): string {
@@ -56,6 +62,8 @@ const blank = (): CreateOrderDto => ({
 /**
  * PROMPT-v2 §1b: Bileşen tablosunda her satırın editlenebilir state'i.
  * Adet ve Birim Fiyat kullanıcı tarafından değiştirilir; Toplam computed.
+ * PROMPT-v3 §2.3: defaultAdet saklanır — ürün adedi spinner'ı değişince
+ * her satırın Adet'i defaultAdet × ürünAdedi olarak yeniden hesaplanır.
  */
 interface ComponentRow {
   bilesenID: number
@@ -65,19 +73,124 @@ interface ComponentRow {
   oznitelikSecenekler: string[]
   adet: number
   birimFiyat: number
+  defaultAdet: number
+}
+
+/**
+ * PROMPT-v3 §2.2: bilesenCheckedListBox satırı — kategori seçilince TÜM
+ * bileşenler listelenir, reçetede olanlar (inRecipe) ön-işaretli gelir.
+ */
+interface ChecklistItem {
+  bilesenID: number
+  bilesenAdi: string
+  birim: string
+  inRecipe: boolean
+  defaultAdet: number
+  defaultFiyat: number
+  attributes: string[]
+  checked: boolean
 }
 
 /** Local UI state for the Sipariş 1..5 tabs (legacy "Çarp" → push set). */
 interface SetTabState {
   kategoriID: number | null
+  kategoriAdi: string     // §2.4 öznitelik auto-default kuralları kategori adına bakar
   kategoriFiyat: number   // tekil fiyat
   adet: number
-  // PROMPT-v2 §1b: Ana Ürün seçilince getComponentsByCategory ile dolar.
+  checklist: ChecklistItem[]
+  // PROMPT-v3 §2.3: grid = checklist'te işaretli satırlar.
   // Çarp basılınca form.sets[i].components'a kopyalanır.
   components: ComponentRow[]
 }
 const emptySetTab = (): SetTabState =>
-  ({ kategoriID: null, kategoriFiyat: 0, adet: 1, components: [] })
+  ({ kategoriID: null, kategoriAdi: '', kategoriFiyat: 0, adet: 1, checklist: [], components: [] })
+
+/**
+ * PROMPT-v3 §2.4: legacy OznitelikDegistir auto-default kuralları.
+ * Dal sırası legacy ile birebir: cam → powder painting → fence-typo.
+ * Not: doğru yazımlı "fence powder painting" legacy'de olduğu gibi
+ * "powder painting" dalına düşer; typo'lu "fence powder paiting" son dala.
+ * Auto değer seçenekler arasında yoksa ekstra option olarak enjekte edilir.
+ */
+function autoOznitelik(
+  kategoriAdi: string, bilesenAdi: string, attributes: string[],
+): { secili: string; secenekler: string[] } {
+  let auto = ''
+  if (bilesenAdi.includes('temperred glass by EN and ISO warranty')) {
+    if (kategoriAdi === 'Standard Padel Court')        auto = '10mm'
+    else if (kategoriAdi === 'Panoramic Padel Court')  auto = '12mm'
+  } else if (bilesenAdi.includes('powder painting')) {
+    if (kategoriAdi === 'Standard Padel Court')        auto = 'metalic structure Black 80x60x3mm'
+    else if (kategoriAdi === 'Panoramic Padel Court')  auto = 'metalic structure Black 80x80x3mm'
+  } else if (bilesenAdi.includes('fence powder paiting') || bilesenAdi.includes('fence powder painting')) {
+    auto = 'fence structure 50x50 black'
+  }
+  const secenekler = auto && !attributes.includes(auto) ? [...attributes, auto] : attributes
+  return { secili: auto || attributes[0] || '', secenekler }
+}
+
+/** §2.3: yeni işaretlenen checklist satırından grid satırı üretir. */
+function buildRow(item: ChecklistItem, kategoriAdi: string, urunAdedi: number): ComponentRow {
+  const { secili, secenekler } = autoOznitelik(kategoriAdi, item.bilesenAdi, item.attributes)
+  return {
+    bilesenID:           item.bilesenID,
+    bilesenAdi:          item.bilesenAdi,
+    birim:               item.birim,
+    oznitelikSecili:     secili,
+    oznitelikSecenekler: secenekler,
+    adet:                item.defaultAdet * urunAdedi,
+    birimFiyat:          item.defaultFiyat,
+    defaultAdet:         item.defaultAdet,
+  }
+}
+
+/**
+ * OrderDetail → CreateOrderDto header dolumu. PROMPT.md #20 revise pre-load
+ * ile PROMPT-v3 §6 Formu Getir aynı eşlemeyi paylaşır (sets'i çağıran doldurur).
+ */
+function detailToForm(d: OrderDetail): CreateOrderDto {
+  return {
+    musteriAd:    d.musteriAd,
+    siparisNotu:  d.siparisNotu ?? '',
+    sTelefon:     d.sTelefon ?? '',
+    sFax:         d.sFax ?? '',
+    sWeb:         d.sWeb ?? '',
+    sE_Mail:      d.sE_Mail ?? '',
+    sVatNumarasi: d.sVatNumarasi ?? '',
+    sUlke:        d.sUlke ?? '',
+    sAdres:       d.sAdres ?? '',
+    montajVar:    d.montajVar,
+    montajFiyat:  d.montajFiyat ?? 0,
+    mAdet:        d.mAdet,
+    teslimatVar:  d.teslimatVar,
+    teslimatFiyat: d.teslimatFiyat ?? 0,
+    mTeslimat:    d.mTeslimat ?? 1,
+    teslimatCesiti: d.teslimatCesiti ?? '',
+    tTeslimAlanAdi: d.tTeslimAlanAdi ?? '',
+    tIlgiliKisi:  d.tIlgiliKisi ?? '',
+    tTelefon:     d.tTelefon ?? '',
+    tAltTelefon:  d.tAltTelefon ?? '',
+    tE_Mail:      d.tE_Mail ?? '',
+    tVATNumarasi: d.tVATNumarasi ?? '',
+    tZipKod:      d.tZipKod ?? '',
+    tUlke:        d.tUlke ?? '',
+    tAdres:       d.tAdres ?? '',
+    mTelefon:     d.mTelefon ?? '',
+    mMail:        d.mMail ?? '',
+    mUlke:        d.mUlke ?? '',
+    mVATNumarasi: d.mVATNumarasi ?? '',
+    mZipKod:      d.mZipKod ?? '',
+    mAdres:       d.mAdres ?? '',
+    paraTipi:     d.paraTipi || 'Euro',
+    // PROMPT-v2 §3: Kaynak NULL ise boş (null) olarak hidrate edilir.
+    indirim:      d.indirim ?? null,
+    kdv:          d.kdv ?? null,
+    pesinYuzde:   d.pesinYuzde ?? null,
+    sirket:       d.sirket ?? 'Unixpadel',
+    sets:         [],
+    details:      d.details ?? [],
+  }
+}
 
 export function NewOrderPage() {
   const nav = useNavigate()
@@ -111,47 +224,7 @@ export function NewOrderPage() {
   })
   useEffect(() => {
     if (!reviseSource) return
-    setForm({
-      musteriAd:    reviseSource.musteriAd,
-      siparisNotu:  reviseSource.siparisNotu ?? '',
-      sTelefon:     reviseSource.sTelefon ?? '',
-      sFax:         reviseSource.sFax ?? '',
-      sWeb:         reviseSource.sWeb ?? '',
-      sE_Mail:      reviseSource.sE_Mail ?? '',
-      sVatNumarasi: reviseSource.sVatNumarasi ?? '',
-      sUlke:        reviseSource.sUlke ?? '',
-      sAdres:       reviseSource.sAdres ?? '',
-      montajVar:    reviseSource.montajVar,
-      montajFiyat:  reviseSource.montajFiyat ?? 0,
-      mAdet:        reviseSource.mAdet,
-      teslimatVar:  reviseSource.teslimatVar,
-      teslimatFiyat: reviseSource.teslimatFiyat ?? 0,
-      mTeslimat:    reviseSource.mTeslimat ?? 1,
-      teslimatCesiti: reviseSource.teslimatCesiti ?? '',
-      tTeslimAlanAdi: reviseSource.tTeslimAlanAdi ?? '',
-      tIlgiliKisi:  reviseSource.tIlgiliKisi ?? '',
-      tTelefon:     reviseSource.tTelefon ?? '',
-      tAltTelefon:  reviseSource.tAltTelefon ?? '',
-      tE_Mail:      reviseSource.tE_Mail ?? '',
-      tVATNumarasi: reviseSource.tVATNumarasi ?? '',
-      tZipKod:      reviseSource.tZipKod ?? '',
-      tUlke:        reviseSource.tUlke ?? '',
-      tAdres:       reviseSource.tAdres ?? '',
-      mTelefon:     reviseSource.mTelefon ?? '',
-      mMail:        reviseSource.mMail ?? '',
-      mUlke:        reviseSource.mUlke ?? '',
-      mVATNumarasi: reviseSource.mVATNumarasi ?? '',
-      mZipKod:      reviseSource.mZipKod ?? '',
-      mAdres:       reviseSource.mAdres ?? '',
-      paraTipi:     reviseSource.paraTipi || 'Euro',
-      // PROMPT-v2 §3: Kaynak NULL ise boş (null) olarak hidrate edilir.
-      indirim:      reviseSource.indirim ?? null,
-      kdv:          reviseSource.kdv ?? null,
-      pesinYuzde:   reviseSource.pesinYuzde ?? null,
-      sirket:       reviseSource.sirket ?? 'Unixpadel',
-      sets:         [],
-      details:      reviseSource.details ?? [],
-    })
+    setForm(detailToForm(reviseSource))
   }, [reviseSource])
 
   // ── Data sources ───────────────────────────────────────────────────────
@@ -225,31 +298,71 @@ export function NewOrderPage() {
   const updateTab = (idx: number, patch: Partial<SetTabState>) =>
     setSetTabs((s) => s.map((t, i) => i === idx ? { ...t, ...patch } : t))
 
+  /** API bileşen listesini ChecklistItem'lara çevirir (reçetedekiler işaretli). */
+  const toChecklist = (list: any[]): ChecklistItem[] =>
+    (list ?? []).map((c: any) => ({
+      bilesenID:    c.bilesenID,
+      bilesenAdi:   c.bilesenAdi ?? '',
+      birim:        c.birim ?? '',
+      inRecipe:     !!c.inRecipe,
+      defaultAdet:  c.defaultAdet ?? 1,
+      defaultFiyat: c.defaultFiyat ?? 0,
+      attributes:   (c.attributes ?? []) as string[],
+      checked:      !!c.inRecipe,
+    }))
+
   /**
-   * PROMPT-v2 §1b: Legacy anaUrunComboBox_SelectedIndexChanged portu.
-   * Kategori seçilince ilgili bileşenler API'den çekilir ve alt tabloyu
-   * editlenebilir satırlarla doldurur. Çarp'a kadar form payload'una etkisi yok.
+   * PROMPT-v3 §2: Legacy anaUrunComboBox_SelectedIndexChanged portu.
+   * Kategori seçilince TÜM bileşenler checklist'e yüklenir (reçetedekiler
+   * ön-işaretli), grid işaretlilerden yeniden kurulur (ZorlaDegistir=true:
+   * eski checklist + tablo temizlenir). Çarp'a kadar payload'a etkisi yok.
    */
   const onCategorySelect = async (idx: number, kategoriID: number) => {
-    const kategoriFiyat = categories.find((c) => c.kategoriID === kategoriID)?.fiyat ?? 0
+    const cat = categories.find((c) => c.kategoriID === kategoriID)
+    const kategoriAdi   = cat?.kategoriAdi ?? ''
+    const kategoriFiyat = cat?.fiyat ?? 0
     // Pre-update: kullanıcı UI'ı responsive görsün — bileşenler arkadan gelir.
-    updateTab(idx, { kategoriID, kategoriFiyat, components: [] })
+    updateTab(idx, { kategoriID, kategoriAdi, kategoriFiyat, checklist: [], components: [] })
     try {
-      const list = await getComponentsByCategory(kategoriID)
-      const rows: ComponentRow[] = (list ?? []).map((c: any) => ({
-        bilesenID:           c.bilesenID,
-        bilesenAdi:          c.bilesenAdi ?? '',
-        birim:               c.birim ?? '',
-        oznitelikSecenekler: (c.attributes ?? []) as string[],
-        oznitelikSecili:     (c.attributes?.[0] as string | undefined) ?? '',
-        adet:                c.defaultAdet ?? 1,
-        birimFiyat:          c.defaultFiyat ?? 0,
+      const checklist = toChecklist(await getComponentsByCategory(kategoriID))
+      setSetTabs((s) => s.map((t, i) => i !== idx ? t : {
+        ...t,
+        checklist,
+        components: checklist
+          .filter((c) => c.checked)
+          .map((c) => buildRow(c, kategoriAdi, t.adet)),
       }))
-      updateTab(idx, { components: rows })
     } catch {
       toast({ title: 'Bileşenler yüklenemedi', variant: 'destructive' })
     }
   }
+
+  /**
+   * PROMPT-v3 §2.3: checklist toggle (legacy bilesenCheckedListBox_ItemCheck →
+   * RefreshDataGrid). İşaret kalkan satır grid'den düşer; yeni işaretlenen
+   * sona eklenir (legacy Rows.Add). Mevcut satırların kullanıcı editleri korunur.
+   */
+  const toggleComponent = (idx: number, bilesenID: number, checked: boolean) =>
+    setSetTabs((s) => s.map((t, i) => {
+      if (i !== idx) return t
+      const checklist = t.checklist.map((c) => c.bilesenID === bilesenID ? { ...c, checked } : c)
+      const components = checked
+        ? [...t.components, buildRow(checklist.find((c) => c.bilesenID === bilesenID)!, t.kategoriAdi, t.adet)]
+        : t.components.filter((c) => c.bilesenID !== bilesenID)
+      return { ...t, checklist, components }
+    }))
+
+  /**
+   * PROMPT-v3 §2.3: ürün adedi spinner'ı (legacy urunNumericUpDown*_ValueChanged).
+   * Her grid satırının Adet'i defaultAdet × ürünAdedi olarak yeniden hesaplanır;
+   * satır bazlı manuel Adet editleri bir sonraki spinner değişimine kadar yaşar.
+   */
+  const onUrunAdetChange = (idx: number, adet: number) =>
+    setSetTabs((s) => s.map((t, i) => i !== idx ? t : {
+      ...t,
+      adet,
+      components: t.components.map((c) => ({ ...c, adet: c.defaultAdet * adet })),
+    }))
 
   /** PROMPT-v2 §1b: Tek bir bileşen satırını (Adet / Birim Fiyat / Öznitelik) düzeltir. */
   const updateComponent = (tabIdx: number, rowIdx: number, patch: Partial<ComponentRow>) =>
@@ -299,6 +412,173 @@ export function NewOrderPage() {
       delete next[idx]
       return { ...f, sets: next.filter(Boolean) as OrderSetInput[] }
     })
+  }
+
+  // ── Teslimat / Montaj handlers (PROMPT-v3 §3 + §4) ────────────────────
+  /**
+   * §4.2: Teslim Alan Adı seçilince kayıttan auto-fill (legacy
+   * txtTeslimatAd_SelectedIndexChanged). DTO'da ülke `ulkeID` olarak gelir —
+   * UlkeAdi'na burada çevrilir (eski `d.ulke` okuması ölü koddu, tUlke hiç dolmuyordu).
+   */
+  const applyDeliveryAddress = (a: any) => {
+    const ulkeAdi = ulkeler.find((u) => u.ulkelerID === (a.ulkeID ?? -1))?.ulkeAdi
+    setForm((f) => ({
+      ...f,
+      tTeslimAlanAdi: a.teslimAlanAdi ?? f.tTeslimAlanAdi,
+      tIlgiliKisi:    a.ilgiliKisi   ?? '',
+      tTelefon:       a.telefon      ?? '',
+      tAltTelefon:    a.altTelefon   ?? '',
+      tE_Mail:        a.e_Mail       ?? '',
+      tUlke:          ulkeAdi        ?? f.tUlke,
+      tZipKod:        a.zipKod       ?? '',
+      tVATNumarasi:   a.vatNumarasi  ?? '',
+      tAdres:         a.adres        ?? '',
+    }))
+  }
+
+  /** §3: İlişkilendir (legacy button4_Click) — Müşteri bloğu → Teslimat alanları. */
+  const ilisikilendir = () =>
+    setForm((f) => ({
+      ...f,
+      tTeslimAlanAdi: f.musteriAd,
+      tIlgiliKisi:    f.musteriAd,
+      tTelefon:       f.mTelefon     ?? '',
+      tE_Mail:        f.mMail        ?? '',
+      tUlke:          f.mUlke        ?? '',
+      tZipKod:        f.mZipKod      ?? '',
+      tVATNumarasi:   f.mVATNumarasi ?? '',
+      tAdres:         f.mAdres       ?? '',
+    }))
+
+  /**
+   * §4.1: Incoterms seçimi. EXW (legacy teslimatCesiti_SelectedIndexChanged):
+   * "Fabrika" adlı kayıtlı teslimat adresi auto-seçilir + teslimatFiyat = 0.
+   */
+  const onTeslimatCesitiChange = (v: string) => {
+    setForm((f) => ({ ...f, teslimatCesiti: v }))
+    if (v !== 'EXW') return
+    const fabrika = (deliveryAddrs as any[]).find((d) => (d.teslimAlanAdi ?? d.TeslimAlanAdi) === 'Fabrika')
+    if (!fabrika) {
+      toast({ title: 'Fabrika seçeneği mevcut değil.', variant: 'destructive' })
+      return
+    }
+    applyDeliveryAddress(fabrika)
+    setForm((f) => ({ ...f, teslimatFiyat: 0 }))
+  }
+
+  /**
+   * §4.3: Montaj/Teslimat Çarp (legacy button2_Click / teslimatCarp_Click) —
+   * fiyat × miktar sonucu fiyat alanına yazılır; miktar 1'e çekilir ki
+   * Brüt Toplam'daki fiyat × miktar formülü çift saymasın.
+   */
+  const montajCarp = () => {
+    const fiyat = Number(form.montajFiyat), miktar = Number(form.mAdet)
+    if (!Number.isFinite(fiyat) || !Number.isFinite(miktar)) {
+      toast({ title: 'Lütfen geçerli bir sayı giriniz.', variant: 'destructive' })
+      return
+    }
+    setForm((f) => ({ ...f, montajFiyat: fiyat * miktar, mAdet: 1 }))
+  }
+  const teslimatCarp = () => {
+    const fiyat = Number(form.teslimatFiyat), miktar = Number(form.mTeslimat)
+    if (!Number.isFinite(fiyat) || !Number.isFinite(miktar)) {
+      toast({ title: 'Lütfen geçerli bir sayı giriniz.', variant: 'destructive' })
+      return
+    }
+    setForm((f) => ({ ...f, teslimatFiyat: fiyat * miktar, mTeslimat: 1 }))
+  }
+
+  // ── Formu Getir (PROMPT-v3 §6 — legacy FormGetir) ─────────────────────
+  const [getirOpen, setGetirOpen]   = useState(false)
+  const [getirQuery, setGetirQuery] = useState('')
+  const [getirLoading, setGetirLoading] = useState(false)
+  // Temsilci'nin kendi siparişleri (backend zaten kendi satırlarına scope'lar).
+  const { data: myOrders = [] } = useQuery({
+    queryKey: ['my-orders-picker'],
+    queryFn:  () => getMyOrders(),
+    enabled:  getirOpen,
+  })
+  const getirList = myOrders.filter((o) => {
+    const q = getirQuery.trim().toLowerCase()
+    if (!q) return true
+    return [o.siparisNo, o.teklifNo, o.musteriAd]
+      .some((s) => (s ?? '').toLowerCase().includes(q))
+  })
+
+  /**
+   * Seçilen siparişi forma YENİ kayıt olarak hidrate eder (revise pre-load'un
+   * aksine numaralar boş kalır, kaydet butonları taze Teklif/Sipariş üretir).
+   * OrderItem satırları kayıt sırasına göre gruplanır: kategori satırı yeni
+   * seti açar, ardından gelen bileşen satırları o sete bağlanır.
+   */
+  const loadFromOrder = async (no: string) => {
+    setGetirLoading(true)
+    try {
+      const d = await getOrderDetail(no)
+
+      interface Group { kategoriID: number; adet: number; fiyat: number; comps: typeof d.items }
+      const groups: Group[] = []
+      for (const it of d.items) {
+        if (it.kategoriID != null)
+          groups.push({ kategoriID: it.kategoriID, adet: it.adet, fiyat: it.fiyat ?? 0, comps: [] })
+        else if (it.bilesenID != null && groups.length > 0)
+          groups[groups.length - 1].comps.push(it)
+      }
+
+      const tabs = Array.from({ length: SET_COUNT }, () => emptySetTab())
+      const sets: OrderSetInput[] = []
+      for (let i = 0; i < Math.min(groups.length, SET_COUNT); i++) {
+        const g = groups[i]
+        const kategoriAdi = categories.find((c) => c.kategoriID === g.kategoriID)?.kategoriAdi ?? ''
+        const checklist = toChecklist(await getComponentsByCategory(g.kategoriID))
+        const savedIds = new Set(g.comps.map((c) => c.bilesenID!))
+        const meta = new Map(checklist.map((c) => [c.bilesenID, c]))
+
+        tabs[i] = {
+          kategoriID:    g.kategoriID,
+          kategoriAdi,
+          kategoriFiyat: g.fiyat,
+          adet:          g.adet,
+          checklist:     checklist.map((c) => ({ ...c, checked: savedIds.has(c.bilesenID) })),
+          components:    g.comps.map((sc) => {
+            const m = meta.get(sc.bilesenID!)
+            const opts = m?.attributes ?? []
+            const saved = sc.oznitelikAdi ?? ''
+            return {
+              bilesenID:           sc.bilesenID!,
+              bilesenAdi:          m?.bilesenAdi ?? `#${sc.bilesenID}`,
+              birim:               m?.birim ?? '',
+              oznitelikSecili:     saved,
+              oznitelikSecenekler: saved && !opts.includes(saved) ? [...opts, saved] : opts,
+              adet:                sc.adet,
+              birimFiyat:          sc.fiyat ?? 0,
+              defaultAdet:         m?.defaultAdet ?? 1,
+            }
+          }),
+        }
+        sets[i] = {
+          kategoriID:    g.kategoriID,
+          adet:          g.adet,
+          kategoriFiyat: g.fiyat,
+          components:    g.comps.map((c) => ({
+            bilesenID:    c.bilesenID!,
+            oznitelikAdi: c.oznitelikAdi || undefined,
+            adet:         c.adet,
+            fiyat:        c.fiyat ?? 0,
+          })),
+        }
+      }
+
+      setSetTabs(tabs)
+      setForm({ ...detailToForm(d), sets })
+      setCreatedNo(null)
+      setGetirOpen(false)
+      toast({ title: 'Form yüklendi', description: `${no} → yeni kayıt olarak düzenlenebilir` })
+    } catch {
+      toast({ title: 'Form yüklenemedi', variant: 'destructive' })
+    } finally {
+      setGetirLoading(false)
+    }
   }
 
   // ── Computed pricing (right column) ───────────────────────────────────
@@ -522,7 +802,9 @@ export function NewOrderPage() {
                         type="number"
                         min={1}
                         value={setTabs[i].adet}
-                        onChange={(e) => updateTab(i, { adet: Math.max(1, Number(e.target.value)) })}
+                        // PROMPT-v3 §2.3: spinner değişince tüm satır Adet'leri
+                        // defaultAdet × ürünAdedi olarak yeniden hesaplanır.
+                        onChange={(e) => onUrunAdetChange(i, Math.max(1, Number(e.target.value)))}
                       />
                     </div>
                     <Button size="sm" onClick={() => carp(i)}>Çarp</Button>
@@ -538,20 +820,39 @@ export function NewOrderPage() {
                     </div>
                   </div>
 
-                  {/* Preview area — boş kalır, ileride önizleme görseli/notu burada gösterilir */}
-                  <div className="rounded border bg-muted/20 h-40 flex items-center justify-center text-xs text-muted-foreground">
-                    {form.sets?.[i]
-                      ? <>Set kaydedildi: Kategori #{form.sets[i].kategoriID} × {form.sets[i].adet}</>
-                      : <>Ana ürün seçip "Çarp" basın</>}
+                  {/*
+                    PROMPT-v3 §2.2: bileşen checklist'i (legacy bilesenCheckedListBox).
+                    Tüm bileşenler listelenir; reçetedekiler ön-işaretli gelir.
+                    İşaretlemek tabloya ekler, kaldırmak siler.
+                    §5: sabit yükseklik viewport ayar düğmesi — taşma olursa önce
+                    burayı küçült (h-40, eski önizleme kutusuyla aynı).
+                  */}
+                  <div className="rounded border bg-muted/20 h-40 overflow-y-auto p-2">
+                    {setTabs[i].checklist.length === 0
+                      ? <p className="text-xs text-muted-foreground text-center pt-14">
+                          {setTabs[i].kategoriID ? 'Bileşenler yükleniyor…' : 'Ana ürün seçince bileşen listesi burada görünür.'}
+                        </p>
+                      : setTabs[i].checklist.map((c) => (
+                        <label key={c.bilesenID} className="flex items-center gap-2 text-xs cursor-pointer py-0.5 hover:bg-muted/40 rounded px-1">
+                          <input
+                            type="checkbox"
+                            checked={c.checked}
+                            onChange={(e) => toggleComponent(i, c.bilesenID, e.target.checked)}
+                          />
+                          {/* Legacy etiket formatı birebir: [ID, Ad (Adet: N)] */}
+                          <span>[{c.bilesenID}, {c.bilesenAdi} (Adet: {c.defaultAdet})]</span>
+                        </label>
+                      ))}
                   </div>
 
                   {/*
-                    PROMPT-v2 §1b: Ana Ürün seçilince bu tablo yüklenir;
-                    Adet / Birim Fiyat satır bazında editlenebilir, Toplam
-                    canlı hesaplanır. Çarp basılınca payload'a alınır.
-                    §1a viewport: overflow-x-auto yalnız bu iç tabloda.
+                    PROMPT-v2 §1b: checklist'te işaretli bileşenler bu tabloda;
+                    Adet / Birim Fiyat / Öznitelik satır bazında editlenebilir,
+                    Toplam canlı hesaplanır. Çarp basılınca payload'a alınır.
+                    PROMPT-v3 §5 viewport: scroll yalnız checklist + bu tablo
+                    içinde — sayfa seviyesinde scroll çıkmamalı.
                   */}
-                  <div className="rounded border overflow-x-auto">
+                  <div className="rounded border overflow-auto max-h-64">
                     <table className="w-full text-xs">
                       <thead className="bg-muted/30">
                         <tr>
@@ -567,18 +868,21 @@ export function NewOrderPage() {
                       <tbody>
                         {setTabs[i].components.length === 0
                           ? <tr><td colSpan={7} className="text-center text-muted-foreground px-2 py-6">
-                              {setTabs[i].kategoriID ? 'Bu kategoride bileşen yok.' : 'Önce Ana Ürün seçin.'}
+                              {setTabs[i].kategoriID ? 'Listeden bileşen işaretleyin.' : 'Önce Ana Ürün seçin.'}
                             </td></tr>
                           : setTabs[i].components.map((cmp, k) => (
                             <tr key={`${cmp.bilesenID}-${k}`} className="border-t">
                               <td className="px-2 py-1">{cmp.bilesenID}</td>
                               <td className="px-2 py-1">
+                                {/* §2.4: boş seçim serbest; auto-default değer
+                                    seçeneklerde yoksa ekstra option enjekte edildi. */}
                                 {cmp.oznitelikSecenekler.length > 0 ? (
                                   <select
                                     value={cmp.oznitelikSecili}
                                     onChange={(e) => updateComponent(i, k, { oznitelikSecili: e.target.value })}
                                     className="w-full bg-transparent border rounded px-1 py-0.5 text-xs"
                                   >
+                                    <option value=""></option>
                                     {cmp.oznitelikSecenekler.map((o) => <option key={o} value={o}>{o}</option>)}
                                   </select>
                                 ) : '—'}
@@ -735,7 +1039,8 @@ export function NewOrderPage() {
                       disabled={!form.montajVar}
                     />
                   </Field>
-                  <Button size="sm" variant="outline" disabled={!form.montajVar}>Çarp</Button>
+                  {/* PROMPT-v3 §4.3: fiyat × miktar yerinde yazılır, miktar 1'e döner. */}
+                  <Button size="sm" variant="outline" disabled={!form.montajVar} onClick={montajCarp}>Çarp</Button>
                 </div>
 
                 <div className="grid grid-cols-[1fr_80px_auto] gap-2 items-end">
@@ -754,42 +1059,45 @@ export function NewOrderPage() {
                       disabled={!form.teslimatVar}
                     />
                   </Field>
-                  <Button size="sm" variant="outline" disabled={!form.teslimatVar}>Çarp</Button>
+                  <Button size="sm" variant="outline" disabled={!form.teslimatVar} onClick={teslimatCarp}>Çarp</Button>
                 </div>
 
                 <div className="border-t pt-3 space-y-2">
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <Field label="Teslim Alan Adı">
-                        <Select
-                          value={form.tTeslimAlanAdi ?? ''}
-                          onValueChange={(v) => {
-                            // Adres seçilince ilgili kişi/telefon/ülke vs. dolsun.
-                            const a = deliveryAddrs.find((d: any) => (d.teslimAlanAdi ?? d.TeslimAlanAdi) === v)
-                            setForm((f) => ({
-                              ...f,
-                              tTeslimAlanAdi: v,
-                              tIlgiliKisi:  a?.ilgiliKisi   ?? a?.IlgiliKisi   ?? f.tIlgiliKisi,
-                              tTelefon:     a?.telefon      ?? a?.Telefon      ?? f.tTelefon,
-                              tAltTelefon:  a?.altTelefon   ?? a?.AltTelefon   ?? f.tAltTelefon,
-                              tE_Mail:      a?.e_Mail       ?? a?.E_Mail       ?? f.tE_Mail,
-                              tUlke:        a?.ulke         ?? a?.Ulke         ?? f.tUlke,
-                              tZipKod:      a?.zipKod       ?? a?.ZipKod       ?? f.tZipKod,
-                              tVATNumarasi: a?.vatNumarasi  ?? a?.VATNumarasi  ?? f.tVATNumarasi,
-                              tAdres:       a?.adres        ?? a?.Adres        ?? f.tAdres,
-                            }))
-                          }}
-                        >
-                          <SelectTrigger><SelectValue placeholder="Seç" /></SelectTrigger>
-                          <SelectContent>
-                            {(deliveryAddrs as any[]).map((d, k) => {
-                              const name = d.teslimAlanAdi ?? d.TeslimAlanAdi ?? `Adres ${k + 1}`
-                              return <SelectItem key={k} value={String(name)}>{String(name)}</SelectItem>
-                            })}
-                          </SelectContent>
-                        </Select>
-                      </Field>
-                    </div>
+                  {/* PROMPT-v3 §4.1: Teslim Alan Adı + Teslimat Çeşidi (Incoterms) yan yana. */}
+                  <div className="grid grid-cols-[1fr_96px] gap-2 items-end">
+                    <Field label="Teslim Alan Adı">
+                      <Select
+                        value={form.tTeslimAlanAdi ?? ''}
+                        onValueChange={(v) => {
+                          // §4.2: kayıt seçilince ilgili kişi/telefon/ülke vs. dolsun.
+                          const a = (deliveryAddrs as any[]).find((d) => (d.teslimAlanAdi ?? d.TeslimAlanAdi) === v)
+                          if (a) applyDeliveryAddress(a)
+                          else setForm((f) => ({ ...f, tTeslimAlanAdi: v }))
+                        }}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Seç" /></SelectTrigger>
+                        <SelectContent>
+                          {/* §3: İlişkilendir sonrası müşteri adı kayıtlı adres olmasa
+                              da değer olarak görünebilmeli (legacy editable combo). */}
+                          {form.tTeslimAlanAdi &&
+                            !(deliveryAddrs as any[]).some((d) => (d.teslimAlanAdi ?? d.TeslimAlanAdi) === form.tTeslimAlanAdi) && (
+                            <SelectItem value={form.tTeslimAlanAdi}>{form.tTeslimAlanAdi}</SelectItem>
+                          )}
+                          {(deliveryAddrs as any[]).map((d, k) => {
+                            const name = d.teslimAlanAdi ?? d.TeslimAlanAdi ?? `Adres ${k + 1}`
+                            return <SelectItem key={k} value={String(name)}>{String(name)}</SelectItem>
+                          })}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field label="Çeşidi">
+                      <Select value={form.teslimatCesiti ?? ''} onValueChange={onTeslimatCesitiChange}>
+                        <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                        <SelectContent>
+                          {INCOTERMS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </Field>
                   </div>
 
                   <div className="flex items-end gap-2">
@@ -798,7 +1106,8 @@ export function NewOrderPage() {
                         <Input value={form.tIlgiliKisi ?? ''} onChange={(e) => setForm((f) => ({ ...f, tIlgiliKisi: e.target.value }))} />
                       </Field>
                     </div>
-                    <Button variant="outline" size="sm">İlişkilendir</Button>
+                    {/* PROMPT-v3 §3: Müşteri bloğunu teslimat alanlarına kopyalar. */}
+                    <Button variant="outline" size="sm" onClick={ilisikilendir}>İlişkilendir</Button>
                   </div>
 
                   <Field label="Ülke">
@@ -842,7 +1151,8 @@ export function NewOrderPage() {
 
         {/* ╔══════════ FOOTER: AKSIYON BUTONLARI ═════════════════════════ */}
         <div className="mt-4 flex flex-wrap justify-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t">
-          <Button variant="outline" onClick={() => nav(-1)}>Formu Getir</Button>
+          {/* PROMPT-v3 §6: legacy FormGetir — mevcut sipariş seçip forma yükler. */}
+          <Button variant="outline" onClick={() => setGetirOpen(true)}>Formu Getir</Button>
           <Button
             variant="secondary"
             disabled={quoteMut.isPending || reviseLoading || isReviseMode}
@@ -864,6 +1174,41 @@ export function NewOrderPage() {
             Revize Et
           </Button>
         </div>
+
+        {/* ╔══════════ FORMU GETİR DIALOG (PROMPT-v3 §6) ═════════════════ */}
+        <Dialog open={getirOpen} onOpenChange={setGetirOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Formu Getir</DialogTitle>
+            </DialogHeader>
+            <Input
+              autoFocus
+              placeholder="Teklif No / Sipariş No / Müşteri adı ara…"
+              value={getirQuery}
+              onChange={(e) => setGetirQuery(e.target.value)}
+            />
+            <div className="max-h-72 overflow-y-auto rounded border divide-y">
+              {getirList.length === 0
+                ? <p className="text-sm text-muted-foreground text-center py-6">Kayıt bulunamadı.</p>
+                : getirList.map((o) => (
+                  <button
+                    key={o.siparisAlID}
+                    type="button"
+                    disabled={getirLoading}
+                    onClick={() => loadFromOrder(o.siparisNo)}
+                    className="w-full text-left px-3 py-2 text-sm hover:bg-accent disabled:opacity-50"
+                  >
+                    <span className="font-mono">{o.siparisMiTeklifMi === 'Teklif' ? o.teklifNo : o.siparisNo}</span>
+                    <span className="text-muted-foreground"> — {o.musteriAd}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {o.siparisMiTeklifMi} · {o.tarih ? new Date(o.tarih).toLocaleDateString('tr-TR') : ''}
+                    </span>
+                  </button>
+                ))}
+            </div>
+            {getirLoading && <p className="text-xs text-muted-foreground">Form yükleniyor…</p>}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

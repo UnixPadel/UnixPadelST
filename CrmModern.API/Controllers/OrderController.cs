@@ -125,8 +125,9 @@ public sealed class OrderController(
     /// Maps to the WinForms teklifAlButonu_Click handler.
     /// Returns the generated TeklifNo.
     /// </summary>
+    // PROMPT-v3 §1: create-path yalnız Temsilci (Yonetici/Gozlemci bilinçli çıkarıldı).
     [HttpPost("quote")]
-    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
+    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateQuote([FromBody] CreateOrderDto dto)
     {
@@ -140,8 +141,9 @@ public sealed class OrderController(
     /// Maps to the WinForms siparisAlButon_Click handler.
     /// Returns the generated SiparisNo.
     /// </summary>
+    // PROMPT-v3 §1: create-path yalnız Temsilci.
     [HttpPost("order")]
-    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
+    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto dto)
     {
@@ -161,9 +163,9 @@ public sealed class OrderController(
     /// Returns the new SiparisNo or TeklifNo.
     /// </summary>
     // PROMPT.md #20: same role set as CreateOrder/CreateQuote — only roles
-    // that can create orders should be able to revise them.
+    // that can create orders should be able to revise them. (v3 §1: Temsilci)
     [HttpPost("{eskiNo}/revise")]
-    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
+    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Revise(string eskiNo, [FromBody] CreateOrderDto dto)
@@ -180,9 +182,9 @@ public sealed class OrderController(
     /// Converts a quote to an order by setting SiparisMiTeklifMi = 'Siparis'.
     /// Maps to the WinForms SipariseCevirButton click.
     /// </summary>
-    // PROMPT.md #20: same role set as CreateOrder/CreateQuote.
+    // PROMPT.md #20: same role set as CreateOrder/CreateQuote. (v3 §1: Temsilci)
     [HttpPut("{teklifNo}/convert-to-order")]
-    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
+    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
@@ -237,7 +239,7 @@ public sealed class OrderController(
 
     /// <summary>FormGetir.cs portu: kaynak siparişten yeni sipariş klonlar (yeni numara, kontrol='Kontrol').</summary>
     [HttpPost("{sourceNo}/clone")]
-    [Authorize(Roles = "Yonetici,Temsilci")]
+    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Clone(string sourceNo)
@@ -275,7 +277,7 @@ public sealed class OrderController(
 
     /// <summary>SiparisForm "Reçeteden Aç": kategori BoM'unu siparişe ekler.</summary>
     [HttpPost("{no}/expand-recipe")]
-    [Authorize(Roles = "Yonetici,Temsilci,Gozlemci")]
+    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ExpandRecipe(string no, [FromBody] ExpandRecipeRequest dto)
     {

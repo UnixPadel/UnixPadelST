@@ -51,6 +51,8 @@ export function SearchPage() {
     { key: 'siparisNo',         header: t('common.orderNo'),    sortable: true },
     { key: 'teklifNo',          header: t('common.quoteNo'),    sortable: true },
     { key: 'musteriAd',         header: t('common.customer'),   sortable: true },
+    // Siparişi oluşturan kullanıcı (legacy Ara formu KullaniciBilgileri join'i).
+    { key: 'kullaniciAdi',      header: t('common.createdBy'),  sortable: true, render: (r) => (r.kullaniciAdi as string) ?? '—' },
     { key: 'mUlke',             header: t('common.country'),    sortable: true },
     { key: 'paraTipi',          header: t('common.currency'),   sortable: true },
     { key: 'toplamFiyat',       header: t('common.totalAmount'),sortable: true, render: (r) => formatCurrency((r.toplamFiyat as number) ?? 0, r.paraTipi as string) },

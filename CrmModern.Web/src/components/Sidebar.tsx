@@ -24,7 +24,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { path: '/dashboard',       i18nKey: 'nav.dashboard',         icon: <LayoutDashboard className="h-4 w-4" /> },
   // PROMPT-v3 §1 — sipariş/teklif oluşturma yalnız Temsilci'ye açık.
-  { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Temsilci'] },
+  // İstisna: elshan.rasulov (kullanıcı adı bazlı).
+  { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Temsilci'], usernames: ['elshan.rasulov'] },
   { path: '/orders/mine',     i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci','Gozlemci'] },
   { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, roles: ['Yonetici'] },
   { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },

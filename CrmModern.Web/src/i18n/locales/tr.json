@@ -39,6 +39,7 @@
     "customer": "Müşteri",
     "orderNo": "Sipariş No",
     "quoteNo": "Teklif No",
+    "createdBy": "Oluşturan",
     "control": "Kontrol",
     "totalAmount": "Toplam",
     "balance": "Bakiye",

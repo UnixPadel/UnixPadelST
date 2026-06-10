@@ -6,6 +6,9 @@ public sealed record SearchResultDto(
     string   MusteriAd,
     string?  MUlke,
     int      KullaniciID,
+    // Siparişi oluşturan kullanıcı (legacy Ara formu KullaniciBilgileri join'i) —
+    // arama tablosundaki "Oluşturan" kolonunu besler.
+    string?  KullaniciAdi,
     string   ParaTipi,
     decimal? ToplamFiyat,
     decimal  KaparoFiyat,

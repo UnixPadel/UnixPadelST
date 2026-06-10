@@ -439,6 +439,7 @@ export interface SearchResultDto {
   musteriAd: string
   mUlke?: string
   kullaniciID: number
+  kullaniciAdi?: string   // siparişi oluşturan kullanıcı ("Oluşturan" kolonu)
   paraTipi: string
   toplamFiyat: number | null
   kaparoFiyat: number | null

@@ -16,9 +16,20 @@ public sealed class OrderController(
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    // PROMPT-v3 §1 create-path Temsilci-only; istisna: elshan.rasulov
+    // (WinForms'taki kullanıcı adı bazlı yetki kalıbı — PurchaseController gibi).
+    private const string OrderCreateExceptionUser = "elshan.rasulov";
+
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("KullaniciID claim missing."));
+
+    private string CurrentUserName =>
+        User.FindFirstValue(ClaimTypes.Name)
+            ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
+
+    private bool CanCreateOrders =>
+        User.IsInRole("Temsilci") || CurrentUserName == OrderCreateExceptionUser;
 
     // ─────────────────────────────────────────────────────────────────────────
     // List
@@ -126,11 +137,12 @@ public sealed class OrderController(
     /// Returns the generated TeklifNo.
     /// </summary>
     // PROMPT-v3 §1: create-path yalnız Temsilci (Yonetici/Gozlemci bilinçli çıkarıldı).
+    // + elshan.rasulov kullanıcı adı istisnası (CanCreateOrders).
     [HttpPost("quote")]
-    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateQuote([FromBody] CreateOrderDto dto)
     {
+        if (!CanCreateOrders) return Forbid();
         var teklifNo = await orderService.CreateQuoteAsync(CurrentUserId, dto);
         return CreatedAtAction(nameof(GetByNo), new { no = teklifNo },
             ApiResponse<string>.Ok(teklifNo, "Teklif başarıyla oluşturuldu."));
@@ -141,12 +153,12 @@ public sealed class OrderController(
     /// Maps to the WinForms siparisAlButon_Click handler.
     /// Returns the generated SiparisNo.
     /// </summary>
-    // PROMPT-v3 §1: create-path yalnız Temsilci.
+    // PROMPT-v3 §1: create-path yalnız Temsilci + elshan.rasulov istisnası.
     [HttpPost("order")]
-    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status201Created)]
     public async Task<IActionResult> CreateOrder([FromBody] CreateOrderDto dto)
     {
+        if (!CanCreateOrders) return Forbid();
         var siparisNo = await orderService.CreateOrderAsync(CurrentUserId, dto);
         return CreatedAtAction(nameof(GetByNo), new { no = siparisNo },
             ApiResponse<string>.Ok(siparisNo, "Sipariş başarıyla oluşturuldu."));
@@ -163,13 +175,13 @@ public sealed class OrderController(
     /// Returns the new SiparisNo or TeklifNo.
     /// </summary>
     // PROMPT.md #20: same role set as CreateOrder/CreateQuote — only roles
-    // that can create orders should be able to revise them. (v3 §1: Temsilci)
+    // that can create orders should be able to revise them. (v3 §1 + elshan istisnası)
     [HttpPost("{eskiNo}/revise")]
-    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Revise(string eskiNo, [FromBody] CreateOrderDto dto)
     {
+        if (!CanCreateOrders) return Forbid();
         var newNo = await orderService.ReviseAsync(CurrentUserId, eskiNo, dto);
         return Ok(ApiResponse<string>.Ok(newNo, "Revize başarıyla tamamlandı."));
     }
@@ -182,14 +194,14 @@ public sealed class OrderController(
     /// Converts a quote to an order by setting SiparisMiTeklifMi = 'Siparis'.
     /// Maps to the WinForms SipariseCevirButton click.
     /// </summary>
-    // PROMPT.md #20: same role set as CreateOrder/CreateQuote. (v3 §1: Temsilci)
+    // PROMPT.md #20: same role set as CreateOrder/CreateQuote. (v3 §1 + elshan istisnası)
     [HttpPut("{teklifNo}/convert-to-order")]
-    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> ConvertToOrder(string teklifNo)
     {
+        if (!CanCreateOrders) return Forbid();
         await orderService.ConvertToOrderAsync(teklifNo);
         return Ok(ApiResponse<object>.Ok(null!, "Teklif siparişe çevrildi."));
     }
@@ -239,11 +251,11 @@ public sealed class OrderController(
 
     /// <summary>FormGetir.cs portu: kaynak siparişten yeni sipariş klonlar (yeni numara, kontrol='Kontrol').</summary>
     [HttpPost("{sourceNo}/clone")]
-    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Clone(string sourceNo)
     {
+        if (!CanCreateOrders) return Forbid();
         var newNo = await orderService.CloneFromExistingAsync(CurrentUserId, sourceNo);
         return Ok(ApiResponse<string>.Ok(newNo, "Sipariş klonlandı."));
     }
@@ -277,10 +289,10 @@ public sealed class OrderController(
 
     /// <summary>SiparisForm "Reçeteden Aç": kategori BoM'unu siparişe ekler.</summary>
     [HttpPost("{no}/expand-recipe")]
-    [Authorize(Roles = "Temsilci")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> ExpandRecipe(string no, [FromBody] ExpandRecipeRequest dto)
     {
+        if (!CanCreateOrders) return Forbid();
         await orderService.ExpandRecipeAsync(no, dto.KategoriID, dto.Adet);
         return Ok(ApiResponse<object>.Ok(null!, "Reçete açıldı."));
     }

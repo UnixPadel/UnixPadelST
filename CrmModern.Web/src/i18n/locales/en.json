@@ -39,6 +39,7 @@
     "customer": "Customer",
     "orderNo": "Order No",
     "quoteNo": "Quote No",
+    "createdBy": "Created By",
     "control": "Control",
     "totalAmount": "Total",
     "balance": "Balance",

@@ -61,8 +61,9 @@ public sealed class FactoryController(IFactoryService factoryService, IOrderServ
     // (OrderService delegasyonu — Fabrika.cs'in advanced özellikleri)
 
     /// <summary>Üretim aşamasındaki siparişler için döviz toplamı.</summary>
+    // PROMPT-v2 §2: Döviz toplamı parasal veridir — Fabrika dışlandı.
     [HttpGet("totals")]
-    [Authorize(Roles = "Yonetici,Fabrika,Gozlemci")]
+    [Authorize(Roles = "Yonetici,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<OrderTotalsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTotals([FromQuery] OrderFilterDto filter)
     {
@@ -71,8 +72,9 @@ public sealed class FactoryController(IFactoryService factoryService, IOrderServ
     }
 
     /// <summary>Sipariş Excel raporu (Fabrika ekranındaki "Excel İndir").</summary>
+    // PROMPT-v2 §2: Excel ToplamFiyat içerdiği için Fabrika dışlandı.
     [HttpGet("{siparisNo}/excel")]
-    [Authorize(Roles = "Yonetici,Fabrika,Muhasebe")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
     public async Task<IActionResult> Excel(string siparisNo)
     {
         var bytes = await orderService.GenerateExcelAsync(siparisNo);

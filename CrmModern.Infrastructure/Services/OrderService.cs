@@ -120,13 +120,15 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
 
         return cat.CategoryComponents
             .Select(cc => new ComponentDto(
-                BilesenID:   cc.BilesenID,
-                BilesenAdi:  cc.Component!.BilesenAdi,
-                Birim:       cc.Component.Birim,
-                DefaultAdet: cc.Adet,
-                Attributes:  cc.Component.Attributes
-                               .Select(a => a.OznitelikAdı)
-                               .ToList()))
+                BilesenID:    cc.BilesenID,
+                BilesenAdi:   cc.Component!.BilesenAdi,
+                Birim:        cc.Component.Birim,
+                DefaultAdet:  cc.Adet,
+                // PROMPT-v2 §1b: Bileşen master fiyatı default Birim Fiyat olur.
+                DefaultFiyat: cc.Component.Fiyat,
+                Attributes:   cc.Component.Attributes
+                                .Select(a => a.OznitelikAdı)
+                                .ToList()))
             .ToList();
     }
 
@@ -221,8 +223,11 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             + (dto.TeslimatVar ? dto.TeslimatFiyat : 0m);
 
         // ToplamFiyat = (Brut − Indirim) × (1 + Kdv/100)
-        decimal indirimliFiyat = brutToplamFiyat - dto.Indirim;
-        decimal toplamFiyat    = indirimliFiyat + (indirimliFiyat * dto.Kdv / 100m);
+        // PROMPT-v2 §3: null değerler "boş" anlamına gelir; hesapta 0 olarak alınır.
+        decimal indirim        = dto.Indirim ?? 0m;
+        decimal kdv            = dto.Kdv     ?? 0m;
+        decimal indirimliFiyat = brutToplamFiyat - indirim;
+        decimal toplamFiyat    = indirimliFiyat + (indirimliFiyat * kdv / 100m);
 
         byte[]? ek = string.IsNullOrEmpty(dto.EkBase64)
             ? null
@@ -382,9 +387,11 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         MZipKod           = dto.MZipKod,
         MAdres            = dto.MAdres,
         ParaTipi          = dto.ParaTipi,
+        // PROMPT-v2 §3: null → DB NULL korunur (Order.Indirim/Kdv zaten nullable);
+        // PesinYüzde non-nullable int olduğu için null → 0.
         Indirim           = dto.Indirim,
         Kdv               = dto.Kdv,
-        PesinYüzde        = dto.PesinYuzde,
+        PesinYüzde        = dto.PesinYuzde ?? 0,
         ToplamFiyat       = toplamFiyat,
         BrutToplamFiyat   = brutToplamFiyat,
         SiparisMiTeklifMi = siparisMiTeklifMi,
@@ -434,9 +441,10 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         existing.MZipKod           = dto.MZipKod;
         existing.MAdres            = dto.MAdres;
         existing.ParaTipi          = dto.ParaTipi;
+        // PROMPT-v2 §3: nullable DTO → entity (PesinYüzde non-nullable: null → 0).
         existing.Indirim           = dto.Indirim;
         existing.Kdv               = dto.Kdv;
-        existing.PesinYüzde        = dto.PesinYuzde;
+        existing.PesinYüzde        = dto.PesinYuzde ?? 0;
         existing.ToplamFiyat       = toplamFiyat;
         existing.BrutToplamFiyat   = brutToplamFiyat;
         existing.SiparisMiTeklifMi = siparisMiTeklifMi;
@@ -635,8 +643,9 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             MTelefon: src.MTelefon, MMail: src.MMail, MUlke: src.MUlke,
             MVATNumarasi: src.MVATNumarasi, MZipKod: src.MZipKod, MAdres: src.MAdres,
             ParaTipi: src.ParaTipi,
-            Indirim:  src.Indirim   ?? 0,
-            Kdv:      src.Kdv       ?? 0,
+            // PROMPT-v2 §3: nullable DTO — kaynaktaki NULL "boş" anlamı korunur.
+            Indirim:  src.Indirim,
+            Kdv:      src.Kdv,
             PesinYuzde: src.PesinYüzde,
             Sets: src.Items
                     .Where(i => i.KategoriID.HasValue)

@@ -45,10 +45,12 @@ public sealed record CreateOrderDto(
     string? MAdres,
 
     // ── Pricing ───────────────────────────────────────────────────────────
-    string  ParaTipi,
-    decimal Indirim,
-    decimal Kdv,
-    int     PesinYuzde,
+    // PROMPT-v2 §3: Indirim/Kdv/PesinYuzde nullable — kullanıcı boş bırakırsa
+    // "henüz karar vermedi" semantiği korunur. Total hesaplamasında null → 0.
+    string   ParaTipi,
+    decimal? Indirim,
+    decimal? Kdv,
+    int?     PesinYuzde,
 
     // ── Product sets (up to 5, matching the 5 tab pages) ─────────────────
     IReadOnlyList<OrderSetDto> Sets,

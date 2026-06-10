@@ -26,4 +26,8 @@ public sealed record AccountingOrderListDto(
     // Kontrol kolonu legacy grid'te gizli; row colouring ve "Muhasebe Onayla"
     // butonu için frontend buna ihtiyaç duyuyor.
     string?  Kontrol,
-    DateTime Tarih);
+    DateTime Tarih,
+    // PROMPT-v2 §10.2: Maliyet Reçetesi Net Kar = ToplamFiyat × (1-İndirim%) ×
+    // (1-KDV%) − Maliyet formülü için. Eski siparişlerde NULL olabilir.
+    decimal? Indirim = null,
+    decimal? Kdv     = null);

@@ -20,8 +20,17 @@ export function NewPurchaseRequestPage() {
   const { t } = useTranslation()
   const { getUser } = useAuth()
   const user = getUser()
-  const [form, setForm] = useState({
-    urunAdi: '', urunTuru: '', urunMaliyeti: 0, alinanYer: '', notlar: '',
+  // PROMPT-v2 §4: Maliyet alanı boş başlar; submit guard (urunMaliyeti > 0)
+  // sıfırla / NULL ile kayıt açılmasını engeller.
+  const [form, setForm] = useState<{
+    urunAdi: string
+    urunTuru: string
+    urunMaliyeti: number | null
+    alinanYer: string
+    notlar: string
+    departman: string
+  }>({
+    urunAdi: '', urunTuru: '', urunMaliyeti: null, alinanYer: '', notlar: '',
     departman: user?.yetkiTuru ?? '',
   })
   const [submitted, setSubmitted] = useState(false)
@@ -30,7 +39,8 @@ export function NewPurchaseRequestPage() {
     mutationFn: () => createPurchaseRequest({
       urunAdi:               form.urunAdi,
       urunTuru:              form.urunTuru || undefined,
-      urunMaliyeti:          form.urunMaliyeti,
+      // PROMPT-v2 §4: valid guard zaten >0 zorunlu; burada non-null garantisi.
+      urunMaliyeti:          form.urunMaliyeti ?? 0,
       alinanYer:             form.alinanYer || undefined,
       notlar:                form.notlar || undefined,
       talepEdenKullaniciAdi: user!.kullaniciAdi,
@@ -45,7 +55,9 @@ export function NewPurchaseRequestPage() {
     onError: () => toast({ title: t('purchase.createError'), variant: 'destructive' }),
   })
 
-  const valid = !!(form.urunAdi.trim() && form.urunMaliyeti > 0 && form.departman.trim() && form.alinanYer.trim() && form.urunTuru.trim())
+  // PROMPT-v2 §4: urunMaliyeti null/0 ise valid değil — kullanıcı sıfır
+  // maliyetli talep gönderemez. Null karşılaştırması "> 0" ile zaten false.
+  const valid = !!(form.urunAdi.trim() && (form.urunMaliyeti ?? 0) > 0 && form.departman.trim() && form.alinanYer.trim() && form.urunTuru.trim())
 
   const onSubmit = () => {
     setSubmitted(true)
@@ -69,8 +81,9 @@ export function NewPurchaseRequestPage() {
         </div>
         <div className="space-y-1">
           <Label>{t('purchase.maliyet')} *</Label>
-          <DecimalInput value={form.urunMaliyeti} onValueChange={(v) => setForm((f) => ({ ...f, urunMaliyeti: v === '' ? 0 : v }))} />
-          {submitted && !(form.urunMaliyeti > 0) && <FieldError message={t('validation.required')} />}
+          {/* PROMPT-v2 §4: boş başlar; null gönderilince valid guard tetiklenir. */}
+          <DecimalInput value={form.urunMaliyeti ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, urunMaliyeti: v === '' ? null : v }))} />
+          {submitted && !((form.urunMaliyeti ?? 0) > 0) && <FieldError message={t('validation.required')} />}
         </div>
         <div className="space-y-1">
           <Label>{t('purchase.alinanYer')} *</Label>

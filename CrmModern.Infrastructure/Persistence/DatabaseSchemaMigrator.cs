@@ -35,6 +35,9 @@ public static class DatabaseSchemaMigrator
 
         // 3) TalepOnaylari (Faz 8.4): yoksa CREATE et — audit log
         await EnsureTalepOnaylariTableAsync(ctx, logger);
+
+        // 4) PROMPT-v2 §7: MusteriBilgileri.CreatedByKullaniciID + tek seferlik backfill.
+        await EnsureMusteriCreatedByColumnAsync(ctx, logger);
     }
 
     private static async Task EnsureSifreColumnSizeAsync(AppDbContext ctx, ILogger? logger)
@@ -121,6 +124,47 @@ public static class DatabaseSchemaMigrator
                 INDEX IX_TalepOnaylari_TalepID (TalepID)
             )");
         logger?.LogInformation("TalepOnaylari tablosu hazırlandı (CREATE IF NOT EXISTS).");
+    }
+
+    /// <summary>
+    /// PROMPT-v2 §7 — Temsilci sahiplenmesi için MusteriBilgileri'ne
+    /// CreatedByKullaniciID INT NULL ekler. Kolon yoksa eklenir ve hemen
+    /// SiparisAlTablo'daki en eski sipariş kaydının KullaniciID'sinden
+    /// backfill çalıştırılır. Hiç siparişi olmayan müşterilerde NULL kalır
+    /// (yalnız Yonetici/Muhasebe/Gozlemci görür).
+    /// </summary>
+    private static async Task EnsureMusteriCreatedByColumnAsync(AppDbContext ctx, ILogger? logger)
+    {
+        bool columnExisted = await ColumnExistsAsync(ctx, "MusteriBilgileri", "CreatedByKullaniciID");
+
+        if (!columnExisted)
+        {
+            await ctx.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE MusteriBilgileri ADD COLUMN CreatedByKullaniciID INT NULL");
+            logger?.LogInformation("MusteriBilgileri.CreatedByKullaniciID kolonu eklendi.");
+        }
+
+        // Backfill: yalnız NULL kayıtları doldur. Kolon ilk kez eklendiğinde
+        // tüm geçmiş kayıtlar bu adımda doldurulur; sonraki çalıştırmalar
+        // (yeni NULL kayıt yoksa) etkisizdir.
+        const string backfill = @"
+            UPDATE MusteriBilgileri m
+            INNER JOIN (
+                SELECT s1.MusteriAd, s1.KullaniciID
+                FROM SiparisAlTablo s1
+                INNER JOIN (
+                    SELECT MusteriAd, MIN(Tarih) AS MinTarih
+                    FROM SiparisAlTablo
+                    GROUP BY MusteriAd
+                ) s2 ON s1.MusteriAd = s2.MusteriAd AND s1.Tarih = s2.MinTarih
+            ) earliest ON earliest.MusteriAd = m.MusteriAd
+            SET m.CreatedByKullaniciID = earliest.KullaniciID
+            WHERE m.CreatedByKullaniciID IS NULL";
+
+        int affected = await ctx.Database.ExecuteSqlRawAsync(backfill);
+        if (affected > 0)
+            logger?.LogInformation(
+                "MusteriBilgileri.CreatedByKullaniciID backfill: {N} kayıt dolduruldu.", affected);
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

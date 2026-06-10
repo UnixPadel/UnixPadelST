@@ -1,7 +1,11 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getTransactionHistory, downloadAccountingExcel, type TransactionFilter } from '@/api/accounting'
+import {
+  getTransactionHistory, downloadAccountingExcel,
+  getAccountingOrderDetail, submitMaliyetTalep,
+  type TransactionFilter, type TransactionListItem,
+} from '@/api/accounting'
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
@@ -10,37 +14,64 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AutocompleteInput } from '@/components/AutocompleteInput'
 import { DecimalInput } from '@/components/DecimalInput'
 import { KPICard } from '@/components/KPICard'
 import { useToast } from '@/components/ToastProvider'
+import { useAuth } from '@/hooks/useAuth'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import type { AccountingOrderListDto } from '@/types'
 
 /**
- * PROMPT.md ACCOUNTING #15: full Muhasebe Geçmiş filter strip ported from
- * legacy MuhasebeGecmis.cs. Adds Ülke, Temsilci, Ödeme Durumu (exact decimal)
- * plus the 4-currency totals strip, row-count badge and Sıfırla button.
+ * PROMPT.md ACCOUNTING #15 + PROMPT-v2 §10 — Muhasebe Geçmiş.
  *
- * Filter sources:
- *   Müşteri Adı  — typeable combobox (Style=DropDown parity) from /api/musteri
- *   Ülke         — strict dropdown from /api/musteri/ulkeler
- *   Temsilci     — strict dropdown from /api/users/lookup (Ad Soyad)
- *   Ödeme Durumu — free decimal text input (Phase 1 DecimalInput)
+ * §10.1: Yonetici/Muhasebe için tek "Tutar" sütunu yerine SiparisNo bazında
+ * gruplanmış peşinat sütunları (1. Peşinat / 2. Peşinat / …) + Fark (1→2).
+ * Görünür peşinat 4 ile sınırlı; fazlası "+N daha" hücresinde toplanır.
+ * Gozlemci için eski tek-Tutar görünümü korunur.
  *
- * Currency totals are computed server-side over the FULL filtered set, so
- * pagination does not skew the strip.
+ * §10.2: Her satırın en solunda "Maliyet Reçetesi" butonu; modal kar/zarar
+ * hesabı yapar (Brüt Kar, Net Kar, Marj %, Tahsilat Oranı) ve maliyet düzenleme
+ * affordance'i mevcut `POST /api/accounting/orders/{no}/maliyet` endpoint'ine
+ * gider; modal kapanınca accounting-orders query'si invalidate edilir.
  */
 
-const SENTINEL_ALL = '__all__'  // shadcn Select can't have an empty value, so we route "tümü" through a sentinel.
+const SENTINEL_ALL = '__all__'
+const MAX_VISIBLE_INSTALLMENTS = 4
+
+interface InstallmentCell {
+  index: number
+  miktar: number | null
+  tarih: string
+}
+
+interface OrderRow {
+  siparisNo: string
+  musteriAd?: string
+  kullanici?: string
+  paraTipi?: string
+  installments: InstallmentCell[]
+}
 
 export function AccountingHistoryPage() {
   const { t } = useTranslation()
   const { toast } = useToast()
-  const [filter, setFilter] = useState<TransactionFilter>({ page: 1, pageSize: 50 })
-  const [exporting, setExporting] = useState(false)
+  const { getUser } = useAuth()
+  const role = getUser()?.yetkiTuru ?? ''
+  // PROMPT-v2 §10.3: Sadece Yonetici + Muhasebe peşinat sütunları + Maliyet
+  // Reçetesi butonu görür. Gozlemci eski tek-Tutar görünümünde kalır.
+  const showInstallments = role === 'Yonetici' || role === 'Muhasebe'
 
-  // ── Filter sources (queryClient-cached, all paginated 0) ───────────────
+  // Grouped view için server-side sayfalama bilgili değil — installment'lar
+  // sayfa sınırını aşmasın diye pageSize'ı yükseltiyoruz.
+  const DEFAULT_PAGE_SIZE = showInstallments ? 200 : 50
+  const [filter, setFilter] = useState<TransactionFilter>({ page: 1, pageSize: DEFAULT_PAGE_SIZE })
+  const [exporting, setExporting] = useState(false)
+  const [maliyetTarget, setMaliyetTarget] = useState<string | null>(null)
+
+  // ── Filter sources ─────────────────────────────────────────────────────
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers })
   const { data: ulkeler   = [] } = useQuery({ queryKey: ['ulkeler'],   queryFn: getUlkeler })
   const { data: users     = [] } = useQuery({ queryKey: ['users-lookup'], queryFn: getUsersLookup })
@@ -51,7 +82,7 @@ export function AccountingHistoryPage() {
     [customers],
   )
 
-  // ── Excel export (PROMPT.md #7 fix preserved) ──────────────────────────
+  // ── Excel export ───────────────────────────────────────────────────────
   const onExport = async () => {
     setExporting(true)
     try { await downloadAccountingExcel(filter) }
@@ -64,13 +95,40 @@ export function AccountingHistoryPage() {
     queryFn: () => getTransactionHistory(filter),
   })
 
-  type Row = {
-    id: number; siparisNo: string; musteriAd?: string;
-    kullanici?: string; paraTipi?: string;
-    odenenMiktar: number | null; tarih: string
-  } & Record<string, unknown>
+  // ── Grouping for §10.1 ─────────────────────────────────────────────────
+  // SiparisNo bazında topla; installmentIndex asc sırala.
+  const orderRows: OrderRow[] = useMemo(() => {
+    if (!showInstallments || !page) return []
+    const m = new Map<string, OrderRow>()
+    for (const tx of page.items as TransactionListItem[]) {
+      if (!tx.siparisNo) continue
+      let g = m.get(tx.siparisNo)
+      if (!g) {
+        g = {
+          siparisNo: tx.siparisNo,
+          musteriAd: tx.musteriAd,
+          kullanici: tx.kullanici,
+          paraTipi:  tx.paraTipi,
+          installments: [],
+        }
+        m.set(tx.siparisNo, g)
+      }
+      g.installments.push({
+        index:   tx.installmentIndex,
+        miktar:  tx.odenenMiktar,
+        tarih:   tx.tarih,
+      })
+    }
+    // Index asc; aynı sipariş için 0 (sahipsiz) olanlar sona düşer.
+    return Array.from(m.values()).map((g) => ({
+      ...g,
+      installments: g.installments.sort((a, b) => a.index - b.index),
+    }))
+  }, [page, showInstallments])
 
-  const cols: Column<Row>[] = [
+  // ── Legacy per-transaction view (Gozlemci) ─────────────────────────────
+  type LegacyRow = TransactionListItem & Record<string, unknown>
+  const legacyCols: Column<LegacyRow>[] = [
     { key: 'id',           header: 'ID' },
     { key: 'tarih',        header: t('common.date'),     render: (r) => formatDate(r.tarih as string) },
     { key: 'siparisNo',    header: t('common.orderNo') },
@@ -82,13 +140,10 @@ export function AccountingHistoryPage() {
   ]
 
   // ── Filter helpers ─────────────────────────────────────────────────────
-  // Any change resets to page 1 so the user isn't stranded on an empty page.
   const update = <K extends keyof TransactionFilter>(k: K, v: TransactionFilter[K]) =>
     setFilter((f) => ({ ...f, [k]: v, page: 1 }))
+  const reset = () => setFilter({ page: 1, pageSize: DEFAULT_PAGE_SIZE })
 
-  const reset = () => setFilter({ page: 1, pageSize: 50 })
-
-  // ── Currency totals strip (4 cards) ────────────────────────────────────
   const totals = page?.currencyTotals ?? { Euro: 0, Dolar: 0, TL: 0, Sterlin: 0 }
 
   return (
@@ -108,7 +163,6 @@ export function AccountingHistoryPage() {
               <Input value={filter.siparisNo ?? ''} onChange={(e) => update('siparisNo', e.target.value || undefined)} />
             </div>
 
-            {/* Combobox — typeable Müşteri Adı */}
             <div className="space-y-1">
               <Label>{t('common.customer')}</Label>
               <AutocompleteInput
@@ -192,18 +246,30 @@ export function AccountingHistoryPage() {
           </div>
         </div>
 
-        {/* Result count — legacy textBoxSorgu */}
+        {/* Result count */}
         <div className="text-sm text-muted-foreground">
           {t('accounting.filter.rowCount')}: <span className="font-semibold text-foreground">{page?.totalCount ?? 0}</span>
         </div>
 
-        <DataTable
-          columns={cols}
-          data={(page?.items ?? []) as unknown as Row[]}
-          keyField="id"
-          loading={isLoading}
-        />
+        {/* Installment-grouped view (Yonetici + Muhasebe) */}
+        {showInstallments ? (
+          <InstallmentTable
+            rows={orderRows}
+            loading={isLoading}
+            onMaliyet={(no) => setMaliyetTarget(no)}
+          />
+        ) : (
+          <DataTable
+            columns={legacyCols}
+            data={(page?.items ?? []) as unknown as LegacyRow[]}
+            keyField="id"
+            loading={isLoading}
+          />
+        )}
 
+        {/* Pagination — only meaningful in the legacy per-transaction view.
+            Installment view loads up to 200 per page; pagination still works
+            but a SiparisNo may straddle pages (acceptable v1 limitation). */}
         {page && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
@@ -216,7 +282,7 @@ export function AccountingHistoryPage() {
                 {t('common.previous')}
               </Button>
               <Button size="sm" variant="outline"
-                disabled={page.items.length < (filter.pageSize ?? 50)}
+                disabled={page.items.length < (filter.pageSize ?? DEFAULT_PAGE_SIZE)}
                 onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}>
                 {t('common.next')}
               </Button>
@@ -224,6 +290,259 @@ export function AccountingHistoryPage() {
           </div>
         )}
       </div>
+
+      {/* PROMPT-v2 §10.2: Maliyet Reçetesi modalı. */}
+      <MaliyetRecetesiDialog
+        siparisNo={maliyetTarget}
+        onClose={() => setMaliyetTarget(null)}
+      />
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Installment table
+// ─────────────────────────────────────────────────────────────────────────────
+
+function InstallmentTable({
+  rows, loading, onMaliyet,
+}: {
+  rows: OrderRow[]
+  loading: boolean
+  onMaliyet: (siparisNo: string) => void
+}) {
+  if (loading) {
+    return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">Yükleniyor…</div>
+  }
+  if (rows.length === 0) {
+    return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">Kayıt yok.</div>
+  }
+  // Sayfa için en yüksek installment sayısı sütun sayısını belirler.
+  const maxN = Math.min(
+    MAX_VISIBLE_INSTALLMENTS,
+    rows.reduce((acc, r) => Math.max(acc, r.installments.length), 0),
+  )
+
+  return (
+    <div className="rounded-md border bg-card overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-muted/30 text-xs uppercase">
+          <tr>
+            <th className="px-2 py-2 text-left w-32">Maliyet Reçetesi</th>
+            <th className="px-2 py-2 text-left">Sipariş No</th>
+            <th className="px-2 py-2 text-left">Müşteri</th>
+            <th className="px-2 py-2 text-left">Temsilci</th>
+            <th className="px-2 py-2 text-left">Para Tipi</th>
+            {Array.from({ length: maxN }, (_, i) => (
+              <th key={i} className="px-2 py-2 text-right">{i + 1}. Peşinat</th>
+            ))}
+            <th className="px-2 py-2 text-right">Fark (1→2)</th>
+            <th className="px-2 py-2 text-right">Diğer</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => {
+            const visible = r.installments.slice(0, maxN)
+            const overflow = r.installments.slice(maxN)
+            const fark = r.installments.length >= 2
+              ? ((r.installments[1].miktar ?? 0) - (r.installments[0].miktar ?? 0))
+              : null
+            return (
+              <tr key={r.siparisNo} className="border-t hover:bg-muted/20">
+                <td className="px-2 py-1">
+                  <Button size="sm" variant="outline" onClick={() => onMaliyet(r.siparisNo)}>
+                    Maliyet Reçetesi
+                  </Button>
+                </td>
+                <td className="px-2 py-1 font-mono text-xs">{r.siparisNo}</td>
+                <td className="px-2 py-1">{r.musteriAd ?? '—'}</td>
+                <td className="px-2 py-1">{r.kullanici ?? '—'}</td>
+                <td className="px-2 py-1">{r.paraTipi ?? '—'}</td>
+                {Array.from({ length: maxN }, (_, i) => {
+                  const inst = visible[i]
+                  if (!inst) return <td key={i} className="px-2 py-1 text-right text-muted-foreground">—</td>
+                  return (
+                    <td key={i} className="px-2 py-1 text-right tabular-nums">
+                      <div>{formatCurrency(inst.miktar ?? 0, r.paraTipi ?? '')}</div>
+                      <div className="text-[10px] text-muted-foreground">{formatDate(inst.tarih)}</div>
+                    </td>
+                  )
+                })}
+                <td className="px-2 py-1 text-right tabular-nums">
+                  {fark === null
+                    ? <span className="text-muted-foreground">—</span>
+                    : <span className={fark < 0 ? 'text-red-600' : ''}>{formatCurrency(fark, r.paraTipi ?? '')}</span>}
+                </td>
+                <td className="px-2 py-1 text-right">
+                  {overflow.length === 0
+                    ? <span className="text-muted-foreground">—</span>
+                    : (
+                      <span
+                        title={overflow
+                          .map((o) => `${o.index}. ${formatCurrency(o.miktar ?? 0, r.paraTipi ?? '')} (${formatDate(o.tarih)})`)
+                          .join('\n')}
+                        className="underline cursor-help text-xs"
+                      >
+                        +{overflow.length} daha
+                      </span>
+                    )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Maliyet Reçetesi dialog (PROMPT-v2 §10.2)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function MaliyetRecetesiDialog({
+  siparisNo, onClose,
+}: {
+  siparisNo: string | null
+  onClose: () => void
+}) {
+  const qc = useQueryClient()
+  const { toast } = useToast()
+
+  const { data: order, isLoading } = useQuery<AccountingOrderListDto>({
+    queryKey: ['accounting-order-detail', siparisNo],
+    queryFn: () => getAccountingOrderDetail(siparisNo!),
+    enabled: !!siparisNo,
+  })
+
+  const [maliyetEdit, setMaliyetEdit] = useState<number | null>(null)
+  // Aynı sipariş için modal her açılışta servisten gelen maliyeti baseline yap.
+  const baseMaliyet = order?.maliyet ?? null
+  const effectiveMaliyet = maliyetEdit ?? baseMaliyet ?? 0
+
+  const saveMut = useMutation({
+    mutationFn: () => submitMaliyetTalep(siparisNo!, {
+      maliyet:          effectiveMaliyet,
+      maliyetDetayi:    order?.maliyetDetayi,
+      toplamSiparis:    order?.toplamFiyat ?? undefined,
+      kaporaBakiyesi:   order?.kaparoFiyat ?? undefined,
+      kalanBakiyeTalep: order?.kalanBakiye ?? undefined,
+      pesinYuzde:       order?.pesinYuzde,
+    }),
+    onSuccess: () => {
+      toast({ title: 'Maliyet kaydedildi' })
+      // Parent grid'i yenile — Kar / Maliyet sütunları güncelsin.
+      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
+      qc.invalidateQueries({ queryKey: ['accounting-order-detail', siparisNo] })
+      qc.invalidateQueries({ queryKey: ['tx-history'] })
+    },
+    onError: () => toast({ title: 'Maliyet kaydedilemedi', variant: 'destructive' }),
+  })
+
+  // ── Computed math ─────────────────────────────────────────────────────
+  // PROMPT-v2 §10.2 formülleri.
+  const toplam      = order?.toplamFiyat ?? 0
+  const odenen      = order?.odenenMiktar ?? 0
+  const indirimPct  = order?.indirim ?? 0   // İndirim mutlak değil; spec'te yüzde gibi okunuyor.
+  const kdvPct      = order?.kdv ?? 0
+  const maliyet     = effectiveMaliyet
+  const brutKar     = toplam - maliyet
+  const netKar      = toplam * (1 - indirimPct / 100) * (1 - kdvPct / 100) - maliyet
+  const marjPct     = toplam > 0 ? (netKar / toplam) * 100 : 0
+  const tahsilatPct = toplam > 0 ? (odenen / toplam) * 100 : 0
+  const isLoss      = netKar < 0
+  const cur         = order?.paraTipi ?? ''
+
+  const handleClose = () => {
+    setMaliyetEdit(null)
+    onClose()
+  }
+
+  return (
+    <Dialog open={!!siparisNo} onOpenChange={(v) => { if (!v) handleClose() }}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Maliyet Reçetesi — {siparisNo}</DialogTitle>
+        </DialogHeader>
+
+        {isLoading || !order ? (
+          <p className="text-center py-8 text-muted-foreground">Yükleniyor…</p>
+        ) : (
+          <div className="space-y-4 text-sm">
+            {/* Read-only girdiler */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <ReadOnlyCell label="Toplam Fiyat" value={formatCurrency(toplam, cur)} />
+              <ReadOnlyCell label="Ödenen Miktar" value={formatCurrency(odenen, cur)} />
+              <ReadOnlyCell label="İndirim %" value={`%${indirimPct}`} />
+              <ReadOnlyCell label="KDV %" value={`%${kdvPct}`} />
+              <ReadOnlyCell label="Peşin %" value={`%${order.pesinYuzde}`} />
+              <ReadOnlyCell label="Para Tipi" value={cur} />
+            </div>
+
+            {/* Maliyet — editlenebilir */}
+            <div className="border rounded-md p-3 bg-muted/20 space-y-2">
+              <Label className="text-xs">Maliyet (editlenebilir)</Label>
+              <div className="flex items-center gap-2">
+                <DecimalInput
+                  value={maliyetEdit ?? baseMaliyet ?? ''}
+                  onValueChange={(v) => setMaliyetEdit(v === '' ? 0 : v)}
+                  className="flex-1"
+                />
+                <span className="text-xs text-muted-foreground">{cur}</span>
+                <Button
+                  size="sm"
+                  disabled={saveMut.isPending || maliyetEdit === null}
+                  onClick={() => saveMut.mutate()}
+                >
+                  {saveMut.isPending ? 'Kaydediliyor…' : 'Maliyet Kaydet'}
+                </Button>
+              </div>
+              {order.maliyetDetayi && (
+                <p className="text-[11px] text-muted-foreground">Detay: {order.maliyetDetayi}</p>
+              )}
+            </div>
+
+            {/* Hesaplanan çıktılar — Net Kar pozitif yeşil / negatif kırmızı (Zarar). */}
+            <div className={`border rounded-md p-3 space-y-2 ${
+              isLoss ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'
+            }`}>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <KPICell label="Brüt Kar"      value={formatCurrency(brutKar, cur)} />
+                <KPICell
+                  label={isLoss ? 'Zarar' : 'Net Kar'}
+                  value={formatCurrency(netKar, cur)}
+                  highlight={isLoss ? 'loss' : 'profit'}
+                />
+                <KPICell label="Marj %"        value={`%${marjPct.toFixed(2)}`} />
+                <KPICell label="Tahsilat %"    value={`%${tahsilatPct.toFixed(2)}`} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>Kapat</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function ReadOnlyCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded p-2 bg-muted/30">
+      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+      <p className="font-semibold text-sm">{value}</p>
+    </div>
+  )
+}
+
+function KPICell({ label, value, highlight }: { label: string; value: string; highlight?: 'loss' | 'profit' }) {
+  const color = highlight === 'loss' ? 'text-red-700' : highlight === 'profit' ? 'text-emerald-700' : ''
+  return (
+    <div className="rounded p-2 bg-card">
+      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
+      <p className={`font-semibold text-sm ${color}`}>{value}</p>
     </div>
   )
 }

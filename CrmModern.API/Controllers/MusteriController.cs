@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Musteri;
 using CrmModern.Core.Interfaces.Services;
@@ -16,13 +17,22 @@ namespace CrmModern.API.Controllers;
 [Authorize]
 public sealed class MusteriController(IMusteriService musteriService) : ControllerBase
 {
+    private int CurrentUserId =>
+        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new InvalidOperationException("KullaniciID claim missing."));
+
+    private string CurrentRole =>
+        User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
+
     // ── Müşteri endpoints ────────────────────────────────────────────────────
 
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<MusteriDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetAll()
     {
-        var data = await musteriService.GetAllAsync();
+        // PROMPT-v2 §7: Servis rol bazlı filtre uygular (Temsilci yalnız kendi
+        // yarattığı kayıtları görür). Diğer roller tüm listeyi alır.
+        var data = await musteriService.GetAllAsync(CurrentUserId, CurrentRole);
         return Ok(ApiResponse<IEnumerable<MusteriDto>>.Ok(data));
     }
 
@@ -44,7 +54,8 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
     [ProducesResponseType(typeof(ApiResponse<object>),     StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> Create([FromBody] CreateMusteriDto dto)
     {
-        var created = await musteriService.CreateAsync(dto);
+        // PROMPT-v2 §7: JWT user id → CreatedByKullaniciID (sahiplenme).
+        var created = await musteriService.CreateAsync(dto, CurrentUserId);
         return CreatedAtAction(
             nameof(GetById),
             new { id = created.MusteriID },

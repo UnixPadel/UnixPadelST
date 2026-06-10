@@ -8,9 +8,17 @@ namespace CrmModern.Infrastructure.Services;
 
 internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
 {
-    public async Task<IEnumerable<MusteriDto>> GetAllAsync()
+    public async Task<IEnumerable<MusteriDto>> GetAllAsync(int currentUserId, string role)
     {
         var list = await unitOfWork.Musteriler.GetAllWithUlkeAsync();
+
+        // PROMPT-v2 §7: Temsilci yalnız kendi yarattığı müşterileri görür.
+        // Diğer roller (Yonetici, Muhasebe, Gozlemci, Fabrika, Lojistik) tüm
+        // listeyi görür. NULL CreatedByKullaniciID olan geçmiş kayıtlar
+        // Temsilci'ye gizlenir (sahiplik belirlenemeyen kayıtlar).
+        if (role == "Temsilci")
+            list = list.Where(m => m.CreatedByKullaniciID == currentUserId);
+
         return list.Select(ToDto);
     }
 
@@ -21,7 +29,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
         return ToDto(musteri);
     }
 
-    public async Task<MusteriDto> CreateAsync(CreateMusteriDto dto)
+    public async Task<MusteriDto> CreateAsync(CreateMusteriDto dto, int currentUserId)
     {
         // Replicates: SELECT COUNT(*) FROM MusteriBilgileri WHERE MusteriAd = @MusteriAd
         if (await unitOfWork.Musteriler.MusteriAdExistsAsync(dto.MusteriAd))
@@ -32,13 +40,15 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
 
         var musteri = new Musteri
         {
-            MusteriAd   = dto.MusteriAd,
-            Telefon     = dto.Telefon,
-            ZipKod      = dto.ZipKod,
-            E_Mail      = dto.E_Mail,
-            Adres       = dto.Adres,
-            VATNumarasi = dto.VATNumarasi,
-            UlkelerID   = dto.UlkelerID
+            MusteriAd            = dto.MusteriAd,
+            Telefon              = dto.Telefon,
+            ZipKod               = dto.ZipKod,
+            E_Mail               = dto.E_Mail,
+            Adres                = dto.Adres,
+            VATNumarasi          = dto.VATNumarasi,
+            UlkelerID            = dto.UlkelerID,
+            // PROMPT-v2 §7: Sahiplik damgası — Temsilci listesini bu kolon belirler.
+            CreatedByKullaniciID = currentUserId
         };
 
         await unitOfWork.Musteriler.AddAsync(musteri);

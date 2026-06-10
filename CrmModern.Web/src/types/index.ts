@@ -167,9 +167,11 @@ export interface CreateOrderDto {
   mZipKod?: string
   mAdres?: string
   paraTipi: string
-  indirim: number
-  kdv: number
-  pesinYuzde: number
+  // PROMPT-v2 §3: boş bırakılınca null olarak gönderilir; backend null → 0
+  // coercion'ı yalnız total hesaplamada uygular.
+  indirim: number | null
+  kdv: number | null
+  pesinYuzde: number | null
   sets: OrderSetInput[]
   details: string[]
   sirket: string
@@ -304,6 +306,9 @@ export interface AccountingOrderListDto {
   // Row colouring + "Muhasebe Onayla" enable rule needs Kontrol.
   kontrol?: string
   tarih: string
+  // PROMPT-v2 §10.2: Maliyet Reçetesi Net Kar math için.
+  indirim?: number | null
+  kdv?: number | null
 }
 
 export interface AccountingTransactionDto {

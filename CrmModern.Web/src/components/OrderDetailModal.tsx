@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
 import { OrderStageTimeline } from '@/components/OrderStageTimeline'
 import { useToast } from '@/components/ToastProvider'
+import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
   siparisNo: string | null
@@ -15,6 +16,10 @@ interface Props {
 
 export function OrderDetailModal({ siparisNo, onClose }: Props) {
   const { toast } = useToast()
+  // PROMPT-v2 §2: Fabrika rolü parasal değer görmez (Fiyatlandırma bloğu,
+  // bileşen Fiyat sütunu, proforma Excel butonu). Backend de aynı gate'lere sahip.
+  const { getUser } = useAuth()
+  const hideMoney = getUser()?.yetkiTuru === 'Fabrika'
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order-detail', siparisNo],
@@ -38,7 +43,9 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>Sipariş Detayı — {siparisNo}</span>
-            <Button size="sm" variant="outline" onClick={handleExcel}>📥 Excel</Button>
+            {!hideMoney && (
+              <Button size="sm" variant="outline" onClick={handleExcel}>📥 Excel</Button>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -81,20 +88,22 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
               )}
             </div>
 
-            {/* Pricing */}
-            <div className="border rounded-md p-3 space-y-2">
-              <h3 className="font-semibold">Fiyatlandırma</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <PriceBox label="Para Birimi" value={order.paraTipi} />
-                <PriceBox label="Brüt Toplam" value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
-                {(order.indirim ?? 0) > 0 && <PriceBox label="İndirim" value={`-${formatCurrency(order.indirim, order.paraTipi)}`} />}
-                {(order.kdv ?? 0) > 0 && <PriceBox label="KDV" value={`%${order.kdv}`} />}
-                <PriceBox label="Toplam" value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
-                <PriceBox label="Peşin Yüzde" value={`%${order.pesinYuzde}`} />
-                {order.montajVar && <PriceBox label="Montaj" value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
-                {order.teslimatVar && <PriceBox label="Teslimat" value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
+            {/* Pricing — PROMPT-v2 §2: Fabrika için tamamen gizli. */}
+            {!hideMoney && (
+              <div className="border rounded-md p-3 space-y-2">
+                <h3 className="font-semibold">Fiyatlandırma</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <PriceBox label="Para Birimi" value={order.paraTipi} />
+                  <PriceBox label="Brüt Toplam" value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
+                  {(order.indirim ?? 0) > 0 && <PriceBox label="İndirim" value={`-${formatCurrency(order.indirim, order.paraTipi)}`} />}
+                  {(order.kdv ?? 0) > 0 && <PriceBox label="KDV" value={`%${order.kdv}`} />}
+                  <PriceBox label="Toplam" value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
+                  <PriceBox label="Peşin Yüzde" value={`%${order.pesinYuzde}`} />
+                  {order.montajVar && <PriceBox label="Montaj" value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
+                  {order.teslimatVar && <PriceBox label="Teslimat" value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Products table */}
             {order.items && order.items.length > 0 && (
@@ -106,7 +115,8 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
                       <th className="text-left px-2 py-1">Tür</th>
                       <th className="text-left px-2 py-1">Öznitelik</th>
                       <th className="text-right px-2 py-1">Adet</th>
-                      <th className="text-right px-2 py-1">Fiyat</th>
+                      {/* PROMPT-v2 §2: Fabrika Fiyat sütununu görmez. */}
+                      {!hideMoney && <th className="text-right px-2 py-1">Fiyat</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -115,7 +125,9 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
                         <td className="px-2 py-1">{item.kategoriID && !item.bilesenID ? `SET ${item.kategoriID}` : `Bileşen ${item.bilesenID}`}</td>
                         <td className="px-2 py-1">{item.oznitelikAdi ?? '—'}</td>
                         <td className="text-right px-2 py-1">{item.adet}</td>
-                        <td className="text-right px-2 py-1">{formatCurrency(item.fiyat, order.paraTipi)}</td>
+                        {!hideMoney && (
+                          <td className="text-right px-2 py-1">{formatCurrency(item.fiyat, order.paraTipi)}</td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

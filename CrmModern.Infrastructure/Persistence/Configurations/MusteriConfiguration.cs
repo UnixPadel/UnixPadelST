@@ -45,6 +45,11 @@ internal sealed class MusteriConfiguration : IEntityTypeConfiguration<Musteri>
         builder.Property(m => m.UlkelerID)
                .HasColumnName("UlkelerID");
 
+        // PROMPT-v2 §7: Temsilci sahiplenmesi. Kolon DatabaseSchemaMigrator
+        // tarafından idempotent eklenir; eski kayıtlarda NULL kalabilir.
+        builder.Property(m => m.CreatedByKullaniciID)
+               .HasColumnName("CreatedByKullaniciID");
+
         builder.HasOne(m => m.Ulke)
                .WithMany(u => u.Musteriler)
                .HasForeignKey(m => m.UlkelerID)

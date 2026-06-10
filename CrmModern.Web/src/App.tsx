@@ -34,8 +34,9 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard"       element={<DashboardPage />} />
-        {/* PROMPT-v3 §1 — Teklif/Sipariş Oluştur yalnız Temsilci. */}
-        <Route path="/orders/new"      element={<RoleGuard roles={['Temsilci']}><NewOrderPage /></RoleGuard>} />
+        {/* PROMPT-v3 §1 — Teklif/Sipariş Oluştur yalnız Temsilci.
+            İstisna: elshan.rasulov (kullanıcı adı bazlı, rol değil). */}
+        <Route path="/orders/new"      element={<RoleGuard roles={['Temsilci']} usernames={['elshan.rasulov']}><NewOrderPage /></RoleGuard>} />
         {/* PROMPT.md #20 — Siparişlerim: only roles that can create orders. */}
         <Route path="/orders/mine"     element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><MyOrdersPage /></RoleGuard>} />
         {/* PROMPT.md #16 + #19 — Müşteri CRUD. Per-row matrix:

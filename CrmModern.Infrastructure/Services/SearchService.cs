@@ -24,6 +24,10 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
             filter.Baslangic,
             filter.Bitis);
 
+        // Oluşturan kullanıcı adları (legacy Ara formu KullaniciBilgileri join'i).
+        var users = (await uow.Kullanicilar.GetAllAsync())
+            .ToDictionary(u => u.KullaniciID, u => u.KullaniciAdi);
+
         return orders.Select(o =>
         {
             decimal odenen      = o.OdenenMiktar ?? 0m;
@@ -34,6 +38,7 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
 
             return new SearchResultDto(
                 o.SiparisNo, o.TeklifNo, o.MusteriAd, o.MUlke, o.KullaniciID,
+                users.TryGetValue(o.KullaniciID, out var kAdi) ? kAdi : null,
                 o.ParaTipi, o.ToplamFiyat, kaparo, kalanBakiye,
                 o.OdenenMiktar, o.OdemeDurum,
                 o.SiparisMiTeklifMi, o.Kontrol, o.Tarih, o.Sirket);

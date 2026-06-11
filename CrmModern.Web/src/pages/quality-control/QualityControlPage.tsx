@@ -12,10 +12,12 @@ import { getCustomers, getUlkeler } from '@/api/customers'
 import { getUsersLookup } from '@/api/users'
 import { DataTable, type Column } from '@/components/DataTable'
 import { DecimalInput } from '@/components/DecimalInput'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
@@ -25,10 +27,13 @@ import type { OrderListDto, QualityControlListDto } from '@/types'
 
 /**
  * PROMPT-v4 — Kontrol ekranı (legacy Kontrol.cs / KontrolRed.cs 1:1 parity).
+ * PROMPT-v5 §1 — yerleşim legacy ekran düzenine çevrildi: üstte dört panel
+ * (Filtreme | sekmeli Detay | Kontrol | Fabrika), altta tam genişlik master
+ * grid. Davranış v4 ile birebir aynı; yalnız re-skin.
  *
  * Erişim: yalnız elshan.rasulov (route RoleGuard + tüm backend mutasyon gate'leri).
- * Tek sayfa, 1920×1080'de sayfa scroll'u YOK — yalnız master grid, Detay listesi,
- * Ürün&Bileşen ve Muhasebe Geçmişi kendi içinde kayar.
+ * Tek sayfa, 1920×1080'de sayfa scroll'u YOK — yalnız master grid, sekme
+ * gövdeleri (Detay / Ürün&Bileşen / Muhasebe Geçmişi) kendi içinde kayar.
  *
  * Bilinçli legacy sapması (§5.1): Onayla → Kontrol='Onay' + SiparisMiTeklifMi='Planlama'
  * (sipariş Muhasebe beklemeden doğrudan Fabrika kuyruğuna düşer).
@@ -150,15 +155,20 @@ function ROField({ label, value, multiline = false, className }: {
   )
 }
 
-function Block({ title, children, className }: {
-  title: string
-  children: React.ReactNode
-  className?: string
-}) {
+/** Cari sekmesi satırı — legacy "etiket solda, kutu sağda" düzeni. */
+function CariRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className={cn('rounded-md border p-2 min-w-0', className)}>
-      <p className="text-xs font-semibold mb-1.5">{title}</p>
+    <div className="grid grid-cols-[110px_1fr] items-center gap-2">
+      <span className="text-xs text-muted-foreground text-right truncate">{label}</span>
       {children}
+    </div>
+  )
+}
+
+function CariValue({ value }: { value?: string | null }) {
+  return (
+    <div className="rounded border bg-muted/40 px-1.5 py-1 text-xs min-h-[1.6rem] truncate" title={value ?? undefined}>
+      {value || '—'}
     </div>
   )
 }
@@ -235,6 +245,7 @@ export function QualityControlPage() {
   // ── Aksiyon state ───────────────────────────────────────────────────────
   const [rejectOpen, setRejectOpen] = useState(false)
   const [redNotu, setRedNotu] = useState('')
+  const [formNo, setFormNo] = useState<string | null>(null)
   const [odenenInput, setOdenenInput] = useState<number | ''>('')
   const [asama, setAsama] = useState('')
   const [asamaTarih, setAsamaTarih] = useState(() => new Date().toISOString().slice(0, 10))
@@ -253,6 +264,7 @@ export function QualityControlPage() {
     qc.invalidateQueries({ queryKey: ['qc-search'] })
     qc.invalidateQueries({ queryKey: ['qc-detail'] })
     qc.invalidateQueries({ queryKey: ['qc-transactions'] })
+    qc.invalidateQueries({ queryKey: ['my-orders'] })
     setSelected(null)
   }
 
@@ -288,6 +300,7 @@ export function QualityControlPage() {
       qc.invalidateQueries({ queryKey: ['qc-search'] })
       qc.invalidateQueries({ queryKey: ['qc-detail', vars.no] })
       qc.invalidateQueries({ queryKey: ['qc-transactions', vars.no] })
+      qc.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: t('qc.cariUpdated') })
     },
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
@@ -313,6 +326,12 @@ export function QualityControlPage() {
   const handleRevise = () => {
     const no = requireSelection()
     if (no) nav(`/orders/new?revise=${encodeURIComponent(no)}`)
+  }
+
+  // PROMPT-v5 §1 — legacy buttonFormGetir_Click: salt-okunur sipariş formu görüntüleyici.
+  const handleFormGetir = () => {
+    const no = requireSelection()
+    if (no) setFormNo(no)
   }
 
   const handleCari = () => {
@@ -403,283 +422,265 @@ export function QualityControlPage() {
         <p className="text-xs text-muted-foreground">{t('qc.pendingCount', { count: pending.length })}</p>
       </div>
 
-      {/* ── Filtreme barı (legacy "Filtreme" grubu) ────────────────────── */}
-      <div className="border-b px-4 py-2 shrink-0">
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-36">
-            <Label className="text-[10px]">{t('qc.filter.siparisNo')}</Label>
-            <Input className="h-7 text-xs" value={filters.siparisNo}
-              onChange={(e) => setFilters((f) => ({ ...f, siparisNo: e.target.value }))} />
-          </div>
-          <div className="w-40">
-            <Label className="text-[10px]">{t('qc.filter.musteriAdi')}</Label>
-            <Select value={filters.musteriAd} onValueChange={(v) => setFilters((f) => ({ ...f, musteriAd: v }))}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr'))
-                  .map((m) => <SelectItem key={m.musteriID} value={m.musteriAd}>{m.musteriAd}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-36">
-            <Label className="text-[10px]">{t('qc.filter.temsilci')}</Label>
-            <Select value={filters.kullaniciID} onValueChange={(v) => setFilters((f) => ({ ...f, kullaniciID: v }))}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {users.map((u) => (
-                  <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>{u.ad} {u.soyad}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-32">
-            <Label className="text-[10px]">{t('qc.filter.ulke')}</Label>
-            <Select value={filters.ulke} onValueChange={(v) => setFilters((f) => ({ ...f, ulke: v }))}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {[...ulkeler].sort((a, b) => a.ulkeAdi.localeCompare(b.ulkeAdi, 'tr'))
-                  .map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-28">
-            <Label className="text-[10px]">{t('qc.filter.kontrolDurumu')}</Label>
-            <Select value={filters.kontrol} onValueChange={(v) => setFilters((f) => ({ ...f, kontrol: v }))}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {CONTROLS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-28">
-            <Label className="text-[10px]">{t('qc.filter.odemeDurumu')}</Label>
-            <Select value={filters.odemeDurum} onValueChange={(v) => setFilters((f) => ({ ...f, odemeDurum: v }))}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-28">
-            <Label className="text-[10px]">{t('qc.filter.asama')}</Label>
-            <Select value={filters.asama} onValueChange={(v) => setFilters((f) => ({ ...f, asama: v }))}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="w-32">
-            <Label className="text-[10px]">{t('qc.filter.bas')}</Label>
-            <Input className="h-7 text-xs" type="date" value={filters.baslangic}
-              onChange={(e) => setFilters((f) => ({ ...f, baslangic: e.target.value }))} />
-          </div>
-          <div className="w-32">
-            <Label className="text-[10px]">{t('qc.filter.son')}</Label>
-            <Input className="h-7 text-xs" type="date" value={filters.bitis}
-              onChange={(e) => setFilters((f) => ({ ...f, bitis: e.target.value }))} />
-          </div>
-          <Button size="sm" className="h-7" onClick={() => { setSubmitted({ ...filters }); setSelected(null) }}>
-            {t('qc.filter.ara')}
-          </Button>
-          <Button size="sm" variant="outline" className="h-7" onClick={() => {
-            // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
-            setFilters(defaultFilters(minTarih))
-            setSubmitted(null)
-            setSelected(null)
-          }}>
-            {t('qc.filter.reset')}
-          </Button>
-        </div>
-      </div>
+      {/* ── Üst bölge: dört panel (legacy ekran düzeni) ─────────────────
+           Paneller seçim olmasa da hep görünür; alanlar '—' gösterir,
+           aksiyonlar select-first toast'ını atar. */}
+      <div className="flex h-[44vh] min-h-[340px] shrink-0 gap-2 overflow-hidden px-4 py-2">
 
-      {/* ── Master grid (iç scroll, sayfa scroll'u yok) ────────────────── */}
-      <div className="shrink-0 px-4 pt-2 h-[36vh] min-h-[200px]">
-        <div className="h-full overflow-auto rounded-md">
-          <DataTable
-            columns={columns}
-            data={rows}
-            keyField="siparisNo"
-            loading={loading}
-            onRowClick={(r) => setSelected(r.siparisNo)}
-            rowClassName={(r) => cn(
-              // Legacy siparisAlDataGrid_CellFormatting: OdemeDurum != 'Beklemede' → sarı/siyah
-              (r.odemeDurum ?? '') !== 'Beklemede' && 'bg-yellow-200 text-black hover:bg-yellow-300 dark:bg-yellow-200 dark:text-black',
-              selected === r.siparisNo && 'outline outline-2 -outline-offset-2 outline-primary',
-            )}
-          />
-        </div>
-      </div>
-
-      {/* ── Detay paneli ───────────────────────────────────────────────── */}
-      <div className="flex-1 min-h-0 overflow-hidden px-4 py-2">
-        {!selected || !d ? (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            {t('qc.emptyHint')}
-          </div>
-        ) : (
-          <div className="flex h-full flex-col gap-2 min-h-0">
-            {/* Üç kolon */}
-            <div className="grid grid-cols-3 gap-2 min-h-0 flex-1 overflow-hidden">
-              {/* 1 — Satış Temsilcisi + Müşteri */}
-              <div className="flex flex-col gap-2 min-h-0 overflow-y-auto pr-0.5">
-                <Block title={t('qc.blocks.satisTemsilcisi')}>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <ROField label={t('qc.fields.temsilciAdi')} value={d.kullaniciAdi} />
-                    <ROField label={t('qc.fields.telefon')} value={d.sTelefon} />
-                    <ROField label={t('qc.fields.fax')} value={d.sFax} />
-                    <ROField label={t('qc.fields.web')} value={d.sWeb} />
-                    <ROField label={t('qc.fields.email')} value={d.sE_Mail} />
-                    <ROField label={t('qc.fields.vat')} value={d.sVatNumarasi} />
-                    <ROField label={t('qc.fields.ulke')} value={d.sUlke} />
-                    <ROField label={t('qc.fields.adres')} value={d.sAdres} multiline className="col-span-2" />
-                  </div>
-                </Block>
-                <Block title={t('qc.blocks.musteri')}>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <ROField label={t('qc.fields.isim')} value={d.musteriAd} />
-                    <ROField label={t('qc.fields.telefon')} value={d.mTelefon} />
-                    <ROField label={t('qc.fields.ulke')} value={d.mUlke} />
-                    <ROField label={t('qc.fields.zipKodu')} value={d.mZipKod} />
-                    <ROField label={t('qc.fields.email')} value={d.mMail} />
-                    <ROField label={t('qc.fields.vat')} value={d.mVATNumarasi} />
-                    <ROField label={t('qc.fields.adres')} value={d.mAdres} multiline className="col-span-2" />
-                  </div>
-                </Block>
-              </div>
-
-              {/* 2 — Teslimat + Detay listesi */}
-              <div className="flex flex-col gap-2 min-h-0 overflow-hidden">
-                <div className="overflow-y-auto min-h-0">
-                  <Block title={t('qc.blocks.teslimatDetaylari')}>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      <ROField label={t('qc.fields.teslimAlanAdi')} value={d.tTeslimAlanAdi} />
-                      <ROField label={t('qc.fields.ilgiliKisi')} value={d.tIlgiliKisi} />
-                      <ROField label={t('qc.fields.ulke')} value={d.tUlke} />
-                      <ROField label={t('qc.fields.telefon')} value={d.tTelefon} />
-                      <ROField label={t('qc.fields.altTelefon')} value={d.tAltTelefon} />
-                      <ROField label={t('qc.fields.email')} value={d.tE_Mail} />
-                      <ROField label={t('qc.fields.zipKodu')} value={d.tZipKod} />
-                      <ROField label={t('qc.fields.vat')} value={d.tVATNumarasi} />
-                      <ROField label={t('qc.fields.adres')} value={d.tAdres} multiline className="col-span-2" />
-                      <div className="col-span-2 flex flex-wrap items-center gap-3 text-xs">
-                        <label className="flex items-center gap-1">
-                          <input type="checkbox" checked={d.montajVar} disabled /> {t('qc.fields.montaj')}
-                        </label>
-                        <label className="flex items-center gap-1">
-                          <input type="checkbox" checked={d.teslimatVar} disabled /> {t('qc.fields.teslimat')}
-                        </label>
-                        <span>{t('qc.fields.montajFiyati')}: {formatCurrency(d.montajFiyat ?? 0, d.paraTipi)}</span>
-                        <span>{t('qc.fields.teslimatFiyati')}: {formatCurrency(d.teslimatFiyat ?? 0, d.paraTipi)}</span>
-                        <span>{t('qc.fields.teslimatCesidi')}: {d.teslimatCesiti || t('qc.grid.veriYok')}</span>
-                      </div>
-                    </div>
-                  </Block>
-                </div>
-                <Block title={t('qc.blocks.detay')} className="flex-1 min-h-0 flex flex-col">
-                  <div className="flex-1 min-h-[4rem] overflow-y-auto rounded border">
-                    {d.details.length === 0 ? (
-                      <p className="p-2 text-xs text-muted-foreground">{t('common.noData')}</p>
-                    ) : (
-                      <ul className="divide-y">
-                        {d.details.map((line, i) => (
-                          <li key={i} className="px-2 py-1 text-xs">{line}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                </Block>
-              </div>
-
-              {/* 3 — Cari Bilgiler + Kontrol Durumu aksiyonları */}
-              <div className="flex flex-col gap-2 min-h-0 overflow-y-auto pr-0.5">
-                <Block title={t('qc.blocks.cariBilgiler')}>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <ROField label={t('qc.fields.siparisToplam')} value={formatCurrency(toplam, d.paraTipi)} />
-                    <ROField label={t('qc.fields.paraBirimi')} value={d.paraTipi} />
-                    <ROField label={t('qc.fields.pesinYuzde')} value={`%${d.pesinYuzde}`} />
-                    <ROField label={t('qc.fields.indirimYuzde')} value={d.indirim != null ? String(d.indirim) : ''} />
-                    <ROField label={t('qc.fields.kaparoBakiye')} value={formatCurrency(brutKaparo, d.paraTipi)} />
-                    <ROField label={t('qc.fields.siparisBakiye')} value={formatCurrency(siparisBakiye, d.paraTipi)} />
-                    <div className="space-y-0.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.odenenBakiye')}</p>
-                      <DecimalInput className="h-7 text-xs" value={odenenInput} onValueChange={setOdenenInput} />
-                    </div>
-                    <div className="flex items-end">
-                      <Button size="sm" variant="outline" className="h-7 w-full text-xs"
-                        disabled={cariMut.isPending} onClick={handleCari}>
-                        {t('qc.actions.cariGuncelle')}
-                      </Button>
-                    </div>
-                    <ROField label={t('qc.fields.siparisNo')} value={d.siparisNo} />
-                    <ROField label={t('qc.fields.not')} value={d.siparisNotu} multiline className="col-span-2" />
-                  </div>
-                </Block>
-
-                <Block title={t('qc.blocks.kontrolDurumu')}>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <Button size="sm" className="h-7 text-xs" disabled={approveMut.isPending} onClick={handleApprove}>
-                      {t('qc.actions.onayla')}
-                    </Button>
-                    <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handleRejectOpen}>
-                      {t('qc.actions.reddet')}
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleRevise}>
-                      {t('qc.actions.revizeEt')}
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExcel}>
-                      {t('qc.actions.excelYaz')}
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('ek')}>
-                      {t('qc.actions.saticiEk')}
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('muhasebeek')}>
-                      {t('qc.actions.muhasebeEk')}
-                    </Button>
-                  </div>
-                </Block>
-
-                {/* Fabrika grubu (legacy Aşama + Bitiş + Not + Kaydet) */}
-                <Block title={t('qc.blocks.fabrika')}>
-                  <div className="grid grid-cols-2 gap-1.5">
-                    <div className="space-y-0.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.asama')}</p>
-                      <Select value={asama || undefined} onValueChange={setAsama}>
-                        <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('common.select')} /></SelectTrigger>
-                        <SelectContent>
-                          {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-0.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.bitis')}</p>
-                      <Input className="h-7 text-xs" type="date" value={asamaTarih}
-                        onChange={(e) => setAsamaTarih(e.target.value)} />
-                    </div>
-                    <div className="col-span-2 space-y-0.5">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
-                      <Input className="h-7 text-xs" value={asamaNot}
-                        onChange={(e) => setAsamaNot(e.target.value)} />
-                    </div>
-                    <Button size="sm" className="col-span-2 h-7 text-xs"
-                      disabled={stageMut.isPending} onClick={handleStageSave}>
-                      {t('qc.actions.kaydet')}
-                    </Button>
-                  </div>
-                </Block>
-              </div>
+        {/* 1 — Filtreme (legacy sıra, dikey) */}
+        <div className="w-[260px] shrink-0 overflow-y-auto rounded-md border p-2">
+          <p className="mb-1.5 text-sm font-semibold text-center">{t('qc.blocks.filtreme')}</p>
+          <div className="space-y-1.5">
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.siparisNo')}</Label>
+              <Input className="h-7 text-xs" value={filters.siparisNo}
+                onChange={(e) => setFilters((f) => ({ ...f, siparisNo: e.target.value }))} />
             </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.musteriAdi')}</Label>
+              <Select value={filters.musteriAd} onValueChange={(v) => setFilters((f) => ({ ...f, musteriAd: v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  {[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr'))
+                    .map((m) => <SelectItem key={m.musteriID} value={m.musteriAd}>{m.musteriAd}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.temsilci')}</Label>
+              <Select value={filters.kullaniciID} onValueChange={(v) => setFilters((f) => ({ ...f, kullaniciID: v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  {users.map((u) => (
+                    <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>{u.ad} {u.soyad}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.ulke')}</Label>
+              <Select value={filters.ulke} onValueChange={(v) => setFilters((f) => ({ ...f, ulke: v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  {[...ulkeler].sort((a, b) => a.ulkeAdi.localeCompare(b.ulkeAdi, 'tr'))
+                    .map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.kontrolDurumu')}</Label>
+              <Select value={filters.kontrol} onValueChange={(v) => setFilters((f) => ({ ...f, kontrol: v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  {CONTROLS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.odemeDurumu')}</Label>
+              <Select value={filters.odemeDurum} onValueChange={(v) => setFilters((f) => ({ ...f, odemeDurum: v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.asama')}</Label>
+              <Select value={filters.asama} onValueChange={(v) => setFilters((f) => ({ ...f, asama: v }))}>
+                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('common.all')}</SelectItem>
+                  {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="pt-1 text-center text-xs font-semibold">{t('qc.filter.tarihAraligi')}</p>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.bas')}</Label>
+              <Input className="h-7 text-xs" type="date" value={filters.baslangic}
+                onChange={(e) => setFilters((f) => ({ ...f, baslangic: e.target.value }))} />
+            </div>
+            <div className="space-y-0.5">
+              <Label className="text-[10px]">{t('qc.filter.son')}</Label>
+              <Input className="h-7 text-xs" type="date" value={filters.bitis}
+                onChange={(e) => setFilters((f) => ({ ...f, bitis: e.target.value }))} />
+            </div>
+            <div className="flex gap-1.5 pt-1">
+              <Button size="sm" variant="outline" className="h-7 flex-1" onClick={() => {
+                // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
+                setFilters(defaultFilters(minTarih))
+                setSubmitted(null)
+                setSelected(null)
+              }}>
+                {t('qc.filter.reset')}
+              </Button>
+              <Button size="sm" className="h-7 flex-1" onClick={() => { setSubmitted({ ...filters }); setSelected(null) }}>
+                {t('qc.filter.ara')}
+              </Button>
+            </div>
+          </div>
+        </div>
 
-            {/* Alt şerit: Ürün & Bileşen + Muhasebe Geçmişi */}
-            <div className="grid grid-cols-2 gap-2 h-44 shrink-0 min-h-0">
-              <Block title={t('qc.blocks.urunBilesen')} className="flex flex-col min-h-0">
-                <div className="flex-1 overflow-auto rounded border">
+        {/* 2 — Detay sekmeleri (legacy tab sırası) */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border p-2">
+          <Tabs defaultValue="cari" className="flex min-h-0 flex-1 flex-col">
+            <TabsList className="h-8 w-full shrink-0 justify-start overflow-x-auto">
+              <TabsTrigger className="px-2 py-1 text-xs" value="cari">{t('qc.tabs.cari')}</TabsTrigger>
+              <TabsTrigger className="px-2 py-1 text-xs" value="muhasebe">{t('qc.tabs.muhasebeGecmisi')}</TabsTrigger>
+              <TabsTrigger className="px-2 py-1 text-xs" value="musteri">{t('qc.tabs.musteri')}</TabsTrigger>
+              <TabsTrigger className="px-2 py-1 text-xs" value="teslimat">{t('qc.tabs.teslimat')}</TabsTrigger>
+              <TabsTrigger className="px-2 py-1 text-xs" value="temsilci">{t('qc.tabs.satisTemsilcisi')}</TabsTrigger>
+              <TabsTrigger className="px-2 py-1 text-xs" value="detay">{t('qc.tabs.detay')}</TabsTrigger>
+            </TabsList>
+
+            {/* Cari — Cari Bilgiler + Cari Güncelle / Revize Et */}
+            <TabsContent value="cari" className="min-h-0 flex-1 overflow-y-auto">
+              <div className="mx-auto max-w-md space-y-1.5 pt-1">
+                <p className="text-sm font-semibold text-center">{t('qc.blocks.cariBilgiler')}</p>
+                <CariRow label={t('qc.fields.siparisToplam')}>
+                  <CariValue value={d ? formatCurrency(toplam, d.paraTipi) : ''} />
+                </CariRow>
+                <CariRow label={t('qc.fields.paraBirimi')}>
+                  <CariValue value={d?.paraTipi} />
+                </CariRow>
+                {/* Legacy iki parçalı alan: %PesinYuzde + kaparo tutarı */}
+                <CariRow label={t('qc.fields.kaparoBakiye')}>
+                  <div className="flex gap-1">
+                    <div className="w-14 rounded border bg-muted/40 px-1.5 py-1 text-center text-xs min-h-[1.6rem]">
+                      {d ? `%${d.pesinYuzde}` : '—'}
+                    </div>
+                    <div className="min-w-0 flex-1 rounded border bg-muted/40 px-1.5 py-1 text-xs min-h-[1.6rem] truncate">
+                      {d ? formatCurrency(brutKaparo, d.paraTipi) : '—'}
+                    </div>
+                  </div>
+                </CariRow>
+                <CariRow label={t('qc.fields.siparisBakiye')}>
+                  <CariValue value={d ? formatCurrency(siparisBakiye, d.paraTipi) : ''} />
+                </CariRow>
+                <CariRow label={t('qc.fields.odenenBakiye')}>
+                  <DecimalInput className="h-7 text-xs" value={odenenInput} onValueChange={setOdenenInput} />
+                </CariRow>
+                <div className="mx-auto flex w-full max-w-[220px] flex-col gap-1.5 pt-2">
+                  <Button size="sm" className="h-7 text-xs" disabled={cariMut.isPending} onClick={handleCari}>
+                    {t('qc.actions.cariGuncelle')}
+                  </Button>
+                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleRevise}>
+                    {t('qc.actions.revizeEt')}
+                  </Button>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Muhasebe Geçmişi */}
+            <TabsContent value="muhasebe" className="min-h-0 flex-1 overflow-y-auto">
+              <div className="rounded border">
+                <table className="w-full text-xs">
+                  <thead className="sticky top-0 bg-muted/80">
+                    <tr>
+                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.musteriAdi')}</th>
+                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.ulke')}</th>
+                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.temsilci')}</th>
+                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.paraTuru')}</th>
+                      <th className="px-2 py-1 text-right font-medium">{t('qc.tx.odenenBakiye')}</th>
+                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.tarih')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {!d || sortedTx.length === 0 ? (
+                      <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">{t('common.noData')}</td></tr>
+                    ) : sortedTx.map((tx) => (
+                      <tr key={tx.id} className="border-t">
+                        <td className="px-2 py-1">{d.musteriAd}</td>
+                        <td className="px-2 py-1">{d.mUlke ?? ''}</td>
+                        <td className="px-2 py-1">{d.kullaniciAdi ?? ''}</td>
+                        <td className="px-2 py-1">{d.paraTipi}</td>
+                        <td className="px-2 py-1 text-right">{formatCurrency(tx.odenenMiktar ?? 0, d.paraTipi)}</td>
+                        <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </TabsContent>
+
+            {/* Müşteri */}
+            <TabsContent value="musteri" className="min-h-0 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-1.5">
+                <ROField label={t('qc.fields.isim')} value={d?.musteriAd} />
+                <ROField label={t('qc.fields.telefon')} value={d?.mTelefon} />
+                <ROField label={t('qc.fields.ulke')} value={d?.mUlke} />
+                <ROField label={t('qc.fields.zipKodu')} value={d?.mZipKod} />
+                <ROField label={t('qc.fields.email')} value={d?.mMail} />
+                <ROField label={t('qc.fields.vat')} value={d?.mVATNumarasi} />
+                <ROField label={t('qc.fields.adres')} value={d?.mAdres} multiline className="col-span-3" />
+              </div>
+            </TabsContent>
+
+            {/* Teslimat */}
+            <TabsContent value="teslimat" className="min-h-0 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-1.5">
+                <ROField label={t('qc.fields.teslimAlanAdi')} value={d?.tTeslimAlanAdi} />
+                <ROField label={t('qc.fields.ilgiliKisi')} value={d?.tIlgiliKisi} />
+                <ROField label={t('qc.fields.ulke')} value={d?.tUlke} />
+                <ROField label={t('qc.fields.telefon')} value={d?.tTelefon} />
+                <ROField label={t('qc.fields.altTelefon')} value={d?.tAltTelefon} />
+                <ROField label={t('qc.fields.email')} value={d?.tE_Mail} />
+                <ROField label={t('qc.fields.zipKodu')} value={d?.tZipKod} />
+                <ROField label={t('qc.fields.vat')} value={d?.tVATNumarasi} />
+                <ROField label={t('qc.fields.adres')} value={d?.tAdres} multiline className="col-span-3" />
+                <div className="col-span-3 flex flex-wrap items-center gap-3 text-xs">
+                  <label className="flex items-center gap-1">
+                    <input type="checkbox" checked={d?.montajVar ?? false} disabled /> {t('qc.fields.montaj')}
+                  </label>
+                  <label className="flex items-center gap-1">
+                    <input type="checkbox" checked={d?.teslimatVar ?? false} disabled /> {t('qc.fields.teslimat')}
+                  </label>
+                  <span>{t('qc.fields.montajFiyati')}: {d ? formatCurrency(d.montajFiyat ?? 0, d.paraTipi) : '—'}</span>
+                  <span>{t('qc.fields.teslimatFiyati')}: {d ? formatCurrency(d.teslimatFiyat ?? 0, d.paraTipi) : '—'}</span>
+                  <span>{t('qc.fields.teslimatCesidi')}: {d ? (d.teslimatCesiti || t('qc.grid.veriYok')) : '—'}</span>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Satış Temsilcisi */}
+            <TabsContent value="temsilci" className="min-h-0 flex-1 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-1.5">
+                <ROField label={t('qc.fields.temsilciAdi')} value={d?.kullaniciAdi} />
+                <ROField label={t('qc.fields.telefon')} value={d?.sTelefon} />
+                <ROField label={t('qc.fields.fax')} value={d?.sFax} />
+                <ROField label={t('qc.fields.web')} value={d?.sWeb} />
+                <ROField label={t('qc.fields.email')} value={d?.sE_Mail} />
+                <ROField label={t('qc.fields.vat')} value={d?.sVatNumarasi} />
+                <ROField label={t('qc.fields.ulke')} value={d?.sUlke} />
+                <ROField label={t('qc.fields.adres')} value={d?.sAdres} multiline className="col-span-3" />
+              </div>
+            </TabsContent>
+
+            {/* Detay — DetayTablo listesi + Ürün & Bileşen (dikey, iç scroll) */}
+            <TabsContent value="detay" className="min-h-0 flex-1 flex flex-col gap-2 overflow-hidden">
+              <div className="flex min-h-0 flex-1 flex-col">
+                <p className="mb-1 text-xs font-semibold">{t('qc.blocks.detay')}</p>
+                <div className="min-h-0 flex-1 overflow-y-auto rounded border">
+                  {!d || d.details.length === 0 ? (
+                    <p className="p-2 text-xs text-muted-foreground">{t('common.noData')}</p>
+                  ) : (
+                    <ul className="divide-y">
+                      {d.details.map((line, i) => (
+                        <li key={i} className="px-2 py-1 text-xs">{line}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+              <div className="flex min-h-0 flex-1 flex-col">
+                <p className="mb-1 text-xs font-semibold">{t('qc.blocks.urunBilesen')}</p>
+                <div className="min-h-0 flex-1 overflow-auto rounded border">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-muted/80">
                       <tr>
@@ -692,7 +693,7 @@ export function QualityControlPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {d.items.length === 0 ? (
+                      {!d || d.items.length === 0 ? (
                         <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">{t('common.noData')}</td></tr>
                       ) : d.items.map((i, idx) => (
                         <tr key={idx} className="border-t">
@@ -710,41 +711,91 @@ export function QualityControlPage() {
                     </tbody>
                   </table>
                 </div>
-              </Block>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </div>
 
-              <Block title={t('qc.blocks.muhasebeGecmisi')} className="flex flex-col min-h-0">
-                <div className="flex-1 overflow-auto rounded border">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-muted/80">
-                      <tr>
-                        <th className="px-2 py-1 text-left font-medium">{t('qc.tx.musteriAdi')}</th>
-                        <th className="px-2 py-1 text-left font-medium">{t('qc.tx.ulke')}</th>
-                        <th className="px-2 py-1 text-left font-medium">{t('qc.tx.temsilci')}</th>
-                        <th className="px-2 py-1 text-left font-medium">{t('qc.tx.paraTuru')}</th>
-                        <th className="px-2 py-1 text-right font-medium">{t('qc.tx.odenenBakiye')}</th>
-                        <th className="px-2 py-1 text-left font-medium">{t('qc.tx.tarih')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sortedTx.length === 0 ? (
-                        <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">{t('common.noData')}</td></tr>
-                      ) : sortedTx.map((tx) => (
-                        <tr key={tx.id} className="border-t">
-                          <td className="px-2 py-1">{d.musteriAd}</td>
-                          <td className="px-2 py-1">{d.mUlke ?? ''}</td>
-                          <td className="px-2 py-1">{d.kullaniciAdi ?? ''}</td>
-                          <td className="px-2 py-1">{d.paraTipi}</td>
-                          <td className="px-2 py-1 text-right">{formatCurrency(tx.odenenMiktar ?? 0, d.paraTipi)}</td>
-                          <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Block>
+        {/* 3 — Kontrol (Sipariş No + Not + 2×3 aksiyon grid'i) */}
+        <div className="flex w-[300px] shrink-0 flex-col gap-1.5 overflow-hidden rounded-md border p-2">
+          <p className="text-sm font-semibold text-center">{t('qc.title')}</p>
+          <div className="space-y-0.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.siparisNo')}</p>
+            <div className="rounded border bg-muted/40 px-1.5 py-1 font-mono text-xs min-h-[1.6rem]">
+              {selected || '—'}
             </div>
           </div>
-        )}
+          <div className="flex min-h-0 flex-1 flex-col space-y-0.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
+            <div className="min-h-[5rem] flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
+              {d?.siparisNotu || '—'}
+            </div>
+          </div>
+          <div className="grid shrink-0 grid-cols-2 gap-1.5">
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('ek')}>
+              {t('qc.actions.saticiEk')}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('muhasebeek')}>
+              {t('qc.actions.muhasebeEk')}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExcel}>
+              {t('qc.actions.excelYaz')}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleFormGetir}>
+              {t('qc.actions.formGetir')}
+            </Button>
+            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handleRejectOpen}>
+              {t('qc.actions.reddet')}
+            </Button>
+            <Button size="sm" className="h-7 text-xs" disabled={approveMut.isPending} onClick={handleApprove}>
+              {t('qc.actions.onayla')}
+            </Button>
+          </div>
+        </div>
+
+        {/* 4 — Fabrika (Aşama + Bitiş + Not + Kaydet) */}
+        <div className="flex w-[260px] shrink-0 flex-col gap-1.5 overflow-hidden rounded-md border p-2">
+          <p className="text-sm font-semibold text-center">{t('qc.blocks.fabrika')}</p>
+          <div className="space-y-0.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.asama')}</p>
+            <Select value={asama || undefined} onValueChange={setAsama}>
+              <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('common.select')} /></SelectTrigger>
+              <SelectContent>
+                {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.bitis')}</p>
+            <Input className="h-7 text-xs" type="date" value={asamaTarih}
+              onChange={(e) => setAsamaTarih(e.target.value)} />
+          </div>
+          <div className="flex min-h-0 flex-1 flex-col space-y-0.5">
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
+            <Textarea className="min-h-[4rem] flex-1 resize-none text-xs" value={asamaNot}
+              onChange={(e) => setAsamaNot(e.target.value)} />
+          </div>
+          <Button size="sm" className="h-7 shrink-0 text-xs"
+            disabled={stageMut.isPending} onClick={handleStageSave}>
+            {t('qc.actions.kaydet')}
+          </Button>
+        </div>
+      </div>
+
+      {/* ── Alt bölge: master grid (tam genişlik, iç scroll) ───────────── */}
+      <div className="min-h-0 flex-1 px-4 pb-2">
+        <div className="h-full overflow-auto rounded-md">
+          <DataTable
+            columns={columns}
+            data={rows}
+            keyField="siparisNo"
+            loading={loading}
+            onRowClick={(r) => setSelected(r.siparisNo)}
+            rowClassName={(r) => cn(
+              selected === r.siparisNo && 'outline outline-2 -outline-offset-2 outline-primary',
+            )}
+          />
+        </div>
       </div>
 
       {/* ── Reddet dialog'u (legacy KontrolRed formu) ──────────────────── */}
@@ -774,6 +825,9 @@ export function QualityControlPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* ── Form'u getir — salt-okunur sipariş formu (legacy buttonFormGetir) ── */}
+      <OrderDetailModal siparisNo={formNo} onClose={() => setFormNo(null)} />
     </div>
   )
 }

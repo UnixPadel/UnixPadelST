@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Search;
 using CrmModern.Core.Interfaces.Services;
@@ -47,6 +48,12 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
             asama, kontrol, odemeDurum, baslangic, bitis);
 
         var result = await searchService.SearchAsync(filter);
+
+        // PROMPT-v5 §2: Fabrika arama sonuçlarında sipariş parası göremez
+        // (ToplamFiyat/Kaparo/KalanBakiye/OdenenMiktar karartılır).
+        if (User.IsInRole("Fabrika"))
+            result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<SearchResultDto>>.Ok(result));
     }
 

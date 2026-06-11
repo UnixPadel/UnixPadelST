@@ -29,13 +29,14 @@ export function LogisticsHistoryPage() {
 
   const completeMut = useMutation({
     mutationFn: (sevkId: number) => completeShipment(sevkId),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['logistics-history'] }); toast({ title: 'Sevkiyat tamamlandı' }) },
+    // PROMPT-v5 §3 — sipariş statü geçişleri Siparişlerim'e canlı yansısın.
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['logistics-history'] }); qc.invalidateQueries({ queryKey: ['my-orders'] }); toast({ title: 'Sevkiyat tamamlandı' }) },
     onError: () => toast({ title: 'Hata', variant: 'destructive' }),
   })
 
   const cancelMut = useMutation({
     mutationFn: ({ id, sebep }: { id: number; sebep: string }) => cancelShipment(id, sebep),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['logistics-history'] }); toast({ title: 'Sevkiyat iptal edildi' }) },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['logistics-history'] }); qc.invalidateQueries({ queryKey: ['my-orders'] }); toast({ title: 'Sevkiyat iptal edildi' }) },
     onError: () => toast({ title: 'Hata', variant: 'destructive' }),
   })
 

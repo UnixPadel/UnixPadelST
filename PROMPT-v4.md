@@ -13,6 +13,10 @@ The CRM lives in two adjacent codebases under `C:\Users\Lenovo_It_1\Desktop\CRM`
 
 **One intentional deviation from legacy (new business rule, §5.1):** approving a Teklif/Sipariş must move it straight to the **`Planlama`** stage so it immediately lands in the Fabrika queue — legacy stopped at `Siparis`.
 
+**Layout source of truth:** the provided legacy screenshot (top strip = Filtreme | tabbed detail | Kontrol | Fabrika panels, bottom = full-width grid — §9). The legacy yellow row colouring visible in it is **explicitly dropped**.
+
+**Cross-cutting items also in this round:** Fabrika cost isolation (§7 — hard rule), Muhasebe Tahsilat row colours removed (§8), Siparişlerim auto-refresh on status changes (§6.1).
+
 **Access rule (hard requirement):** the entire Kontrol section — route, sidebar entry, dashboard tile, and every backend endpoint it calls for **mutations** — is open **only to the username `elshan.rasulov`**. This is username-based, not role-based (same pattern as `/approval/pre` → `omur.caliskan`). No role may see or use it, including `Yonetici`.
 
 Apply the items below in order. Build cadence after each item: `npm run build` in `CrmModern.Web` + `dotnet build CrmModern.slnx` — both must stay green.
@@ -61,7 +65,7 @@ Implementation: `GET /api/quality-control/pending` + `QualityControlListDto` alr
 Grid spec (use the shared `DataTable` component):
 - Columns + headers exactly: Sipariş Numarası, Müşteri Adı, Ülke, Toplam Sipariş, Kaparo Bakiyesi, Kalan Bakiye, Peşin Yüzde, Teslimat Çeşidi, Para Tipi, Ödeme Durumu, Aşama (`SiparisMiTeklifMi`), Tarih (`dd/MM/yyyy`), Şirket. `SiparisAlID` and `Kontrol` are not shown.
 - Money columns formatted `N2` via `formatCurrency`.
-- Row highlight (legacy `siparisAlDataGrid_CellFormatting`, :2273): when `OdemeDurum !== 'Beklemede'` the whole row gets a yellow background with black text.
+- **No row colouring.** Legacy painted rows yellow when `OdemeDurum !== 'Beklemede'` (`siparisAlDataGrid_CellFormatting`, :2273) — dropped by user decision. All rows default white; only the selected-row highlight remains.
 - Row click selects the order and loads the detail panel (§4).
 - Grid body scrolls **internally** (fixed height); the page itself never scrolls.
 
@@ -90,20 +94,24 @@ Backend: extend `OrderFilterDto` only with what is genuinely missing (it already
 
 ## 4. DETAIL PANEL — row click loads the full order (legacy `CellClick()`, Kontrol.cs:2018)
 
-Selecting a grid row fetches the complete order and renders the read-only blocks below/beside the grid. Reuse `GET /api/orders/{no}` — **verify its DTO carries every field below and extend it where missing** (it was built for other pages):
+Selecting a grid row fetches the complete order and renders it in the **tabbed detail panel** (second panel of the top strip, §9). Reuse `GET /api/orders/{no}` — **verify its DTO carries every field below and extend it where missing** (it was built for other pages). Until a row is selected the panel shows an empty-state hint.
 
-### 4.1 Blocks and fields (captions from `Kontrol.Designer.cs`)
-- **Satış Temsilcisi**: Temsilci Adı (`Ad Soyad` of `KullaniciID` owner), Telefon (`STelefon`), Fax (`SFax`), Web (`SWeb`), E-Mail (`SE_Mail`), VAT Numarası (`SVatNumarasi`), Ülke (`SUlke`), Adres (`SAdres`).
-- **Müşteri**: İsim (`MusteriAd`), Telefon (`MTelefon`), Ülke (`MUlke`), Zip Kodu (`MZipKod`), E-Mail (`MMail`), VAT Numarası (`MVATNumarasi`), Adres (`MAdres`).
-- **Teslimat Detayları**: Teslim Alan Adı (`TTeslimAlanAdi`), İlgili Kişi (`TIlgiliKisi`), Ülke (`TUlke`), Telefon (`TTelefon`), Alternatif Telefon (`TAltTelefon`), E-Mail (`TE_Mail`), VAT Numarası (`TVATNumarasi`), Adres (`TAdres`); Montaj checkbox = `Montaj === 'Var'`, Teslimat checkbox = `Teslimat === 'Var'`, Montaj Fiyatı, Teslimat Fiyatı, Teslimat Çeşidi.
-- **Cari Bilgiler** (all derived client-side or in the DTO, money as `N2`):
-  - Para birimi symbol next to amounts: Euro→`€`, Dolar→`$`, TL→`₺`, Sterlin→`£` (legacy :2076-2099).
-  - Sipariş Toplam = `ToplamFiyat`; Peşin Yüzde shown as `%{PesinYüzde}`; İndirim Yüzde = `Indirim`.
-  - `pesinTutar = ToplamFiyat × PesinYüzde / 100`.
-  - **Brüt Kaparo / gelecek kaparo** = `max(pesinTutar − OdenenMiktar, 0)`.
-  - **Sipariş Bakiye / kalan** = `max(ToplamFiyat − OdenenMiktar, 0)`.
-  - **Ödenen Bakiye** = `OdenenMiktar` — rendered as an *editable* numeric field (digits only) because of the Cari Güncelle action (§5.4).
-- **Not**: `SiparisNotu` (read-only) + Sipariş No display.
+### 4.1 Tab strip — exactly as in the screenshot: **Cari | Muhasebe Geçmişi | Müşteri | Teslimat | Satış Temsilcisi | Detay**
+
+- **Cari** (default tab) — titled "Cari Bilgiler", money as `N2`:
+  - Para birimi symbol prefix on amounts: Euro→`€`, Dolar→`$`, TL→`₺`, Sterlin→`£` (legacy :2076-2099).
+  - Sipariş Toplam = `ToplamFiyat`; Para Birimi = `ParaTipi`.
+  - Kaparo Bakiye row shows `%{PesinYüzde}` next to the amount: `max(pesinTutar − OdenenMiktar, 0)` where `pesinTutar = ToplamFiyat × PesinYüzde / 100`.
+  - Sipariş Bakiye = `max(ToplamFiyat − OdenenMiktar, 0)`.
+  - Ödenen Bakiye = `OdenenMiktar` — *editable* numeric field (digits only), because of Cari Güncelle (§5.4).
+  - Buttons inside this tab: **Cari Güncelle** (§5.4) and **Revize Et** (§5.3).
+- **Muhasebe Geçmişi** — the payments grid (§4.4).
+- **Müşteri** — İsim (`MusteriAd`), Telefon (`MTelefon`), Ülke (`MUlke`), Zip Kodu (`MZipKod`), E-Mail (`MMail`), VAT Numarası (`MVATNumarasi`), Adres (`MAdres`).
+- **Teslimat** — Teslim Alan Adı (`TTeslimAlanAdi`), İlgili Kişi (`TIlgiliKisi`), Ülke (`TUlke`), Telefon (`TTelefon`), Alternatif Telefon (`TAltTelefon`), E-Mail (`TE_Mail`), VAT Numarası (`TVATNumarasi`), Adres (`TAdres`); Montaj checkbox = `Montaj === 'Var'`, Teslimat checkbox = `Teslimat === 'Var'`, Montaj Fiyatı, Teslimat Fiyatı, Teslimat Çeşidi.
+- **Satış Temsilcisi** — Temsilci Adı (`Ad Soyad` of the `KullaniciID` owner), Telefon (`STelefon`), Fax (`SFax`), Web (`SWeb`), E-Mail (`SE_Mail`), VAT Numarası (`SVatNumarasi`), Ülke (`SUlke`), Adres (`SAdres`).
+- **Detay** — the Detay list (§4.2) and the Ürün & Bileşen grid (§4.3) stacked, each with internal scroll.
+
+All fields read-only (muted inputs) except Ödenen Bakiye.
 
 ### 4.2 Detay list — **pulled from the Teklif** (legacy :2181)
 `DetayTablo` rows are written when the **Teklif** is created; the Kontrol screen shows them per order:
@@ -131,7 +139,13 @@ Both inner grids (Detay, Ürün&Bileşen, Muhasebe) scroll internally with fixed
 
 ---
 
-## 5. ACTIONS — the Kontrol Durumu button strip
+## 5. ACTIONS — Kontrol panel + Fabrika panel (placement per screenshot)
+
+Actions live in two dedicated panels of the top strip (§9), not in a generic strip:
+
+- **Kontrol panel** (third panel): Sipariş No (read-only, fills on row select), **Not** (read-only textarea = `SiparisNotu`), and six buttons in a 2×3 grid: **Satıcı Ek**, **Muhasebe Ek** (§5.6) / **Excel'e yaz** (§5.7), **Form'u getir** (§5.8) / **Reddet** (§5.2), **Onayla** (§5.1).
+- **Fabrika panel** (fourth panel): **Aşama** select, **Bitiş** date picker, **Not** input, **Kaydet** (§5.5).
+- **Cari tab** hosts **Cari Güncelle** (§5.4) and **Revize Et** (§5.3) — see §4.1.
 
 All mutations require a selected order (`SiparisNo`); otherwise toast "Lütfen sipariş seçiniz." Every successful mutation refreshes the grid (React Query invalidate) and clears/reloads the detail panel, mirroring legacy `DataGrid()` after each action.
 
@@ -173,8 +187,8 @@ UPDATE SiparisAlTablo SET OdenenMiktar = @OdenenMiktar WHERE SiparisNo = @Sipari
 ```
 Frontend: the editable Ödenen Bakiye field (§4.1) + "Cari Güncelle" button. Invalid number → toast "Geçerli bir ödenen bakiye girin." After success the cari block recomputes (kaparo/kalan).
 
-### 5.5 Aşama Kaydet (legacy `fabrikaButton_Click_1`, :4007 — Fabrika group: Aşama select + tarih + Not + Kaydet)
-New endpoint `PUT /api/orders/{no}/stage` (ControlUser only): body `{ asama: string, sTarih: DateTime, kontrolNot: string }`. Semantics:
+### 5.5 Aşama Kaydet — Fabrika panel (legacy `fabrikaButton_Click_1`, :4007)
+The screenshot's **Fabrika** panel: Aşama select, **Bitiş** date picker (= `STarih`, default today), Not input (= `KontrolNot`), Kaydet. New endpoint `PUT /api/orders/{no}/stage` (ControlUser only): body `{ asama: string, sTarih: DateTime, kontrolNot: string }`. Semantics:
 - Order must exist (404 otherwise).
 - `kontrol = (asama == 'Iptal') ? 'Reddet' : 'Onay'`.
 - ```sql
@@ -191,6 +205,9 @@ Two buttons calling the existing `GET /api/orders/{no}/attachments/{type}` (type
 ### 5.7 Excel'e Yaz (legacy `excelYazOzet_Click`, :2680)
 Button calling the existing `GET /api/orders/{no}/excel` (extend its gate with elshan per §1) and downloading the file. Do **not** re-implement the legacy Office-Interop writer — the modern endpoint's output is the accepted equivalent.
 
+### 5.8 Form'u getir (legacy `buttonFormGetir_Click`, :3548)
+Legacy opens the read-only `FormGetir` viewer for the selected `SiparisNo`. Modern equivalent: open the existing **`OrderDetailModal`** component for the selected order (it already renders the full order form read-only — check which page uses it today and reuse as-is). No new endpoint.
+
 ### Out of scope (commented-out / dead in legacy — do NOT port)
 `muhasebeOnayla_Click`, charts, kullanıcı/müşteri/depo CRUD handlers, `TeslimatBilgileriDataGrid`, `MuhasebeEkEkle` upload (upload already exists elsewhere in modern), `teklifAlButton` (create flow lives in `/orders/new`).
 
@@ -205,7 +222,7 @@ A Temsilci must be able to follow every order they created through its **entire 
 
 - `GetMyOrdersAsync` already returns all of the user's rows unfiltered (stage filter is opt-in) — **verify nothing upstream or in the UI drops later-stage rows** (e.g. a default `asama` filter, a `Kontrol='Kontrol'`-only query, or pagination hiding them). The list must show orders at every stage including `Tamamlandi` and rejected ones.
 - The grid must surface both status dimensions per row: **Aşama** (`SiparisMiTeklifMi`) and **Kontrol** (use the existing `OrderKontrolBadge` / `StatusBadge` components — check what MyOrdersPage renders today and add whichever is missing).
-- After the §5.1 change, statuses move without the Temsilci doing anything — make sure the page doesn't serve stale cache forever (React Query: a sane `staleTime`/refetch-on-focus is enough; no polling infrastructure).
+- **Auto-refresh (hard requirement):** every status change must reach the open Siparişlerim screen without a manual reload. Statuses change from other sessions (elshan approves, Fabrika moves to Uretim…), so cache invalidation alone is not enough — configure the list query with `refetchOnWindowFocus: true` **and** a `refetchInterval` of ~30s while the page is mounted (plus invalidate on any in-app mutation that touches orders). No SignalR/websocket infrastructure — polling at this cadence is the accepted mechanism.
 - A rejected order must let the owner see the red nedeni (the `getRejectionNote` flow already exists on this page — verify it still works for rejections coming from the new QC gate).
 
 ### 6.2 `elshan.rasulov` sees ALL orders in Siparişlerim
@@ -218,28 +235,56 @@ elshan must be able to track **every order in the system** from the same screen:
 
 ---
 
-## 7. LAYOUT & VIEWPORT FIT
+## 7. FABRİKA — COST ISOLATION (HARD RULE, applies everywhere)
 
-Mirror the legacy arrangement (consult `Kontrol.Designer.cs` for grouping, not pixel positions):
+**Nobody in the Fabrika area — the Fabrika role, the Fabrika pages, any factory-facing endpoint — may EVER see anything cost-related, at any stage.** This covers every monetary field: `ToplamFiyat`, `BrutToplamFiyat`, `KaparoFiyat`/`KalanBakiye`, `OdenenMiktar`, `PesinYüzde`, `Indirim`, `Kdv`, `MontajFiyat`, `TeslimatFiyat`, `ParaTipi`-attached amounts, `SiparisIslemTablo.Fiyat` (component/category prices), material cost (`maliyet`), and all accounting data.
 
-- **Top strip:** Filtreme bar (one row) + Ara/Reset.
-- **Upper half:** master grid (internal scroll, ~40% of viewport height).
-- **Lower half (visible only when a row is selected; show an empty-state hint otherwise):** three columns —
-  1. Satış Temsilcisi + Müşteri,
-  2. Teslimat Detayları + Detay list,
-  3. Cari Bilgiler + Kontrol Durumu action strip (Onayla / Reddet / Revize Et / Cari Güncelle / Aşama Kaydet / Ekler / Excel).
-  Below the columns, full-width: Ürün & Bileşen grid and Muhasebe Geçmişi side by side.
-- **1920×1080 @100% zoom: zero page-level scroll in both axes.** Scrolling allowed only inside the four grids/lists. At 1366×768 the action strip must remain reachable (sticky within its column if needed).
-- Compact field rendering: label-above-input pairs in dense Tailwind grids (`text-xs`/`text-sm`), consistent with NewOrderPage density. Read-only fields as muted inputs, not plain text, to match the form look.
+Enforce on **both** sides:
 
-**Acceptance:** screenshot at 1920×1080 — all blocks visible simultaneously with a row selected, nothing clipped, no page scrollbars.
+- **Backend (authoritative):**
+  - Audit `FactoryController`/`FactoryService` and `FactoryOrderListDto` — they must contain **zero** monetary fields. Remove any that exist.
+  - Audit every endpoint a `Fabrika` token can reach (anything `[Authorize]`-wide is reachable: e.g. `GET /api/orders/{no}`, `GET /api/orders`, search, QC history, attachments). For each: either exclude `Fabrika` from the gate, or **strip all monetary fields server-side when the caller's role is `Fabrika`** (null them in the DTO mapping — a `User.IsInRole("Fabrika")` branch at the service/controller mapping layer). Pick per endpoint whichever doesn't break the factory workflow, but no money may cross the wire to a Fabrika session.
+  - `GET /{no}/material-cost` and `GET /{no}/excel` (proforma contains prices — PROMPT-v2 §2 already hides it from Fabrika) must reject `Fabrika` outright — verify, don't assume.
+- **Frontend:** `FactoryPage` (and anything a Fabrika login can open) renders no price columns, no currency totals, no cari blocks. If a shared component (e.g. `OrderDetailModal`, `OrderStageTimeline`) is reachable from a Fabrika session, it must hide its monetary sections for that role.
+
+**Acceptance:** login as a `Fabrika` user → walk every screen they can reach and every API call in devtools: not a single monetary value appears in any response body or on screen, at any order stage. This is a security-style check — server-side stripping is mandatory; UI hiding alone fails the item.
 
 ---
 
-## 8. Rules
+## 8. MUHASEBE / TAHSİLAT — remove row colours
+
+`AccountingPage.tsx` colours rows by `muhasebeDurumu` (`rowColourClass`, line ~52: green `Onaylandı` / rose `Reddedildi` / amber `Onay Bekliyor`, applied at the `DataTable rowClassName`, line ~395). **Remove this entirely:** delete `rowColourClass` and its usage so all rows render default white; keep only the selected-row ring highlight and hover style. Status stays visible through the existing badge/column — no information loss, just no row paint. Check the other accounting screens (`AccountingHistoryPage`, `LogisticsApprovalsPage`, `CustomerBalancePage`) for the same pattern and clean any that colour rows by durum too.
+
+**Acceptance:** Tahsilat list shows every row on white background regardless of muhasebe durumu; status badges still render.
+
+---
+
+## 9. LAYOUT & VIEWPORT FIT — match the provided screenshot
+
+The legacy screenshot is the layout spec. Two horizontal bands:
+
+- **Top strip (~45% of viewport height), four panels left → right:**
+  1. **Filtreme** — the §3 filter fields stacked (Sipariş No, Müşteri Adı, Temsilci Adı, Ülke, Kontrol Durumu, Ödeme Durumu, Aşama), "Tarih Aralığı" sub-header with Baş/Son date pickers, then **Reset** + **Ara** buttons side by side.
+  2. **Tabbed detail panel** (widest) — tab strip `Cari | Muhasebe Geçmişi | Müşteri | Teslimat | Satış Temsilcisi | Detay` (§4.1).
+  3. **Kontrol panel** — heading "Kontrol", Sipariş No (read-only), Not textarea, six action buttons in a 2-column grid (§5).
+  4. **Fabrika panel** — heading "Fabrika", Aşama select, Bitiş date, Not, Kaydet (§5.5).
+- **Bottom band (remaining ~55%):** the master grid (§2) full-width with internal scroll.
+
+Rules:
+- **1920×1080 @100% zoom: zero page-level scroll in both axes.** Scrolling allowed only inside the master grid, the Muhasebe Geçmişi grid, and the Detay tab's two lists.
+- The tabbed panel is what keeps it uncramped — never render more than one detail block at a time. Don't try to show all blocks simultaneously like the old three-column draft.
+- At 1366×768 the four top panels stay side by side (tighten paddings; the Filtreme panel may compact its labels) — no wrapping into a second row.
+- Compact field rendering: label-left/input-right rows like the screenshot, dense Tailwind (`text-xs`/`text-sm`), consistent with NewOrderPage density. Read-only fields as muted inputs, not plain text.
+- **No yellow/status row painting anywhere on this page** (user decision — see §2).
+
+**Acceptance:** side-by-side screenshot comparison with the provided image at 1920×1080 — same four top panels in the same order, same tab strip, grid below, nothing clipped, no page scrollbars.
+
+---
+
+## 10. Rules
 
 - **Match existing code conventions.** Tailwind + shadcn, React Query, shared `DataTable`, `PageHeader`, `Dialog`, `useToast`, `formatCurrency`/`formatDate`, `DecimalInput` for money entry. i18n keys for every new string (tr + en).
-- **Legacy parity beats elegance** — including quirks: yellow row rule, blank Fiyat on component rows, `T`→`S` normalisation, SiparisNo-overrides-all-filters, the `Iptal`-skips-Kontrol-filter guard, `max(…, 0)` clamps in cari math. The **only sanctioned deviations** are §5.1 (approve → `Planlama`, straight to Fabrika) and §6.2 (elshan sees all orders in Siparişlerim).
+- **Legacy parity beats elegance** — including quirks: blank Fiyat on component rows, `T`→`S` normalisation, SiparisNo-overrides-all-filters, the `Iptal`-skips-Kontrol-filter guard, `max(…, 0)` clamps in cari math. The **sanctioned deviations** are: §5.1 (approve → `Planlama`, straight to Fabrika), §6.2 (elshan sees all orders in Siparişlerim), §7 (Fabrika never sees costs — stricter than legacy), and the dropped row colourings (§2 yellow rule, §8 muhasebe durum colours).
 - **Reuse before creating:** approve/reject/attachments/excel/accounting-transactions endpoints exist — re-gate and align semantics rather than duplicating. New endpoints only where listed (§5.4, §5.5, possibly the kontrol list filter).
 - **Username gate is mandatory on both sides** — frontend `RoleGuard usernames` AND backend username claim check. Frontend-only hiding is not acceptable.
 - **Schema:** expected zero new tables; only the possible `KontrolNot` column mapping (§5.5) via `DatabaseSchemaMigrator` if missing.

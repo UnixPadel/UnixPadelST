@@ -40,7 +40,7 @@ import type { AccountingOrderListDto, AccountingTransactionDto, OrderDetail } fr
  *     + "Muhasebe Onayla" button in form chrome (gated)
  *
  *   Bottom grid:
- *     • Onaylanmış siparişler (Kontrol='Onay'), row colouring by muhasebeDurumu
+ *     • Onaylanmış siparişler (Kontrol='Onay') — PROMPT-v5 §5: satır renklendirmesi yok
  *     • Existing row actions preserved: Detay / Tahsilat Ekle / MuhasebeEk
  *     • Double-click row → MuhasebeRowDetailDialog (legacy MessageBox dump)
  */
@@ -48,15 +48,6 @@ import type { AccountingOrderListDto, AccountingTransactionDto, OrderDetail } fr
 // Currency dropdown set used by legacy (4 values). Unused directly but kept
 // here so the future "filter by para tipi" lands without a re-look.
 const _CURRENCIES = ['Euro', 'Dolar', 'TL', 'Sterlin']
-
-// Row colouring per muhasebeDurumu — green/red/amber mirroring legacy
-// SiparisAlDataGridRenklendir (lines 437-450).
-function rowColourClass(durum?: string): string {
-  if (durum === 'Onaylandı')   return 'bg-green-50  hover:bg-green-100'
-  if (durum === 'Reddedildi')  return 'bg-rose-50   hover:bg-rose-100'
-  if (durum === 'Onay Bekliyor') return 'bg-amber-50 hover:bg-amber-100'
-  return ''
-}
 
 export function AccountingPage() {
   const qc = useQueryClient()
@@ -165,6 +156,8 @@ export function AccountingPage() {
     mutationFn: () => approveMuhasebeAndMoveToPlanning(selectedNo!),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['accounting-orders'] })
+      // PROMPT-v5 §3 — Planlama'ya geçiş Siparişlerim'e canlı yansısın.
+      qc.invalidateQueries({ queryKey: ['my-orders'] })
       setSelectedNo(null)
       toast({ title: t('accountingFull.toast.approved') })
     },
@@ -392,8 +385,9 @@ export function AccountingPage() {
           keyField="siparisNo"
           loading={isLoading}
           onRowClick={(r) => setSelectedNo((r as AccountingOrderListDto).siparisNo)}
+          // PROMPT-v5 §5: muhasebeDurumu satır renklendirmesi kaldırıldı — durum
+          // kolon/badge'den okunur; yalnız seçili satır vurgusu kalır.
           rowClassName={(r) => cn(
-            rowColourClass((r as AccountingOrderListDto).muhasebeDurumu),
             (r as AccountingOrderListDto).siparisNo === selectedNo && 'ring-2 ring-primary ring-inset',
           )}
           onRowDoubleClick={(r) => setDoubleClickRow(r as AccountingOrderListDto)}

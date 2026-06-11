@@ -27,6 +27,10 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     private string CurrentRole =>
         User.FindFirstValue(ClaimTypes.Role) ?? "Temsilci";
 
+    // PROMPT-v5 §2: ciro görünürlüğü olmayan roller — ReportingService
+    // .GetDashboardKpisAsync içindeki revenueHidden setiyle birebir aynı.
+    private bool RevenueHidden => CurrentRole is "Fabrika" or "Lojistik" or "Temsilci";
+
     /// <summary>
     /// Exports all approved accounting orders to Excel.
     /// Maps to Muhasebe.cs "Özet Excel" export.
@@ -35,6 +39,8 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     [HttpGet("accounting/export")]
     public async Task<IActionResult> ExportAccounting()
     {
+        // PROMPT-v5 §2: rapor sipariş tutarları içerir — Fabrika alamaz.
+        if (User.IsInRole("Fabrika")) return Forbid();
         var bytes = await reportingService.ExportAccountingOrdersAsync();
         var filename = $"muhasebe_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(bytes, ContentType, filename);
@@ -48,6 +54,8 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     [HttpGet("orders/{siparisNo}/proforma")]
     public async Task<IActionResult> ExportProforma(string siparisNo)
     {
+        // PROMPT-v5 §2: proforma fiyat içerir — Fabrika alamaz.
+        if (User.IsInRole("Fabrika")) return Forbid();
         var bytes = await reportingService.ExportOrderProformaAsync(siparisNo);
         var filename = $"proforma_{siparisNo}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes, ContentType, filename);
@@ -72,6 +80,15 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     public async Task<IActionResult> GetOrdersByMonth([FromQuery] int months = 12)
     {
         var result = await reportingService.GetOrdersByMonthAsync(months);
+
+        // PROMPT-v5 §2: trend noktaları aylık ciro taşır — ciro görmeyen roller
+        // (Fabrika dahil) yalnız sipariş sayısını alır. (Servis cache'i rol
+        // bağımsız olduğu için karartma controller'da yapılır.)
+        if (RevenueHidden)
+            result = result
+                .Select(p => p with { CiroEuro = 0m, CiroDolar = 0m, CiroTL = 0m, CiroSterlin = 0m })
+                .ToList();
+
         return Ok(ApiResponse<IReadOnlyList<OrderTrendPointDto>>.Ok(result));
     }
 
@@ -100,6 +117,11 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     public async Task<IActionResult> GetCurrencyDistribution([FromQuery] int days = 90)
     {
         var result = await reportingService.GetCurrencyDistributionAsync(days);
+
+        // PROMPT-v5 §2: ToplamCiro parasal — ciro görmeyen roller yalnız adet görür.
+        if (RevenueHidden)
+            result = result.Select(c => c with { ToplamCiro = 0m }).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<CurrencyDistributionDto>>.Ok(result));
     }
 }

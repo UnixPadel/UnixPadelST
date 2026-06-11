@@ -52,6 +52,13 @@ export function MyOrdersPage() {
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['my-orders'],
     queryFn: () => getMyOrders(),
+    // PROMPT-v5 §3 — canlı izleme: başka kullanıcıların (Kontrol onayı, Fabrika
+    // aşama geçişi, lojistik) statü değişimleri ≤30 sn'de veya sekme odağında
+    // anında yansır; websocket/polling altyapısı gerekmez.
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   })
 
   // ── Form Göster modal target ───────────────────────────────────────────

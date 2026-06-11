@@ -53,6 +53,8 @@ export function FactoryPage() {
       moveToProduction(siparisNo, dto),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['factory'] })
+      // PROMPT-v5 §3 — Siparişlerim açıksa aşama geçişi anında yansısın.
+      qc.invalidateQueries({ queryKey: ['my-orders'] })
       setProductionTarget(null)
       setFabrikaNot('')
       toast({ title: t('common.success') })
@@ -64,6 +66,7 @@ export function FactoryPage() {
     mutationFn: (siparisNo: string) => markReady(siparisNo),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['factory'] })
+      qc.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: t('common.success') })
     },
     onError: () => toast({ title: t('common.error'), variant: 'destructive' }),

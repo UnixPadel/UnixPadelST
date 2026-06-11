@@ -53,6 +53,8 @@ export function LogisticsReadyPage() {
       qc.invalidateQueries({ queryKey: ['logistics-pending-approval'] })
       qc.invalidateQueries({ queryKey: ['carriers'] })
       qc.invalidateQueries({ queryKey: ['cesitler'] })
+      // PROMPT-v5 §3 — sipariş statüsü değişti: Siparişlerim canlı yansısın.
+      qc.invalidateQueries({ queryKey: ['my-orders'] })
       setTarget(null); setForm(blank()); setSubmitted(false)
       // Paket 3: yeni akış — sevk talebi muhasebe onayını bekler.
       toast({ title: 'Sevk talebi oluşturuldu — Muhasebe onayı bekliyor.' })

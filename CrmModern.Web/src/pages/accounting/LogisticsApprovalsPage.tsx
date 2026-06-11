@@ -43,6 +43,8 @@ export function LogisticsApprovalsPage() {
     qc.invalidateQueries({ queryKey: ['logistics-pending-approval'] })
     qc.invalidateQueries({ queryKey: ['logistics-history'] })
     qc.invalidateQueries({ queryKey: ['logistics-ready'] })
+    // PROMPT-v5 §3 — sipariş statü geçişleri Siparişlerim'e canlı yansısın.
+    qc.invalidateQueries({ queryKey: ['my-orders'] })
   }
 
   const approveMut = useMutation({

@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Order;
 using CrmModern.Core.Interfaces.Services;
@@ -35,6 +36,9 @@ public sealed class OrderController(
     private bool CanCreateOrders =>
         User.IsInRole("Temsilci") || IsControlUser;
 
+    // PROMPT-v5 §2: Fabrika rolü sipariş parasal değerlerini hiçbir endpoint'ten alamaz.
+    private bool IsFabrika => User.IsInRole("Fabrika");
+
     // ─────────────────────────────────────────────────────────────────────────
     // List
     // ─────────────────────────────────────────────────────────────────────────
@@ -54,6 +58,14 @@ public sealed class OrderController(
             filter = filter with { KullaniciID = CurrentUserId };
 
         var result = await orderService.GetOrdersAsync(filter);
+
+        // PROMPT-v5 §2: Fabrika liste satırlarında da para göremez.
+        if (IsFabrika)
+            result = result with
+            {
+                Items = result.Items.Select(OrderDtoSanitizer.StripPricesForFactory).ToList(),
+            };
+
         return Ok(ApiResponse<OrderListPageDto>.Ok(result));
     }
 
@@ -66,6 +78,11 @@ public sealed class OrderController(
         // PROMPT-v4 §6.2: elshan.rasulov Siparişlerim'de TÜM siparişleri izler;
         // diğer herkes v2 §6 gereği kendi satırlarıyla sınırlı kalır.
         var result = await orderService.GetMyOrdersAsync(CurrentUserId, asama, allUsers: IsControlUser);
+
+        // PROMPT-v5 §2: kullanıcı bazlı scope yeterli değil — Fabrika satır parası da karartılır.
+        if (IsFabrika)
+            result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<OrderListDto>>.Ok(result));
     }
 
@@ -74,6 +91,9 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<OrderTotalsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTotals([FromQuery] OrderFilterDto filter)
     {
+        // PROMPT-v5 §2: döviz toplamları sipariş parasıdır — Fabrika tamamen dışlanır.
+        if (IsFabrika) return Forbid();
+
         // PROMPT-v2 §6: Temsilci toplamları kendi siparişlerinden hesaplanır.
         // PROMPT-v4 §1: elshan rolünden bağımsız tümünü görür.
         if (User.IsInRole("Temsilci") && !IsControlUser)
@@ -97,6 +117,12 @@ public sealed class OrderController(
     public async Task<IActionResult> GetByNo(string no)
     {
         var result = await orderService.GetByNoAsync(no);
+
+        // PROMPT-v5 §2: Fabrika için tüm parasal alanlar (kalem fiyatları dahil)
+        // kaynağında null'lanır — istemci gizlemesi ikinci katmandır.
+        if (IsFabrika)
+            result = OrderDtoSanitizer.StripPricesForFactory(result);
+
         return Ok(ApiResponse<OrderDetailDto>.Ok(result));
     }
 

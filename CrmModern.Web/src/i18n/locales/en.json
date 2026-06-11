@@ -292,7 +292,16 @@
       "bas": "From",
       "son": "To",
       "ara": "Search",
-      "reset": "Reset"
+      "reset": "Reset",
+      "tarihAraligi": "Date Range"
+    },
+    "tabs": {
+      "cari": "Account",
+      "muhasebeGecmisi": "Accounting History",
+      "musteri": "Customer",
+      "teslimat": "Delivery",
+      "satisTemsilcisi": "Sales Representative",
+      "detay": "Details"
     },
     "grid": {
       "siparisNo": "Order Number",
@@ -311,6 +320,7 @@
       "veriYok": "No Data"
     },
     "blocks": {
+      "filtreme": "Filters",
       "satisTemsilcisi": "Sales Representative",
       "musteri": "Customer",
       "teslimatDetaylari": "Delivery Details",
@@ -358,6 +368,7 @@
       "revizeEt": "Revise",
       "cariGuncelle": "Update Balance",
       "excelYaz": "Export Excel",
+      "formGetir": "Open Form",
       "saticiEk": "Seller Attachment",
       "muhasebeEk": "Accounting Attachment",
       "kaydet": "Save"

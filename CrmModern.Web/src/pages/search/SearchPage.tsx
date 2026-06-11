@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
 import type { SearchResultDto } from '@/types'
 
 const STAGES = ['all', 'Teklif', 'Siparis', 'Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi']
@@ -30,6 +31,10 @@ const empty = (): Filters => ({ siparisNo: '', musteriAd: '', ulke: '', asama: '
 
 export function SearchPage() {
   const { t } = useTranslation()
+  // PROMPT-v5 §2: Fabrika sipariş parası görmez — para kolonları gizlenir
+  // (backend de aynı alanları null/0 dönerek karartır).
+  const { getUser } = useAuth()
+  const hideMoney = getUser()?.yetkiTuru === 'Fabrika'
   const [filters, setFilters] = useState<Filters>(empty())
   const [submitted, setSubmitted] = useState<Filters | null>(null)
 
@@ -55,9 +60,11 @@ export function SearchPage() {
     { key: 'kullaniciAdi',      header: t('common.createdBy'),  sortable: true, render: (r) => (r.kullaniciAdi as string) ?? '—' },
     { key: 'mUlke',             header: t('common.country'),    sortable: true },
     { key: 'paraTipi',          header: t('common.currency'),   sortable: true },
-    { key: 'toplamFiyat',       header: t('common.totalAmount'),sortable: true, render: (r) => formatCurrency((r.toplamFiyat as number) ?? 0, r.paraTipi as string) },
-    { key: 'kaparoFiyat',       header: t('qc.columns.deposit'),render: (r) => formatCurrency((r.kaparoFiyat as number) ?? 0, r.paraTipi as string) },
-    { key: 'kalanBakiye',       header: t('qc.columns.remaining'), render: (r) => formatCurrency((r.kalanBakiye as number) ?? 0, r.paraTipi as string) },
+    ...(!hideMoney ? [
+      { key: 'toplamFiyat',     header: t('common.totalAmount'),sortable: true, render: (r) => formatCurrency((r.toplamFiyat as number) ?? 0, r.paraTipi as string) },
+      { key: 'kaparoFiyat',     header: t('qc.columns.deposit'),render: (r) => formatCurrency((r.kaparoFiyat as number) ?? 0, r.paraTipi as string) },
+      { key: 'kalanBakiye',     header: t('qc.columns.remaining'), render: (r) => formatCurrency((r.kalanBakiye as number) ?? 0, r.paraTipi as string) },
+    ] satisfies Column<SearchResultDto & Record<string, unknown>>[] : []),
     { key: 'odemeDurum',        header: t('common.status'),     render: (r) => r.odemeDurum ? <StatusBadge value={r.odemeDurum as string} /> : '—' },
     { key: 'siparisMiTeklifMi', header: t('common.stage'),      sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
     { key: 'kontrol',           header: t('common.control'),    render: (r) => <StatusBadge value={r.kontrol as string} /> },

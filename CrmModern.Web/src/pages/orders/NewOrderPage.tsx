@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createOrder, createQuote, getCategories, expandRecipe, uploadAttachment,
   getDeliveryAddresses, getComponentsByCategory,
@@ -263,9 +263,12 @@ export function NewOrderPage() {
   }
 
   // ── Save mutations ────────────────────────────────────────────────────
+  // PROMPT-v5 §3 — yeni kayıt/revize Siparişlerim listesini değiştirir.
+  const queryClient = useQueryClient()
   const orderMut = useMutation({
     mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createOrder(form),
     onSuccess: (no) => {
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: isReviseMode ? 'Revize edildi' : 'Sipariş oluşturuldu', description: no })
       setCreatedNo(no)
     },
@@ -274,6 +277,7 @@ export function NewOrderPage() {
   const quoteMut = useMutation({
     mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createQuote(form),
     onSuccess: (no) => {
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: isReviseMode ? 'Revize edildi' : 'Teklif oluşturuldu', description: no })
       setCreatedNo(no)
     },

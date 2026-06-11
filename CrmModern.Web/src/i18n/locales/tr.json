@@ -292,7 +292,16 @@
       "bas": "Baş",
       "son": "Son",
       "ara": "Ara",
-      "reset": "Reset"
+      "reset": "Reset",
+      "tarihAraligi": "Tarih Aralığı"
+    },
+    "tabs": {
+      "cari": "Cari",
+      "muhasebeGecmisi": "Muhasebe Geçmişi",
+      "musteri": "Müşteri",
+      "teslimat": "Teslimat",
+      "satisTemsilcisi": "Satış Temsilcisi",
+      "detay": "Detay"
     },
     "grid": {
       "siparisNo": "Sipariş Numarası",
@@ -311,6 +320,7 @@
       "veriYok": "Veri Yok"
     },
     "blocks": {
+      "filtreme": "Filtreme",
       "satisTemsilcisi": "Satış Temsilcisi",
       "musteri": "Müşteri",
       "teslimatDetaylari": "Teslimat Detayları",
@@ -358,6 +368,7 @@
       "revizeEt": "Revize Et",
       "cariGuncelle": "Cari Güncelle",
       "excelYaz": "Excel'e Yaz",
+      "formGetir": "Form'u getir",
       "saticiEk": "Satıcı Ek",
       "muhasebeEk": "Muhasebe Ek",
       "kaydet": "Kaydet"

@@ -1,5 +1,7 @@
 namespace CrmModern.Core.DTOs.Factory;
 
+// PROMPT-v5 §2 regresyon korkuluğu: bu DTO Fabrika rolünün ana listesini besler —
+// hiçbir parasal alan (fiyat/bakiye/kaparo/ciro) EKLENMEMELİDİR.
 public sealed record FactoryOrderListDto(
     string  SiparisNo,
     string  MusteriAd,

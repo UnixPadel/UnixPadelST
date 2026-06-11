@@ -38,6 +38,13 @@ public static class DatabaseSchemaMigrator
 
         // 4) PROMPT-v2 §7: MusteriBilgileri.CreatedByKullaniciID + tek seferlik backfill.
         await EnsureMusteriCreatedByColumnAsync(ctx, logger);
+
+        // 5) PROMPT-v4 §5.5: SiparisAlTablo.KontrolNot — legacy Kontrol formu yazıyor,
+        // canlı DB'de büyük ihtimalle var; yoksa eklenir (idempotent).
+        await EnsureColumnAsync(ctx, logger,
+            table: "SiparisAlTablo",
+            column: "KontrolNot",
+            ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN KontrolNot TEXT NULL");
     }
 
     private static async Task EnsureSifreColumnSizeAsync(AppDbContext ctx, ILogger? logger)

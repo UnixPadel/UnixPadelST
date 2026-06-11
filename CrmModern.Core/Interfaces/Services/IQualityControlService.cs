@@ -18,8 +18,8 @@ public interface IQualityControlService
     Task<IReadOnlyList<OrderApprovalDto>> GetControlHistoryAsync(string siparisNo);
 
     /// <summary>
-    /// QC Onay: Order.Kontrol='Onay', Teklif ise Siparis'e dönüşür,
-    /// SiparisOnaylari'na audit satırı yazılır.
+    /// QC Onay (PROMPT-v4 §5.1): Order.Kontrol='Onay', Teklif/Siparis doğrudan
+    /// 'Planlama'ya taşınır (Fabrika kuyruğu), SiparisOnaylari'na audit satırı yazılır.
     /// </summary>
     Task ApproveAsync(string siparisNo, int currentUserId, string? kontrolNot);
 

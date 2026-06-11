@@ -79,6 +79,8 @@ public sealed class Order
     public byte[]?   Ek              { get; set; }
     public byte[]?   MuhasebeEk      { get; set; }
     public DateTime? STarih          { get; set; }
+    // PROMPT-v4 §5.5 — Kontrol ekranı "Aşama Kaydet" notu (legacy fabrikaButton_Click_1).
+    public string?   KontrolNot      { get; set; }
     public string?   FabrikaNot      { get; set; }
     public string?   LojistikNot     { get; set; }
 

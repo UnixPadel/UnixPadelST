@@ -16,5 +16,12 @@ public sealed record OrderListDto(
     string   SiparisMiTeklifMi,
     string   Kontrol,
     DateTime Tarih,
-    string?  Sirket
+    string?  Sirket,
+    // PROMPT-v4 §2/§6.2 — Kontrol grid kolonları + Siparişlerim sahip kolonu.
+    // Kaparo/Kalan hesapları istemcide yapılır (legacy formülü, liste tarafında clamp'siz kalan).
+    int      PesinYuzde       = 0,
+    decimal? OdenenMiktar     = null,
+    string?  TeslimatCesiti   = null,
+    string?  OdemeDurum       = null,
+    string?  KullaniciAdSoyad = null
 );

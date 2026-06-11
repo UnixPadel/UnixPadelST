@@ -26,8 +26,10 @@ const navItems: NavItem[] = [
   // PROMPT-v3 §1 — sipariş/teklif oluşturma yalnız Temsilci'ye açık.
   // İstisna: elshan.rasulov (kullanıcı adı bazlı).
   { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Temsilci'], usernames: ['elshan.rasulov'] },
-  { path: '/orders/mine',     i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci','Gozlemci'] },
-  { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, roles: ['Yonetici'] },
+  // PROMPT-v4 §6.2 — elshan.rasulov tüm siparişleri Siparişlerim'den izler.
+  { path: '/orders/mine',     i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci','Gozlemci'], usernames: ['elshan.rasulov'] },
+  // PROMPT-v4 §1 — Kontrol yalnız elshan.rasulov (kullanıcı adı bazlı; rol yok).
+  { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, usernames: ['elshan.rasulov'] },
   { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },
   { path: '/logistics/ready',     i18nKey: 'nav.logisticsReady',     icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
   { path: '/logistics/history',   i18nKey: 'nav.logisticsHistory',   icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },

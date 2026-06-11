@@ -13,6 +13,7 @@ import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
+import { useAuth } from '@/hooks/useAuth'
 import { describeApiError } from '@/lib/axios'
 import { formatDate } from '@/lib/utils'
 import type { OrderListDto } from '@/types'
@@ -43,6 +44,10 @@ export function MyOrdersPage() {
   const qc = useQueryClient()
   const { t } = useTranslation()
   const { toast } = useToast()
+  const { getUser } = useAuth()
+  // PROMPT-v4 §6.2 — elshan.rasulov tüm sistemi izler; sahip (Temsilci) kolonu
+  // yalnız ona görünür (backend /my zaten tüm satırları döner).
+  const isGlobalViewer = getUser()?.kullaniciAdi === 'elshan.rasulov'
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['my-orders'],
@@ -86,6 +91,13 @@ export function MyOrdersPage() {
     { key: 'numara', header: t('myOrders.cols.numara'), sortable: true,
       render: (r) => <span className="font-mono text-sm">{rowNo(r as OrderListDto)}</span> },
     { key: 'musteriAd', header: t('myOrders.cols.musteriAd'), sortable: true },
+    // PROMPT-v4 §6.2 — sahip kolonu yalnız elshan görünümünde
+    ...(isGlobalViewer ? [{
+      key: 'kullaniciAdSoyad',
+      header: t('myOrders.cols.temsilci'),
+      sortable: true,
+      render: (r) => (r.kullaniciAdSoyad as string) || '—',
+    } satisfies Column<OrderListDto & Record<string, unknown>>] : []),
     { key: 'siparisMiTeklifMi', header: t('myOrders.cols.asama'),
       render: (r) => <StatusBadge value={(r.siparisMiTeklifMi as string) ?? ''} /> },
     { key: 'kontrol', header: t('myOrders.cols.durum'),

@@ -37,8 +37,9 @@ export default function App() {
         {/* PROMPT-v3 §1 — Teklif/Sipariş Oluştur yalnız Temsilci.
             İstisna: elshan.rasulov (kullanıcı adı bazlı, rol değil). */}
         <Route path="/orders/new"      element={<RoleGuard roles={['Temsilci']} usernames={['elshan.rasulov']}><NewOrderPage /></RoleGuard>} />
-        {/* PROMPT.md #20 — Siparişlerim: only roles that can create orders. */}
-        <Route path="/orders/mine"     element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><MyOrdersPage /></RoleGuard>} />
+        {/* PROMPT.md #20 — Siparişlerim: only roles that can create orders.
+            PROMPT-v4 §6.2: elshan.rasulov tüm siparişleri buradan izler. */}
+        <Route path="/orders/mine"     element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']} usernames={['elshan.rasulov']}><MyOrdersPage /></RoleGuard>} />
         {/* PROMPT.md #16 + #19 — Müşteri CRUD. Per-row matrix:
               list   — Yonetici, Temsilci, Gozlemci, Muhasebe (read-only)
               new    — Yonetici, Temsilci, Gozlemci
@@ -46,7 +47,8 @@ export default function App() {
         <Route path="/customers"            element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci','Muhasebe']}><CustomersPage /></RoleGuard>} />
         <Route path="/customers/new"        element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><CustomerFormPage /></RoleGuard>} />
         <Route path="/customers/:id/edit"   element={<RoleGuard roles={['Yonetici','Gozlemci']}><CustomerFormPage /></RoleGuard>} />
-        <Route path="/quality-control" element={<QualityControlPage />} />
+        {/* PROMPT-v4 §1 — Kontrol ekranı YALNIZ elshan.rasulov (rol değil; Yonetici dahil giremez). */}
+        <Route path="/quality-control" element={<RoleGuard usernames={['elshan.rasulov']}><QualityControlPage /></RoleGuard>} />
         <Route path="/factory"         element={<FactoryPage />} />
         <Route path="/logistics"           element={<Navigate to="/logistics/ready" replace />} />
         <Route path="/logistics/ready"     element={<RoleGuard roles={['Yonetici','Lojistik']}><LogisticsReadyPage /></RoleGuard>} />

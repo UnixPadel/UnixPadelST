@@ -25,29 +25,19 @@ internal sealed class QualityControlService(IUnitOfWork uow, IOrderService order
     public Task<IReadOnlyList<OrderApprovalDto>> GetControlHistoryAsync(string siparisNo) =>
         orderService.GetApprovalHistoryAsync(siparisNo);
 
-    public async Task ApproveAsync(string siparisNo, int currentUserId, string? kontrolNot)
-    {
-        var existing = await uow.Orders.GetByNoAsync(siparisNo)
-            ?? throw new NotFoundException("Order", siparisNo);
-        if (existing.Kontrol == "Onay")
-            throw new BusinessException($"'{siparisNo}' zaten onaylı.");
+    public Task ApproveAsync(string siparisNo, int currentUserId, string? kontrolNot) =>
+        // PROMPT-v4 §5.1 — guard'lar (Kontrol<>'Onay', aşama Teklif/Siparis) ve
+        // 'Planlama'ya geçiş OrderService.ApproveOrderAsync içinde tek noktada.
+        orderService.ApproveOrderAsync(siparisNo, currentUserId, kontrolNot);
 
-        // Order.Kontrol='Onay' + Teklif→Siparis + SiparisOnaylari audit (Faz 3)
-        await orderService.ApproveOrderAsync(siparisNo, currentUserId, kontrolNot);
-    }
-
-    public async Task RejectAsync(string siparisNo, int currentUserId, string red)
+    public Task RejectAsync(string siparisNo, int currentUserId, string red)
     {
         if (string.IsNullOrWhiteSpace(red))
             throw new BusinessException("Red gerekçesi zorunlu.");
 
-        var existing = await uow.Orders.GetByNoAsync(siparisNo)
-            ?? throw new NotFoundException("Order", siparisNo);
-        if (existing.Kontrol == "Onay")
-            throw new BusinessException($"'{siparisNo}' onaylanmış — reddedilemez.");
-
-        // Order.Kontrol='Reddet' + Red kolonu + SiparisOnaylari audit (Faz 3)
-        await orderService.RejectOrderAsync(siparisNo, currentUserId, red);
+        // Order.Kontrol='Reddet' + Red kolonu + SiparisOnaylari audit;
+        // PROMPT-v4 §5.2 guard'ları OrderService.RejectOrderAsync içinde.
+        return orderService.RejectOrderAsync(siparisNo, currentUserId, red);
     }
 
     // ── Mapping ──────────────────────────────────────────────────────────────

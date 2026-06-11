@@ -20,6 +20,10 @@ public sealed class AccountingController(IAccountingService accountingService) :
         User.FindFirstValue(ClaimTypes.Name)
             ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
 
+    // PROMPT-v4 §1/§4.4 — Kontrol ekranı Muhasebe Geçmişi okuması için
+    // kullanıcı adı bazlı istisna (rol değil).
+    private const string ControlUser = "elshan.rasulov";
+
     [HttpGet("orders")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<AccountingOrderListDto>>), StatusCodes.Status200OK)]
@@ -38,11 +42,14 @@ public sealed class AccountingController(IAccountingService accountingService) :
         return Ok(ApiResponse<AccountingOrderListDto>.Ok(result));
     }
 
+    // PROMPT-v4 §4.4: rol seti aynen korunur + elshan.rasulov okuma istisnası.
     [HttpGet("orders/{siparisNo}/transactions")]
-    [Authorize(Roles = "Yonetici,Muhasebe,Gozlemci")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<AccountingTransactionDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTransactionsForOrder(string siparisNo)
     {
+        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") &&
+            !User.IsInRole("Gozlemci") && CurrentUserName != ControlUser)
+            return Forbid();
         var result = await accountingService.GetTransactionsForOrderAsync(siparisNo);
         return Ok(ApiResponse<IReadOnlyList<AccountingTransactionDto>>.Ok(result));
     }

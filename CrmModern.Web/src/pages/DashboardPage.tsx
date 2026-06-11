@@ -93,11 +93,13 @@ interface RoleLayout {
   tiles: string[]   // path keys into MODULES
 }
 
+// PROMPT-v4 §1: /quality-control kartı hiçbir rol layout'unda yer almaz —
+// yalnız elshan.rasulov kullanıcı adına eklenir (aşağıda tiles hesabında).
 const ADMIN_LAYOUT: RoleLayout = {
   kpis:    ['last30Orders', 'myOpenOrders', 'pendingQC', 'inProduction', 'pendingShipment', 'pendingPayment', 'pendingPurchase'],
   revenue: true,
   charts:  ['trend', 'stage', 'topCustomers'],
-  tiles:   ['/quality-control', '/factory', '/logistics/ready', '/accounting', '/purchase/mine', '/users', '/search'],
+  tiles:   ['/factory', '/logistics/ready', '/accounting', '/purchase/mine', '/users', '/search'],
 }
 
 const ROLE_LAYOUT: Record<string, RoleLayout> = {
@@ -125,7 +127,7 @@ const ROLE_LAYOUT: Record<string, RoleLayout> = {
     kpis:    ['last30Orders', 'pendingQC', 'pendingShipment', 'pendingPayment'],
     revenue: true,
     charts:  ['trend', 'stage', 'topCustomers'],
-    tiles:   ['/quality-control', '/logistics/history', '/accounting/history', '/purchase/mine', '/search'],
+    tiles:   ['/logistics/history', '/accounting/history', '/purchase/mine', '/search'],
   },
   // Note: tiles include only existing routes. /orders/new is Temsilci-only
   // (PROMPT-v3 §1) — no other role layout may list it.
@@ -207,10 +209,12 @@ export function DashboardPage() {
     return () => { cancelled = true }
   }, [needsTrend, needsTop])
 
-  const tiles = useMemo(
-    () => layout.tiles.map((p) => MODULES[p]).filter(Boolean),
-    [layout.tiles],
-  )
+  // PROMPT-v4 §1: Kontrol kartı yalnız elshan.rasulov'a görünür (rol bağımsız).
+  const isControlUser = user?.kullaniciAdi === 'elshan.rasulov'
+  const tiles = useMemo(() => {
+    const paths = isControlUser ? ['/quality-control', ...layout.tiles] : layout.tiles
+    return paths.map((p) => MODULES[p]).filter(Boolean)
+  }, [layout.tiles, isControlUser])
 
   // Welcome string: Ad Soyad'tan üretiliyor, kullanıcı adına geri düşüyor.
   const fullName = [user?.ad, user?.soyad].filter(Boolean).join(' ') || user?.kullaniciAdi || ''

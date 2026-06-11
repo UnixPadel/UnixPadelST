@@ -10,22 +10,31 @@ namespace CrmModern.API.Controllers;
 
 /// <summary>
 /// WinForms Kontrol / KontrolRed formlarının REST karşılığı.
-/// Yetki: Yonetici (Form3.cs satır 156-179).
+/// PROMPT-v4 §1: tüm bölüm yalnız elshan.rasulov kullanıcı adına açık —
+/// rol bazlı değil (Yonetici dahil hiçbir rol geçemez). İstisna: history.
 /// </summary>
 [ApiController]
 [Route("api/quality-control")]
-[Authorize(Roles = "Yonetici")]
+[Authorize]
 public sealed class QualityControlController(IQualityControlService qc) : ControllerBase
 {
+    // PurchaseController.FinalApproverUser kalıbı — kullanıcı adı bazlı yetki.
+    private const string ControlUser = "elshan.rasulov";
+
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("KullaniciID claim missing."));
+
+    private string? CurrentUserName => User.FindFirstValue(ClaimTypes.Name);
+
+    private bool IsControlUser => CurrentUserName == ControlUser;
 
     [HttpGet]
     [HttpGet("pending")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<QualityControlListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetPending()
     {
+        if (!IsControlUser) return Forbid();
         var result = await qc.GetPendingAsync();
         return Ok(ApiResponse<IReadOnlyList<QualityControlListDto>>.Ok(result));
     }
@@ -34,12 +43,14 @@ public sealed class QualityControlController(IQualityControlService qc) : Contro
     [ProducesResponseType(typeof(ApiResponse<OrderDetailDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetById(string siparisNo)
     {
+        if (!IsControlUser) return Forbid();
         var result = await qc.GetByIdAsync(siparisNo);
         return Ok(ApiResponse<OrderDetailDto>.Ok(result));
     }
 
+    /// <summary>Bilerek geniş: diğer ekranların timeline'ı kullanıyor (PROMPT-v4 §1 istisnası).</summary>
     [HttpGet("{siparisNo}/history")]
-    [Authorize]   // history herkese açık (Yonetici override yok)
+    [Authorize]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderApprovalDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetHistory(string siparisNo)
     {
@@ -53,8 +64,9 @@ public sealed class QualityControlController(IQualityControlService qc) : Contro
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Approve(string siparisNo, [FromBody] QcApproveDto? dto)
     {
+        if (!IsControlUser) return Forbid();
         await qc.ApproveAsync(siparisNo, CurrentUserId, dto?.KontrolNot);
-        return Ok(ApiResponse<object>.Ok(null!, "Başarıyla onaylandı."));
+        return Ok(ApiResponse<object>.Ok(null!, "Başarıyla onaylandı!"));
     }
 
     [HttpPost("{siparisNo}/reject")]
@@ -62,6 +74,7 @@ public sealed class QualityControlController(IQualityControlService qc) : Contro
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Reject(string siparisNo, [FromBody] RejectDto dto)
     {
+        if (!IsControlUser) return Forbid();
         await qc.RejectAsync(siparisNo, CurrentUserId, dto.Red);
         return Ok(ApiResponse<object>.Ok(null!, "Sipariş reddedildi."));
     }

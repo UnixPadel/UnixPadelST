@@ -64,6 +64,12 @@ export interface OrderListDto {
   kontrol: string
   tarih: string
   sirket?: string
+  // PROMPT-v4 §2/§6.2 — Kontrol grid kolonları + Siparişlerim sahip kolonu
+  pesinYuzde: number
+  odenenMiktar?: number | null
+  teslimatCesiti?: string
+  odemeDurum?: string
+  kullaniciAdSoyad?: string
 }
 
 export interface OrderDetail {
@@ -124,6 +130,10 @@ export interface OrderDetail {
   // items
   items: OrderDetailItem[]
   details: string[]
+  // PROMPT-v4 §4.1 — Kontrol ekranı cari bloğu
+  odenenMiktar?: number | null
+  odemeDurum?: string
+  kontrolNot?: string
 }
 
 export interface OrderDetailItem {
@@ -132,6 +142,10 @@ export interface OrderDetailItem {
   oznitelikAdi?: string
   adet: number
   fiyat?: number | null
+  // PROMPT-v4 §4.3 — Ürün & Bileşen grid isimleri (backend join çözümlemesi)
+  kategoriAdi?: string
+  bilesenAdi?: string
+  birim?: string
 }
 
 export interface CreateOrderDto {

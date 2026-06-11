@@ -28,6 +28,17 @@ internal sealed class OrderRepository(AppDbContext context)
             .Where(d => d.SiparisNo == siparisNo)
             .ToListAsync();
 
+        // PROMPT-v4 §4.2 — Detay satırları Teklif oluşturulurken yazılır; sipariş
+        // numarasıyla bulunamazsa TeklifNo ile tekrar dene (teklif→sipariş dönüşümü).
+        if (order.Details.Count == 0 &&
+            !string.IsNullOrEmpty(order.TeklifNo) && order.TeklifNo != siparisNo)
+        {
+            order.Details = await _context.DetayTablo
+                .AsNoTracking()
+                .Where(d => d.SiparisNo == order.TeklifNo)
+                .ToListAsync();
+        }
+
         return order;
     }
 

@@ -13,7 +13,10 @@ public sealed record OrderFilterDto(
     DateTime? BaslangicTarih,
     DateTime? BitisTarih,
     int       Page    = 1,
-    int       PageSize = 50);
+    int       PageSize = 50,
+    // PROMPT-v4 §3 — Kontrol ekranı filtre barı (repository SearchAsync zaten destekliyor)
+    string?   Kontrol    = null,
+    string?   OdemeDurum = null);
 
 public sealed record OrderListPageDto(
     IReadOnlyList<OrderListDto> Items,

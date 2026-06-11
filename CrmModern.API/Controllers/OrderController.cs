@@ -16,9 +16,11 @@ public sealed class OrderController(
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // PROMPT-v3 §1 create-path Temsilci-only; istisna: elshan.rasulov
-    // (WinForms'taki kullanıcı adı bazlı yetki kalıbı — PurchaseController gibi).
-    private const string OrderCreateExceptionUser = "elshan.rasulov";
+    // PROMPT-v3 §1 create-path Temsilci-only; istisna: elshan.rasulov.
+    // PROMPT-v4 §1: aynı kullanıcı Kontrol ekranının tek yetkilisi (ControlUser) —
+    // approve/reject/paid-amount/stage mutasyonları ve excel/material-cost
+    // okumaları için kullanıcı adı bazlı kalıp (PurchaseController gibi).
+    private const string ControlUser = "elshan.rasulov";
 
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -28,8 +30,10 @@ public sealed class OrderController(
         User.FindFirstValue(ClaimTypes.Name)
             ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
 
+    private bool IsControlUser => CurrentUserName == ControlUser;
+
     private bool CanCreateOrders =>
-        User.IsInRole("Temsilci") || CurrentUserName == OrderCreateExceptionUser;
+        User.IsInRole("Temsilci") || IsControlUser;
 
     // ─────────────────────────────────────────────────────────────────────────
     // List
@@ -44,8 +48,9 @@ public sealed class OrderController(
     public async Task<IActionResult> GetOrders([FromQuery] OrderFilterDto filter)
     {
         // PROMPT-v2 §6: Temsilci yalnız kendi siparişlerini görür.
-        // Filtre KullaniciID'si zorla kendi user id'sine sabitlenir.
-        if (User.IsInRole("Temsilci"))
+        // PROMPT-v4 §1/§6.2: elshan.rasulov rolünden bağımsız tümünü görür
+        // (Kontrol ekranı filtreli yüklemesi bu endpoint'i kullanır).
+        if (User.IsInRole("Temsilci") && !IsControlUser)
             filter = filter with { KullaniciID = CurrentUserId };
 
         var result = await orderService.GetOrdersAsync(filter);
@@ -58,7 +63,9 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMyOrders([FromQuery] string? asama = null)
     {
-        var result = await orderService.GetMyOrdersAsync(CurrentUserId, asama);
+        // PROMPT-v4 §6.2: elshan.rasulov Siparişlerim'de TÜM siparişleri izler;
+        // diğer herkes v2 §6 gereği kendi satırlarıyla sınırlı kalır.
+        var result = await orderService.GetMyOrdersAsync(CurrentUserId, asama, allUsers: IsControlUser);
         return Ok(ApiResponse<IReadOnlyList<OrderListDto>>.Ok(result));
     }
 
@@ -68,7 +75,8 @@ public sealed class OrderController(
     public async Task<IActionResult> GetTotals([FromQuery] OrderFilterDto filter)
     {
         // PROMPT-v2 §6: Temsilci toplamları kendi siparişlerinden hesaplanır.
-        if (User.IsInRole("Temsilci"))
+        // PROMPT-v4 §1: elshan rolünden bağımsız tümünü görür.
+        if (User.IsInRole("Temsilci") && !IsControlUser)
             filter = filter with { KullaniciID = CurrentUserId };
 
         var result = await orderService.GetTotalsByCurrencyAsync(filter);
@@ -103,11 +111,13 @@ public sealed class OrderController(
 
     /// <summary>UrunMaliyetTablo'dan sipariş başına maliyet özeti.</summary>
     // PROMPT-v2 §2: Fabrika dışlandı — fabrika rolüne hiçbir parasal değer açılmıyor.
+    // PROMPT-v4 §1: + elshan.rasulov okuma istisnası (Kontrol ekranı).
     [HttpGet("{no}/material-cost")]
-    [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(ApiResponse<MaterialCostDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMaterialCost(string no)
     {
+        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !IsControlUser)
+            return Forbid();
         var result = await orderService.ComputeMaterialCostAsync(no);
         return Ok(ApiResponse<MaterialCostDto>.Ok(result));
     }
@@ -269,22 +279,49 @@ public sealed class OrderController(
         return Ok(ApiResponse<object>.Ok(null!, "Onaya gönderildi."));
     }
 
+    // PROMPT-v4 §1: Frontend bu iki endpoint'i hiç çağırmıyor (yalnız QC controller
+    // varyantları kullanılıyor) — aynı servis metotları oldukları için Yonetici
+    // backdoor'u kalmasın diye ControlUser'a yeniden gate'lendi.
     [HttpPost("{no}/approve")]
-    [Authorize(Roles = "Yonetici")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Approve(string no, [FromBody] ApproveOrderDto? dto)
     {
+        if (!IsControlUser) return Forbid();
         await orderService.ApproveOrderAsync(no, CurrentUserId, dto?.Aciklama);
         return Ok(ApiResponse<object>.Ok(null!, "Onaylandı."));
     }
 
     [HttpPost("{no}/reject")]
-    [Authorize(Roles = "Yonetici")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Reject(string no, [FromBody] RejectOrderDto dto)
     {
+        if (!IsControlUser) return Forbid();
         await orderService.RejectOrderAsync(no, CurrentUserId, dto.Aciklama);
         return Ok(ApiResponse<object>.Ok(null!, "Reddedildi."));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROMPT-v4 §5.4 / §5.5 — Kontrol ekranı mutasyonları (yalnız ControlUser)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Cari Güncelle (legacy button2_Click_2): OdenenMiktar set.</summary>
+    [HttpPut("{no}/paid-amount")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdatePaidAmount(string no, [FromBody] UpdatePaidAmountDto dto)
+    {
+        if (!IsControlUser) return Forbid();
+        await orderService.UpdatePaidAmountAsync(no, dto.OdenenMiktar);
+        return Ok(ApiResponse<object>.Ok(null!, "Cari güncellendi."));
+    }
+
+    /// <summary>Aşama Kaydet (legacy fabrikaButton_Click_1): aşama + STarih + KontrolNot.</summary>
+    [HttpPut("{no}/stage")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UpdateStage(string no, [FromBody] UpdateStageDto dto)
+    {
+        if (!IsControlUser) return Forbid();
+        await orderService.UpdateStageAsync(no, dto);
+        return Ok(ApiResponse<object>.Ok(null!, "Sipariş başarıyla güncellendi!"));
     }
 
     /// <summary>SiparisForm "Reçeteden Aç": kategori BoM'unu siparişe ekler.</summary>
@@ -333,11 +370,13 @@ public sealed class OrderController(
     /// halde hard-coded ClosedXML fallback'e düşülür.
     /// </summary>
     // PROMPT-v2 §2: Proforma fiyatlar içerdiği için Fabrika dışlandı.
+    // PROMPT-v4 §1/§5.7: + elshan.rasulov istisnası (Kontrol ekranı "Excel'e Yaz").
     [HttpGet("{no}/excel")]
-    [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Excel(string no)
     {
+        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !IsControlUser)
+            return Forbid();
         var bytes = await reportingService.ExportOrderProformaAsync(no);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes,

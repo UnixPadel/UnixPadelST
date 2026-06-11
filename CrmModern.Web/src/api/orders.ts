@@ -16,6 +16,9 @@ export interface OrderFilter {
   bitisTarih?: string
   page?: number
   pageSize?: number
+  // PROMPT-v4 §3 — Kontrol ekranı filtre barı
+  kontrol?: string
+  odemeDurum?: string
 }
 
 export interface OrderListPage {
@@ -114,6 +117,20 @@ export const rejectOrder = (no: string, aciklama: string) =>
 export const expandRecipe = (no: string, kategoriID: number, adet: number) =>
   api.post(`/api/orders/${no}/expand-recipe`, { kategoriID, adet }).then((r) => r.data)
 
+// ── PROMPT-v4 §5.4 / §5.5 — Kontrol ekranı mutasyonları ─────────────────────
+
+export const updatePaidAmount = (no: string, odenenMiktar: number) =>
+  api.put(`/api/orders/${no}/paid-amount`, { odenenMiktar }).then((r) => r.data)
+
+export interface UpdateStageRequest {
+  asama: string
+  sTarih: string
+  kontrolNot?: string
+}
+
+export const updateStage = (no: string, dto: UpdateStageRequest) =>
+  api.put(`/api/orders/${no}/stage`, dto).then((r) => r.data)
+
 // ── Attachments ─────────────────────────────────────────────────────────────
 
 export const uploadAttachment = (no: string, type: 'ek' | 'muhasebeek', file: File) => {
@@ -126,6 +143,19 @@ export const uploadAttachment = (no: string, type: 'ek' | 'muhasebeek', file: Fi
 
 export const attachmentUrl = (no: string, type: 'ek' | 'muhasebeek') =>
   `/api/orders/${no}/attachments/${type}`
+
+// PROMPT-v4 §5.6 — Kontrol ekranı Satıcı Ek / Muhasebe Ek indirme.
+// 404 (blob yok) çağıran tarafta toast'a çevrilir.
+export const downloadAttachment = async (no: string, type: 'ek' | 'muhasebeek') => {
+  const res = await api.get(`/api/orders/${no}/attachments/${type}`, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = type === 'ek' ? `siparis_ek_${no}.zip` : `muhasebe_ek_${no}.zip`
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 0)
+}
 
 // ── Excel ───────────────────────────────────────────────────────────────────
 

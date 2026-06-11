@@ -24,6 +24,13 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
     private string CurrentRole =>
         User.FindFirstValue(ClaimTypes.Role) ?? string.Empty;
 
+    // PROMPT-v4 §1/§3 — Kontrol ekranı Müşteri filtresi tüm listeyi ister;
+    // elshan.rasulov rolünden bağımsız Temsilci sahiplenme filtresinden muaf.
+    private const string ControlUser = "elshan.rasulov";
+
+    private bool IsControlUser =>
+        User.FindFirstValue(ClaimTypes.Name) == ControlUser;
+
     // ── Müşteri endpoints ────────────────────────────────────────────────────
 
     [HttpGet]
@@ -32,7 +39,9 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
     {
         // PROMPT-v2 §7: Servis rol bazlı filtre uygular (Temsilci yalnız kendi
         // yarattığı kayıtları görür). Diğer roller tüm listeyi alır.
-        var data = await musteriService.GetAllAsync(CurrentUserId, CurrentRole);
+        // PROMPT-v4 §1: elshan.rasulov rolü Temsilci olsa bile tam listeyi alır.
+        var role = IsControlUser ? "Yonetici" : CurrentRole;
+        var data = await musteriService.GetAllAsync(CurrentUserId, role);
         return Ok(ApiResponse<IEnumerable<MusteriDto>>.Ok(data));
     }
 

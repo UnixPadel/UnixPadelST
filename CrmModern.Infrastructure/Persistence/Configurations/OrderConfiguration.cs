@@ -107,6 +107,7 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.Ek)        .HasColumnName("Ek")        .HasColumnType("mediumblob");
         builder.Property(o => o.MuhasebeEk).HasColumnName("MuhasebeEk").HasColumnType("mediumblob");
         builder.Property(o => o.STarih)    .HasColumnName("STarih")    .HasColumnType("datetime");
+        builder.Property(o => o.KontrolNot).HasColumnName("KontrolNot").HasMaxLength(2000);
         builder.Property(o => o.FabrikaNot).HasColumnName("FabrikaNot").HasMaxLength(2000);
         builder.Property(o => o.LojistikNot).HasColumnName("LojistikNot").HasMaxLength(2000);
 

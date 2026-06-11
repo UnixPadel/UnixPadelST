@@ -24,28 +24,46 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     // List
     // ─────────────────────────────────────────────────────────────────────────
 
-    public async Task<IReadOnlyList<OrderListDto>> GetMyOrdersAsync(int kullaniciID, string? asama = null)
+    public async Task<IReadOnlyList<OrderListDto>> GetMyOrdersAsync(int kullaniciID, string? asama = null, bool allUsers = false)
     {
-        var orders = await uow.Orders.GetByKullaniciAsync(kullaniciID);
+        // PROMPT-v4 §6.2 — allUsers yalnız elshan.rasulov için true gelir (controller
+        // branch'i); diğer herkes v2 §6 kapsamında kendi satırlarıyla sınırlı kalır.
+        var orders = allUsers
+            ? await uow.Orders.SearchAsync(null, null, null, null, null, null, null, null, null)
+            : await uow.Orders.GetByKullaniciAsync(kullaniciID);
+
         // Paket 2 — opsiyonel aşama filtresi (SiparisMiTeklifMi enum string birebir)
         if (!string.IsNullOrWhiteSpace(asama))
             orders = orders.Where(o => o.SiparisMiTeklifMi == asama).ToList().AsReadOnly();
+
+        // §6.2 — sahip (Temsilci) kolonu: Ad Soyad çözümlemesi
+        var users = (await uow.Kullanicilar.GetAllAsync())
+            .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
+
         return orders
-            .Select(o => new OrderListDto(
-                SiparisAlID:       o.SiparisAlID,
-                SiparisNo:         o.SiparisNo,
-                TeklifNo:          o.TeklifNo,
-                MusteriAd:         o.MusteriAd,
-                MUlke:             o.MUlke,
-                KullaniciID:       o.KullaniciID,
-                ParaTipi:          o.ParaTipi,
-                ToplamFiyat:       o.ToplamFiyat,
-                SiparisMiTeklifMi: o.SiparisMiTeklifMi,
-                Kontrol:           o.Kontrol,
-                Tarih:             o.Tarih,
-                Sirket:            o.Sirket))
+            .Select(o => MapToListDto(o, users))
             .ToList();
     }
+
+    private static OrderListDto MapToListDto(Order o, IReadOnlyDictionary<int, string>? users = null) =>
+        new(
+            SiparisAlID:       o.SiparisAlID,
+            SiparisNo:         o.SiparisNo,
+            TeklifNo:          o.TeklifNo,
+            MusteriAd:         o.MusteriAd,
+            MUlke:             o.MUlke,
+            KullaniciID:       o.KullaniciID,
+            ParaTipi:          o.ParaTipi,
+            ToplamFiyat:       o.ToplamFiyat,
+            SiparisMiTeklifMi: o.SiparisMiTeklifMi,
+            Kontrol:           o.Kontrol,
+            Tarih:             o.Tarih,
+            Sirket:            o.Sirket,
+            PesinYuzde:        o.PesinYüzde,
+            OdenenMiktar:      o.OdenenMiktar,
+            TeslimatCesiti:    o.TeslimatÇeşiti,
+            OdemeDurum:        o.OdemeDurum,
+            KullaniciAdSoyad:  users is not null && users.TryGetValue(o.KullaniciID, out var n) ? n : null);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Single record
@@ -56,7 +74,17 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         var order = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
             ?? throw new NotFoundException("Order", no);
 
-        return MapToDetailDto(order);
+        // PROMPT-v4 §4.1 — Satış Temsilcisi bloğu "Temsilci Adı" = sahibin Ad Soyad'ı.
+        var owner = await uow.Kullanicilar.GetByIdAsync(order.KullaniciID);
+        string? ownerAdSoyad = owner is null ? null : $"{owner.Ad} {owner.Soyad}".Trim();
+
+        // PROMPT-v4 §4.3 — Ürün & Bileşen grid'i isimleri (legacy LEFT JOIN'ler).
+        var kategoriler = (await uow.ProductCategories.GetAllAsync())
+            .ToDictionary(c => c.KategoriID, c => c.KategoriAdi);
+        var bilesenler = (await uow.Components.GetAllAsync())
+            .ToDictionary(b => b.BilesenID, b => (b.BilesenAdi, b.Birim));
+
+        return MapToDetailDto(order, ownerAdSoyad, kategoriler, bilesenler);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -466,7 +494,11 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         if (ek is not null) existing.Ek = ek;
     }
 
-    private static OrderDetailDto MapToDetailDto(Order o) => new(
+    private static OrderDetailDto MapToDetailDto(
+        Order o,
+        string? ownerAdSoyad = null,
+        IReadOnlyDictionary<int, string>? kategoriler = null,
+        IReadOnlyDictionary<int, (string BilesenAdi, string? Birim)>? bilesenler = null) => new(
         SiparisNo:         o.SiparisNo,
         TeklifNo:          o.TeklifNo,
         MusteriAd:         o.MusteriAd,
@@ -514,11 +546,20 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         LojistikNot:       o.LojistikNot,
         Tarih:             o.Tarih,
         STarih:            o.STarih,   // 2.5 stage-history timeline buradan beslenir
-        KullaniciAdi:      null,   // populated by controller if needed
+        KullaniciAdi:      ownerAdSoyad,   // PROMPT-v4 §4.1: sahibin Ad Soyad'ı
         Items:             o.Items.Select(i => new OrderItemDto(
                                i.KategoriID, i.BilesenID,
-                               i.OznitelikAdi, i.Adet, i.Fiyat)).ToList(),
-        Details:           o.Details.Select(d => d.Text).ToList()
+                               i.OznitelikAdi, i.Adet, i.Fiyat,
+                               KategoriAdi: i.KategoriID.HasValue && kategoriler is not null &&
+                                            kategoriler.TryGetValue(i.KategoriID.Value, out var ka) ? ka : null,
+                               BilesenAdi:  i.BilesenID.HasValue && bilesenler is not null &&
+                                            bilesenler.TryGetValue(i.BilesenID.Value, out var bb) ? bb.BilesenAdi : null,
+                               Birim:       i.BilesenID.HasValue && bilesenler is not null &&
+                                            bilesenler.TryGetValue(i.BilesenID.Value, out var bb2) ? bb2.Birim : null)).ToList(),
+        Details:           o.Details.Select(d => d.Text).ToList(),
+        OdenenMiktar:      o.OdenenMiktar,
+        OdemeDurum:        o.OdemeDurum,
+        KontrolNot:        o.KontrolNot
     );
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -535,8 +576,8 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             kullaniciID: f.KullaniciID,
             ulke:        f.MUlke,
             asama:       f.Asama,
-            kontrol:     null,
-            odemeDurum:  null,
+            kontrol:     f.Kontrol,       // PROMPT-v4 §3 — Kontrol Durumu filtresi
+            odemeDurum:  f.OdemeDurum,    // PROMPT-v4 §3 — Ödeme Durumu filtresi
             baslangic:   f.BaslangicTarih,
             bitis:       f.BitisTarih);
 
@@ -551,10 +592,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         var items = filtered
             .Skip((page - 1) * size)
             .Take(size)
-            .Select(o => new OrderListDto(
-                o.SiparisAlID, o.SiparisNo, o.TeklifNo, o.MusteriAd, o.MUlke,
-                o.KullaniciID, o.ParaTipi, o.ToplamFiyat, o.SiparisMiTeklifMi,
-                o.Kontrol, o.Tarih, o.Sirket))
+            .Select(o => MapToListDto(o))
             .ToList()
             .AsReadOnly();
 
@@ -599,11 +637,16 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
 
-        // BIREBIR WinForms: KontrolForm onay → Kontrol = "Onay"
+        // PROMPT-v4 §5.1 guard'ları (legacy WHERE Kontrol <> 'Onay'
+        // AND SiparisMiTeklifMi IN ('Teklif','Siparis') birebir):
+        if (order.Kontrol == "Onay" ||
+            order.SiparisMiTeklifMi is not ("Teklif" or "Siparis"))
+            throw new BusinessException("Kayıt bulunamadı veya zaten Onay durumunda.");
+
         order.Kontrol = "Onay";
-        // Teklif ise sipariş'e çevir (WinForms ApproveQualityControlAsync davranışı)
-        if (order.SiparisMiTeklifMi == "Teklif")
-            order.SiparisMiTeklifMi = "Siparis";
+        // PROMPT-v4 §5.1 — BİLİNÇLİ legacy sapması: onay Teklif/Siparis'i doğrudan
+        // Planlama'ya taşır; sipariş Muhasebe adımı beklemeden Fabrika kuyruğuna düşer.
+        order.SiparisMiTeklifMi = "Planlama";
 
         uow.Orders.Update(order);
 
@@ -620,12 +663,56 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
 
+        // PROMPT-v4 §5.2 — legacy WHERE guard'ları (Kontrol <> 'Onay' AND
+        // SiparisMiTeklifMi IN ('Teklif','Siparis')); 0 satır = iş hatası.
+        if (order.Kontrol == "Onay" ||
+            order.SiparisMiTeklifMi is not ("Teklif" or "Siparis"))
+            throw new BusinessException(
+                "İşlem yapılamadı! Sipariş zaten Onay durumunda olabilir veya Teklif/Sipariş değil.");
+
         // BIREBIR WinForms KontrolRed: Kontrol="Reddet" + Red kolonu
         order.Kontrol = "Reddet";
         order.Red     = aciklama;
         uow.Orders.Update(order);
 
         await uow.OrderApprovals.UpsertAsync(no, kullaniciID, "Reddedildi", aciklama);
+        await uow.SaveChangesAsync();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // PROMPT-v4 §5.4 / §5.5 — Kontrol ekranı mutasyonları
+    // ─────────────────────────────────────────────────────────────────────────
+
+    public async Task UpdatePaidAmountAsync(string siparisNo, decimal odenenMiktar)
+    {
+        // Legacy button2_Click_2: UPDATE SiparisAlTablo SET OdenenMiktar=@x WHERE SiparisNo=@no
+        if (odenenMiktar < 0)
+            throw new BusinessException("Geçerli bir ödenen bakiye girin.");
+
+        var order = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(siparisNo))
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        order.OdenenMiktar = odenenMiktar;
+        uow.Orders.Update(order);
+        await uow.SaveChangesAsync();
+    }
+
+    public async Task UpdateStageAsync(string siparisNo, UpdateStageDto dto)
+    {
+        // Legacy fabrikaButton_Click_1: aşama + kontrol + STarih + KontrolNot tek UPDATE.
+        if (string.IsNullOrWhiteSpace(dto.Asama))
+            throw new BusinessException("Aşama boş olamaz.");
+
+        var order = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(siparisNo))
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        order.SiparisMiTeklifMi = dto.Asama;
+        order.Kontrol           = dto.Asama.Equals("Iptal", StringComparison.OrdinalIgnoreCase)
+                                      ? "Reddet" : "Onay";
+        order.STarih            = dto.STarih;
+        order.KontrolNot        = dto.KontrolNot?.Trim();
+
+        uow.Orders.Update(order);
         await uow.SaveChangesAsync();
     }
 

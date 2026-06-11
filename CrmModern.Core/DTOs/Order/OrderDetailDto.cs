@@ -74,5 +74,10 @@ public sealed record OrderDetailDto(
 
     // ── Line items & details ──────────────────────────────────────────────
     IReadOnlyList<OrderItemDto> Items,
-    IReadOnlyList<string>       Details
+    IReadOnlyList<string>       Details,
+
+    // ── PROMPT-v4 §4.1 — Kontrol ekranı cari bloğu ────────────────────────
+    decimal? OdenenMiktar = null,
+    string?  OdemeDurum   = null,
+    string?  KontrolNot   = null
 );

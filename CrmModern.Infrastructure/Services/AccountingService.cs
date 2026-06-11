@@ -390,6 +390,11 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             throw new BusinessException(
                 "Sipariş henüz Kontrol onayı almamış. Önce Kontrol aşamasında onaylanmalı.");
 
+        // PROMPT-v4 §5.1 — QC onayı artık doğrudan Planlama'ya indirir; bu buton
+        // zaten-Planlama kayıtlarda zararsız kalmalı (idempotent no-op).
+        if (order.SiparisMiTeklifMi == "Planlama")
+            return;
+
         if (order.SiparisMiTeklifMi != "Siparis")
             throw new BusinessException(
                 $"Sipariş zaten '{order.SiparisMiTeklifMi}' aşamasında. " +

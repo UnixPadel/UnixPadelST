@@ -10,5 +10,10 @@ public sealed record OrderItemDto(
     int?    BilesenID,
     string? OznitelikAdi,
     int      Adet,
-    decimal? Fiyat
+    decimal? Fiyat,
+    // PROMPT-v4 §4.3 — Kontrol ekranı Ürün & Bileşen grid'i için isim çözümlemesi
+    // (legacy LEFT JOIN UrunKategorileri / BilesenBilgileri). Create yolunda null kalır.
+    string? KategoriAdi = null,
+    string? BilesenAdi  = null,
+    string? Birim       = null
 );

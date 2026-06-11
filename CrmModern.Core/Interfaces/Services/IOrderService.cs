@@ -9,7 +9,8 @@ namespace CrmModern.Core.Interfaces.Services;
 public interface IOrderService
 {
     // ── List ──────────────────────────────────────────────────────────────
-    Task<IReadOnlyList<OrderListDto>> GetMyOrdersAsync(int kullaniciID, string? asama = null);
+    // PROMPT-v4 §6.2: allUsers=true (yalnız elshan.rasulov) tüm siparişleri döner.
+    Task<IReadOnlyList<OrderListDto>> GetMyOrdersAsync(int kullaniciID, string? asama = null, bool allUsers = false);
     Task<OrderListPageDto>            GetOrdersAsync(OrderFilterDto filter);
 
     // ── Single record ─────────────────────────────────────────────────────
@@ -29,6 +30,10 @@ public interface IOrderService
     Task SubmitForApprovalAsync(string siparisNo, int kullaniciID);
     Task ApproveOrderAsync(string siparisNo, int kullaniciID, string? aciklama);
     Task RejectOrderAsync(string siparisNo, int kullaniciID, string aciklama);
+
+    // ── PROMPT-v4 §5.4 / §5.5 — Kontrol ekranı mutasyonları ───────────────
+    Task UpdatePaidAmountAsync(string siparisNo, decimal odenenMiktar);
+    Task UpdateStageAsync(string siparisNo, UpdateStageDto dto);
 
     // ── Recipe expansion (SiparisForm "Reçeteden Aç") ─────────────────────
     Task ExpandRecipeAsync(string siparisNo, int kategoriID, int adet);

@@ -26,7 +26,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
           cache: 'npm'
           cache-dependency-path: CrmModern.Web/package-lock.json
 
@@ -34,18 +34,16 @@ jobs:
         working-directory: CrmModern.Web
         run: npm ci
 
-      - name: Build & publish (electron-builder)
+      - name: Build application
         working-directory: CrmModern.Web
-        env:
-          # RELEASES_TOKEN: UnixPadel/UnixPadelST-Releases repo'suna yazma yetkisi
-          # olan Personal Access Token. Bkz: Settings → Secrets → Actions.
-          GH_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        run: npm run release
+        run: npm run build
 
-      - name: Show release URL
+      - name: Package with electron-builder
+        working-directory: CrmModern.Web
+        run: npx electron-builder
+
+      - name: Build complete
         if: success()
         run: |
-          echo "Release oluşturuldu (draft olarak):"
-          echo "https://github.com/UnixPadel/UnixPadelST-Releases/releases"
-          echo ""
-          echo "Yayına almak için: ilgili draft → Edit → Publish release."
+          echo "Build completed successfully!"
+          echo "Release artifacts are ready at: release/UnixPadelST-Setup-*.exe"

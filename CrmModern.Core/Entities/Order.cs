@@ -72,6 +72,9 @@ public sealed class Order
     public string  SiparisMiTeklifMi { get; set; } = "Teklif";
     public string  Kontrol           { get; set; } = "Kontrol";
     public string? Red               { get; set; }
+    // PROMPT-v6 §1.1 — Burcu lojistik onayı: NULL = eski kayıt (gate uygulanmaz),
+    // 'Bekliyor' (MarkReady yazdı), 'Onay' (burcu.karaman onayladı).
+    public string? LojistikOnay      { get; set; }
 
     // ── Metadata ──────────────────────────────────────────────────────────
     public string?   Sirket          { get; set; }

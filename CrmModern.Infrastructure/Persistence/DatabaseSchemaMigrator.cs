@@ -45,6 +45,38 @@ public static class DatabaseSchemaMigrator
             table: "SiparisAlTablo",
             column: "KontrolNot",
             ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN KontrolNot TEXT NULL");
+
+        // 6) PROMPT-v6 §1.1: SiparisAlTablo.LojistikOnay — Burcu lojistik onay gate'i.
+        // NULL = eski kayıt (gate uygulanmaz) | 'Bekliyor' | 'Onay'.
+        await EnsureLojistikOnayColumnAsync(ctx, logger);
+    }
+
+    /// <summary>
+    /// PROMPT-v6 §1.1 — LojistikOnay kolonu + geriye uyum backfill'i: kolon İLK
+    /// eklendiğinde, o anda zaten Hazir + Kontrol='Onay' bekleyen kayıtlara
+    /// 'Onay' yazılır ki lojistik kuyruğundan kaybolmasınlar. Sonraki
+    /// çalıştırmalarda (kolon zaten varsa) hiçbir şey yapılmaz — MarkReady
+    /// yeni Hazir kayıtlarını 'Bekliyor' ile işaretler.
+    /// </summary>
+    private static async Task EnsureLojistikOnayColumnAsync(AppDbContext ctx, ILogger? logger)
+    {
+        if (await ColumnExistsAsync(ctx, "SiparisAlTablo", "LojistikOnay"))
+        {
+            logger?.LogInformation("SiparisAlTablo.LojistikOnay kolonu zaten var; atlandı.");
+            return;
+        }
+
+        await ctx.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE SiparisAlTablo ADD COLUMN LojistikOnay VARCHAR(16) NULL");
+        logger?.LogInformation("SiparisAlTablo.LojistikOnay kolonu eklendi.");
+
+        int affected = await ctx.Database.ExecuteSqlRawAsync(@"
+            UPDATE SiparisAlTablo
+            SET LojistikOnay = 'Onay'
+            WHERE SiparisMiTeklifMi = 'Hazir' AND Kontrol = 'Onay'");
+        if (affected > 0)
+            logger?.LogInformation(
+                "LojistikOnay backfill: migration anında Hazir bekleyen {N} kayıt 'Onay' yapıldı.", affected);
     }
 
     private static async Task EnsureSifreColumnSizeAsync(AppDbContext ctx, ILogger? logger)

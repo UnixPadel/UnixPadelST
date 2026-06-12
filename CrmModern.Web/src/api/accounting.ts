@@ -144,9 +144,14 @@ export interface SubmitMaliyetRequest {
 export const submitMaliyetTalep = (siparisNo: string, dto: SubmitMaliyetRequest) =>
   api.post(`/api/accounting/orders/${siparisNo}/maliyet`, dto).then((r) => r.data)
 
-/** Muhasebe ekranı "Muhasebe Onayla" — Siparis → Planlama transition. */
+/** PROMPT-v6 §1 — Burcu ekranı "Cari Onayla" — Siparis → Planlama (yalnız burcu.karaman). */
 export const approveMuhasebeAndMoveToPlanning = (siparisNo: string) =>
   api.put(`/api/accounting/orders/${siparisNo}/approve-and-move-to-planning`)
+    .then((r) => r.data)
+
+/** PROMPT-v6 §1 — Burcu ekranı "Lojistik Onayla" — LojistikOnay: Bekliyor → Onay (yalnız burcu.karaman). */
+export const approveLogistics = (siparisNo: string) =>
+  api.post(`/api/accounting/orders/${siparisNo}/approve-logistics`)
     .then((r) => r.data)
 
 export const uploadMuhasebeEk = async (siparisNo: string, file: File) => {

@@ -100,6 +100,8 @@ internal sealed class OrderConfiguration : IEntityTypeConfiguration<Order>
         builder.Property(o => o.SiparisMiTeklifMi).HasColumnName("SiparisMiTeklifMi").HasMaxLength(20);
         builder.Property(o => o.Kontrol)          .HasColumnName("Kontrol")          .HasMaxLength(20);
         builder.Property(o => o.Red)              .HasColumnName("Red")              .HasMaxLength(2000);
+        // PROMPT-v6 §1.1 — Burcu lojistik onay gate'i (DatabaseSchemaMigrator adım 6).
+        builder.Property(o => o.LojistikOnay)     .HasColumnName("LojistikOnay")     .HasMaxLength(16);
 
         // ── Metadata ──────────────────────────────────────────────────────
         builder.Property(o => o.Sirket)    .HasColumnName("Sirket")    .HasMaxLength(100);

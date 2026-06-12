@@ -30,6 +30,12 @@ interface DataTableProps<T> {
    * (legacy SiparisAlDataGridRenklendir).
    */
   rowClassName?: (row: T) => string | undefined
+  /**
+   * PROMPT-v6 §6 — yoğunluk geçişi. 'compact': px-2 py-2 hücre, text-xs,
+   * başlıklar iki satıra sarabilir. Geniş gridler (Kontrol/Tahsilat/Arama/
+   * Burcu) opt-in eder; default 'normal' mevcut sayfaları değiştirmez.
+   */
+  density?: 'normal' | 'compact'
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -37,11 +43,15 @@ type SortDir = 'asc' | 'desc' | null
 export function DataTable<T extends Record<string, unknown>>({
   columns, data, keyField, loading, emptyMessage,
   onRowClick, onRowDoubleClick, rowClassName,
+  density = 'normal',
 }: DataTableProps<T>) {
   const { t, i18n } = useTranslation()
   const effectiveEmpty = emptyMessage ?? t('common.noData')
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<SortDir>(null)
+
+  const compact = density === 'compact'
+  const cellPad = compact ? 'px-2 py-2' : 'px-4 py-3'
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -68,14 +78,17 @@ export function DataTable<T extends Record<string, unknown>>({
   return (
     <div className="rounded-md border overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className={cn('w-full', compact ? 'text-xs' : 'text-sm')}>
           <thead className="bg-muted/50">
             <tr>
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
                   className={cn(
-                    'px-4 py-3 text-left font-medium text-muted-foreground whitespace-nowrap',
+                    cellPad,
+                    'text-left font-medium text-muted-foreground',
+                    // §6: kompakt modda başlıklar iki satıra sarabilir.
+                    !compact && 'whitespace-nowrap',
                     col.sortable && 'cursor-pointer select-none hover:text-foreground',
                     col.className
                   )}
@@ -103,7 +116,7 @@ export function DataTable<T extends Record<string, unknown>>({
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={`sk-${i}`} className="border-t">
                   {columns.map((c, j) => (
-                    <td key={j} className="px-4 py-3">
+                    <td key={j} className={cellPad}>
                       <div className="h-3 rounded bg-muted animate-pulse" style={{ width: `${50 + ((i + j) * 7) % 40}%` }} />
                     </td>
                   ))}
@@ -148,7 +161,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   }
                 >
                   {columns.map((col) => (
-                    <td key={String(col.key)} className={cn('px-4 py-3', col.className)}>
+                    <td key={String(col.key)} className={cn(cellPad, col.className)}>
                       {(() => {
                         try {
                           return col.render

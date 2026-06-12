@@ -24,7 +24,12 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             siparisNo: null, musteriAd: null, kullaniciID: null,
             ulke: null, asama: "Hazir", kontrol: "Onay",
             odemeDurum: null, baslangic: null, bitis: null);
-        return orders.Select(MapList).ToList().AsReadOnly();
+        // PROMPT-v6 §1.1 — Burcu lojistik onay gate'i: 'Bekliyor' satırlar
+        // ready-listte görünmez. NULL = migration öncesi eski kayıt (gate
+        // uygulanmaz — migrator backfill'i bunları zaten 'Onay' yapar).
+        return orders
+            .Where(o => o.LojistikOnay is null or "Onay")
+            .Select(MapList).ToList().AsReadOnly();
     }
 
     public async Task MoveToLogisticsAsync(string siparisNo, MoveToLogisticsDto dto)
@@ -201,5 +206,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
 
     private static LogisticsOrderListDto MapList(Order o) => new(
         o.SiparisNo, o.MusteriAd, o.MUlke,
-        o.SiparisMiTeklifMi, o.LojistikNot, o.STarih, o.Tarih);
+        o.SiparisMiTeklifMi, o.LojistikNot, o.STarih, o.Tarih,
+        // PROMPT-v6 §4 — ödeme türü bilgisi (tutar yok; v5 §2 karartması korunur).
+        o.PesinYüzde, o.OdemeDurum);
 }

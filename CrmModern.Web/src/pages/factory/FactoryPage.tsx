@@ -29,6 +29,9 @@ export function FactoryPage() {
   // PROMPT-v2 §2: Excel proforma fiyat içerir; Fabrika için gizli.
   const { getUser } = useAuth()
   const isFabrika = getUser()?.yetkiTuru === 'Fabrika'
+  // PROMPT-v6 §1.1 — Üretime Al / Hazır aşama geçişleri yalnız simge.cakir
+  // (backend Forbid + buton render gate'i; diğer Fabrika kullanıcıları listeyi görür).
+  const isFactoryUser = getUser()?.kullaniciAdi === 'simge.cakir'
   const [productionTarget, setProductionTarget] = useState<string | null>(null)
   const [fabrikaNot, setFabrikaNot] = useState('')
   const [sTarih, setSTarih] = useState(() => new Date().toISOString().slice(0, 16))
@@ -55,6 +58,8 @@ export function FactoryPage() {
       qc.invalidateQueries({ queryKey: ['factory'] })
       // PROMPT-v5 §3 — Siparişlerim açıksa aşama geçişi anında yansısın.
       qc.invalidateQueries({ queryKey: ['my-orders'] })
+      // PROMPT-v6 §1 — Burcu ekranı gridine de yansısın.
+      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
       setProductionTarget(null)
       setFabrikaNot('')
       toast({ title: t('common.success') })
@@ -67,6 +72,8 @@ export function FactoryPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['factory'] })
       qc.invalidateQueries({ queryKey: ['my-orders'] })
+      // PROMPT-v6 §1 — Hazır'a çekilen sipariş Burcu'nun Lojistik Onay kuyruğuna düşer.
+      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
       toast({ title: t('common.success') })
     },
     onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
@@ -110,12 +117,12 @@ export function FactoryPage() {
           {!isFabrika && (
             <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
           )}
-          {(r.siparisMiTeklifMi as string) === 'Planlama' && (
+          {isFactoryUser && (r.siparisMiTeklifMi as string) === 'Planlama' && (
             <Button size="sm" onClick={() => { setProductionTarget(r.siparisNo as string) }}>
               {t('factory.moveToProduction')}
             </Button>
           )}
-          {(r.siparisMiTeklifMi as string) === 'Uretim' && (
+          {isFactoryUser && (r.siparisMiTeklifMi as string) === 'Uretim' && (
             <Button size="sm" variant="secondary" onClick={() => readyMut.mutate(r.siparisNo as string)} disabled={readyMut.isPending}>
               {t('factory.ready')}
             </Button>

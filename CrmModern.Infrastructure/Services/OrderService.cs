@@ -643,10 +643,11 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             order.SiparisMiTeklifMi is not ("Teklif" or "Siparis"))
             throw new BusinessException("Kayıt bulunamadı veya zaten Onay durumunda.");
 
+        // PROMPT-v6 §1.1 — v4 §5.1 sapması geri alındı: onay yalnız Kontrol='Onay'
+        // yazar, aşama (Teklif/Siparis) DEĞİŞMEZ. Onaylı bir 'Siparis' Burcu'nun
+        // Cari Onay kuyruğuna düşer; onaylı bir 'Teklif' temsilci Siparişe
+        // Çevir'ince 'Siparis' olur ve o anda kuyruğa girer.
         order.Kontrol = "Onay";
-        // PROMPT-v4 §5.1 — BİLİNÇLİ legacy sapması: onay Teklif/Siparis'i doğrudan
-        // Planlama'ya taşır; sipariş Muhasebe adımı beklemeden Fabrika kuyruğuna düşer.
-        order.SiparisMiTeklifMi = "Planlama";
 
         uow.Orders.Update(order);
 

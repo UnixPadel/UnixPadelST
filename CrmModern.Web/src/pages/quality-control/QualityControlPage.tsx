@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getPendingQC, getQCById, approveQC, rejectQC } from '@/api/qualityControl'
 import {
-  getOrders, updatePaidAmount, updateStage, downloadAttachment, downloadExcel,
+  getOrders, updatePaidAmount, downloadAttachment, downloadExcel,
   type OrderFilter,
 } from '@/api/orders'
 import { getTransactionsForOrder } from '@/api/accounting'
@@ -22,21 +22,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { describeApiError } from '@/lib/axios'
-import { formatDate, formatCurrency, cn } from '@/lib/utils'
+import { formatDate, formatDateShort, formatCurrency, cn } from '@/lib/utils'
 import type { OrderListDto, QualityControlListDto } from '@/types'
 
 /**
  * PROMPT-v4 — Kontrol ekranı (legacy Kontrol.cs / KontrolRed.cs 1:1 parity).
- * PROMPT-v5 §1 — yerleşim legacy ekran düzenine çevrildi: üstte dört panel
- * (Filtreme | sekmeli Detay | Kontrol | Fabrika), altta tam genişlik master
- * grid. Davranış v4 ile birebir aynı; yalnız re-skin.
+ * PROMPT-v6 §2 — yerleşim düzeltmesi: üstte ÜÇ panel (Filtreme | sekmeli
+ * Detay | Kontrol; Fabrika kartı kaldırıldı), altta tam genişlik master grid.
+ * Üst bölge aktif sekmenin doğal yüksekliğine oturur (iç scroll yok); grid
+ * ile arasındaki splitter sürüklenerek grid yüksekliği ayarlanabilir.
+ * Yalnız Detay sekmesindeki iki liste kendi içinde kayar (en uzun içerik).
  *
  * Erişim: yalnız elshan.rasulov (route RoleGuard + tüm backend mutasyon gate'leri).
- * Tek sayfa, 1920×1080'de sayfa scroll'u YOK — yalnız master grid, sekme
- * gövdeleri (Detay / Ürün&Bileşen / Muhasebe Geçmişi) kendi içinde kayar.
  *
- * Bilinçli legacy sapması (§5.1): Onayla → Kontrol='Onay' + SiparisMiTeklifMi='Planlama'
- * (sipariş Muhasebe beklemeden doğrudan Fabrika kuyruğuna düşer).
+ * PROMPT-v6 §1 onay semantiği: Onayla yalnız Kontrol='Onay' yazar — aşama
+ * değişmez; sipariş Burcu'nun Cari Onay kuyruğuna düşer (v4 §5.1 sapması kalktı).
  */
 
 const STAGES = ['Teklif', 'Siparis', 'Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi', 'Iptal']
@@ -247,16 +247,32 @@ export function QualityControlPage() {
   const [redNotu, setRedNotu] = useState('')
   const [formNo, setFormNo] = useState<string | null>(null)
   const [odenenInput, setOdenenInput] = useState<number | ''>('')
-  const [asama, setAsama] = useState('')
-  const [asamaTarih, setAsamaTarih] = useState(() => new Date().toISOString().slice(0, 10))
-  const [asamaNot, setAsamaNot] = useState('')
 
-  // Detay yüklenince cari + fabrika alanlarını doldur
+  // PROMPT-v6 §2 — splitter: null = varsayılan (kalan alanı doldur),
+  // sayı = kullanıcı sürüklemesiyle sabitlenmiş grid yüksekliği (px).
+  const [gridH, setGridH] = useState<number | null>(null)
+  const gridRef = useRef<HTMLDivElement>(null)
+
+  const startSplitterDrag = (e: React.PointerEvent) => {
+    e.preventDefault()
+    const startY = e.clientY
+    const startH = gridRef.current?.getBoundingClientRect().height ?? 300
+    const onMove = (ev: PointerEvent) => {
+      // Splitter yukarı çekilince grid büyür, aşağı itilince küçülür.
+      const dy = ev.clientY - startY
+      setGridH(Math.min(Math.max(startH - dy, 120), window.innerHeight - 160))
+    }
+    const onUp = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', onUp)
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', onUp)
+  }
+
+  // Detay yüklenince cari alanını doldur
   useEffect(() => {
     setOdenenInput(detail?.odenenMiktar ?? '')
-    setAsama('')
-    setAsamaTarih(new Date().toISOString().slice(0, 10))
-    setAsamaNot(detail?.kontrolNot ?? '')
   }, [detail])
 
   const refreshAll = () => {
@@ -306,12 +322,8 @@ export function QualityControlPage() {
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
 
-  const stageMut = useMutation({
-    mutationFn: ({ no, dto }: { no: string; dto: { asama: string; sTarih: string; kontrolNot?: string } }) =>
-      updateStage(no, dto),
-    onSuccess: () => { refreshAll(); toast({ title: t('qc.stageSaved') }) },
-    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
-  })
+  // PROMPT-v6 §2 — Fabrika kartı (stage mutasyonu) UI'dan kaldırıldı;
+  // backend PUT /api/orders/{no}/stage endpoint'i dokunulmadı.
 
   // ── Aksiyon handler'ları ────────────────────────────────────────────────
   const handleApprove = () => {
@@ -342,16 +354,6 @@ export function QualityControlPage() {
       return
     }
     cariMut.mutate({ no, miktar: odenenInput })
-  }
-
-  const handleStageSave = () => {
-    const no = requireSelection()
-    if (!no) return
-    if (!asama) {
-      toast({ title: t('qc.stageRequired'), variant: 'destructive' })
-      return
-    }
-    stageMut.mutate({ no, dto: { asama, sTarih: asamaTarih, kontrolNot: asamaNot.trim() } })
   }
 
   const handleAttachment = async (type: 'ek' | 'muhasebeek') => {
@@ -394,8 +396,9 @@ export function QualityControlPage() {
     { key: 'odemeDurum', header: t('qc.grid.odemeDurumu'), sortable: true,
       render: (r) => r.odemeDurum || '' },
     { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true },
+    // §6 — yoğun grid: kısa tarih (dd.MM.yy)
     { key: 'tarih', header: t('qc.grid.tarih'), sortable: true,
-      render: (r) => formatDate(r.tarih) },
+      render: (r) => formatDateShort(r.tarih) },
     { key: 'sirket', header: t('qc.grid.sirket'), sortable: true },
   ]
 
@@ -415,20 +418,24 @@ export function QualityControlPage() {
   const loading = submitted !== null ? searchLoading : pendingLoading
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    // h-full sütun düzeni; üst bölge doğal yüksekliğini alır, grid kalan alanı
+    // doldurur. İçerik sığmazsa (küçük ekran) sayfa dikeyde kayar — üst
+    // kartlarda iç scroll yok (PROMPT-v6 §2).
+    <div className="flex h-full flex-col overflow-y-auto overflow-x-hidden">
       {/* ── Kompakt başlık ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
         <h1 className="text-base font-semibold">{t('qc.title')}</h1>
         <p className="text-xs text-muted-foreground">{t('qc.pendingCount', { count: pending.length })}</p>
       </div>
 
-      {/* ── Üst bölge: dört panel (legacy ekran düzeni) ─────────────────
-           Paneller seçim olmasa da hep görünür; alanlar '—' gösterir,
+      {/* ── Üst bölge: üç panel (PROMPT-v6 §2 — Fabrika kartı kalktı) ───
+           Bölge aktif sekmenin doğal yüksekliğine oturur (h-auto, iç scroll
+           yok). Paneller seçim olmasa da hep görünür; alanlar '—' gösterir,
            aksiyonlar select-first toast'ını atar. */}
-      <div className="flex h-[44vh] min-h-[340px] shrink-0 gap-2 overflow-hidden px-4 py-2">
+      <div className="flex h-auto shrink-0 items-stretch gap-2 px-4 py-2">
 
         {/* 1 — Filtreme (legacy sıra, dikey) */}
-        <div className="w-[260px] shrink-0 overflow-y-auto rounded-md border p-2">
+        <div className="w-[260px] shrink-0 rounded-md border p-2">
           <p className="mb-1.5 text-sm font-semibold text-center">{t('qc.blocks.filtreme')}</p>
           <div className="space-y-1.5">
             <div className="space-y-0.5">
@@ -527,9 +534,9 @@ export function QualityControlPage() {
           </div>
         </div>
 
-        {/* 2 — Detay sekmeleri (legacy tab sırası) */}
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border p-2">
-          <Tabs defaultValue="cari" className="flex min-h-0 flex-1 flex-col">
+        {/* 2 — Detay sekmeleri (legacy tab sırası) — doğal yükseklik, iç scroll yok */}
+        <div className="flex min-w-0 flex-1 flex-col rounded-md border p-2">
+          <Tabs defaultValue="cari" className="flex flex-1 flex-col">
             <TabsList className="h-8 w-full shrink-0 justify-start overflow-x-auto">
               <TabsTrigger className="px-2 py-1 text-xs" value="cari">{t('qc.tabs.cari')}</TabsTrigger>
               <TabsTrigger className="px-2 py-1 text-xs" value="muhasebe">{t('qc.tabs.muhasebeGecmisi')}</TabsTrigger>
@@ -540,7 +547,7 @@ export function QualityControlPage() {
             </TabsList>
 
             {/* Cari — Cari Bilgiler + Cari Güncelle / Revize Et */}
-            <TabsContent value="cari" className="min-h-0 flex-1 overflow-y-auto">
+            <TabsContent value="cari">
               <div className="mx-auto max-w-md space-y-1.5 pt-1">
                 <p className="text-sm font-semibold text-center">{t('qc.blocks.cariBilgiler')}</p>
                 <CariRow label={t('qc.fields.siparisToplam')}>
@@ -578,7 +585,7 @@ export function QualityControlPage() {
             </TabsContent>
 
             {/* Muhasebe Geçmişi */}
-            <TabsContent value="muhasebe" className="min-h-0 flex-1 overflow-y-auto">
+            <TabsContent value="muhasebe">
               <div className="rounded border">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0 bg-muted/80">
@@ -610,7 +617,7 @@ export function QualityControlPage() {
             </TabsContent>
 
             {/* Müşteri */}
-            <TabsContent value="musteri" className="min-h-0 flex-1 overflow-y-auto">
+            <TabsContent value="musteri">
               <div className="grid grid-cols-3 gap-1.5">
                 <ROField label={t('qc.fields.isim')} value={d?.musteriAd} />
                 <ROField label={t('qc.fields.telefon')} value={d?.mTelefon} />
@@ -623,7 +630,7 @@ export function QualityControlPage() {
             </TabsContent>
 
             {/* Teslimat */}
-            <TabsContent value="teslimat" className="min-h-0 flex-1 overflow-y-auto">
+            <TabsContent value="teslimat">
               <div className="grid grid-cols-3 gap-1.5">
                 <ROField label={t('qc.fields.teslimAlanAdi')} value={d?.tTeslimAlanAdi} />
                 <ROField label={t('qc.fields.ilgiliKisi')} value={d?.tIlgiliKisi} />
@@ -649,7 +656,7 @@ export function QualityControlPage() {
             </TabsContent>
 
             {/* Satış Temsilcisi */}
-            <TabsContent value="temsilci" className="min-h-0 flex-1 overflow-y-auto">
+            <TabsContent value="temsilci">
               <div className="grid grid-cols-3 gap-1.5">
                 <ROField label={t('qc.fields.temsilciAdi')} value={d?.kullaniciAdi} />
                 <ROField label={t('qc.fields.telefon')} value={d?.sTelefon} />
@@ -662,11 +669,13 @@ export function QualityControlPage() {
               </div>
             </TabsContent>
 
-            {/* Detay — DetayTablo listesi + Ürün & Bileşen (dikey, iç scroll) */}
-            <TabsContent value="detay" className="min-h-0 flex-1 flex flex-col gap-2 overflow-hidden">
-              <div className="flex min-h-0 flex-1 flex-col">
+            {/* Detay — DetayTablo listesi + Ürün & Bileşen. PROMPT-v6 §2:
+                 en uzun sekme; sayfa 1920×1080'e sığsın diye YALNIZ bu
+                 sekmedeki iki liste max-h ile kendi içinde kayar. */}
+            <TabsContent value="detay" className="flex flex-col gap-2">
+              <div className="flex flex-col">
                 <p className="mb-1 text-xs font-semibold">{t('qc.blocks.detay')}</p>
-                <div className="min-h-0 flex-1 overflow-y-auto rounded border">
+                <div className="max-h-[16vh] overflow-y-auto rounded border">
                   {!d || d.details.length === 0 ? (
                     <p className="p-2 text-xs text-muted-foreground">{t('common.noData')}</p>
                   ) : (
@@ -678,9 +687,9 @@ export function QualityControlPage() {
                   )}
                 </div>
               </div>
-              <div className="flex min-h-0 flex-1 flex-col">
+              <div className="flex flex-col">
                 <p className="mb-1 text-xs font-semibold">{t('qc.blocks.urunBilesen')}</p>
-                <div className="min-h-0 flex-1 overflow-auto rounded border">
+                <div className="max-h-[20vh] overflow-auto rounded border">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-muted/80">
                       <tr>
@@ -717,7 +726,7 @@ export function QualityControlPage() {
         </div>
 
         {/* 3 — Kontrol (Sipariş No + Not + 2×3 aksiyon grid'i) */}
-        <div className="flex w-[300px] shrink-0 flex-col gap-1.5 overflow-hidden rounded-md border p-2">
+        <div className="flex w-[300px] shrink-0 flex-col gap-1.5 rounded-md border p-2">
           <p className="text-sm font-semibold text-center">{t('qc.title')}</p>
           <div className="space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.siparisNo')}</p>
@@ -725,9 +734,11 @@ export function QualityControlPage() {
               {selected || '—'}
             </div>
           </div>
-          <div className="flex min-h-0 flex-1 flex-col space-y-0.5">
+          <div className="flex flex-1 flex-col space-y-0.5">
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
-            <div className="min-h-[5rem] flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
+            {/* Sipariş notu serbest metin — yalnız bu kutu max-h ile sınırlı
+                 (alan-düzeyi sınır; §2'nin hedefi yarım görünen sekmelerdi). */}
+            <div className="min-h-[5rem] max-h-32 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
               {d?.siparisNotu || '—'}
             </div>
           </div>
@@ -752,44 +763,31 @@ export function QualityControlPage() {
             </Button>
           </div>
         </div>
+      </div>
 
-        {/* 4 — Fabrika (Aşama + Bitiş + Not + Kaydet) */}
-        <div className="flex w-[260px] shrink-0 flex-col gap-1.5 overflow-hidden rounded-md border p-2">
-          <p className="text-sm font-semibold text-center">{t('qc.blocks.fabrika')}</p>
-          <div className="space-y-0.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.asama')}</p>
-            <Select value={asama || undefined} onValueChange={setAsama}>
-              <SelectTrigger className="h-7 text-xs"><SelectValue placeholder={t('common.select')} /></SelectTrigger>
-              <SelectContent>
-                {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.bitis')}</p>
-            <Input className="h-7 text-xs" type="date" value={asamaTarih}
-              onChange={(e) => setAsamaTarih(e.target.value)} />
-          </div>
-          <div className="flex min-h-0 flex-1 flex-col space-y-0.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
-            <Textarea className="min-h-[4rem] flex-1 resize-none text-xs" value={asamaNot}
-              onChange={(e) => setAsamaNot(e.target.value)} />
-          </div>
-          <Button size="sm" className="h-7 shrink-0 text-xs"
-            disabled={stageMut.isPending} onClick={handleStageSave}>
-            {t('qc.actions.kaydet')}
-          </Button>
-        </div>
+      {/* ── Splitter (PROMPT-v6 §2) — sürükleyince grid yüksekliği değişir ── */}
+      <div
+        role="separator"
+        aria-orientation="horizontal"
+        className="mx-4 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded bg-border/60 hover:bg-border"
+        onPointerDown={startSplitterDrag}
+      >
+        <div className="h-0.5 w-10 rounded bg-muted-foreground/40" />
       </div>
 
       {/* ── Alt bölge: master grid (tam genişlik, iç scroll) ───────────── */}
-      <div className="min-h-0 flex-1 px-4 pb-2">
+      <div
+        ref={gridRef}
+        className={cn('min-h-[120px] px-4 pb-2', gridH === null && 'flex-1 min-h-0')}
+        style={gridH !== null ? { height: gridH, flex: 'none' } : undefined}
+      >
         <div className="h-full overflow-auto rounded-md">
           <DataTable
             columns={columns}
             data={rows}
             keyField="siparisNo"
             loading={loading}
+            density="compact"
             onRowClick={(r) => setSelected(r.siparisNo)}
             rowClassName={(r) => cn(
               selected === r.siparisNo && 'outline outline-2 -outline-offset-2 outline-primary',

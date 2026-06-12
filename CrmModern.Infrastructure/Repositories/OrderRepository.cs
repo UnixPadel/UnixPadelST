@@ -100,6 +100,9 @@ internal sealed class OrderRepository(AppDbContext context)
             .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "Uretim")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.SiparisMiTeklifMi, "Hazir")
+                // PROMPT-v6 §1.1 — Hazir'a geçen sipariş Burcu'nun lojistik onay
+                // kuyruğuna düşer; o onaylayana dek lojistik ready-listte görünmez.
+                .SetProperty(o => o.LojistikOnay, "Bekliyor")
                 .SetProperty(o => o.STarih, (DateTime?)DateTime.Now));
 
     // ── Logistics ─────────────────────────────────────────────────────────────

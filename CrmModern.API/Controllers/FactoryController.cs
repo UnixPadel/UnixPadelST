@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Factory;
 using CrmModern.Core.DTOs.Order;
@@ -12,6 +13,14 @@ namespace CrmModern.API.Controllers;
 [Authorize]
 public sealed class FactoryController(IFactoryService factoryService, IOrderService orderService) : ControllerBase
 {
+    // PROMPT-v6 §1.1 — Fabrika aşama geçişleri (Üretime Al / Hazır) yalnız bu
+    // kullanıcı adına açık (elshan kalıbı: kullanıcı adı gate, rol değil).
+    // Diğer Fabrika kullanıcıları listeyi görmeye devam eder.
+    private const string FactoryUser = "simge.cakir";
+
+    private bool IsFactoryUser =>
+        User.FindFirstValue(ClaimTypes.Name) == FactoryUser;
+
     /// <summary>
     /// Returns orders in production stages (Planlama/Uretim/Hazir/Lojistik/Tamamlandi).
     /// Maps to the Fabrika form DataGrid.
@@ -39,6 +48,7 @@ public sealed class FactoryController(IFactoryService factoryService, IOrderServ
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> MoveToProduction(string siparisNo, [FromBody] MoveToProductionDto dto)
     {
+        if (!IsFactoryUser) return Forbid();
         await factoryService.MoveToProductionAsync(siparisNo, dto.STarih, dto.FabrikaNot);
         return Ok(ApiResponse<object>.Ok(null!, "Üretime alındı."));
     }
@@ -53,6 +63,7 @@ public sealed class FactoryController(IFactoryService factoryService, IOrderServ
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     public async Task<IActionResult> MarkReady(string siparisNo)
     {
+        if (!IsFactoryUser) return Forbid();
         await factoryService.MarkAsReadyAsync(siparisNo);
         return Ok(ApiResponse<object>.Ok(null!, "Hazır aşamasına alındı."));
     }

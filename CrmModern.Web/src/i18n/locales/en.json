@@ -93,6 +93,7 @@
     "logisticsHistory": "Logistics · History",
     "logisticsCarriers": "Logistics · Carriers",
     "accounting": "Accounting · Collections",
+    "accountingApproval": "Accounting · Approval",
     "accountingLogisticsApprovals": "Accounting · Logistics Approvals",
     "accountingHistory": "Accounting · History",
     "accountingBalance": "Accounting · Balance",
@@ -168,6 +169,7 @@
       "logistics": "Shipment and delivery tracking",
       "logisticsHistory": "Shipment history",
       "accounting": "Payments and account operations",
+      "accountingApproval": "Cari and logistics approval queues",
       "accountingHistory": "Collection and transaction history",
       "purchase": "Purchase requests",
       "createOrderQuote": "Create a new order or quote",
@@ -229,6 +231,9 @@
       "indirim": "Discount %",
       "kdv": "VAT %",
       "pesin": "Deposit %",
+      "odemeSekli": "Payment Method",
+      "odemePesin": "Upfront",
+      "odemeVadeli": "Installments",
       "siparisNotu": "Order Note",
       "kategori": "Category",
       "kategoriSec": "Select category",
@@ -278,8 +283,6 @@
     "emptyHint": "Select an order from the table above to see its details.",
     "cariUpdated": "Balance updated.",
     "invalidPaidAmount": "Enter a valid paid amount.",
-    "stageSaved": "Order updated successfully!",
-    "stageRequired": "Stage cannot be empty.",
     "attachmentNotFound": "Attachment not found.",
     "filter": {
       "siparisNo": "Order No",
@@ -327,7 +330,6 @@
       "detay": "Details",
       "cariBilgiler": "Account Info",
       "kontrolDurumu": "Control Status",
-      "fabrika": "Factory",
       "urunBilesen": "Product & Components",
       "muhasebeGecmisi": "Accounting History"
     },
@@ -358,9 +360,7 @@
       "siparisBakiye": "Order Balance",
       "odenenBakiye": "Paid Balance",
       "siparisNo": "Order No",
-      "not": "Note",
-      "asama": "Stage",
-      "bitis": "End"
+      "not": "Note"
     },
     "actions": {
       "onayla": "Approve",
@@ -370,8 +370,7 @@
       "excelYaz": "Export Excel",
       "formGetir": "Open Form",
       "saticiEk": "Seller Attachment",
-      "muhasebeEk": "Accounting Attachment",
-      "kaydet": "Save"
+      "muhasebeEk": "Accounting Attachment"
     },
     "items": {
       "kategori": "Category",
@@ -454,15 +453,50 @@
       "lastStatus": "Last request status"
     },
     "actions": {
-      "talepGonder": "Submit Request",
-      "muhasebeOnayla": "Approve & Move to Planning"
-    },
-    "disabled": {
-      "approve": "Order must be in 'Siparis' stage with Kontrol='Onay'."
+      "talepGonder": "Submit Request"
     },
     "toast": {
-      "maliyetSent": "Accounting request submitted (Pending Approval).",
-      "approved": "Accounting approved — order moved to Planning."
+      "maliyetSent": "Accounting request submitted (Pending Approval)."
+    }
+  },
+  "accApproval": {
+    "title": "Accounting · Approval",
+    "queueCounts": "Cari: {{cari}} · Logistics: {{lojistik}} pending",
+    "selectFirst": "Please select an order.",
+    "views": {
+      "cariQueue": "Pending Cari Approval",
+      "lojistikQueue": "Pending Logistics Approval",
+      "hepsi": "All",
+      "beklenen": "Pending",
+      "onaylanan": "Paid"
+    },
+    "grid": {
+      "kuyruk": "Queue"
+    },
+    "queueBadge": {
+      "cari": "Awaiting Cari Approval",
+      "lojistik": "Awaiting Logistics Approval"
+    },
+    "blocks": {
+      "ozet": "Summary"
+    },
+    "fields": {
+      "teslimatCesiti": "Delivery Type",
+      "kapora": "Deposit",
+      "brutKapora": "Gross Deposit",
+      "siparisNotu": "Order Note",
+      "dosya": "File (PDF/ZIP/JPG…)"
+    },
+    "actions": {
+      "cariOnayla": "Approve Cari",
+      "lojistikOnayla": "Approve Logistics"
+    },
+    "disabled": {
+      "cari": "Order must be in 'Siparis' stage with Kontrol='Onay'."
+    },
+    "toast": {
+      "cariApproved": "Cari approved — order moved to Planning.",
+      "logisticsApproved": "Logistics approved — order released to shipment queue."
     }
   },
   "accounting": {
@@ -485,7 +519,17 @@
   "logistics": {
     "readyTitle": "Logistics · Ready",
     "historyTitle": "Logistics · History",
-    "carriersTitle": "Logistics · Carriers"
+    "carriersTitle": "Logistics · Carriers",
+    "payment": {
+      "col": "Payment",
+      "pesin": "Upfront",
+      "vadeli": "Installments ({{pesinYuzde}}% upfront)"
+    },
+    "carrier": {
+      "select": "Select carrier",
+      "other": "Other",
+      "otherPlaceholder": "Type carrier name"
+    }
   },
   "factory": {
     "title": "Factory / Production",

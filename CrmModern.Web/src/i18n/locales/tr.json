@@ -93,6 +93,7 @@
     "logisticsHistory": "Lojistik · Geçmiş",
     "logisticsCarriers": "Lojistik · Taşıyıcılar",
     "accounting": "Muhasebe · Tahsilat",
+    "accountingApproval": "Muhasebe · Onay",
     "accountingLogisticsApprovals": "Muhasebe · Lojistik Onayları",
     "accountingHistory": "Muhasebe · Geçmiş",
     "accountingBalance": "Muhasebe · Bakiye",
@@ -168,6 +169,7 @@
       "logistics": "Sevkiyat ve teslimat takibi",
       "logisticsHistory": "Sevkiyat geçmişi",
       "accounting": "Ödeme ve hesap işlemleri",
+      "accountingApproval": "Cari ve lojistik onay kuyrukları",
       "accountingHistory": "Tahsilat ve işlem geçmişi",
       "purchase": "Satın alma talepleri",
       "createOrderQuote": "Yeni sipariş veya teklif oluştur",
@@ -229,6 +231,9 @@
       "indirim": "İndirim %",
       "kdv": "KDV %",
       "pesin": "Peşin %",
+      "odemeSekli": "Ödeme Şekli",
+      "odemePesin": "Peşin",
+      "odemeVadeli": "Vadeli",
       "siparisNotu": "Sipariş Notu",
       "kategori": "Kategori",
       "kategoriSec": "Kategori seç",
@@ -278,8 +283,6 @@
     "emptyHint": "Detayları görmek için yukarıdaki tablodan bir sipariş seçin.",
     "cariUpdated": "Cari güncellendi.",
     "invalidPaidAmount": "Geçerli bir ödenen bakiye girin.",
-    "stageSaved": "Sipariş başarıyla güncellendi!",
-    "stageRequired": "Aşama boş olamaz.",
     "attachmentNotFound": "Ek dosya bulunamadı.",
     "filter": {
       "siparisNo": "Sipariş No",
@@ -327,7 +330,6 @@
       "detay": "Detay",
       "cariBilgiler": "Cari Bilgiler",
       "kontrolDurumu": "Kontrol Durumu",
-      "fabrika": "Fabrika",
       "urunBilesen": "Ürün & Bileşen",
       "muhasebeGecmisi": "Muhasebe Geçmişi"
     },
@@ -358,9 +360,7 @@
       "siparisBakiye": "Sipariş Bakiye",
       "odenenBakiye": "Ödenen Bakiye",
       "siparisNo": "Sipariş No",
-      "not": "Not",
-      "asama": "Aşama",
-      "bitis": "Bitiş"
+      "not": "Not"
     },
     "actions": {
       "onayla": "Onayla",
@@ -370,8 +370,7 @@
       "excelYaz": "Excel'e Yaz",
       "formGetir": "Form'u getir",
       "saticiEk": "Satıcı Ek",
-      "muhasebeEk": "Muhasebe Ek",
-      "kaydet": "Kaydet"
+      "muhasebeEk": "Muhasebe Ek"
     },
     "items": {
       "kategori": "Kategori",
@@ -454,15 +453,50 @@
       "lastStatus": "Son talep durumu"
     },
     "actions": {
-      "talepGonder": "Talep Gönder",
-      "muhasebeOnayla": "Muhasebe Onayla"
-    },
-    "disabled": {
-      "approve": "Sipariş 'Siparis' aşamasında ve Kontrol='Onay' olmalı."
+      "talepGonder": "Talep Gönder"
     },
     "toast": {
-      "maliyetSent": "Muhasebe talebi gönderildi (Onay Bekliyor).",
-      "approved": "Muhasebe onayı verildi — sipariş Planlama aşamasında."
+      "maliyetSent": "Muhasebe talebi gönderildi (Onay Bekliyor)."
+    }
+  },
+  "accApproval": {
+    "title": "Muhasebe · Onay",
+    "queueCounts": "Cari: {{cari}} · Lojistik: {{lojistik}} bekleyen",
+    "selectFirst": "Lütfen sipariş seçiniz.",
+    "views": {
+      "cariQueue": "Cari Onay Bekleyen",
+      "lojistikQueue": "Lojistik Onay Bekleyen",
+      "hepsi": "Hepsi",
+      "beklenen": "Beklenen",
+      "onaylanan": "Onaylanan"
+    },
+    "grid": {
+      "kuyruk": "Kuyruk"
+    },
+    "queueBadge": {
+      "cari": "Cari Onay Bekliyor",
+      "lojistik": "Lojistik Onay Bekliyor"
+    },
+    "blocks": {
+      "ozet": "Özet"
+    },
+    "fields": {
+      "teslimatCesiti": "Teslimat Çeşiti",
+      "kapora": "Kapora",
+      "brutKapora": "Brüt Kapora",
+      "siparisNotu": "Sipariş Notu",
+      "dosya": "Dosya (PDF/ZIP/JPG…)"
+    },
+    "actions": {
+      "cariOnayla": "Cari Onayla",
+      "lojistikOnayla": "Lojistik Onayla"
+    },
+    "disabled": {
+      "cari": "Sipariş 'Siparis' aşamasında ve Kontrol='Onay' olmalı."
+    },
+    "toast": {
+      "cariApproved": "Cari onay verildi — sipariş Planlama aşamasında.",
+      "logisticsApproved": "Lojistik onay verildi — sipariş sevkiyat kuyruğunda."
     }
   },
   "accounting": {
@@ -485,7 +519,17 @@
   "logistics": {
     "readyTitle": "Lojistik · Hazır",
     "historyTitle": "Lojistik · Geçmiş",
-    "carriersTitle": "Lojistik · Taşıyıcılar"
+    "carriersTitle": "Lojistik · Taşıyıcılar",
+    "payment": {
+      "col": "Ödeme",
+      "pesin": "Peşin",
+      "vadeli": "Vadeli (%{{pesinYuzde}} peşin)"
+    },
+    "carrier": {
+      "select": "Firma seç",
+      "other": "Diğer",
+      "otherPlaceholder": "Firma adı yazın"
+    }
   },
   "factory": {
     "title": "Fabrika / Üretim",

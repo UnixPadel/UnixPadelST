@@ -26,8 +26,9 @@ internal sealed class QualityControlService(IUnitOfWork uow, IOrderService order
         orderService.GetApprovalHistoryAsync(siparisNo);
 
     public Task ApproveAsync(string siparisNo, int currentUserId, string? kontrolNot) =>
-        // PROMPT-v4 §5.1 — guard'lar (Kontrol<>'Onay', aşama Teklif/Siparis) ve
-        // 'Planlama'ya geçiş OrderService.ApproveOrderAsync içinde tek noktada.
+        // Guard'lar (Kontrol<>'Onay', aşama Teklif/Siparis) OrderService
+        // .ApproveOrderAsync içinde tek noktada. PROMPT-v6 §1.1: onay yalnız
+        // Kontrol='Onay' yazar — aşama değişmez (v4 §5.1 sapması kalktı).
         orderService.ApproveOrderAsync(siparisNo, currentUserId, kontrolNot);
 
     public Task RejectAsync(string siparisNo, int currentUserId, string red)

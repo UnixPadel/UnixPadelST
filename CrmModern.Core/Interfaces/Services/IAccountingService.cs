@@ -44,9 +44,16 @@ public interface IAccountingService
     Task SubmitMaliyetTalepAsync(string siparisNo, SubmitMaliyetTalepDto dto, string currentUserName);
 
     /// <summary>
-    /// Muhasebe ekranı "Muhasebe Onayla" butonu: SiparisAlTablo durumunu
-    /// 'Siparis' → 'Planlama' yap ve Muhasebe=1 set et. Yalnız Kontrol='Onay'
-    /// olanlar geçer; aksi halde BusinessException.
+    /// PROMPT-v6 §1 — Burcu ekranı "Cari Onayla" butonu: SiparisAlTablo durumunu
+    /// 'Siparis' → 'Planlama' yap. Yalnız Kontrol='Onay' olanlar geçer; aksi
+    /// halde BusinessException. SiparisOnaylari'na 'MuhasebeOnaylandi' audit yazar.
     /// </summary>
-    Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo);
+    Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo, int currentUserId);
+
+    /// <summary>
+    /// PROMPT-v6 §1 — Burcu ekranı "Lojistik Onayla" butonu: Hazir +
+    /// LojistikOnay='Bekliyor' → 'Onay'. SiparisOnaylari'na 'LojistikOnaylandi'
+    /// audit yazar. Zaten 'Onay'/NULL ise idempotent no-op.
+    /// </summary>
+    Task ApproveLogisticsAsync(string siparisNo, int currentUserId);
 }

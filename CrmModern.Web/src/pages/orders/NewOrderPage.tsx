@@ -32,6 +32,51 @@ const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk'] as const
 // PROMPT-v3 §4.1: legacy teslimatCesiti1 combobox seçenekleri — sıra birebir.
 const INCOTERMS = ['EXW', 'FCA', 'CPT', 'CIP', 'DAT', 'DAP', 'DDP', 'FAS', 'FOB', 'MCFR', 'CIF', 'CFR', 'CNF'] as const
 
+// ── PROMPT-v6 §5 — otomatik Detay satırları ─────────────────────────────────
+// Metinler VERİ olarak Türkçe kaydedilir (i18n'e girmez). Prefix'ler otomatik
+// satırı tanımanın anahtarı — idempotent upsert bu prefix'lerle çalışır.
+const DETAY_PREFIX_TESLIMAT = 'Teslimat Şekli:'
+const DETAY_PREFIX_ODEME    = 'Ödeme Şekli:'
+// Haklar-saklıdır metni — kesin ifade tek sabitte, kolay değiştirilebilir.
+const SART_HAKLAR = 'Bu belgedeki fiyat ve bilgiler üzerindeki tüm haklar saklıdır.'
+// Montaj şartı — Montaj checkbox'ı işaretlenince silinir, kaldırılınca döner.
+const SART_MONTAJ = 'Fiyatlara montaj dahil değildir.'
+// Yeni boş formda seed edilen standart şartlar (sıra korunur).
+const STANDART_SARTLAR: readonly string[] = [
+  'Fiyatlar 2 hafta geçerlidir.',
+  'Fiyatlara KDV dahil değildir.',
+  'Fiyatlara nakliye dahil değildir.',
+  SART_MONTAJ,
+  SART_HAKLAR,
+]
+
+/**
+ * Prefix'le tanınan otomatik satırı idempotent günceller: varsa yerinde
+ * değiştirir (çoğaltmaz), yoksa sona ekler, line=null ise siler. Kullanıcının
+ * elle yazdığı satırlara dokunmaz.
+ */
+function upsertDetail(details: string[], prefix: string, line: string | null): string[] {
+  const idx = details.findIndex((s) => s.startsWith(prefix))
+  if (line === null) return idx >= 0 ? details.filter((_, i) => i !== idx) : details
+  if (idx >= 0) return details.map((s, i) => (i === idx ? line : s))
+  return [...details, line]
+}
+
+/** Ödeme Şekli satırı: 'Peşin' | 'Vadeli — %x peşin' (pesinYuzde boşsa yalnız 'Vadeli'). */
+function odemeSekliLine(sekli: 'Pesin' | 'Vadeli', pesinYuzde: number | null): string {
+  if (sekli === 'Pesin') return `${DETAY_PREFIX_ODEME} Peşin`
+  return pesinYuzde != null
+    ? `${DETAY_PREFIX_ODEME} Vadeli — %${pesinYuzde} peşin`
+    : `${DETAY_PREFIX_ODEME} Vadeli`
+}
+
+/** Revize/Formu Getir hidrasyonunda Ödeme Şekli kontrolünü mevcut satırdan kur. */
+function parseOdemeSekli(details: string[]): '' | 'Pesin' | 'Vadeli' {
+  const line = details.find((s) => s.startsWith(DETAY_PREFIX_ODEME))
+  if (!line) return ''
+  return line.includes('Vadeli') ? 'Vadeli' : 'Pesin'
+}
+
 /** Currency symbol for any selected paraTipi (Euro/Dolar/TL/Sterlin). */
 function currencySymbol(paraTipi: string): string {
   switch (paraTipi) {
@@ -56,7 +101,9 @@ const blank = (): CreateOrderDto => ({
   // PROMPT-v2 §3: İndirim/KDV/Peşin başlangıçta boş — "henüz karar vermedi"
   // semantiği. Backend null → 0 coercion'ını total hesaplamada uygular.
   paraTipi: 'Euro', indirim: null, kdv: null, pesinYuzde: null,
-  sets: [], details: [], sirket: 'Unixpadel',
+  // PROMPT-v6 §5 — yeni boş form standart şartlarla seed'li gelir.
+  // Revize/Formu Getir modunda detailToForm() bunları kaynağın içeriğiyle ezer.
+  sets: [], details: [...STANDART_SARTLAR], sirket: 'Unixpadel',
 })
 
 /**
@@ -206,6 +253,9 @@ export function NewOrderPage() {
   const [form, setForm] = useState<CreateOrderDto>(blank())
   const [createdNo, setCreatedNo] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  // PROMPT-v6 §5 — Ödeme Şekli kontrolü; bilgi backend'e ayrı kolon olarak
+  // değil, Detaylar satırı ('Ödeme Şekli: …') olarak persist olur.
+  const [odemeSekli, setOdemeSekli] = useState<'' | 'Pesin' | 'Vadeli'>('')
 
   // Sipariş 1..5 tab state (per-tab "Tekil Fiyat × Adet" before "Çarp").
   const [setTabs, setSetTabs] = useState<SetTabState[]>(
@@ -225,6 +275,9 @@ export function NewOrderPage() {
   useEffect(() => {
     if (!reviseSource) return
     setForm(detailToForm(reviseSource))
+    // PROMPT-v6 §5 — revize modunda seed YOK; Ödeme Şekli kontrolü kaynaktaki
+    // mevcut satırdan kurulur ki pesinYuzde değişiklikleri senkron kalsın.
+    setOdemeSekli(parseOdemeSekli(reviseSource.details ?? []))
   }, [reviseSource])
 
   // ── Data sources ───────────────────────────────────────────────────────
@@ -459,7 +512,13 @@ export function NewOrderPage() {
    * "Fabrika" adlı kayıtlı teslimat adresi auto-seçilir + teslimatFiyat = 0.
    */
   const onTeslimatCesitiChange = (v: string) => {
-    setForm((f) => ({ ...f, teslimatCesiti: v }))
+    // PROMPT-v6 §5 — Detaylar'a 'Teslimat Şekli: {INCOTERM}' satırı düşer;
+    // seçim değişirse satır yerinde güncellenir, temizlenirse silinir.
+    setForm((f) => ({
+      ...f,
+      teslimatCesiti: v,
+      details: upsertDetail(f.details, DETAY_PREFIX_TESLIMAT, v ? `${DETAY_PREFIX_TESLIMAT} ${v}` : null),
+    }))
     if (v !== 'EXW') return
     const fabrika = (deliveryAddrs as any[]).find((d) => (d.teslimAlanAdi ?? d.TeslimAlanAdi) === 'Fabrika')
     if (!fabrika) {
@@ -575,6 +634,8 @@ export function NewOrderPage() {
 
       setSetTabs(tabs)
       setForm({ ...detailToForm(d), sets })
+      // PROMPT-v6 §5 — teklif-yükleme modunda seed YOK; kontrol satırdan kurulur.
+      setOdemeSekli(parseOdemeSekli(d.details ?? []))
       setCreatedNo(null)
       setGetirOpen(false)
       toast({ title: 'Form yüklendi', description: `${no} → yeni kayıt olarak düzenlenebilir` })
@@ -988,7 +1049,15 @@ export function NewOrderPage() {
                     <Input readOnly disabled value={fmt(toplamFiyat)} />
                   </Field>
                   <Field label="Peşin" suffix="%">
-                    <DecimalInput value={form.pesinYuzde ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, pesinYuzde: v === '' ? null : v }))} />
+                    <DecimalInput value={form.pesinYuzde ?? ''} onValueChange={(v) => setForm((f) => {
+                      const pesinYuzde = v === '' ? null : v
+                      // PROMPT-v6 §5 — Vadeli seçiliyken Ödeme Şekli satırı
+                      // pesinYuzde ile senkron güncellenir.
+                      const details = odemeSekli === 'Vadeli'
+                        ? upsertDetail(f.details, DETAY_PREFIX_ODEME, odemeSekliLine('Vadeli', pesinYuzde))
+                        : f.details
+                      return { ...f, pesinYuzde, details }
+                    })} />
                   </Field>
 
                   <Field label="Kapora Miktarı" prefix={sym}>
@@ -998,6 +1067,24 @@ export function NewOrderPage() {
                     <Select value={form.sirket} onValueChange={(v) => setForm((f) => ({ ...f, sirket: v }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>{SIRKETLER.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </Field>
+
+                  {/* PROMPT-v6 §5 — Ödeme Şekli: seçim Detaylar'a tek satır düşer. */}
+                  <Field label={t('orders.form.odemeSekli')}>
+                    <Select value={odemeSekli || undefined} onValueChange={(v) => {
+                      const sekli = v as 'Pesin' | 'Vadeli'
+                      setOdemeSekli(sekli)
+                      setForm((f) => ({
+                        ...f,
+                        details: upsertDetail(f.details, DETAY_PREFIX_ODEME, odemeSekliLine(sekli, f.pesinYuzde)),
+                      }))
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Pesin">{t('orders.form.odemePesin')}</SelectItem>
+                        <SelectItem value="Vadeli">{t('orders.form.odemeVadeli')}</SelectItem>
+                      </SelectContent>
                     </Select>
                   </Field>
                 </div>
@@ -1013,7 +1100,18 @@ export function NewOrderPage() {
                     <input
                       type="checkbox"
                       checked={form.montajVar}
-                      onChange={(e) => setForm((f) => ({ ...f, montajVar: e.target.checked }))}
+                      onChange={(e) => {
+                        // PROMPT-v6 §5 — montaj şartı satırı: işaretlenince
+                        // silinir, kaldırılınca (yoksa) geri gelir.
+                        const montajVar = e.target.checked
+                        setForm((f) => ({
+                          ...f,
+                          montajVar,
+                          details: montajVar
+                            ? f.details.filter((s) => s !== SART_MONTAJ)
+                            : (f.details.includes(SART_MONTAJ) ? f.details : [...f.details, SART_MONTAJ]),
+                        }))
+                      }}
                     />
                     Montaj
                   </label>

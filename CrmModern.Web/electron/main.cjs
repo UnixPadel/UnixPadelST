@@ -62,6 +62,9 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
+    // PROMPT-v6 §6 — layout'un altına inilemesin (tablolar kaymasın).
+    minWidth: 1280,
+    minHeight: 720,
     title: 'UnixPadelST',
     autoHideMenuBar: true,
     webPreferences: {

@@ -60,7 +60,9 @@ export function Layout() {
             <LanguageSwitcher />
           </div>
         </header>
-        <main className="flex-1 overflow-auto">
+        {/* PROMPT-v6 §6 — sayfa düzeyinde yatay scrollbar üretilmez; geniş
+             tablolar kendi sarmalayıcılarında (overflow-x-auto) kayar. */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden">
           <Suspense fallback={<PageLoader />}>
             <Outlet />
           </Suspense>

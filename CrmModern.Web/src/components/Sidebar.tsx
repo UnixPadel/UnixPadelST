@@ -35,6 +35,8 @@ const navItems: NavItem[] = [
   { path: '/logistics/history',   i18nKey: 'nav.logisticsHistory',   icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
   { path: '/logistics/carriers',  i18nKey: 'nav.logisticsCarriers',  icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
   { path: '/accounting',         i18nKey: 'nav.accounting',                       icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },
+  // PROMPT-v6 §1 — Burcu onay ekranı yalnız burcu.karaman (kullanıcı adı bazlı; rol yok).
+  { path: '/accounting/approval', i18nKey: 'nav.accountingApproval',              icon: <CheckSquare className="h-4 w-4" />, usernames: ['burcu.karaman'] },
   { path: '/accounting/logistics-approvals', i18nKey: 'nav.accountingLogisticsApprovals', icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'], usernames: ['elshan.rasulov'] },
   { path: '/accounting/history', i18nKey: 'nav.accountingHistory',                icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe', 'Gozlemci'] },
   { path: '/accounting/balance', i18nKey: 'nav.accountingBalance',                icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },

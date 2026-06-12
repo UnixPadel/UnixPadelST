@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
-import { formatDate, formatCurrency } from '@/lib/utils'
+import { formatDateShort, formatCurrency } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import type { SearchResultDto } from '@/types'
 
@@ -68,7 +68,8 @@ export function SearchPage() {
     { key: 'odemeDurum',        header: t('common.status'),     render: (r) => r.odemeDurum ? <StatusBadge value={r.odemeDurum as string} /> : '—' },
     { key: 'siparisMiTeklifMi', header: t('common.stage'),      sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
     { key: 'kontrol',           header: t('common.control'),    render: (r) => <StatusBadge value={r.kontrol as string} /> },
-    { key: 'tarih',             header: t('common.date'),       sortable: true, render: (r) => formatDate((r.tarih as string) ?? '-') },
+    // §6 — yoğun grid: kısa tarih (dd.MM.yy)
+    { key: 'tarih',             header: t('common.date'),       sortable: true, render: (r) => formatDateShort((r.tarih as string) ?? '-') },
     { key: 'sirket',            header: t('orders.form.sirket') },
   ]
 
@@ -133,6 +134,7 @@ export function SearchPage() {
               data={data as (SearchResultDto & Record<string, unknown>)[]}
               keyField="siparisNo"
               loading={isLoading}
+              density="compact"
             />
           </div>
         )}

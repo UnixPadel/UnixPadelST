@@ -53,7 +53,9 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 Tarih:            o.Tarih,
                 // PROMPT-v2 §10.2: Maliyet Reçetesi math için.
                 Indirim:          o.Indirim,
-                Kdv:              o.Kdv));
+                Kdv:              o.Kdv,
+                // PROMPT-v6 §1 — Burcu kuyruk seçicisi.
+                LojistikOnay:     o.LojistikOnay));
         }
 
         return result.AsReadOnly();
@@ -96,7 +98,9 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             Tarih:            o.Tarih,
             // PROMPT-v2 §10.2: Maliyet Reçetesi math için.
             Indirim:          o.Indirim,
-            Kdv:              o.Kdv);
+            Kdv:              o.Kdv,
+            // PROMPT-v6 §1 — Burcu kuyruk seçicisi.
+            LojistikOnay:     o.LojistikOnay);
     }
 
     public async Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(string siparisNo)
@@ -379,7 +383,7 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         await uow.SaveChangesAsync();
     }
 
-    public async Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo)
+    public async Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo, int currentUserId)
     {
         var no = NormalizeNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
@@ -390,8 +394,7 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             throw new BusinessException(
                 "Sipariş henüz Kontrol onayı almamış. Önce Kontrol aşamasında onaylanmalı.");
 
-        // PROMPT-v4 §5.1 — QC onayı artık doğrudan Planlama'ya indirir; bu buton
-        // zaten-Planlama kayıtlarda zararsız kalmalı (idempotent no-op).
+        // İdempotent no-op: zaten Planlama'daysa ikinci tık zararsız.
         if (order.SiparisMiTeklifMi == "Planlama")
             return;
 
@@ -407,6 +410,43 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         // ikinci basışta state aynı kalır.
         order.SiparisMiTeklifMi = "Planlama";
         uow.Orders.Update(order);
+
+        // PROMPT-v6 §1.1 — Burcu Cari onayı SiparisOnaylari'na audit yazar.
+        await uow.OrderApprovals.UpsertAsync(
+            order.SiparisNo, currentUserId, "MuhasebeOnaylandi",
+            "Cari onay — sipariş Planlama aşamasına alındı.");
+
+        await uow.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// PROMPT-v6 §1.1 — Burcu lojistik onayı: Hazir + LojistikOnay='Bekliyor'
+    /// siparişi 'Onay' yapar; sipariş lojistik ready-listte belirir.
+    /// </summary>
+    public async Task ApproveLogisticsAsync(string siparisNo, int currentUserId)
+    {
+        var no = NormalizeNo(siparisNo);
+        var order = await uow.Orders.GetByNoAsync(no)
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        if (order.SiparisMiTeklifMi != "Hazir")
+            throw new BusinessException(
+                $"Sipariş '{order.SiparisMiTeklifMi}' aşamasında. " +
+                "Lojistik onayı yalnız 'Hazir' aşamasındaki kayıtlara uygulanır.");
+
+        // İdempotent no-op: zaten onaylıysa (veya NULL = gate'siz eski kayıt)
+        // ikinci tık zararsız.
+        if (order.LojistikOnay is null or "Onay")
+            return;
+
+        order.LojistikOnay = "Onay";
+        uow.Orders.Update(order);
+
+        // PROMPT-v6 §1.1 — Burcu lojistik onayı SiparisOnaylari'na audit yazar.
+        await uow.OrderApprovals.UpsertAsync(
+            order.SiparisNo, currentUserId, "LojistikOnaylandi",
+            "Lojistik onay — sipariş sevkiyat kuyruğuna açıldı.");
+
         await uow.SaveChangesAsync();
     }
 

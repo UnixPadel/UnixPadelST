@@ -4,10 +4,11 @@ import { useTranslation } from 'react-i18next'
 import {
   getAccountingOrders, addTransaction, uploadMuhasebeEk, downloadAccountingExcel,
   getTransactionsForOrder,
-  submitMaliyetTalep, approveMuhasebeAndMoveToPlanning,
+  submitMaliyetTalep,
   type SubmitMaliyetRequest,
 } from '@/api/accounting'
 import { getOrderDetail } from '@/api/orders'
+import { getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -19,7 +20,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MuhasebeRowDetailDialog } from '@/components/MuhasebeRowDetailDialog'
-import { formatDate, formatCurrency, cn } from '@/lib/utils'
+import { formatDate, formatDateShort, formatCurrency, formatPhone, cn } from '@/lib/utils'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { useToast } from '@/components/ToastProvider'
 import { describeApiError } from '@/lib/axios'
@@ -76,6 +77,9 @@ export function AccountingPage() {
     queryKey: ['accounting-orders'],
     queryFn: getAccountingOrders,
   })
+
+  // PROMPT-v6 §3 — telefon prefix'i için ülke lookup'ı (Ulkeler.NumaraBirimi).
+  const { data: ulkeler = [] } = useQuery({ queryKey: ['ulkeler'], queryFn: getUlkeler })
 
   // Top-form source: full OrderDetail for the selected SiparisNo.
   const { data: orderDetail, isLoading: detailLoading } = useQuery({
@@ -152,23 +156,8 @@ export function AccountingPage() {
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
 
-  const approveMut = useMutation({
-    mutationFn: () => approveMuhasebeAndMoveToPlanning(selectedNo!),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
-      // PROMPT-v5 §3 — Planlama'ya geçiş Siparişlerim'e canlı yansısın.
-      qc.invalidateQueries({ queryKey: ['my-orders'] })
-      setSelectedNo(null)
-      toast({ title: t('accountingFull.toast.approved') })
-    },
-    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
-  })
-
-  // Muhasebe Onayla gate — legacy 2229-2245.
-  const canApproveMuhasebe =
-    !!selectedRow &&
-    selectedRow.kontrol === 'Onay' &&
-    selectedRow.siparisMiTeklifMi === 'Siparis'
+  // PROMPT-v6 §1 — "Muhasebe Onayla" butonu kaldırıldı: Cari onay gate'i artık
+  // Burcu ekranında (/accounting/approval, yalnız burcu.karaman) yaşıyor.
 
   // ── Bottom grid columns (full legacy set) ─────────────────────────────
   const filtered = orders.filter((o) => {
@@ -207,8 +196,9 @@ export function AccountingPage() {
       render: (r) => r.odemeDurum ? <StatusBadge value={r.odemeDurum as string} /> : '—' },
     { key: 'muhasebeDurumu',header: t('accountingFull.cols.muhasebeDurum'),
       render: (r) => (r.muhasebeDurumu as string) ?? '—' },
+    // §6 — 17 kolonlu yoğun grid: kısa tarih (dd.MM.yy)
     { key: 'tarih',         header: t('common.date'),
-      render: (r) => formatDate((r.tarih as string) ?? '-') },
+      render: (r) => formatDateShort((r.tarih as string) ?? '-') },
     {
       key: 'actions', header: t('common.actions'),
       render: (r) => (
@@ -245,14 +235,6 @@ export function AccountingPage() {
                 {detailLoading && <span className="ml-2 text-xs text-muted-foreground">({t('common.loading')})</span>}
               </div>
               <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  disabled={!canApproveMuhasebe || approveMut.isPending}
-                  title={canApproveMuhasebe ? undefined : t('accountingFull.disabled.approve')}
-                  onClick={() => approveMut.mutate()}
-                >
-                  {t('accountingFull.actions.muhasebeOnayla')}
-                </Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelectedNo(null)}>
                   {t('common.close')} ✕
                 </Button>
@@ -277,7 +259,8 @@ export function AccountingPage() {
               <TabsContent value="musteri" className="mt-4">
                 <KeyValueGrid pairs={[
                   ['Müşteri Adı',  orderDetail?.musteriAd],
-                  ['Telefon',      orderDetail?.mTelefon],
+                  // PROMPT-v6 §3 — ülke koduyla prefix'li gösterim
+                  ['Telefon',      formatPhone(orderDetail?.mUlke, orderDetail?.mTelefon, ulkeler)],
                   ['E-posta',      orderDetail?.mMail],
                   ['Ülke',         orderDetail?.mUlke],
                   ['VAT',          orderDetail?.mVATNumarasi],
@@ -291,8 +274,9 @@ export function AccountingPage() {
                 <KeyValueGrid pairs={[
                   ['Teslim Alan',  orderDetail?.tTeslimAlanAdi],
                   ['İlgili Kişi',  orderDetail?.tIlgiliKisi],
-                  ['Telefon',      orderDetail?.tTelefon],
-                  ['Alt Telefon',  orderDetail?.tAltTelefon],
+                  // PROMPT-v6 §3 — ülke koduyla prefix'li gösterim
+                  ['Telefon',      formatPhone(orderDetail?.tUlke, orderDetail?.tTelefon, ulkeler)],
+                  ['Alt Telefon',  formatPhone(orderDetail?.tUlke, orderDetail?.tAltTelefon, ulkeler)],
                   ['E-posta',      orderDetail?.tE_Mail],
                   ['VAT',          orderDetail?.tVATNumarasi],
                   ['Posta Kodu',   orderDetail?.tZipKod],
@@ -306,7 +290,8 @@ export function AccountingPage() {
               <TabsContent value="temsilci" className="mt-4">
                 <KeyValueGrid pairs={[
                   ['Ad Soyad',     orderDetail?.kullaniciAdi],
-                  ['Telefon',      orderDetail?.sTelefon],
+                  // PROMPT-v6 §3 — ülke koduyla prefix'li gösterim
+                  ['Telefon',      formatPhone(orderDetail?.sUlke, orderDetail?.sTelefon, ulkeler)],
                   ['Fax',          orderDetail?.sFax],
                   ['Web',          orderDetail?.sWeb],
                   ['E-posta',      orderDetail?.sE_Mail],
@@ -384,6 +369,7 @@ export function AccountingPage() {
           data={filtered as (AccountingOrderListDto & Record<string, unknown>)[]}
           keyField="siparisNo"
           loading={isLoading}
+          density="compact"
           onRowClick={(r) => setSelectedNo((r as AccountingOrderListDto).siparisNo)}
           // PROMPT-v5 §5: muhasebeDurumu satır renklendirmesi kaldırıldı — durum
           // kolon/badge'den okunur; yalnız seçili satır vurgusu kalır.

@@ -30,4 +30,7 @@ public sealed record AccountingOrderListDto(
     // PROMPT-v2 §10.2: Maliyet Reçetesi Net Kar = ToplamFiyat × (1-İndirim%) ×
     // (1-KDV%) − Maliyet formülü için. Eski siparişlerde NULL olabilir.
     decimal? Indirim = null,
-    decimal? Kdv     = null);
+    decimal? Kdv     = null,
+    // PROMPT-v6 §1 — Burcu ekranı "Lojistik Onay Bekleyen" kuyruğu için:
+    // NULL | 'Bekliyor' | 'Onay'.
+    string?  LojistikOnay = null);

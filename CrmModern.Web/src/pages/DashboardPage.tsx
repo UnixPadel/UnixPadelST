@@ -75,6 +75,7 @@ const MODULES: Record<string, ModuleCard> = {
   '/logistics/ready':    { path: '/logistics/ready',    titleKey: 'nav.logisticsReady',    descKey: 'dashboard.moduleCard.logistics',         icon: <Truck className="h-6 w-6" />,       color: 'text-green-500'  },
   '/logistics/history':  { path: '/logistics/history',  titleKey: 'nav.logisticsHistory',  descKey: 'dashboard.moduleCard.logisticsHistory',  icon: <Truck className="h-6 w-6" />,       color: 'text-green-500'  },
   '/accounting':         { path: '/accounting',         titleKey: 'nav.accounting',        descKey: 'dashboard.moduleCard.accounting',        icon: <Calculator className="h-6 w-6" />,  color: 'text-yellow-500' },
+  '/accounting/approval':{ path: '/accounting/approval',titleKey: 'nav.accountingApproval',descKey: 'dashboard.moduleCard.accountingApproval',icon: <CheckSquare className="h-6 w-6" />, color: 'text-amber-500'  },
   '/accounting/history': { path: '/accounting/history', titleKey: 'nav.accountingHistory', descKey: 'dashboard.moduleCard.accountingHistory', icon: <Calculator className="h-6 w-6" />,  color: 'text-yellow-500' },
   '/orders/new':         { path: '/orders/new',         titleKey: 'nav.createOrderQuote',  descKey: 'dashboard.moduleCard.createOrderQuote',  icon: <ShoppingCart className="h-6 w-6" />,color: 'text-blue-500'   },
   '/orders/mine':        { path: '/orders/mine',        titleKey: 'nav.myOrders',          descKey: 'dashboard.moduleCard.myOrders',          icon: <ShoppingCart className="h-6 w-6" />,color: 'text-blue-500'   },
@@ -211,10 +212,14 @@ export function DashboardPage() {
 
   // PROMPT-v4 §1: Kontrol kartı yalnız elshan.rasulov'a görünür (rol bağımsız).
   const isControlUser = user?.kullaniciAdi === 'elshan.rasulov'
+  // PROMPT-v6 §1: Muhasebe Onay kartı yalnız burcu.karaman'a görünür (rol bağımsız).
+  const isAccountingApprover = user?.kullaniciAdi === 'burcu.karaman'
   const tiles = useMemo(() => {
-    const paths = isControlUser ? ['/quality-control', ...layout.tiles] : layout.tiles
+    let paths = layout.tiles
+    if (isControlUser) paths = ['/quality-control', ...paths]
+    if (isAccountingApprover) paths = ['/accounting/approval', ...paths]
     return paths.map((p) => MODULES[p]).filter(Boolean)
-  }, [layout.tiles, isControlUser])
+  }, [layout.tiles, isControlUser, isAccountingApprover])
 
   // Welcome string: Ad Soyad'tan üretiliyor, kullanıcı adına geri düşüyor.
   const fullName = [user?.ad, user?.soyad].filter(Boolean).join(' ') || user?.kullaniciAdi || ''

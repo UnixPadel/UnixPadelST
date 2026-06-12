@@ -253,6 +253,9 @@ export interface LogisticsOrderListDto {
   lojistikNot?: string
   sTarih?: string
   tarih: string
+  // PROMPT-v6 §4 — yalnız ödeme TÜRÜ bilgisi; tutar alanı bilinçli yok (v5 §2).
+  pesinYuzde: number
+  odemeDurum?: string | null
 }
 
 export interface MoveToLogisticsDto {
@@ -323,6 +326,8 @@ export interface AccountingOrderListDto {
   // PROMPT-v2 §10.2: Maliyet Reçetesi Net Kar math için.
   indirim?: number | null
   kdv?: number | null
+  // PROMPT-v6 §1 — Burcu "Lojistik Onay Bekleyen" kuyruğu: null | 'Bekliyor' | 'Onay'
+  lojistikOnay?: string | null
 }
 
 export interface AccountingTransactionDto {

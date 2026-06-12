@@ -24,6 +24,12 @@ public sealed class AccountingController(IAccountingService accountingService) :
     // kullanıcı adı bazlı istisna (rol değil).
     private const string ControlUser = "elshan.rasulov";
 
+    // PROMPT-v6 §1 — Burcu onay ekranı: Cari onay + Lojistik onay mutasyonları
+    // yalnız bu kullanıcı adına açık (rol değil; Yonetici dahil giremez).
+    private const string AccountingApprover = "burcu.karaman";
+
+    private bool IsAccountingApprover => CurrentUserName == AccountingApprover;
+
     [HttpGet("orders")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<AccountingOrderListDto>>), StatusCodes.Status200OK)]
@@ -121,18 +127,35 @@ public sealed class AccountingController(IAccountingService accountingService) :
     }
 
     /// <summary>
-    /// PROMPT.md ACCOUNTING #14 — Muhasebe ekranı "Muhasebe Onayla" butonu.
+    /// PROMPT-v6 §1 — Burcu ekranı "Cari Onayla" butonu.
     /// Siparis → Planlama. Kontrol='Onay' AND SiparisMiTeklifMi='Siparis' guards.
+    /// Yalnız burcu.karaman (kullanıcı adı gate — rol değil).
     /// </summary>
     [HttpPut("orders/{siparisNo}/approve-and-move-to-planning")]
-    [Authorize(Roles = "Yonetici,Muhasebe")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> ApproveMuhasebeAndMoveToPlanning(string siparisNo)
     {
-        await accountingService.ApproveMuhasebeAndMoveToPlanningAsync(siparisNo);
-        return Ok(ApiResponse<object>.Ok(null!, "Muhasebe onayı verildi — sipariş Planlama aşamasında."));
+        if (!IsAccountingApprover) return Forbid();
+        await accountingService.ApproveMuhasebeAndMoveToPlanningAsync(siparisNo, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Cari onay verildi — sipariş Planlama aşamasında."));
+    }
+
+    /// <summary>
+    /// PROMPT-v6 §1 — Burcu ekranı "Lojistik Onayla" butonu.
+    /// Hazir + LojistikOnay='Bekliyor' → 'Onay'; sipariş lojistik ready-listte belirir.
+    /// Yalnız burcu.karaman (kullanıcı adı gate — rol değil).
+    /// </summary>
+    [HttpPost("orders/{siparisNo}/approve-logistics")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> ApproveLogistics(string siparisNo)
+    {
+        if (!IsAccountingApprover) return Forbid();
+        await accountingService.ApproveLogisticsAsync(siparisNo, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Lojistik onay verildi — sipariş sevkiyat kuyruğunda."));
     }
 
     /// <summary>MuhasebeEk yükle (Faz 3 blok kaldırıldı, yetki: Yonetici, Muhasebe).</summary>

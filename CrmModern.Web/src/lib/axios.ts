@@ -50,6 +50,11 @@ api.interceptors.response.use(
       error.userMessage = error.message
       error.fieldErrors = []
     }
+    // PROMPT-v7 §3 — 403 Forbid() gövdesiz döner; "status code 403" yerine
+    // anlamlı yetki mesajı göster (zarf bir mesaj taşımıyorsa).
+    if (error.response?.status === 403 && !data?.message) {
+      error.userMessage = 'Bu işlem için yetkiniz yok.'
+    }
     return Promise.reject(error)
   }
 )

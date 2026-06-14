@@ -25,10 +25,11 @@ public sealed class AccountingController(IAccountingService accountingService) :
     private const string ControlUser = "elshan.rasulov";
 
     // PROMPT-v6 §1 — Burcu onay ekranı: Cari onay + Lojistik onay mutasyonları
-    // yalnız bu kullanıcı adına açık (rol değil; Yonetici dahil giremez).
-    private const string AccountingApprover = "burcu.karaman";
+    // kullanıcı adına açık (rol değil; Yonetici dahil giremez).
+    // PROMPT-v7 §1/§3 — elshan.rasulov merkezi bypass: o da onaylayabilir.
+    private static readonly string[] AccountingApprovers = { "burcu.karaman", "elshan.rasulov" };
 
-    private bool IsAccountingApprover => CurrentUserName == AccountingApprover;
+    private bool IsAccountingApprover => AccountingApprovers.Contains(CurrentUserName);
 
     [HttpGet("orders")]
     [Authorize(Roles = "Yonetici,Muhasebe")]

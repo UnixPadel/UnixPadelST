@@ -529,6 +529,9 @@
       "select": "Select carrier",
       "other": "Other",
       "otherPlaceholder": "Type carrier name"
+    },
+    "cesit": {
+      "select": "Select transport type"
     }
   },
   "factory": {
@@ -560,7 +563,10 @@
     "create": "Create Request",
     "creating": "Submitting...",
     "createSuccess": "Request created",
-    "createError": "Error"
+    "createError": "Error",
+    "actionCol": "Action",
+    "overrideApprove": "Approve",
+    "overrideSuccess": "Request approved (all stages skipped)."
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",

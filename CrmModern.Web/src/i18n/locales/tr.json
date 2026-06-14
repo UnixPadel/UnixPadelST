@@ -529,6 +529,9 @@
       "select": "Firma seç",
       "other": "Diğer",
       "otherPlaceholder": "Firma adı yazın"
+    },
+    "cesit": {
+      "select": "Taşıma türü seç"
     }
   },
   "factory": {
@@ -561,7 +564,10 @@
     "creating": "Gönderiliyor...",
     "createSuccess": "Talep oluşturuldu",
     "createError": "Hata",
-    "approvalFlowNote": "Talep \"Bekliyor\" durumunda kaydedilir, ön onay için omur.caliskan'a düşer."
+    "approvalFlowNote": "Talep \"Bekliyor\" durumunda kaydedilir, ön onay için omur.caliskan'a düşer.",
+    "actionCol": "İşlem",
+    "overrideApprove": "Onayla",
+    "overrideSuccess": "Talep onaylandı (tüm aşamalar atlandı)."
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",

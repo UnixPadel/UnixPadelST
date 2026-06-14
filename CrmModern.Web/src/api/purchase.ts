@@ -127,6 +127,10 @@ export const finalApprovePurchase = (talepId: number, aciklama?: string) =>
 export const finalRejectPurchase = (talepId: number, redNotu: string) =>
   api.post(`/api/purchase/${talepId}/final-reject`, { redNotu }).then((r) => r.data)
 
+// PROMPT-v7 §2: override onayı — yalnız elshan.rasulov (backend gate).
+export const overrideApprovePurchase = (talepId: number, aciklama?: string) =>
+  api.post(`/api/purchase/${talepId}/override-approve`, { aciklama }).then((r) => r.data)
+
 // Geriye uyum (Faz 5 öncesi)
 export const approvePurchase = async (talepId: number, islemYapanKullanici: string): Promise<void> => {
   await api.put(`/api/purchase/${talepId}/approve`, null, { params: { islemYapanKullanici } })

@@ -184,6 +184,20 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // PROMPT-v7 §2: Override onayı — tüm aşamaları atlayan tek-tık kısa devre.
+    // Gate YALNIZ elshan.rasulov (Yonetici rolü DEĞİL — nihai onaydan farkı bu).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    [HttpPost("{talepId:int}/override-approve")]
+    public async Task<IActionResult> OverrideApprove(int talepId, [FromBody] ApprovalActionDto? dto)
+    {
+        if (CurrentUserName != FinalApproverUser)
+            return Forbid();
+        await purchaseService.OverrideApproveAsync(talepId, CurrentUserName, dto?.Aciklama);
+        return Ok(ApiResponse<object>.Ok(null!, "Talep onaylandı (override)."));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Geriye uyum (Faz 5 öncesi tek-aşama yöntemleri)
     // ─────────────────────────────────────────────────────────────────────────
 

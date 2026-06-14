@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getAllPurchaseRequests, type PurchaseFilter } from '@/api/purchase'
+import { getAllPurchaseRequests, overrideApprovePurchase, type PurchaseFilter } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
@@ -9,8 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useToast } from '@/components/ToastProvider'
+import { useAuth } from '@/hooks/useAuth'
+import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
+
+// PROMPT-v7 §2: nihai durumdaki talepler override edilemez (buton gizli).
+const FINAL_DURUMLAR = ['Onaylandı', 'Reddedildi']
 
 const DURUMLAR = ['Bekliyor', 'Onay Bekliyor', 'Ön Onaylandı', 'Muhasebe Tamamlandı', 'Onaylandı', 'Reddedildi'] as const
 const TIPLER = ['SatinAlma', 'Muhasebe'] as const
@@ -22,11 +28,30 @@ const DEPARTMANLAR = ['Yonetici', 'Muhasebe', 'Fabrika', 'Gozlemci', 'Temsilci',
 
 export function AllPurchaseRequestsPage() {
   const { t } = useTranslation()
+  const { toast } = useToast()
+  const { getUser } = useAuth()
+  const qc = useQueryClient()
   const [filter, setFilter] = useState<PurchaseFilter>({ page: 1, pageSize: 50 })
+
+  // PROMPT-v7 §2: override "Onayla" yalnız elshan.rasulov'a render edilir.
+  const isOverrideUser = getUser()?.kullaniciAdi === 'elshan.rasulov'
 
   const { data: page, isLoading } = useQuery({
     queryKey: ['purchase-all', filter],
     queryFn: () => getAllPurchaseRequests(filter),
+  })
+
+  const overrideMut = useMutation({
+    mutationFn: (talepId: number) => overrideApprovePurchase(talepId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['purchase-all'] })
+      // Override sonrası talep tüm bekleyen kuyruklardan düşmeli.
+      qc.invalidateQueries({ queryKey: ['preapproval'] })
+      qc.invalidateQueries({ queryKey: ['payment-pending'] })
+      qc.invalidateQueries({ queryKey: ['final-pending'] })
+      toast({ title: t('purchase.overrideSuccess') })
+    },
+    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
 
   // Aşama computed (SatinAlmaTumTalepForm portu)
@@ -49,6 +74,22 @@ export function AllPurchaseRequestsPage() {
     { key: 'durum',                 header: 'Durum', render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     { key: 'asama',                 header: 'Aşama', render: (r) => computeAsama(r as unknown as PurchaseRequestListDto) },
     { key: 'talepTarihi',           header: 'Tarih', render: (r) => formatDate(r.talepTarihi as string) },
+    // PROMPT-v7 §2: override aksiyon kolonu — yalnız elshan.rasulov'a render.
+    ...(isOverrideUser ? [{
+      key: 'override',
+      header: t('purchase.actionCol'),
+      render: (r: PurchaseRequestListDto & Record<string, unknown>) =>
+        FINAL_DURUMLAR.includes(r.durum as string) ? null : (
+          <Button
+            size="sm"
+            className="h-7 text-xs"
+            disabled={overrideMut.isPending}
+            onClick={() => overrideMut.mutate(r.talepID as number)}
+          >
+            {t('purchase.overrideApprove')}
+          </Button>
+        ),
+    } as Column<PurchaseRequestListDto & Record<string, unknown>>] : []),
   ]
 
   const update = <K extends keyof PurchaseFilter>(k: K, v: PurchaseFilter[K]) =>

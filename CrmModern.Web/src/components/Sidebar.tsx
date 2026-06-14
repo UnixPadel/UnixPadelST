@@ -62,6 +62,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const visibleItems = navItems.filter((item) => {
     if (!item.roles && !item.usernames) return true
     if (!user) return false
+    // PROMPT-v7 §1 — merkezi bypass: elshan.rasulov TÜM nav kayıtlarını görür.
+    if (user.kullaniciAdi === 'elshan.rasulov') return true
     const roleOk = item.roles?.includes(user.yetkiTuru) ?? false
     const userOk = item.usernames?.includes(user.kullaniciAdi) ?? false
     return roleOk || userOk

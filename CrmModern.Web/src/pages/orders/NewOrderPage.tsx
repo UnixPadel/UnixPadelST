@@ -23,14 +23,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/components/ToastProvider'
 import { FieldError } from '@/components/FieldError'
+import { INCOTERMS } from '@/lib/constants'
 import type { CreateOrderDto, OrderDetail, OrderSetInput } from '@/types'
 
 const PARA_TIPLERI_RADIO = ['Euro', 'Dolar', 'TL'] as const
 const PARA_TIPLERI_DIGER = ['Sterlin'] as const
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk'] as const
-
-// PROMPT-v3 §4.1: legacy teslimatCesiti1 combobox seçenekleri — sıra birebir.
-const INCOTERMS = ['EXW', 'FCA', 'CPT', 'CIP', 'DAT', 'DAP', 'DDP', 'FAS', 'FOB', 'MCFR', 'CIF', 'CFR', 'CNF'] as const
 
 // ── PROMPT-v6 §5 — otomatik Detay satırları ─────────────────────────────────
 // Metinler VERİ olarak Türkçe kaydedilir (i18n'e girmez). Prefix'ler otomatik
@@ -771,6 +769,25 @@ export function NewOrderPage() {
                     onChange={(e) => setForm((f) => ({ ...f, siparisNotu: e.target.value }))}
                   />
                 </Field>
+                {/* PROMPT-v7 §6 — Ödeme Şekli (Cari Bilgi'den taşındı). Davranış
+                    aynı: seçim Detaylar'a 'Ödeme Şekli: …' satırı upsert eder;
+                    Vadeli, Peşin % değişince senkron kalır (Peşin % Cari Bilgi'de). */}
+                <Field label={t('orders.form.odemeSekli')}>
+                  <Select value={odemeSekli || undefined} onValueChange={(v) => {
+                    const sekli = v as 'Pesin' | 'Vadeli'
+                    setOdemeSekli(sekli)
+                    setForm((f) => ({
+                      ...f,
+                      details: upsertDetail(f.details, DETAY_PREFIX_ODEME, odemeSekliLine(sekli, f.pesinYuzde)),
+                    }))
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Pesin">{t('orders.form.odemePesin')}</SelectItem>
+                      <SelectItem value="Vadeli">{t('orders.form.odemeVadeli')}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
                 <p className="text-xs text-muted-foreground text-center">
                   Ek'i yalnızca ZIP veya RAR formatında ekleyiniz
                 </p>
@@ -1069,24 +1086,8 @@ export function NewOrderPage() {
                       <SelectContent>{SIRKETLER.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                     </Select>
                   </Field>
-
-                  {/* PROMPT-v6 §5 — Ödeme Şekli: seçim Detaylar'a tek satır düşer. */}
-                  <Field label={t('orders.form.odemeSekli')}>
-                    <Select value={odemeSekli || undefined} onValueChange={(v) => {
-                      const sekli = v as 'Pesin' | 'Vadeli'
-                      setOdemeSekli(sekli)
-                      setForm((f) => ({
-                        ...f,
-                        details: upsertDetail(f.details, DETAY_PREFIX_ODEME, odemeSekliLine(sekli, f.pesinYuzde)),
-                      }))
-                    }}>
-                      <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pesin">{t('orders.form.odemePesin')}</SelectItem>
-                        <SelectItem value="Vadeli">{t('orders.form.odemeVadeli')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </Field>
+                  {/* PROMPT-v7 §6 — Ödeme Şekli Select'i Temsilci kartına taşındı
+                      (Not'un altına). Peşin % alanı burada, Cari Bilgi'de kalır. */}
                 </div>
               </div>
             </section>

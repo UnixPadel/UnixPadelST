@@ -242,6 +242,33 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         await LogApprovalAsync(talepId, "NihaiOnay", "Reddedildi", currentUserName, redNotu);
     }
 
+    // ── PROMPT-v7 §2: Override onayı (elshan tek-tık) ────────────────────────
+
+    public async Task OverrideApproveAsync(int talepId, string currentUserName, string? aciklama)
+    {
+        var entity = await uow.PurchaseRequests.GetByIdAsync(talepId)
+            ?? throw new NotFoundException("PurchaseRequest", talepId);
+
+        // Zaten onaylı → idempotent no-op (audit yazmadan çık).
+        if (entity.Durum == "Onaylandı")
+            return;
+
+        // Reddedilmiş talep override edilemez — talep sahibi yeniden göndermeli.
+        if (entity.Durum == "Reddedildi")
+            throw new BusinessException(
+                "Reddedilmiş talep override edilemez — talep sahibi yeniden göndermeli.");
+
+        // Ara aşamaların hepsinden (Bekliyor/Onay Bekliyor/Ön Onaylandı/Muhasebe Tamamlandı)
+        // doğrudan nihai onaya kısa devre. Ara alanlar (OdemeTuru vb.) NULL kalabilir.
+        entity.Durum               = "Onaylandı";
+        entity.IslemYapanKullanici = currentUserName;
+        entity.IslemTarihi         = DateTime.Now;
+        uow.PurchaseRequests.Update(entity);
+        await uow.SaveChangesAsync();
+        await LogApprovalAsync(talepId, "Override", "Onaylandı", currentUserName,
+            aciklama ?? "Tüm aşamalar atlanarak onaylandı (override).");
+    }
+
     // ── Faz 8.4 — TalepOnaylari log + history ────────────────────────────────
 
     public async Task<IReadOnlyList<PurchaseApprovalDto>> GetApprovalHistoryAsync(int talepId)

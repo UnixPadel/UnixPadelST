@@ -212,8 +212,9 @@ export function DashboardPage() {
 
   // PROMPT-v4 §1: Kontrol kartı yalnız elshan.rasulov'a görünür (rol bağımsız).
   const isControlUser = user?.kullaniciAdi === 'elshan.rasulov'
-  // PROMPT-v6 §1: Muhasebe Onay kartı yalnız burcu.karaman'a görünür (rol bağımsız).
-  const isAccountingApprover = user?.kullaniciAdi === 'burcu.karaman'
+  // PROMPT-v6 §1: Muhasebe Onay kartı burcu.karaman'a görünür (rol bağımsız).
+  // PROMPT-v7 §1: elshan.rasulov da Cari Onay kartını görür (merkezi bypass).
+  const isAccountingApprover = user?.kullaniciAdi === 'burcu.karaman' || user?.kullaniciAdi === 'elshan.rasulov'
   const tiles = useMemo(() => {
     let paths = layout.tiles
     if (isControlUser) paths = ['/quality-control', ...paths]

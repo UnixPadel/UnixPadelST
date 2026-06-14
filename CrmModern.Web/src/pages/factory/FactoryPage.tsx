@@ -49,6 +49,13 @@ export function FactoryPage() {
   const { data = [], isLoading } = useQuery({
     queryKey: ['factory', filter],
     queryFn: () => getFactoryOrders(filter),
+    // PROMPT-v7 §3 — canlılık: Burcu Cari Onayla deyince başka makinedeki açık
+    // Fabrika ekranı ≤30 sn'de / sekme odağında yeni Planlama satırını görsün
+    // (v5 §3 kalıbı; bugüne dek yalnız onaylayanın client'ı invalidate ediyordu).
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   })
 
   const toProductionMut = useMutation({

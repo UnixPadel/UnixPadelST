@@ -7,7 +7,6 @@ import {
   getOrders, updatePaidAmount, downloadAttachment, downloadExcel,
   type OrderFilter,
 } from '@/api/orders'
-import { getTransactionsForOrder } from '@/api/accounting'
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { getUsersLookup } from '@/api/users'
 import { DataTable, type Column } from '@/components/DataTable'
@@ -22,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { describeApiError } from '@/lib/axios'
-import { formatDate, formatDateShort, formatCurrency, cn } from '@/lib/utils'
+import { formatDateShort, formatCurrency, cn } from '@/lib/utils'
 import type { OrderListDto, QualityControlListDto } from '@/types'
 
 /**
@@ -236,11 +235,9 @@ export function QualityControlPage() {
     enabled: !!selected,
   })
 
-  const { data: transactions = [] } = useQuery({
-    queryKey: ['qc-transactions', selected],
-    queryFn: () => getTransactionsForOrder(selected!),
-    enabled: !!selected,
-  })
+  // PROMPT-v7 §4 — Muhasebe Geçmişi sekmesi Kontrol ekranından kaldırıldı;
+  // qc-transactions query'si ve sortedTx memo'su da gitti. (Burcu ekranı
+  // aynı endpoint'i kendi acc-approval-tx query'siyle kullanmaya devam eder.)
 
   // ── Aksiyon state ───────────────────────────────────────────────────────
   const [rejectOpen, setRejectOpen] = useState(false)
@@ -279,7 +276,6 @@ export function QualityControlPage() {
     qc.invalidateQueries({ queryKey: ['quality-control'] })
     qc.invalidateQueries({ queryKey: ['qc-search'] })
     qc.invalidateQueries({ queryKey: ['qc-detail'] })
-    qc.invalidateQueries({ queryKey: ['qc-transactions'] })
     qc.invalidateQueries({ queryKey: ['my-orders'] })
     setSelected(null)
   }
@@ -315,7 +311,6 @@ export function QualityControlPage() {
       qc.invalidateQueries({ queryKey: ['quality-control'] })
       qc.invalidateQueries({ queryKey: ['qc-search'] })
       qc.invalidateQueries({ queryKey: ['qc-detail', vars.no] })
-      qc.invalidateQueries({ queryKey: ['qc-transactions', vars.no] })
       qc.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: t('qc.cariUpdated') })
     },
@@ -410,11 +405,6 @@ export function QualityControlPage() {
   const brutKaparo = Math.max(pesinTutar - odenen, 0)
   const siparisBakiye = Math.max(toplam - odenen, 0)
 
-  const sortedTx = useMemo(
-    () => [...transactions].sort((a, b) => (b.tarih ?? '').localeCompare(a.tarih ?? '')),
-    [transactions],
-  )
-
   const loading = submitted !== null ? searchLoading : pendingLoading
 
   return (
@@ -434,112 +424,16 @@ export function QualityControlPage() {
            aksiyonlar select-first toast'ını atar. */}
       <div className="flex h-auto shrink-0 items-stretch gap-2 px-4 py-2">
 
-        {/* 1 — Filtreme (legacy sıra, dikey) */}
-        <div className="w-[260px] shrink-0 rounded-md border p-2">
-          <p className="mb-1.5 text-sm font-semibold text-center">{t('qc.blocks.filtreme')}</p>
-          <div className="space-y-1.5">
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.siparisNo')}</Label>
-              <Input className="h-7 text-xs" value={filters.siparisNo}
-                onChange={(e) => setFilters((f) => ({ ...f, siparisNo: e.target.value }))} />
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.musteriAdi')}</Label>
-              <Select value={filters.musteriAd} onValueChange={(v) => setFilters((f) => ({ ...f, musteriAd: v }))}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr'))
-                    .map((m) => <SelectItem key={m.musteriID} value={m.musteriAd}>{m.musteriAd}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.temsilci')}</Label>
-              <Select value={filters.kullaniciID} onValueChange={(v) => setFilters((f) => ({ ...f, kullaniciID: v }))}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {users.map((u) => (
-                    <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>{u.ad} {u.soyad}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.ulke')}</Label>
-              <Select value={filters.ulke} onValueChange={(v) => setFilters((f) => ({ ...f, ulke: v }))}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {[...ulkeler].sort((a, b) => a.ulkeAdi.localeCompare(b.ulkeAdi, 'tr'))
-                    .map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.kontrolDurumu')}</Label>
-              <Select value={filters.kontrol} onValueChange={(v) => setFilters((f) => ({ ...f, kontrol: v }))}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {CONTROLS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.odemeDurumu')}</Label>
-              <Select value={filters.odemeDurum} onValueChange={(v) => setFilters((f) => ({ ...f, odemeDurum: v }))}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.asama')}</Label>
-              <Select value={filters.asama} onValueChange={(v) => setFilters((f) => ({ ...f, asama: v }))}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('common.all')}</SelectItem>
-                  {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <p className="pt-1 text-center text-xs font-semibold">{t('qc.filter.tarihAraligi')}</p>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.bas')}</Label>
-              <Input className="h-7 text-xs" type="date" value={filters.baslangic}
-                onChange={(e) => setFilters((f) => ({ ...f, baslangic: e.target.value }))} />
-            </div>
-            <div className="space-y-0.5">
-              <Label className="text-[10px]">{t('qc.filter.son')}</Label>
-              <Input className="h-7 text-xs" type="date" value={filters.bitis}
-                onChange={(e) => setFilters((f) => ({ ...f, bitis: e.target.value }))} />
-            </div>
-            <div className="flex gap-1.5 pt-1">
-              <Button size="sm" variant="outline" className="h-7 flex-1" onClick={() => {
-                // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
-                setFilters(defaultFilters(minTarih))
-                setSubmitted(null)
-                setSelected(null)
-              }}>
-                {t('qc.filter.reset')}
-              </Button>
-              <Button size="sm" className="h-7 flex-1" onClick={() => { setSubmitted({ ...filters }); setSelected(null) }}>
-                {t('qc.filter.ara')}
-              </Button>
-            </div>
-          </div>
-        </div>
+        {/* PROMPT-v7 §4 — Filtreme dikey kartı kaldırıldı; filtreler gridin
+            hemen üstüne kompakt yatay bar olarak taşındı (aşağıda). Üst bölgede
+            yalnız iki kart kalır: Detay (genişler) | Kontrol (~300px). */}
 
-        {/* 2 — Detay sekmeleri (legacy tab sırası) — doğal yükseklik, iç scroll yok */}
+        {/* 1 — Detay sekmeleri (legacy tab sırası) — doğal yükseklik, iç scroll yok */}
         <div className="flex min-w-0 flex-1 flex-col rounded-md border p-2">
           <Tabs defaultValue="cari" className="flex flex-1 flex-col">
             <TabsList className="h-8 w-full shrink-0 justify-start overflow-x-auto">
               <TabsTrigger className="px-2 py-1 text-xs" value="cari">{t('qc.tabs.cari')}</TabsTrigger>
-              <TabsTrigger className="px-2 py-1 text-xs" value="muhasebe">{t('qc.tabs.muhasebeGecmisi')}</TabsTrigger>
+              {/* PROMPT-v7 §4 — Muhasebe Geçmişi sekmesi kaldırıldı. */}
               <TabsTrigger className="px-2 py-1 text-xs" value="musteri">{t('qc.tabs.musteri')}</TabsTrigger>
               <TabsTrigger className="px-2 py-1 text-xs" value="teslimat">{t('qc.tabs.teslimat')}</TabsTrigger>
               <TabsTrigger className="px-2 py-1 text-xs" value="temsilci">{t('qc.tabs.satisTemsilcisi')}</TabsTrigger>
@@ -584,37 +478,7 @@ export function QualityControlPage() {
               </div>
             </TabsContent>
 
-            {/* Muhasebe Geçmişi */}
-            <TabsContent value="muhasebe">
-              <div className="rounded border">
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-muted/80">
-                    <tr>
-                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.musteriAdi')}</th>
-                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.ulke')}</th>
-                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.temsilci')}</th>
-                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.paraTuru')}</th>
-                      <th className="px-2 py-1 text-right font-medium">{t('qc.tx.odenenBakiye')}</th>
-                      <th className="px-2 py-1 text-left font-medium">{t('qc.tx.tarih')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {!d || sortedTx.length === 0 ? (
-                      <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">{t('common.noData')}</td></tr>
-                    ) : sortedTx.map((tx) => (
-                      <tr key={tx.id} className="border-t">
-                        <td className="px-2 py-1">{d.musteriAd}</td>
-                        <td className="px-2 py-1">{d.mUlke ?? ''}</td>
-                        <td className="px-2 py-1">{d.kullaniciAdi ?? ''}</td>
-                        <td className="px-2 py-1">{d.paraTipi}</td>
-                        <td className="px-2 py-1 text-right">{formatCurrency(tx.odenenMiktar ?? 0, d.paraTipi)}</td>
-                        <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </TabsContent>
+            {/* PROMPT-v7 §4 — Muhasebe Geçmişi sekmesi içeriği kaldırıldı. */}
 
             {/* Müşteri */}
             <TabsContent value="musteri">
@@ -773,6 +637,106 @@ export function QualityControlPage() {
         onPointerDown={startSplitterDrag}
       >
         <div className="h-0.5 w-10 rounded bg-muted-foreground/40" />
+      </div>
+
+      {/* ── Filtre barı (PROMPT-v7 §4) — gridin hemen üstünde kompakt yatay
+           bar; sol dikey Filtreme kartının yerini aldı. Alan seti ve davranış
+           (Sipariş No diğerlerini ezer, default Kontrol, Ara/Reset) AYNEN. */}
+      <div className="shrink-0 px-4 pb-2">
+        <div className="grid grid-cols-2 gap-2 rounded-md border bg-card p-2 md:grid-cols-4 lg:grid-cols-8">
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.siparisNo')}</Label>
+            <Input className="h-8 text-xs" value={filters.siparisNo}
+              onChange={(e) => setFilters((f) => ({ ...f, siparisNo: e.target.value }))} />
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.musteriAdi')}</Label>
+            <Select value={filters.musteriAd} onValueChange={(v) => setFilters((f) => ({ ...f, musteriAd: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr'))
+                  .map((m) => <SelectItem key={m.musteriID} value={m.musteriAd}>{m.musteriAd}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.temsilci')}</Label>
+            <Select value={filters.kullaniciID} onValueChange={(v) => setFilters((f) => ({ ...f, kullaniciID: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {users.map((u) => (
+                  <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>{u.ad} {u.soyad}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.ulke')}</Label>
+            <Select value={filters.ulke} onValueChange={(v) => setFilters((f) => ({ ...f, ulke: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {[...ulkeler].sort((a, b) => a.ulkeAdi.localeCompare(b.ulkeAdi, 'tr'))
+                  .map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.kontrolDurumu')}</Label>
+            <Select value={filters.kontrol} onValueChange={(v) => setFilters((f) => ({ ...f, kontrol: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {CONTROLS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.odemeDurumu')}</Label>
+            <Select value={filters.odemeDurum} onValueChange={(v) => setFilters((f) => ({ ...f, odemeDurum: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.asama')}</Label>
+            <Select value={filters.asama} onValueChange={(v) => setFilters((f) => ({ ...f, asama: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.bas')}</Label>
+            <Input className="h-8 text-xs" type="date" value={filters.baslangic}
+              onChange={(e) => setFilters((f) => ({ ...f, baslangic: e.target.value }))} />
+          </div>
+          <div className="space-y-0.5">
+            <Label className="text-[10px]">{t('qc.filter.son')}</Label>
+            <Input className="h-8 text-xs" type="date" value={filters.bitis}
+              onChange={(e) => setFilters((f) => ({ ...f, bitis: e.target.value }))} />
+          </div>
+          <div className="col-span-2 flex items-end gap-1.5 md:col-span-2 lg:col-span-1">
+            <Button size="sm" variant="outline" className="h-8 flex-1" onClick={() => {
+              // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
+              setFilters(defaultFilters(minTarih))
+              setSubmitted(null)
+              setSelected(null)
+            }}>
+              {t('qc.filter.reset')}
+            </Button>
+            <Button size="sm" className="h-8 flex-1" onClick={() => { setSubmitted({ ...filters }); setSelected(null) }}>
+              {t('qc.filter.ara')}
+            </Button>
+          </div>
+        </div>
       </div>
 
       {/* ── Alt bölge: master grid (tam genişlik, iç scroll) ───────────── */}

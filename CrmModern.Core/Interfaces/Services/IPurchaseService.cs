@@ -37,6 +37,10 @@ public interface IPurchaseService
     Task FinalApproveAsync(int talepId, string currentUserName, string? aciklama);
     Task FinalRejectAsync (int talepId, string currentUserName, string redNotu);
 
+    // ── PROMPT-v7 §2: override onayı (elshan.rasulov tek-tık kısa devre) ──
+    /// <summary>Tüm aşamaları atlayıp Durum='Onaylandı' yapar. Reddedilmiş talep override edilemez.</summary>
+    Task OverrideApproveAsync(int talepId, string currentUserName, string? aciklama);
+
     // Geriye uyum
     Task ApproveAsync(int talepId, string islemYapanKullanici);
     Task RejectAsync (int talepId, string redNotu, string islemYapanKullanici);

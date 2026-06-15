@@ -429,7 +429,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Excel(string no, [FromQuery] string lang = "tr")
     {
-        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !IsControlUser)
+        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe")  && !User.IsInRole("Lojistik") && !IsControlUser)
             return Forbid();
         var bytes = await reportingService.ExportOrderProformaAsync(no, lang);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.xlsx";

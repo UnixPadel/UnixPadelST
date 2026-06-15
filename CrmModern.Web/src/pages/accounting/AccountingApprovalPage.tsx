@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/components/ToastProvider'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatDateShort, formatCurrency, cn } from '@/lib/utils'
+import { resolveClause } from '@/lib/clauses'
 import type { AccountingOrderListDto } from '@/types'
 
 /**
@@ -362,7 +363,7 @@ export function AccountingApprovalPage() {
                   ) : (
                     <ul className="divide-y">
                       {d.details.map((line, i) => (
-                        <li key={i} className="px-2 py-1 text-xs">{line}</li>
+                        <li key={i} className="px-2 py-1 text-xs">{resolveClause(t, line)}</li>
                       ))}
                     </ul>
                   )}

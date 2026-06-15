@@ -63,7 +63,10 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             OdenenMiktar:      o.OdenenMiktar,
             TeslimatCesiti:    o.TeslimatÇeşiti,
             OdemeDurum:        o.OdemeDurum,
-            KullaniciAdSoyad:  users is not null && users.TryGetValue(o.KullaniciID, out var n) ? n : null);
+            KullaniciAdSoyad:  users is not null && users.TryGetValue(o.KullaniciID, out var n) ? n : null,
+            Silindi:           o.Silindi,
+            Guncellendi:       o.Guncellendi,
+            DegisiklikGerekce: o.DegisiklikGerekce);
 
     // ─────────────────────────────────────────────────────────────────────────
     // Single record
@@ -108,6 +111,62 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
 
         bool isTeklif = existing.SiparisMiTeklifMi == "Teklif";
         return await SaveAsync(kullaniciID, dto, isTeklif, existingOrder: existing);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Round-8 §7 — Kontrol onayı öncesi yerinde düzenleme / yumuşak silme
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Onaylanmamış (Kontrol != 'Onay') ve silinmemiş sipariş; sahip
+    /// (Temsilci) veya Yönetici/elshan değilse engelle.</summary>
+    private static void GuardEditable(Order o, int kullaniciID, bool isManagerOrElshan)
+    {
+        if (o.Silindi)
+            throw new BusinessException("Bu sipariş zaten silinmiş.");
+        if (o.Kontrol == "Onay")
+            throw new BusinessException("Onaylanmış sipariş düzenlenemez veya silinemez.");
+        bool isOwner = o.KullaniciID == kullaniciID;
+        if (!isOwner && !isManagerOrElshan)
+            throw new BusinessException("Bu işlem için yetkiniz yok.");
+    }
+
+    public async Task<string> AmendOrderAsync(int kullaniciID, string no, CreateOrderDto dto,
+        string gerekce, bool isManagerOrElshan)
+    {
+        if (string.IsNullOrWhiteSpace(gerekce))
+            throw new BusinessException("Değişiklik gerekçesi zorunludur.");
+
+        var existing = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
+            ?? throw new NotFoundException("Order", no);
+        GuardEditable(existing, kullaniciID, isManagerOrElshan);
+
+        bool isTeklif = existing.SiparisMiTeklifMi == "Teklif";
+        var resultNo = await SaveAsync(kullaniciID, dto, isTeklif, existing,
+            amendInPlace: true, amendGerekce: gerekce);
+
+        // Audit (SiparisOnaylari) — son düzenleyen + gerekçe.
+        await uow.OrderApprovals.UpsertAsync(existing.SiparisNo, kullaniciID, "Guncellendi", gerekce);
+        await uow.SaveChangesAsync();
+        return resultNo;
+    }
+
+    public async Task SoftDeleteOrderAsync(int kullaniciID, string no, string gerekce, bool isManagerOrElshan)
+    {
+        if (string.IsNullOrWhiteSpace(gerekce))
+            throw new BusinessException("Silme gerekçesi zorunludur.");
+
+        var existing = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
+            ?? throw new NotFoundException("Order", no);
+        GuardEditable(existing, kullaniciID, isManagerOrElshan);
+
+        existing.Silindi               = true;
+        existing.DegisiklikGerekce     = gerekce;
+        existing.DegisiklikKullaniciID = kullaniciID;
+        existing.DegisiklikTarihi      = DateTime.Now;
+        uow.Orders.Update(existing);
+
+        await uow.OrderApprovals.UpsertAsync(existing.SiparisNo, kullaniciID, "Silindi", gerekce);
+        await uow.SaveChangesAsync();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -201,7 +260,10 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         int            kullaniciID,
         CreateOrderDto dto,
         bool           isTeklif,
-        Order?         existingOrder)
+        Order?         existingOrder,
+        // Round-8 §7 — yerinde düzenleme: numara DEĞİŞMEZ, Guncellendi damgalanır.
+        bool           amendInPlace = false,
+        string?        amendGerekce = null)
     {
         // ── 1. Load Kullanici for number-prefix generation ────────────────
         var kullanici = await uow.Kullanicilar.GetByIdAsync(kullaniciID)
@@ -217,6 +279,12 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             string prefix = BuildNumberPrefix(kullanici, DateTime.Now);
             siparisNo = "S" + prefix + seq;
             teklifNo  = "T" + prefix + seq;
+        }
+        else if (amendInPlace)
+        {
+            // Round-8 §7 — yerinde düzenleme: aynı numarayı koru.
+            siparisNo = existingOrder.SiparisNo;
+            teklifNo  = existingOrder.TeklifNo;
         }
         else
         {
@@ -304,6 +372,14 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             // WinForms: UPDATE ... SET SiparisNo=@YeniNo ... WHERE SiparisNo=@EskiNo
             ApplyUpdateToOrder(existingOrder, siparisNo, teklifNo, kullaniciID, dto,
                                siparisMiTeklifMi, brutToplamFiyat, toplamFiyat, ek);
+            // Round-8 §7 — yerinde düzenlemede Guncellendi + gerekçe damgası.
+            if (amendInPlace)
+            {
+                existingOrder.Guncellendi           = true;
+                existingOrder.DegisiklikGerekce     = amendGerekce;
+                existingOrder.DegisiklikKullaniciID = kullaniciID;
+                existingOrder.DegisiklikTarihi      = DateTime.Now;
+            }
             uow.Orders.Update(existingOrder);
         }
 

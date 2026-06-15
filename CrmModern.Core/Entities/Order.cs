@@ -87,6 +87,15 @@ public sealed class Order
     public string?   FabrikaNot      { get; set; }
     public string?   LojistikNot     { get; set; }
 
+    // ── Round-8 §7 — Kontrol onayı öncesi düzenleme/silme audit'i ─────────
+    // Silindi/Guncellendi yumuşak-silme + düzenlendi bayrakları; sipariş listede
+    // kalır, yanında rozet+gerekçe gösterilir.
+    public bool      Silindi               { get; set; }
+    public bool      Guncellendi           { get; set; }
+    public string?   DegisiklikGerekce     { get; set; }
+    public int?      DegisiklikKullaniciID { get; set; }
+    public DateTime? DegisiklikTarihi      { get; set; }
+
     // ── Navigation properties ─────────────────────────────────────────────
     public Kullanici?                  Kullanici { get; set; }
     public ICollection<OrderItem>      Items     { get; set; } = [];

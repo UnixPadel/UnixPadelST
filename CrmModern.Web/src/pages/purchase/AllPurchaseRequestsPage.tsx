@@ -13,6 +13,7 @@ import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { purchaseStatusLabel } from '@/lib/status'
 import type { PurchaseRequestListDto } from '@/types'
 
 // PROMPT-v7 §2: nihai durumdaki talepler override edilemez (buton gizli).
@@ -54,26 +55,26 @@ export function AllPurchaseRequestsPage() {
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
 
-  // Aşama computed (SatinAlmaTumTalepForm portu)
+  // Aşama computed (SatinAlmaTumTalepForm portu) — i18n kod döner, render çevirir.
   const computeAsama = (r: PurchaseRequestListDto): string => {
     const d = r.durum
-    if (d === 'Bekliyor' || d === 'Onay Bekliyor') return 'Fabrika / Ön İzleme'
-    if (d === 'Ön Onaylandı') return 'Muhasebe'
-    if (d === 'Muhasebe Tamamlandı') return 'Nihai Onay'
-    if (d === 'Onaylandı' || d === 'Reddedildi') return 'Tamamlandı'
-    return '—'
+    if (d === 'Bekliyor' || d === 'Onay Bekliyor') return 'fabrikaOnIzleme'
+    if (d === 'Ön Onaylandı') return 'muhasebe'
+    if (d === 'Muhasebe Tamamlandı') return 'nihaiOnay'
+    if (d === 'Onaylandı' || d === 'Reddedildi') return 'tamamlandi'
+    return ''
   }
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',               header: 'ID' },
-    { key: 'urunAdi',               header: 'Ürün' },
-    { key: 'urunMaliyeti',          header: 'Maliyet', render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
-    { key: 'talepEdenKullaniciAdi', header: 'Talep Eden' },
-    { key: 'departman',             header: 'Departman' },
-    { key: 'talepTipi',             header: 'Tip', render: (r) => r.talepTipi ?? 'SatinAlma' },
-    { key: 'durum',                 header: 'Durum', render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
-    { key: 'asama',                 header: 'Aşama', render: (r) => computeAsama(r as unknown as PurchaseRequestListDto) },
-    { key: 'talepTarihi',           header: 'Tarih', render: (r) => formatDate(r.talepTarihi as string) },
+    { key: 'talepID',               header: t('purchase.cols.id') },
+    { key: 'urunAdi',               header: t('purchase.cols.urun') },
+    { key: 'urunMaliyeti',          header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
+    { key: 'departman',             header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
+    { key: 'talepTipi',             header: t('purchase.cols.tip'), render: (r) => t(`purchase.tipLabel.${(r.talepTipi as string) ?? 'SatinAlma'}`, { defaultValue: (r.talepTipi as string) ?? 'SatinAlma' }) },
+    { key: 'durum',                 header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
+    { key: 'asama',                 header: t('purchase.cols.asama'), render: (r) => { const c = computeAsama(r as unknown as PurchaseRequestListDto); return c ? t(`purchase.asamaLabel.${c}`) : '—' } },
+    { key: 'talepTarihi',           header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
     // PROMPT-v7 §2: override aksiyon kolonu — yalnız elshan.rasulov'a render.
     ...(isOverrideUser ? [{
       key: 'override',
@@ -100,52 +101,52 @@ export function AllPurchaseRequestsPage() {
       <PageHeader title={t('purchase.allTitle')} />
       <div className="p-6 space-y-4">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-md border bg-card p-3">
-          <div className="space-y-1"><Label>Talep Eden</Label><Input value={filter.talepEden ?? ''} onChange={(e) => update('talepEden', e.target.value || undefined)} /></div>
+          <div className="space-y-1"><Label>{t('purchase.filter.talepEden')}</Label><Input value={filter.talepEden ?? ''} onChange={(e) => update('talepEden', e.target.value || undefined)} /></div>
           <div className="space-y-1">
-            <Label>Departman</Label>
+            <Label>{t('purchase.filter.departman')}</Label>
             <Select value={filter.departman ?? 'all'} onValueChange={(v) => update('departman', v === 'all' ? undefined : v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">— Tümü —</SelectItem>
-                {DEPARTMANLAR.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {DEPARTMANLAR.map((d) => <SelectItem key={d} value={d}>{t(`roles.${d}`, { defaultValue: d })}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Durum</Label>
+            <Label>{t('purchase.filter.durum')}</Label>
             <Select value={filter.durum ?? 'all'} onValueChange={(v) => update('durum', v === 'all' ? undefined : v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">— Tümü —</SelectItem>
-                {DURUMLAR.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {DURUMLAR.map((d) => <SelectItem key={d} value={d}>{purchaseStatusLabel(t, d)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Tip</Label>
+            <Label>{t('purchase.filter.tip')}</Label>
             <Select value={filter.talepTipi ?? 'all'} onValueChange={(v) => update('talepTipi', v === 'all' ? undefined : v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">— Tümü —</SelectItem>
-                {TIPLER.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                <SelectItem value="all">{t('common.all')}</SelectItem>
+                {TIPLER.map((tp) => <SelectItem key={tp} value={tp}>{t(`purchase.tipLabel.${tp}`, { defaultValue: tp })}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1"><Label>Başlangıç</Label><Input type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => update('baslangicTarih', e.target.value || undefined)} /></div>
-          <div className="space-y-1"><Label>Bitiş</Label><Input type="date" value={filter.bitisTarih ?? ''} onChange={(e) => update('bitisTarih', e.target.value || undefined)} /></div>
+          <div className="space-y-1"><Label>{t('purchase.filter.baslangic')}</Label><Input type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => update('baslangicTarih', e.target.value || undefined)} /></div>
+          <div className="space-y-1"><Label>{t('purchase.filter.bitis')}</Label><Input type="date" value={filter.bitisTarih ?? ''} onChange={(e) => update('bitisTarih', e.target.value || undefined)} /></div>
           <div className="space-y-1 flex items-end col-span-2 md:col-span-2">
-            <Button variant="outline" onClick={() => setFilter({ page: 1, pageSize: 50 })}>Temizle</Button>
+            <Button variant="outline" onClick={() => setFilter({ page: 1, pageSize: 50 })}>{t('common.clear')}</Button>
           </div>
         </div>
 
-        <DataTable columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
+        <DataTable columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} density="compact" />
 
         {page && (
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Toplam: {page.totalCount} • Sayfa {page.page}</span>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" disabled={(filter.page ?? 1) <= 1} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}>Önceki</Button>
-              <Button size="sm" variant="outline" disabled={page.items.length < (filter.pageSize ?? 50)} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}>Sonraki</Button>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">{t('purchase.pager', { total: page.totalCount, page: page.page })}</span>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" disabled={(filter.page ?? 1) <= 1} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}>{t('common.previous')}</Button>
+              <Button size="sm" variant="outline" disabled={page.items.length < (filter.pageSize ?? 50)} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}>{t('common.next')}</Button>
             </div>
           </div>
         )}

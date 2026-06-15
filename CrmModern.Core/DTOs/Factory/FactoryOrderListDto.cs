@@ -11,4 +11,7 @@ public sealed record FactoryOrderListDto(
     DateTime? STarih,
     DateTime Tarih,
     int     KullaniciID,
-    string? Kullanici);     // "Ad Soyad" — Fabrika "Temsilci" sütunu / filtresi
+    string? Kullanici,        // "Ad Soyad" — Fabrika "Temsilci" sütunu / filtresi
+    // Round-8 §11 — Cari onay (SiparisOnaylari "MuhasebeOnaylandi") tarihi.
+    // STarih (başlangıç) DEĞİŞMEZ; bu yalnız onay zamanını taşır. Parasal değil.
+    DateTime? CariOnayTarih);

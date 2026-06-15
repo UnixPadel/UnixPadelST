@@ -147,4 +147,12 @@ public interface IOrderRepository : IBaseRepository<Order>
 
     /// <summary>Son N günde ParaTipi başına sipariş sayısı + ciro (Teklif hariç).</summary>
     Task<IReadOnlyList<CurrencyDistributionDto>> GetCurrencyDistributionAsync(int days);
+
+    /// <summary>Round-8 §13 — Tarih aralığındaki (silinmemiş) sipariş başlık satırları;
+    /// Temsilci performans raporu servis tarafında bunları gruplar.</summary>
+    Task<IReadOnlyList<Order>> GetOrdersInRangeAsync(DateTime start, DateTime end);
+
+    /// <summary>Round-8 §10 — müşterinin (id veya ad eşleşmesiyle) herhangi bir
+    /// siparişi/teklifi var mı? Müşteri silmeden önce güvenlik kontrolü.</summary>
+    Task<bool> AnyByCustomerAsync(int musteriId, string musteriAd);
 }

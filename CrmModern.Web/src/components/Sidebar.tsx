@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ShoppingCart, CheckSquare, Factory, Truck,
-  Calculator, FileText, Users, UserPlus, Search, LogOut, ChevronRight, Sparkles, X,
+  Calculator, FileText, Users, UserPlus, Search, LogOut, ChevronRight, Sparkles, X, BarChart3,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -48,6 +48,8 @@ const navItems: NavItem[] = [
   { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
   { path: '/customers',       i18nKey: 'nav.customers',       icon: <UserPlus className="h-4 w-4" />,roles: ['Yonetici','Temsilci','Gozlemci','Muhasebe'] },
   { path: '/users',           i18nKey: 'nav.users',           icon: <Users className="h-4 w-4" />,   roles: ['Yonetici'] },
+  // Round-8 §13 — Temsilci performans raporu yalnız Yonetici.
+  { path: '/reporting/representatives', i18nKey: 'nav.reporting', icon: <BarChart3 className="h-4 w-4" />, roles: ['Yonetici'] },
   { path: '/search',          i18nKey: 'nav.search',          icon: <Search className="h-4 w-4" /> },
   { path: '/updates',         i18nKey: 'nav.updates',         icon: <Sparkles className="h-4 w-4" /> },
 ]

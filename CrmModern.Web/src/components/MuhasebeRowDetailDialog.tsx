@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { statusLabel } from '@/lib/status'
 import type { AccountingOrderListDto } from '@/types'
 
 /**
@@ -23,37 +25,38 @@ const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
 )
 
 export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
+  const { t } = useTranslation()
   return (
     <Dialog open={!!row} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-lg">
-        <DialogHeader><DialogTitle>Talep Detayları</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t('accounting.rowDetailTitle')}</DialogTitle></DialogHeader>
         {row && (
           <div className="space-y-1 max-h-[60vh] overflow-y-auto">
-            <Row label="Sipariş No"      value={row.siparisNo} />
-            <Row label="Müşteri Adı"     value={row.musteriAd} />
-            <Row label="Ülke"            value={row.mUlke ?? '—'} />
-            <Row label="Şirket"          value={row.sirket ?? '—'} />
-            <Row label="Aşama"           value={row.siparisMiTeklifMi} />
-            <Row label="Tarih"           value={formatDate(row.tarih)} />
-            <Row label="Para Tipi"       value={row.paraTipi} />
+            <Row label={t('common.orderNo')}            value={row.siparisNo} />
+            <Row label={t('qc.grid.musteriAd')}         value={row.musteriAd} />
+            <Row label={t('common.country')}            value={row.mUlke ?? '—'} />
+            <Row label={t('orders.form.sirket')}        value={row.sirket ?? '—'} />
+            <Row label={t('common.stage')}              value={statusLabel(t, row.siparisMiTeklifMi)} />
+            <Row label={t('common.date')}               value={formatDate(row.tarih)} />
+            <Row label={t('qc.grid.paraTipi')}          value={row.paraTipi} />
             <div className="my-2 border-t" />
-            <Row label="Toplam Sipariş"  value={formatCurrency(row.toplamFiyat ?? 0, row.paraTipi)} />
-            <Row label="Kapora Bakiyesi" value={formatCurrency(row.kaparoFiyat ?? 0, row.paraTipi)} />
-            <Row label="Kalan Bakiye"    value={formatCurrency(row.kalanBakiye ?? 0, row.paraTipi)} />
-            <Row label="Peşin Yüzde"     value={`%${row.pesinYuzde}`} />
-            <Row label="Teslimat Çeşidi" value={row.teslimatCesiti ?? '—'} />
-            <Row label="Ödeme Durumu"    value={row.odemeDurum ?? '—'} />
+            <Row label={t('qc.grid.toplamSiparis')}     value={formatCurrency(row.toplamFiyat ?? 0, row.paraTipi)} />
+            <Row label={t('qc.grid.kaparoBakiyesi')}    value={formatCurrency(row.kaparoFiyat ?? 0, row.paraTipi)} />
+            <Row label={t('qc.grid.kalanBakiye')}       value={formatCurrency(row.kalanBakiye ?? 0, row.paraTipi)} />
+            <Row label={t('orderDetail.pesinYuzde')}    value={`%${row.pesinYuzde}`} />
+            <Row label={t('qc.fields.teslimatCesidi')}  value={row.teslimatCesiti ?? '—'} />
+            <Row label={t('qc.grid.odemeDurumu')}       value={row.odemeDurum ? statusLabel(t, row.odemeDurum) : '—'} />
             {row.maliyet != null && (
-              <Row label="Maliyet" value={formatCurrency(row.maliyet, row.paraTipi)} />
+              <Row label={t('accountingFull.maliyet.maliyet')} value={formatCurrency(row.maliyet, row.paraTipi)} />
             )}
             {row.kar != null && (
-              <Row label="Kar" value={formatCurrency(row.kar, row.paraTipi)} />
+              <Row label={t('accountingFull.cols.kar')} value={formatCurrency(row.kar, row.paraTipi)} />
             )}
             {row.maliyetDetayi && (
               <>
                 <div className="my-2 border-t" />
                 <div className="space-y-1">
-                  <span className="text-sm text-muted-foreground">Maliyet Notu</span>
+                  <span className="text-sm text-muted-foreground">{t('accountingFull.maliyet.notu')}</span>
                   <p className="text-sm whitespace-pre-wrap rounded border bg-muted/30 p-2">{row.maliyetDetayi}</p>
                 </div>
               </>
@@ -61,14 +64,14 @@ export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
             {row.muhasebeDurumu && (
               <>
                 <div className="my-2 border-t" />
-                <Row label="Muhasebe Durumu" value={row.muhasebeDurumu} />
-                {row.muhasebeRedNotu && <Row label="Red Notu" value={row.muhasebeRedNotu} />}
+                <Row label={t('accountingFull.cols.muhasebeDurum')} value={row.muhasebeDurumu} />
+                {row.muhasebeRedNotu && <Row label={t('orderDetail.redNotu')} value={row.muhasebeRedNotu} />}
               </>
             )}
           </div>
         )}
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Kapat</Button>
+          <Button variant="outline" onClick={onClose}>{t('common.close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

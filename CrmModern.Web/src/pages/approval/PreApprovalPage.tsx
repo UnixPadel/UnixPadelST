@@ -24,8 +24,8 @@ export function PreApprovalPage() {
 
   const approveMut = useMutation({
     mutationFn: (id: number) => preApprovePurchase(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['preapproval'] }); toast({ title: 'Ön onaylandı' }) },
-    onError: (e: unknown) => toast({ title: 'Hata', description: (e as Error).message, variant: 'destructive' }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['preapproval'] }); toast({ title: t('purchase.pre.approved') }) },
+    onError: (e: unknown) => toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' }),
   })
 
   const rejectMut = useMutation({
@@ -33,27 +33,27 @@ export function PreApprovalPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['preapproval'] })
       setRejectTarget(null); setRedNotu('')
-      toast({ title: 'Reddedildi' })
+      toast({ title: t('purchase.pre.rejected') })
     },
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
   })
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',       header: 'ID', sortable: true },
-    { key: 'urunAdi',       header: 'Ürün' },
-    { key: 'urunTuru',      header: 'Tür' },
-    { key: 'urunMaliyeti',  header: 'Maliyet', render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
-    { key: 'alinanYer',     header: 'Alınan Yer' },
-    { key: 'departman',     header: 'Departman' },
-    { key: 'talepEdenKullaniciAdi', header: 'Talep Eden' },
-    { key: 'talepTarihi',   header: 'Tarih', render: (r) => formatDate(r.talepTarihi as string) },
-    { key: 'durum',         header: 'Durum', render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
+    { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
+    { key: 'urunAdi',       header: t('purchase.cols.urun') },
+    { key: 'urunTuru',      header: t('purchase.cols.tur') },
+    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    { key: 'alinanYer',     header: t('purchase.cols.alinanYer') },
+    { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
+    { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
+    { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
+    { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     {
-      key: 'actions', header: 'İşlem',
+      key: 'actions', header: t('purchase.cols.islem'),
       render: (r) => (
-        <div className="flex gap-2">
-          <Button size="sm" disabled={approveMut.isPending} onClick={() => approveMut.mutate(r.talepID as number)}>Onayla</Button>
-          <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(r.talepID as number); setRedNotu('') }}>Reddet</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" disabled={approveMut.isPending} onClick={() => approveMut.mutate(r.talepID as number)}>{t('common.approve')}</Button>
+          <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(r.talepID as number); setRedNotu('') }}>{t('common.reject')}</Button>
         </div>
       ),
     },
@@ -68,15 +68,15 @@ export function PreApprovalPage() {
 
       <Dialog open={rejectTarget !== null} onOpenChange={() => setRejectTarget(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Talebi Reddet — #{rejectTarget}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('purchase.reject.title', { id: rejectTarget })}</DialogTitle></DialogHeader>
           <div className="space-y-2">
-            <Label>Red Notu *</Label>
+            <Label>{t('purchase.reject.note')}</Label>
             <Textarea value={redNotu} onChange={(e) => setRedNotu(e.target.value)} rows={3} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>İptal</Button>
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>{t('common.cancel')}</Button>
             <Button variant="destructive" disabled={!redNotu.trim() || rejectMut.isPending}
-              onClick={() => rejectMut.mutate({ id: rejectTarget!, not: redNotu })}>Reddet</Button>
+              onClick={() => rejectMut.mutate({ id: rejectTarget!, not: redNotu })}>{t('common.reject')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

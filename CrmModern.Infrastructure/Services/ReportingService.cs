@@ -4,6 +4,7 @@ using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
 using CrmModern.Core.Interfaces;
 using CrmModern.Core.Interfaces.Services;
+using CrmModern.Core.Proforma;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace CrmModern.Infrastructure.Services;
@@ -123,7 +124,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
     // EXPORT 2: Single order proforma  (Kontrol.cs / Muhasebe.cs excelYazOzet_Click)
     // ─────────────────────────────────────────────────────────────────────────────
 
-    public async Task<byte[]> ExportOrderProformaAsync(string siparisNo)
+    public async Task<byte[]> ExportOrderProformaAsync(string siparisNo, string lang = "tr")
     {
         // Normalize: accept T-prefixed TeklifNo
         string sno = siparisNo.StartsWith('T') ? "S" + siparisNo[1..] : siparisNo;
@@ -144,7 +145,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
 
             try
             {
-                return GenerateProformaFromTemplate(templateBytes, order, catLookup, compLookup);
+                return GenerateProformaFromTemplate(templateBytes, order, catLookup, compLookup, lang);
             }
             catch
             {
@@ -292,15 +293,16 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         ws.Cell(r, 1).Value = $"Ödeme: %{order.PesinYüzde} peşin, %{100 - order.PesinYüzde} yükleme öncesi";
         ws.Cell(r, 1).Style.Font.Italic = true;
 
-        // Details
+        // Details — Round-8 §4/§8: standart şart kodları hedef dile çevrilir.
         if (order.Details.Any())
         {
             r += 2;
-            ws.Cell(r, 1).Value = "Notlar:"; ws.Cell(r, 1).Style.Font.Bold = true;
+            ws.Cell(r, 1).Value = lang == "en" ? "Notes:" : "Notlar:";
+            ws.Cell(r, 1).Style.Font.Bold = true;
             foreach (var detail in order.Details)
             {
                 r++;
-                ws.Cell(r, 1).Value = $"• {detail.Text}";
+                ws.Cell(r, 1).Value = $"• {ClauseText.Resolve(detail.Text, lang)}";
             }
         }
 
@@ -349,7 +351,8 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         byte[] templateBytes,
         Core.Entities.Order order,
         IReadOnlyDictionary<int, string> catLookup,
-        IReadOnlyDictionary<int, Component> compLookup)
+        IReadOnlyDictionary<int, Component> compLookup,
+        string lang = "tr")
     {
         using var inMs = new MemoryStream(templateBytes, writable: false);
         using var wb   = new XLWorkbook(inMs);
@@ -548,19 +551,25 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     break;
 
                 // ── Detay döngüsü (her detay için hücre ofseti) ─────────────
+                // Round-8 §4/§8 — standart şart kodları hedef dile çevrilir;
+                // detay yoksa orphan "#DETAY" kalmasın diye placeholder temizlenir.
                 case "#DETAY":
                 {
                     int rowIdx = 0, colIdx = 0, count = 1;
                     int baseR = cell.Address.RowNumber;
                     int baseC = cell.Address.ColumnNumber;
+                    bool wroteAny = false;
                     foreach (var d in order.Details)
                     {
                         if (string.IsNullOrWhiteSpace(d.Text)) continue;
-                        ws.Cell(baseR + rowIdx, baseC + colIdx).Value = $"{count}. {d.Text}";
+                        var text = ClauseText.Resolve(d.Text, lang);
+                        ws.Cell(baseR + rowIdx, baseC + colIdx).Value = $"{count}. {text}";
                         rowIdx++;
                         count++;
+                        wroteAny = true;
                         if (rowIdx > 10) { rowIdx = 0; colIdx = 1; }
                     }
+                    if (!wroteAny) cell.Value = string.Empty; // orphan placeholder'ı sil
                     break;
                 }
 
@@ -666,4 +675,48 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             e.AbsoluteExpirationRelativeToNow = DashboardTtl;
             return uow.Orders.GetCurrencyDistributionAsync(days);
         })!;
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // Round-8 §13 — Temsilci performans raporu (Yönetici-only)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<RepPerformanceDto>> GetRepPerformanceAsync(DateTime start, DateTime end)
+    {
+        var orders = await uow.Orders.GetOrdersInRangeAsync(start, end);
+
+        // Yalnız Temsilci rolündeki kullanıcılar performans boyutunda görünür.
+        var temsilciler = (await uow.Kullanicilar.GetAllAsync())
+            .Where(u => u.YetkiTuru == "Temsilci")
+            .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
+
+        static decimal CiroOf(IEnumerable<Order> rows, string para) =>
+            rows.Where(o => o.ParaTipi == para).Sum(o => o.ToplamFiyat ?? 0m);
+
+        return orders
+            .Where(o => temsilciler.ContainsKey(o.KullaniciID))
+            .GroupBy(o => o.KullaniciID)
+            .Select(g =>
+            {
+                int olusturulan = g.Count();
+                int teklif      = g.Count(o => o.SiparisMiTeklifMi == "Teklif");
+                int siparis     = g.Count(o => o.SiparisMiTeklifMi != "Teklif" && o.SiparisMiTeklifMi != "Iptal");
+                return new RepPerformanceDto(
+                    KullaniciID:  g.Key,
+                    AdSoyad:      temsilciler[g.Key],
+                    Olusturulan:  olusturulan,
+                    Teklif:       teklif,
+                    Siparis:      siparis,
+                    Onaylanan:    g.Count(o => o.Kontrol == "Onay"),
+                    Reddedilen:   g.Count(o => o.Kontrol == "Reddet"),
+                    Bekleyen:     g.Count(o => o.Kontrol == "Kontrol"),
+                    Tamamlanan:   g.Count(o => o.SiparisMiTeklifMi == "Tamamlandi"),
+                    DonusumOrani: olusturulan > 0 ? Math.Round((decimal)siparis / olusturulan * 100m, 1) : 0m,
+                    CiroEuro:     CiroOf(g, "Euro"),
+                    CiroDolar:    CiroOf(g, "Dolar"),
+                    CiroTL:       CiroOf(g, "TL"),
+                    CiroSterlin:  CiroOf(g, "Sterlin"));
+            })
+            .OrderByDescending(r => r.Olusturulan)
+            .ToList();
+    }
 }

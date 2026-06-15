@@ -81,12 +81,15 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
         return Ok(ApiResponse<MusteriDto>.Ok(updated, "Müşteri güncellendi."));
     }
 
+    // Round-8 §10 — müşteri silme YALNIZ elshan.rasulov'a açık (kullanıcı adı
+    // bazlı gate; rol değil). Siparişi olan müşteri serviste bloklanır.
     [HttpDelete("{id:int}")]
-    [Authorize(Roles = "Yonetici")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int id)
     {
+        if (!IsControlUser) return Forbid();
         await musteriService.DeleteAsync(id);
         return NoContent();
     }

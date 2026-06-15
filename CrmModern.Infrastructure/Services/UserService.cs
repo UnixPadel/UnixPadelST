@@ -34,7 +34,7 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
         var users = await uow.Kullanicilar.GetAllAsync();
         return users
             .OrderBy(u => u.Ad).ThenBy(u => u.Soyad)
-            .Select(u => new UserLookupDto(u.KullaniciID, u.Ad, u.Soyad))
+            .Select(u => new UserLookupDto(u.KullaniciID, u.Ad, u.Soyad, u.YetkiTuru))
             .ToList()
             .AsReadOnly();
     }

@@ -73,7 +73,8 @@
     "convertToOrder": "Convert to Order",
     "rejectReasonPrompt": "Rejection reason:",
     "module": "Module",
-    "select": "Select"
+    "select": "Select",
+    "representative": "Representative"
   },
   "login": {
     "title": "Sign In",
@@ -107,7 +108,8 @@
     "myOrders": "My Orders",
     "users": "Users",
     "search": "Search",
-    "updates": "What's New"
+    "updates": "What's New",
+    "reporting": "Reports · Representatives"
   },
   "customers": {
     "title": "Customers",
@@ -116,6 +118,8 @@
     "searchPlaceholder": "Name, phone, email, VAT, country...",
     "addCountry": "Add Country",
     "addCountryTitle": "New Country",
+    "deleteTitle": "Delete Customer",
+    "deleteConfirm": "Delete \"{{name}}\"? This cannot be undone.",
     "fields": {
       "musteriAd": "Customer Name",
       "telefon": "Phone",
@@ -134,13 +138,16 @@
       "updated": "Customer updated.",
       "saveFailed": "Save failed.",
       "ulkeCreated": "Country added.",
-      "ulkeFailed": "Could not add country."
+      "ulkeFailed": "Could not add country.",
+      "deleted": "Customer deleted.",
+      "deleteFailed": "Could not delete customer."
     }
   },
   "topbar": {
     "toggleMenu": "Toggle menu",
     "language": "Language",
-    "search": "Search..."
+    "search": "Search...",
+    "searchMinChars": "Type at least 2 characters…"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -193,12 +200,28 @@
       "formGoster": "Show Form",
       "sipariseCevir": "Convert to Order",
       "redNotu": "Rejection Note",
-      "revize": "Revise"
+      "revize": "Revise",
+      "duzenle": "Edit",
+      "sil": "Delete"
     },
     "disabled": {
       "convert": "Only non-rejected quotes can be converted to orders.",
       "redNote": "This order was not rejected so no note is available.",
-      "revise": "Approved records cannot be revised."
+      "revise": "Approved records cannot be revised.",
+      "editDelete": "Approved orders can no longer be edited or deleted."
+    },
+    "badge": {
+      "silindi": "Deleted",
+      "guncellendi": "Updated"
+    },
+    "delete": {
+      "title": "Delete Order — {{no}}",
+      "reason": "Reason for deletion *"
+    },
+    "amend": {
+      "banner": "Editing order (a reason is required to save)",
+      "reason": "Reason for change *",
+      "save": "Save Changes"
     },
     "redNote": {
       "title": "Rejection Note",
@@ -206,7 +229,9 @@
     },
     "toast": {
       "converted": "Quote converted to order.",
-      "convertFailed": "Conversion failed."
+      "convertFailed": "Conversion failed.",
+      "deleted": "Order deleted.",
+      "deleteFailed": "Delete failed."
     }
   },
   "orders": {
@@ -265,7 +290,67 @@
       "multiAddressHint": "Multiple delivery addresses are stored; the first is snapshotted to the parent table.",
       "siparisOlusturuldu": "Order created",
       "teklifOlusturuldu": "Quote created",
-      "receteAcildi": "Recipe expanded"
+      "receteAcildi": "Recipe expanded",
+      "musteriEkle": "Add Customer",
+      "temsilciIsmi": "Representative Name",
+      "ek": "Attachment",
+      "ekHint": "Attach only in ZIP or RAR format",
+      "standardTerms": "Standard Terms",
+      "freeNotes": "Notes (one per line)",
+      "toplamFiyatLabel": "Total Price",
+      "kaporaMiktari": "Deposit Amount",
+      "diger": "Other",
+      "montaj": "Assembly",
+      "teslimat": "Delivery",
+      "montajFiyat": "Assembly Price",
+      "miktar": "Qty",
+      "carp": "Multiply",
+      "siparisN": "Order {{n}}",
+      "anaUrun": "Main Product",
+      "anaUrunSec": "Select main product",
+      "tekilFiyatAdet": "Unit Price & Qty",
+      "setFiyati": "Set Price",
+      "bilesenlerYukleniyor": "Loading components…",
+      "anaUrunSecHint": "Select a main product to see its components here.",
+      "oznitelik": "Attribute",
+      "bilesenAdiLabel": "Component Name",
+      "birim": "Unit",
+      "birimFiyat": "Unit Price",
+      "toplam": "Total",
+      "listedenSecin": "Check components from the list.",
+      "onceAnaUrun": "Select a main product first.",
+      "iliskilendir": "Associate",
+      "sec": "Select",
+      "cesidi": "Type",
+      "altTelefon": "Alternate Phone",
+      "musteriTeslimat": "Customer / Delivery",
+      "formuGetir": "Load Form",
+      "teklifiHazirla": "Prepare Quote",
+      "siparisiHazirla": "Prepare Order",
+      "revizeEt": "Revise",
+      "getirSearch": "Search quote no / order no / customer…",
+      "formYukleniyor": "Loading form…"
+    },
+    "subtitle": "Order Form — 3 columns (Customer / Sets / Account)",
+    "sections": {
+      "musteri": "Customer",
+      "temsilci": "Representative",
+      "cariBilgi": "Account Info",
+      "teslimatMontaj": "Delivery / Assembly"
+    },
+    "toast": {
+      "created": "Order created",
+      "quoteCreated": "Quote created",
+      "revised": "Revision saved",
+      "error": "Error",
+      "formLoaded": "Form loaded",
+      "formLoadedDesc": "{{no}} → editable as a new record",
+      "formLoadFailed": "Could not load form",
+      "uploadFailed": "Upload failed",
+      "invalidNumber": "Please enter a valid number.",
+      "noFabrikaOption": "The 'Factory' option is not available.",
+      "amended": "Order updated",
+      "bilesenLoadFailed": "Could not load components"
     }
   },
   "qc": {
@@ -464,7 +549,7 @@
     "queueCounts": "Cari: {{cari}} · Logistics: {{lojistik}} pending",
     "selectFirst": "Please select an order.",
     "views": {
-      "cariQueue": "Pending Cari Approval",
+      "cariQueue": "Pending Account Approval",
       "lojistikQueue": "Pending Logistics Approval",
       "hepsi": "All",
       "beklenen": "Pending",
@@ -474,7 +559,7 @@
       "kuyruk": "Queue"
     },
     "queueBadge": {
-      "cari": "Awaiting Cari Approval",
+      "cari": "Awaiting Account Approval",
       "lojistik": "Awaiting Logistics Approval"
     },
     "blocks": {
@@ -488,7 +573,7 @@
       "dosya": "File (PDF/ZIP/JPG…)"
     },
     "actions": {
-      "cariOnayla": "Approve Cari",
+      "cariOnayla": "Approve Account",
       "lojistikOnayla": "Approve Logistics"
     },
     "disabled": {
@@ -504,6 +589,7 @@
     "historyTitle": "Accounting · History",
     "balanceTitle": "Accounting · Balance",
     "logisticsApprovalsTitle": "Accounting · Logistics Approvals",
+    "rowDetailTitle": "Request Details",
     "filter": {
       "all": "— All —",
       "ulke": "Country",
@@ -514,6 +600,50 @@
       "reset": "Reset",
       "totalsLabel": "Total payments in the filtered result (by currency)",
       "rowCount": "Records found"
+    },
+    "tahsilat": {
+      "title": "Collection — {{no}}",
+      "toplam": "Total",
+      "odenen": "Paid",
+      "kalan": "Remaining",
+      "tutar": "Amount",
+      "previous": "Previous collections:",
+      "none": "No collections yet.",
+      "ekTitle": "Accounting Attachment — {{no}}",
+      "dosya": "File (PDF/ZIP/JPG…)"
+    }
+  },
+  "accountingHistory": {
+    "maliyetRecetesi": "Cost Sheet",
+    "cols": {
+      "siparisNo": "Order No",
+      "musteri": "Customer",
+      "temsilci": "Representative",
+      "paraTipi": "Currency",
+      "pesinat": "Installment {{n}}",
+      "fark": "Difference (1→2)",
+      "diger": "Other"
+    },
+    "moreCount": "+{{count}} more",
+    "empty": "No records.",
+    "dialog": {
+      "title": "Cost Sheet — {{no}}",
+      "toplamFiyat": "Total Price",
+      "odenenMiktar": "Paid Amount",
+      "indirim": "Discount %",
+      "kdv": "VAT %",
+      "pesin": "Down Payment %",
+      "paraTipi": "Currency",
+      "maliyetEdit": "Cost (editable)",
+      "maliyetKaydet": "Save Cost",
+      "detay": "Detail",
+      "brutKar": "Gross Profit",
+      "netKar": "Net Profit",
+      "zarar": "Loss",
+      "marj": "Margin %",
+      "tahsilat": "Collection %",
+      "saved": "Cost saved",
+      "saveFailed": "Could not save cost"
     }
   },
   "logistics": {
@@ -532,6 +662,55 @@
     },
     "cesit": {
       "select": "Select transport type"
+    },
+    "createShipment": "Create Shipment",
+    "shipmentTitle": "Create Shipment — {{no}}",
+    "carrierLabel": "Carrier / Firm *",
+    "transportType": "Transport Type *",
+    "agreedAmount": "Agreed Amount (carrier)",
+    "shipDate": "Shipment Date",
+    "note": "Logistics Note",
+    "ship": "Ship",
+    "agreement": {
+      "title": "Carrier Agreement",
+      "firm": "Carrier",
+      "type": "Transport Type",
+      "amount": "Agreed Amount",
+      "note": "Agreement Note",
+      "empty": "Not entered yet"
+    },
+    "toast": {
+      "created": "Shipment request created — awaiting accounting approval.",
+      "error": "Operation failed",
+      "completed": "Shipment completed",
+      "cancelled": "Shipment cancelled"
+    },
+    "history": {
+      "firma": "Carrier",
+      "tur": "Type",
+      "operator": "Operator",
+      "complete": "Complete",
+      "cancelPrompt": "Cancellation reason:",
+      "firmaPlaceholder": "Carrier name"
+    }
+  },
+  "logApprovals": {
+    "sevkId": "Shipment #",
+    "tasiyici": "Carrier",
+    "tur": "Type",
+    "sevkTarihi": "Ship Date",
+    "approveTitle": "Approve Shipment — #{{id}}",
+    "rejectTitle": "Reject Shipment — #{{id}}",
+    "siparis": "Order",
+    "onayAciklama": "Approval Note",
+    "optional": "(optional)",
+    "redGerekce": "Rejection Reason *",
+    "rejectHint": "After rejection the shipment row is deleted and the order stays 'Ready'.",
+    "toast": {
+      "approved": "Shipment approved",
+      "approveFailed": "Approval failed",
+      "rejected": "Shipment rejected",
+      "rejectFailed": "Rejection failed"
     }
   },
   "factory": {
@@ -546,7 +725,8 @@
     "ready": "Ready",
     "uretimTarihi": "Production Date",
     "fabrikaNot": "Factory Note",
-    "fabrikaNotPlaceholder": "Enter factory note..."
+    "fabrikaNotPlaceholder": "Enter factory note...",
+    "cariOnayTarih": "Account Approval Date"
   },
   "purchase": {
     "newTitle": "Purchase · New Request",
@@ -566,7 +746,165 @@
     "createError": "Error",
     "actionCol": "Action",
     "overrideApprove": "Approve",
-    "overrideSuccess": "Request approved (all stages skipped)."
+    "overrideSuccess": "Request approved (all stages skipped).",
+    "cols": {
+      "id": "ID",
+      "urun": "Product",
+      "tur": "Type",
+      "maliyet": "Cost",
+      "alinanYer": "Source",
+      "talepEden": "Requested By",
+      "departman": "Department",
+      "tip": "Type",
+      "durum": "Status",
+      "asama": "Stage",
+      "tarih": "Date",
+      "islem": "Action"
+    },
+    "tipLabel": { "SatinAlma": "Purchase", "Muhasebe": "Accounting" },
+    "asamaLabel": {
+      "fabrikaOnIzleme": "Factory / Pre-Review",
+      "muhasebe": "Accounting",
+      "nihaiOnay": "Final Approval",
+      "tamamlandi": "Completed"
+    },
+    "filter": {
+      "talepEden": "Requested By",
+      "departman": "Department",
+      "durum": "Status",
+      "tip": "Type",
+      "baslangic": "Start",
+      "bitis": "End"
+    },
+    "pager": "Total: {{total}} • Page {{page}}",
+    "reject": {
+      "title": "Reject Request — #{{id}}",
+      "note": "Rejection Note *"
+    },
+    "pre": { "approved": "Pre-approved", "rejected": "Rejected" },
+    "payment": {
+      "pageTitle": "Payment Details (Accounting)",
+      "dialogTitle": "Payment Details — Request #{{id}}",
+      "enter": "Enter Payment Details",
+      "heading": "Payment Details",
+      "odemeTuru": "Payment Type *",
+      "islemTarihi": "Transaction Date *",
+      "saved": "Payment details saved (Accounting Done)",
+      "selectPlaceholder": "Select"
+    },
+    "final": {
+      "reviewApprove": "Review / Approve",
+      "reviewTitle": "Request Review — #{{id}}",
+      "talep": "Request",
+      "muhasebeReadonly": "Accounting Payment Details (read-only)",
+      "noPayment": "⚠ Payment details not entered yet (RULE 4: required for Purchase type).",
+      "approved": "Approved",
+      "approveFailed": "Approval failed",
+      "rejected": "Rejected",
+      "ruleBlocked": "RULE 4: Payment details missing",
+      "fields": {
+        "urun": "Product",
+        "tur": "Type",
+        "maliyet": "Cost",
+        "alinanYer": "Source",
+        "departman": "Department",
+        "talepEden": "Requested By",
+        "tarih": "Date",
+        "notlar": "Notes",
+        "onOnay": "Pre-Approval",
+        "odemeTuru": "Payment Type",
+        "odenenTutar": "Paid Amount",
+        "odemeTutari": "Payment Amount",
+        "vadeSuresi": "Term Length",
+        "vadeTutari": "Term Amount",
+        "vadeTarihi": "Term Date",
+        "belgeNo": "Document No",
+        "bankaAdi": "Bank Name",
+        "islemTarihi": "Transaction Date",
+        "kartTipi": "Card Type",
+        "taksit": "Installments",
+        "aciklama": "Description",
+        "muhasebeYapan": "Processed By",
+        "muhasebeTarihi": "Processing Date"
+      }
+    },
+    "detailPanel": {
+      "urun": "Product",
+      "maliyet": "Cost",
+      "departman": "Department",
+      "talepEden": "Requested By",
+      "not": "Note",
+      "onOnaylayan": "Pre-Approver"
+    }
+  },
+  "roles": {
+    "Yonetici": "Manager",
+    "Muhasebe": "Accounting",
+    "Fabrika": "Factory",
+    "Gozlemci": "Observer",
+    "Temsilci": "Representative",
+    "Lojistik": "Logistics"
+  },
+  "clauses": {
+    "fiyat": "Prices are valid for 2 weeks.",
+    "kdv": "VAT is not included in the prices.",
+    "kargo": "Shipping is not included in the prices.",
+    "montaj": "Assembly is not included in the prices.",
+    "haklar": "All rights to the prices and information in this document are reserved.",
+    "teslimat": "Delivery Term: {{value}}",
+    "odemePesin": "Payment Method: Upfront",
+    "odemeVadeli": "Payment Method: Installments",
+    "odemeVadeliPesin": "Payment Method: Installments — {{pesin}}% upfront"
+  },
+  "reporting": {
+    "repTitle": "Representative Performance",
+    "repSubtitle": "Per-representative metrics for the selected period",
+    "period": { "day": "Today", "week": "This Week", "month": "This Month" },
+    "cols": {
+      "olusturulan": "Created",
+      "teklif": "Quotes",
+      "siparis": "Orders",
+      "onaylanan": "Approved",
+      "reddedilen": "Rejected",
+      "bekleyen": "Pending",
+      "tamamlanan": "Completed",
+      "donusum": "Conversion %",
+      "ciro": "Revenue"
+    },
+    "empty": "No data for this period."
+  },
+  "orderDetail": {
+    "title": "Order Detail — {{no}}",
+    "musteriInfo": "Customer Information",
+    "teslimatAddr": "Delivery Address",
+    "pricing": "Pricing",
+    "products": "Products / Components",
+    "notes": "Notes",
+    "musteri": "Customer",
+    "ulke": "Country",
+    "telefon": "Phone",
+    "email": "E-Mail",
+    "vat": "VAT No",
+    "adres": "Address",
+    "teslimAlan": "Recipient",
+    "ilgiliKisi": "Contact Person",
+    "paraBirimi": "Currency",
+    "brut": "Gross Total",
+    "indirim": "Discount",
+    "kdv": "VAT",
+    "toplam": "Total",
+    "pesinYuzde": "Down Payment %",
+    "montaj": "Assembly",
+    "teslimat": "Delivery",
+    "tur": "Type",
+    "oznitelik": "Attribute",
+    "adet": "Qty",
+    "fiyat": "Price",
+    "set": "SET {{id}}",
+    "bilesen": "Component {{id}}",
+    "redNotu": "Rejection Note",
+    "fabrikaNot": "Factory Note",
+    "lojistikNot": "Logistics Note"
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",
@@ -597,5 +935,34 @@
     "completed": "Completed",
     "planning": "Planning",
     "noHistoryNote": "Detailed stage transitions are not stored; only the last action time is shown."
+  },
+  "status": {
+    "stage": {
+      "quote": "Quote",
+      "order": "Order",
+      "planning": "Planning",
+      "production": "Production",
+      "ready": "Ready",
+      "logistics": "Logistics",
+      "completed": "Completed",
+      "cancelled": "Cancelled"
+    },
+    "kontrol": {
+      "pendingControl": "Pending Control",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    },
+    "odeme": {
+      "paid": "Paid",
+      "pending": "Pending"
+    },
+    "purchase": {
+      "waiting": "Waiting",
+      "awaitingApproval": "Awaiting Approval",
+      "preApproved": "Pre-Approved",
+      "accountingDone": "Accounting Done",
+      "approved": "Approved",
+      "rejected": "Rejected"
+    }
   }
 }

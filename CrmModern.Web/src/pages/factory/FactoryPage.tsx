@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getFactoryOrders, moveToProduction, markReady, type FactoryFilter } from '@/api/factory'
@@ -6,6 +6,7 @@ import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
+import { statusLabel } from '@/lib/status'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -44,6 +45,8 @@ export function FactoryPage() {
 
   // Temsilci dropdown — /api/users/lookup (Yonetici-only değil; herkes çekebilir)
   const { data: users = [] } = useQuery({ queryKey: ['users-lookup'], queryFn: getUsersLookup })
+  // Round-8 §11 — Temsilci filtresi yalnız Temsilci rolündeki kullanıcıları listeler.
+  const temsilciUsers = useMemo(() => users.filter((u) => u.yetkiTuru === 'Temsilci'), [users])
 
   // Aşama veya herhangi bir filtre değişimi sorguyu tetikler
   const { data = [], isLoading } = useQuery({
@@ -114,12 +117,14 @@ export function FactoryPage() {
     { key: 'siparisMiTeklifMi', header: t('common.stage'),    sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
     { key: 'fabrikaNot',        header: t('common.note'),     render: (r) => <span className="text-sm text-muted-foreground">{(r.fabrikaNot as string) ?? '—'}</span> },
     { key: 'sTarih',            header: t('common.startDate'),render: (r) => r.sTarih ? formatDate(r.sTarih as string) : '—' },
+    // Round-8 §11 — Cari onay tarihi (başlangıç tarihinden ayrı).
+    { key: 'cariOnayTarih',     header: t('factory.cariOnayTarih'), sortable: true, render: (r) => r.cariOnayTarih ? formatDate(r.cariOnayTarih as string) : '—' },
     { key: 'tarih',             header: t('common.date'),     sortable: true, render: (r) => formatDate(r.tarih as string) },
     {
       key: 'actions',
       header: t('common.actions'),
       render: (r) => (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.form')}</Button>
           {!isFabrika && (
             <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
@@ -166,7 +171,7 @@ export function FactoryPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
-                {users.map((u) => (
+                {temsilciUsers.map((u) => (
                   <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>{`${u.ad} ${u.soyad}`.trim()}</SelectItem>
                 ))}
               </SelectContent>
@@ -178,7 +183,7 @@ export function FactoryPage() {
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
-                {FACTORY_ASAMALAR.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                {FACTORY_ASAMALAR.map((a) => <SelectItem key={a} value={a}>{statusLabel(t, a)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -201,6 +206,7 @@ export function FactoryPage() {
           data={data as (FactoryOrderListDto & Record<string, unknown>)[]}
           keyField="siparisNo"
           loading={isLoading}
+          density="compact"
           onRowClick={(r) => setDetailNo(r.siparisNo as string)}
         />
       </div>

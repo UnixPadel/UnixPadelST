@@ -223,6 +223,32 @@ public sealed class OrderController(
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Round-8 §7 — Kontrol onayı öncesi yerinde düzenleme / yumuşak silme
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Mevcut siparişi yerinde günceller (numara değişmez). Yalnız
+    /// Kontrol != 'Onay' iken; gerekçe zorunlu; sahip + Yönetici/elshan yetkili.</summary>
+    [HttpPut("{no}/amend")]
+    [ProducesResponseType(typeof(ApiResponse<string>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Amend(string no, [FromBody] AmendOrderRequest req)
+    {
+        bool mgr = User.IsInRole("Yonetici") || IsControlUser;
+        var resultNo = await orderService.AmendOrderAsync(CurrentUserId, no, req.Order, req.Gerekce, mgr);
+        return Ok(ApiResponse<string>.Ok(resultNo, "Sipariş güncellendi."));
+    }
+
+    /// <summary>Siparişi yumuşak siler (listede 'Silindi' rozetiyle kalır).
+    /// Yalnız Kontrol != 'Onay' iken; gerekçe zorunlu; sahip + Yönetici/elshan.</summary>
+    [HttpDelete("{no}")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Delete(string no, [FromBody] DeleteOrderRequest req)
+    {
+        bool mgr = User.IsInRole("Yonetici") || IsControlUser;
+        await orderService.SoftDeleteOrderAsync(CurrentUserId, no, req.Gerekce, mgr);
+        return Ok(ApiResponse<object>.Ok(null!, "Sipariş silindi."));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Status transitions
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -397,13 +423,15 @@ public sealed class OrderController(
     /// </summary>
     // PROMPT-v2 §2: Proforma fiyatlar içerdiği için Fabrika dışlandı.
     // PROMPT-v4 §1/§5.7: + elshan.rasulov istisnası (Kontrol ekranı "Excel'e Yaz").
+    // Round-8 §4 — `lang` (tr|en) standart şart kodlarını proformada hangi dile
+    // çevireceğini belirler; frontend mevcut UI dilini geçer.
     [HttpGet("{no}/excel")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
-    public async Task<IActionResult> Excel(string no)
+    public async Task<IActionResult> Excel(string no, [FromQuery] string lang = "tr")
     {
         if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !IsControlUser)
             return Forbid();
-        var bytes = await reportingService.ExportOrderProformaAsync(no);
+        var bytes = await reportingService.ExportOrderProformaAsync(no, lang);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

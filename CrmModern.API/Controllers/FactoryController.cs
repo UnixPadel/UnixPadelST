@@ -11,7 +11,10 @@ namespace CrmModern.API.Controllers;
 [ApiController]
 [Route("api/factory")]
 [Authorize]
-public sealed class FactoryController(IFactoryService factoryService, IOrderService orderService) : ControllerBase
+public sealed class FactoryController(
+    IFactoryService factoryService,
+    IOrderService orderService,
+    IReportingService reportingService) : ControllerBase
 {
     // PROMPT-v6 §1.1 — Fabrika aşama geçişleri (Üretime Al / Hazır) yalnız bu
     // kullanıcı adına açık (elshan kalıbı: kullanıcı adı gate, rol değil).
@@ -86,12 +89,14 @@ public sealed class FactoryController(IFactoryService factoryService, IOrderServ
     // PROMPT-v2 §2: Excel ToplamFiyat içerdiği için Fabrika dışlandı.
     [HttpGet("{siparisNo}/excel")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
-    public async Task<IActionResult> Excel(string siparisNo)
+    public async Task<IActionResult> Excel(string siparisNo, [FromQuery] string lang = "tr")
     {
-        var bytes = await orderService.GenerateExcelAsync(siparisNo);
+        // Round-8 §8 — Kontrol/Muhasebe/Fabrika "Excel" düğmeleri AYNI proforma
+        // üreticisini kullanır (detaylar #DETAY altında doğru gelsin diye).
+        var bytes = await reportingService.ExportOrderProformaAsync(siparisNo, lang);
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            $"siparis_{siparisNo}.xlsx");
+            $"Proforma_{siparisNo}_{DateTime.Now:yyyyMMdd}.xlsx");
     }
 
     /// <summary>Ek/MuhasebeEk dosya indirme (Fabrika ekranındaki "Ek İndir").</summary>

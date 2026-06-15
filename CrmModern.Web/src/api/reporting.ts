@@ -1,7 +1,7 @@
 import axios from '@/lib/axios'
 import type {
   ApiResponse, DashboardKpi, OrderTrendPoint,
-  StageDistribution, TopCustomer, CurrencyDistribution,
+  StageDistribution, TopCustomer, CurrencyDistribution, RepPerformance,
 } from '@/types'
 
 // ─── Faz 7 Dashboard ────────────────────────────────────────────────────────
@@ -32,6 +32,13 @@ export async function getTopCustomers(days = 90, limit = 10): Promise<TopCustome
 export async function getCurrencyDistribution(days = 90): Promise<CurrencyDistribution[]> {
   const res = await axios.get<ApiResponse<CurrencyDistribution[]>>(
     '/api/reporting/dashboard/currency-distribution', { params: { days } })
+  return res.data.data
+}
+
+// Round-8 §13 — Temsilci performans raporu (Yönetici-only). ISO tarih (yyyy-MM-dd).
+export async function getRepPerformance(baslangic: string, bitis: string): Promise<RepPerformance[]> {
+  const res = await axios.get<ApiResponse<RepPerformance[]>>(
+    '/api/reporting/rep-performance', { params: { baslangic, bitis } })
   return res.data.data
 }
 

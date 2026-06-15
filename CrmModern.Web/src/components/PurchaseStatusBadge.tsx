@@ -5,9 +5,13 @@
 //   Ön Onaylandı         → #BDD7EE koyu mavi
 //   Reddedildi           → #FFC7CE kırmızı/pembe
 //   Bekliyor / diğer     → #FFEB9C sarı
+import { useTranslation } from 'react-i18next'
+import { purchaseStatusLabel } from '@/lib/status'
+
 interface Props { value?: string | null }
 
 export function PurchaseStatusBadge({ value }: Props) {
+  const { t } = useTranslation()
   if (!value) return <span className="text-muted-foreground">—</span>
   const cls =
     value === 'Onaylandı'           ? 'bg-purchase-onay     text-green-900  border-green-700/30' :
@@ -17,7 +21,7 @@ export function PurchaseStatusBadge({ value }: Props) {
                                       'bg-purchase-bekle    text-yellow-900 border-yellow-700/30'
   return (
     <span className={`inline-block px-2 py-0.5 text-xs rounded border ${cls}`}>
-      {value}
+      {purchaseStatusLabel(t, value)}
     </span>
   )
 }

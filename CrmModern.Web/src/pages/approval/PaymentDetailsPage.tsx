@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import {
   getPendingPayment, getPurchaseById, setPaymentDetails,
   type SetPaymentDetailsRequest,
@@ -41,6 +42,7 @@ const buildEmpty = (): SetPaymentDetailsRequest => ({
 })
 
 export function PaymentDetailsPage() {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { toast } = useToast()
   const [target, setTarget] = useState<number | null>(null)
@@ -70,24 +72,24 @@ export function PaymentDetailsPage() {
       qc.invalidateQueries({ queryKey: ['preapproval'] })
       qc.invalidateQueries({ queryKey: ['final-pending'] })
       setTarget(null); setForm(buildEmpty()); setSubmitted(false)
-      toast({ title: 'Ödeme detayı kaydedildi (Muhasebe Tamamlandı)' })
+      toast({ title: t('purchase.payment.saved') })
     },
-    onError: (e: unknown) => toast({ title: 'Kayıt başarısız', description: (e as Error).message, variant: 'destructive' }),
+    onError: (e: unknown) => toast({ title: t('common.failed'), description: (e as Error).message, variant: 'destructive' }),
   })
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',       header: 'ID', sortable: true },
-    { key: 'urunAdi',       header: 'Ürün' },
-    { key: 'urunMaliyeti',  header: 'Maliyet', render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
-    { key: 'departman',     header: 'Departman' },
-    { key: 'talepEdenKullaniciAdi', header: 'Talep Eden' },
-    { key: 'talepTarihi',   header: 'Tarih', render: (r) => formatDate(r.talepTarihi as string) },
-    { key: 'durum',         header: 'Durum', render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
+    { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
+    { key: 'urunAdi',       header: t('purchase.cols.urun') },
+    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
+    { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
+    { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
+    { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     {
-      key: 'actions', header: 'İşlem',
+      key: 'actions', header: t('purchase.cols.islem'),
       render: (r) => (
         <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()); setSubmitted(false) }}>
-          Ödeme Detayı Gir
+          {t('purchase.payment.enter')}
         </Button>
       ),
     },
@@ -95,7 +97,7 @@ export function PaymentDetailsPage() {
 
   return (
     <div>
-      <PageHeader title="Ödeme Detayı (Muhasebe)" />
+      <PageHeader title={t('purchase.payment.pageTitle')} />
       <div className="p-6">
         <DataTable columns={cols} data={pending as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
       </div>
@@ -103,18 +105,18 @@ export function PaymentDetailsPage() {
       <Dialog open={!!target} onOpenChange={() => setTarget(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Ödeme Detayı — Talep #{target}</DialogTitle>
+            <DialogTitle>{t('purchase.payment.dialogTitle', { id: target })}</DialogTitle>
           </DialogHeader>
 
           {detail && (
             <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1 mb-3">
               <div className="grid grid-cols-2 gap-2">
-                <div><span className="text-muted-foreground">Ürün:</span> {detail.urunAdi}</div>
-                <div><span className="text-muted-foreground">Maliyet:</span> {formatCurrency(detail.urunMaliyeti ?? 0)}</div>
-                <div><span className="text-muted-foreground">Departman:</span> {detail.departman}</div>
-                <div><span className="text-muted-foreground">Talep Eden:</span> {detail.talepEdenKullaniciAdi}</div>
-                {detail.notlar && <div className="col-span-2"><span className="text-muted-foreground">Not:</span> {detail.notlar}</div>}
-                {detail.onIzlemeYapan && <div className="col-span-2 text-xs text-blue-700">Ön Onaylayan: {detail.onIzlemeYapan} · {detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''}</div>}
+                <div><span className="text-muted-foreground">{t('purchase.detailPanel.urun')}:</span> {detail.urunAdi}</div>
+                <div><span className="text-muted-foreground">{t('purchase.detailPanel.maliyet')}:</span> {formatCurrency(detail.urunMaliyeti ?? 0)}</div>
+                <div><span className="text-muted-foreground">{t('purchase.detailPanel.departman')}:</span> {detail.departman}</div>
+                <div><span className="text-muted-foreground">{t('purchase.detailPanel.talepEden')}:</span> {detail.talepEdenKullaniciAdi}</div>
+                {detail.notlar && <div className="col-span-2"><span className="text-muted-foreground">{t('purchase.detailPanel.not')}:</span> {detail.notlar}</div>}
+                {detail.onIzlemeYapan && <div className="col-span-2 text-xs text-blue-700">{t('purchase.detailPanel.onOnaylayan')}: {detail.onIzlemeYapan} · {detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''}</div>}
               </div>
             </div>
           )}
@@ -122,23 +124,23 @@ export function PaymentDetailsPage() {
           {/* PROMPT.md ACCOUNTING #10 (revised): heading + Ödeme Türü dropdown +
               İşlem Tarihi (defaults to DateTime.Now — task #11). No sub-fields. */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">Ödeme Detayı</h3>
+            <h3 className="text-sm font-medium">{t('purchase.payment.heading')}</h3>
             <div className="space-y-1">
-              <Label>Ödeme Türü *</Label>
+              <Label>{t('purchase.payment.odemeTuru')}</Label>
               <Select
                 value={form.odemeTuru}
                 onValueChange={(s) => setForm((f) => ({ ...f, odemeTuru: s }))}
                 disabled={saveMut.isPending}
               >
-                <SelectTrigger><SelectValue placeholder="Seçin" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('purchase.payment.selectPlaceholder')} /></SelectTrigger>
                 <SelectContent>
-                  {ODEME_TURLERI.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                  {ODEME_TURLERI.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
-              {submitted && !form.odemeTuru && <FieldError message="Bu alan zorunludur" />}
+              {submitted && !form.odemeTuru && <FieldError message={t('validation.required')} />}
             </div>
             <div className="space-y-1">
-              <Label>İşlem Tarihi *</Label>
+              <Label>{t('purchase.payment.islemTarihi')}</Label>
               <Input
                 type="datetime-local"
                 value={form.odemeIslemTarihi ?? ''}
@@ -149,9 +151,9 @@ export function PaymentDetailsPage() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTarget(null)}>İptal</Button>
+            <Button variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
             <Button disabled={saveMut.isPending} onClick={onSubmit}>
-              {saveMut.isPending ? 'Kaydediliyor...' : 'Kaydet'}
+              {saveMut.isPending ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -95,6 +95,13 @@ export const createOrder = (dto: CreateOrderDto) =>
 export const reviseOrder = (eskiNo: string, dto: CreateOrderDto) =>
   api.post<ApiResponse<string>>(`/api/orders/${eskiNo}/revise`, dto).then((r) => r.data.data)
 
+// Round-8 §7 — Kontrol onayı öncesi yerinde düzenleme (numara değişmez) + silme.
+export const amendOrder = (no: string, dto: CreateOrderDto, gerekce: string) =>
+  api.put<ApiResponse<string>>(`/api/orders/${no}/amend`, { order: dto, gerekce }).then((r) => r.data.data)
+
+export const deleteOrder = (no: string, gerekce: string) =>
+  api.delete(`/api/orders/${no}`, { data: { gerekce } }).then((r) => r.data)
+
 export const cloneOrder = (sourceNo: string) =>
   api.post<ApiResponse<string>>(`/api/orders/${sourceNo}/clone`).then((r) => r.data.data)
 
@@ -159,13 +166,21 @@ export const downloadAttachment = async (no: string, type: 'ek' | 'muhasebeek') 
 
 // ── Excel ───────────────────────────────────────────────────────────────────
 
-export const excelUrl = (no: string) => `/api/orders/${no}/excel`
+// Round-8 §4 — proforma standart şartları aktif UI diline göre üretilsin diye
+// `lang` query'si geçilir (i18next localStorage anahtarı: 'i18nextLng').
+const currentLang = (): 'tr' | 'en' =>
+  (localStorage.getItem('i18nextLng') || 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr'
+
+export const excelUrl = (no: string) => `/api/orders/${no}/excel?lang=${currentLang()}`
 
 export const downloadExcel = async (no: string) => {
-  const res = await api.get(`/api/orders/${no}/excel`, { responseType: 'blob' })
+  const res = await api.get(`/api/orders/${no}/excel`, {
+    params: { lang: currentLang() },
+    responseType: 'blob',
+  })
   const url = URL.createObjectURL(res.data as Blob)
   const a = document.createElement('a')
-  a.href = url; a.download = `siparis_${no}.xlsx`; a.click()
+  a.href = url; a.download = `Proforma_${no}.xlsx`; a.click()
   URL.revokeObjectURL(url)
 }
 

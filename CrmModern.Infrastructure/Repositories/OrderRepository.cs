@@ -49,6 +49,20 @@ internal sealed class OrderRepository(AppDbContext context)
             .OrderByDescending(o => o.SiparisAlID)
             .ToListAsync();
 
+    // Round-8 §13 — Temsilci performans raporu kaynağı (silinmemiş başlık satırları).
+    public async Task<IReadOnlyList<Order>> GetOrdersInRangeAsync(DateTime start, DateTime end) =>
+        await _context.SiparisAlTablo
+            .AsNoTracking()
+            .Where(o => !o.Silindi && o.Tarih >= start && o.Tarih <= end)
+            .ToListAsync();
+
+    // Round-8 §10 — müşteri silmeden önce sipariş/teklif var mı kontrolü.
+    public async Task<bool> AnyByCustomerAsync(int musteriId, string musteriAd) =>
+        await _context.SiparisAlTablo
+            .AsNoTracking()
+            .AnyAsync(o => o.MusteriId == musteriId
+                || (musteriAd != "" && o.MusteriAd == musteriAd));
+
     public async Task<int> GetNextSequenceAsync()
     {
         // Matches the WinForms query: SELECT MAX(SiparisAlID) FROM SiparisAlTablo

@@ -50,12 +50,19 @@ internal sealed class FactoryService(IUnitOfWork uow) : IFactoryService
             .Where(u => userIds.Contains(u.KullaniciID))
             .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
 
+        // Round-8 §11 — Cari onay tarihini SiparisOnaylari'ndan toplu çek;
+        // STarih (başlangıç) bozulmadan Fabrika listesine taşınır.
+        var siparisNolar = orders.Select(o => o.SiparisNo).Distinct().ToList();
+        var cariOnayTarihleri = await uow.OrderApprovals
+            .GetApprovalDatesAsync(siparisNolar, "MuhasebeOnaylandi");
+
         return orders
             .Select(o => new FactoryOrderListDto(
                 o.SiparisNo, o.MusteriAd, o.MUlke,
                 o.SiparisMiTeklifMi, o.FabrikaNot, o.STarih, o.Tarih,
                 o.KullaniciID,
-                users.TryGetValue(o.KullaniciID, out var name) ? name : null))
+                users.TryGetValue(o.KullaniciID, out var name) ? name : null,
+                cariOnayTarihleri.TryGetValue(o.SiparisNo, out var cot) ? cot : null))
             .ToList()
             .AsReadOnly();
     }

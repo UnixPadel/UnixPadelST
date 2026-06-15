@@ -15,6 +15,22 @@ internal sealed class OrderApprovalRepository(AppDbContext context)
             .OrderBy(o => o.OnayTarih)
             .ToListAsync();
 
+    public async Task<IReadOnlyDictionary<string, DateTime?>> GetApprovalDatesAsync(
+        IReadOnlyCollection<string> siparisNolar, string onayDurumu)
+    {
+        if (siparisNolar.Count == 0)
+            return new Dictionary<string, DateTime?>();
+
+        var rows = await _context.SiparisOnaylari
+            .AsNoTracking()
+            .Where(o => o.OnayDurumu == onayDurumu && siparisNolar.Contains(o.SiparisNo))
+            .GroupBy(o => o.SiparisNo)
+            .Select(g => new { SiparisNo = g.Key, OnayTarih = g.Max(x => x.OnayTarih) })
+            .ToListAsync();
+
+        return rows.ToDictionary(r => r.SiparisNo, r => r.OnayTarih);
+    }
+
     public async Task UpsertAsync(string siparisNo, int kullaniciID, string durum, string? aciklama)
     {
         // Tracked çek — UPDATE için Tracking gerekli.

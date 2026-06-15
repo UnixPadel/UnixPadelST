@@ -90,6 +90,12 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
         var musteri = await unitOfWork.Musteriler.GetByIdAsync(id)
             ?? throw new NotFoundException(nameof(Musteri), id);
 
+        // Round-8 §10 — siparişi olan müşteri silinemez (yetim sipariş riski).
+        bool hasOrders = await unitOfWork.Orders.AnyByCustomerAsync(musteri.MusteriID, musteri.MusteriAd);
+        if (hasOrders)
+            throw new BusinessException(
+                "Bu müşterinin siparişleri/teklifleri olduğu için silinemez.");
+
         unitOfWork.Musteriler.Remove(musteri);
         await unitOfWork.SaveChangesAsync();
     }

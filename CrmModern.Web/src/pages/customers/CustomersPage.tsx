@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getCustomers } from '@/api/customers'
+import { getCustomers, deleteCustomer } from '@/api/customers'
 import { useAuth } from '@/hooks/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useToast } from '@/components/ToastProvider'
+import { describeApiError } from '@/lib/axios'
 import type { Musteri } from '@/types'
 
 /**
@@ -29,16 +32,32 @@ const EDIT_ROLES = new Set(['Yonetici', 'Gozlemci'])
 export function CustomersPage() {
   const nav = useNavigate()
   const { t } = useTranslation()
+  const { toast } = useToast()
+  const qc = useQueryClient()
   const { getUser } = useAuth()
   const role = getUser()?.yetkiTuru ?? ''
   const canAdd  = ADD_ROLES.has(role)
   const canEdit = EDIT_ROLES.has(role)
+  // Round-8 §10 — müşteri silme YALNIZ elshan.rasulov (kullanıcı adı bazlı).
+  const canDelete = getUser()?.kullaniciAdi === 'elshan.rasulov'
 
   const [q, setQ] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Musteri | null>(null)
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: getCustomers,
+  })
+
+  const deleteMut = useMutation({
+    mutationFn: (id: number) => deleteCustomer(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      setDeleteTarget(null)
+      toast({ title: t('customers.toast.deleted') })
+    },
+    // Siparişi olan müşteride backend BusinessException döner — net mesaj göster.
+    onError: (e) => toast({ title: t('customers.toast.deleteFailed'), description: describeApiError(e), variant: 'destructive' }),
   })
 
   // Client-side filter on the canonical columns. Sorting by MusteriAd ascending
@@ -63,6 +82,17 @@ export function CustomersPage() {
     { key: 'adres',       header: t('customers.fields.adres') },
     { key: 'ulkeAdi',     header: t('customers.fields.ulke'),  sortable: true },
     { key: 'bolge',       header: t('customers.fields.bolge'), render: (r) => (r.bolge as string) ?? '—' },
+    // Round-8 §10 — Sil aksiyonu yalnız elshan.rasulov'a render edilir.
+    ...(canDelete ? [{
+      key: 'actions',
+      header: t('common.actions'),
+      render: (r: Musteri & Record<string, unknown>) => (
+        <Button size="sm" variant="destructive" className="h-7 text-xs"
+          onClick={() => setDeleteTarget(r as Musteri)}>
+          {t('common.delete')}
+        </Button>
+      ),
+    } as Column<Musteri & Record<string, unknown>>] : []),
   ]
 
   return (
@@ -84,9 +114,25 @@ export function CustomersPage() {
           data={filtered as (Musteri & Record<string, unknown>)[]}
           keyField="musteriID"
           loading={isLoading}
+          density="compact"
           onRowClick={canEdit ? (r) => nav(`/customers/${(r as Musteri).musteriID}/edit`) : undefined}
         />
       </div>
+
+      {/* Round-8 §10 — elshan-only silme onayı */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('customers.deleteTitle')}</DialogTitle></DialogHeader>
+          <p className="text-sm">{t('customers.deleteConfirm', { name: deleteTarget?.musteriAd ?? '' })}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" disabled={deleteMut.isPending}
+              onClick={() => deleteTarget && deleteMut.mutate(deleteTarget.musteriID)}>
+              {t('common.delete')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

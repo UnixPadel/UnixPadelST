@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent } from '@/components/ui/card'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
+import { statusLabel } from '@/lib/status'
 import { useAuth } from '@/hooks/useAuth'
 import type { SearchResultDto } from '@/types'
 
@@ -98,14 +99,14 @@ export function SearchPage() {
                 <Label>{t('common.stage')}</Label>
                 <Select value={filters.asama} onValueChange={set('asama')}>
                   <SelectTrigger><SelectValue placeholder={t('common.all')} /></SelectTrigger>
-                  <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s === 'all' ? t('common.all') : s}</SelectItem>)}</SelectContent>
+                  <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s === 'all' ? t('common.all') : statusLabel(t, s)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
                 <Label>{t('common.control')}</Label>
                 <Select value={filters.kontrol} onValueChange={set('kontrol')}>
                   <SelectTrigger><SelectValue placeholder={t('common.all')} /></SelectTrigger>
-                  <SelectContent>{CONTROLS.map((c) => <SelectItem key={c} value={c}>{c === 'all' ? t('common.all') : c}</SelectItem>)}</SelectContent>
+                  <SelectContent>{CONTROLS.map((c) => <SelectItem key={c} value={c}>{c === 'all' ? t('common.all') : statusLabel(t, c)}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">

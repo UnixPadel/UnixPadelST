@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
+import { statusLabel } from '@/lib/status'
 
 interface StatusBadgeProps {
   value: string
@@ -26,6 +28,8 @@ const stageColors: Record<string, 'default' | 'secondary' | 'destructive' | 'out
 }
 
 export function StatusBadge({ value }: StatusBadgeProps) {
+  const { t } = useTranslation()
+  // Renkler TR literal'e göre eşlenir; sadece görünen etiket çevrilir.
   const variant = stageColors[value] ?? 'outline'
-  return <Badge variant={variant}>{value}</Badge>
+  return <Badge variant={variant}>{statusLabel(t, value)}</Badge>
 }

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
-  getMyOrders, convertToOrder, getRejectionNote,
+  getMyOrders, convertToOrder, getRejectionNote, deleteOrder,
 } from '@/api/orders'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
@@ -11,6 +11,8 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { OrderKontrolBadge } from '@/components/OrderKontrolBadge'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
@@ -86,6 +88,19 @@ export function MyOrdersPage() {
     }),
   })
 
+  // ── Round-8 §7 — yumuşak silme dialog + mutation ───────────────────────
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
+  const [deleteReason, setDeleteReason] = useState('')
+  const deleteMut = useMutation({
+    mutationFn: ({ no, gerekce }: { no: string; gerekce: string }) => deleteOrder(no, gerekce),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['my-orders'] })
+      setDeleteTarget(null); setDeleteReason('')
+      toast({ title: t('myOrders.toast.deleted') })
+    },
+    onError: (e) => toast({ title: t('myOrders.toast.deleteFailed'), description: describeApiError(e), variant: 'destructive' }),
+  })
+
   // ── Validity helpers (legacy rules) ────────────────────────────────────
   const canConvert = (r: OrderListDto) =>
     r.siparisMiTeklifMi === 'Teklif' && r.kontrol !== 'Reddet'
@@ -93,10 +108,31 @@ export function MyOrdersPage() {
   const canRevise = (r: OrderListDto) =>
     (r.siparisMiTeklifMi === 'Teklif' || r.siparisMiTeklifMi === 'Siparis') &&
     r.kontrol !== 'Onay'
+  // §7 — Kontrol onayı öncesi + silinmemiş düzenlenebilir/silinebilir.
+  const canEditDelete = (r: OrderListDto) => r.kontrol !== 'Onay' && !r.silindi
 
   const cols: Column<OrderListDto & Record<string, unknown>>[] = [
     { key: 'numara', header: t('myOrders.cols.numara'), sortable: true,
-      render: (r) => <span className="font-mono text-sm">{rowNo(r as OrderListDto)}</span> },
+      render: (r) => {
+        const o = r as OrderListDto
+        return (
+          <span className="flex items-center gap-1.5">
+            <span className={`font-mono text-sm ${o.silindi ? 'line-through text-muted-foreground' : ''}`}>{rowNo(o)}</span>
+            {o.silindi && (
+              <span title={o.degisiklikGerekce ?? undefined}
+                className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-medium text-red-800 border border-red-200">
+                {t('myOrders.badge.silindi')}
+              </span>
+            )}
+            {!o.silindi && o.guncellendi && (
+              <span title={o.degisiklikGerekce ?? undefined}
+                className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 border border-amber-200">
+                {t('myOrders.badge.guncellendi')}
+              </span>
+            )}
+          </span>
+        )
+      } },
     { key: 'musteriAd', header: t('myOrders.cols.musteriAd'), sortable: true },
     // PROMPT-v4 §6.2 — sahip kolonu yalnız elshan görünümünde
     ...(isGlobalViewer ? [{
@@ -149,6 +185,25 @@ export function MyOrdersPage() {
             >
               {t('myOrders.actions.revize')}
             </Button>
+            {/* Round-8 §7 — Kontrol onayı öncesi yerinde düzenle / sil. */}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!canEditDelete(r)}
+              title={canEditDelete(r) ? undefined : t('myOrders.disabled.editDelete')}
+              onClick={() => nav(`/orders/new?amend=${encodeURIComponent(no)}`)}
+            >
+              {t('myOrders.actions.duzenle')}
+            </Button>
+            <Button
+              size="sm"
+              variant="destructive"
+              disabled={!canEditDelete(r)}
+              title={canEditDelete(r) ? undefined : t('myOrders.disabled.editDelete')}
+              onClick={() => { setDeleteTarget(no); setDeleteReason('') }}
+            >
+              {t('myOrders.actions.sil')}
+            </Button>
           </div>
         )
       },
@@ -186,6 +241,24 @@ export function MyOrdersPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setRedTarget(null)}>{t('common.close')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Round-8 §7 — Sil: zorunlu gerekçe dialog'u */}
+      <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) { setDeleteTarget(null); setDeleteReason('') } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('myOrders.delete.title', { no: deleteTarget })}</DialogTitle></DialogHeader>
+          <div className="space-y-2">
+            <Label>{t('myOrders.delete.reason')}</Label>
+            <Textarea rows={3} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" disabled={!deleteReason.trim() || deleteMut.isPending}
+              onClick={() => deleteMut.mutate({ no: deleteTarget!, gerekce: deleteReason })}>
+              {t('common.delete')}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

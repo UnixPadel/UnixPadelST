@@ -70,6 +70,10 @@ export interface OrderListDto {
   teslimatCesiti?: string
   odemeDurum?: string
   kullaniciAdSoyad?: string
+  // Round-8 §7 — düzenleme/silme rozetleri.
+  silindi?: boolean
+  guncellendi?: boolean
+  degisiklikGerekce?: string
 }
 
 export interface OrderDetail {
@@ -236,6 +240,8 @@ export interface FactoryOrderListDto {
   tarih: string
   kullaniciID: number
   kullanici?: string  // "Ad Soyad" — Temsilci sütunu / filtresi (2.2)
+  /** Round-8 §11 — Cari onay tarihi (STarih değişmez; parasal değil). */
+  cariOnayTarih?: string
 }
 
 export interface MoveToProductionDto {
@@ -428,6 +434,8 @@ export interface UserLookupDto {
   kullaniciID: number
   ad: string
   soyad: string
+  /** Round-8 §11/§13/§15 — role so "Temsilci" filters can narrow the list. */
+  yetkiTuru: string
 }
 
 export interface CreateUserDto {
@@ -512,6 +520,24 @@ export interface CurrencyDistribution {
   paraTipi: string
   siparisSayisi: number
   toplamCiro: number
+}
+
+// Round-8 §13 — Temsilci performans raporu satırı.
+export interface RepPerformance {
+  kullaniciID: number
+  adSoyad: string
+  olusturulan: number
+  teklif: number
+  siparis: number
+  onaylanan: number
+  reddedilen: number
+  bekleyen: number
+  tamamlanan: number
+  donusumOrani: number
+  ciroEuro: number
+  ciroDolar: number
+  ciroTL: number
+  ciroSterlin: number
 }
 
 // ── Global Search (Faz 7) ─────────────────────────────────────────────────────

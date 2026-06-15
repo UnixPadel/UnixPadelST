@@ -12,6 +12,7 @@ import { getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
+import { statusLabel } from '@/lib/status'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
@@ -353,8 +354,8 @@ export function AccountingPage() {
           <Input placeholder={t('common.quickFilter')} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-xs" />
           <select value={odemeDurum} onChange={(e) => setOdemeDurum(e.target.value)} className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm">
             <option value="all">{t('common.all')}</option>
-            <option value="Beklemede">Beklemede</option>
-            <option value="Ödendi">Ödendi</option>
+            <option value="Beklemede">{statusLabel(t, 'Beklemede')}</option>
+            <option value="Ödendi">{statusLabel(t, 'Ödendi')}</option>
           </select>
           <div className="flex items-center gap-1">
             <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-36" />
@@ -385,29 +386,29 @@ export function AccountingPage() {
       {/* Tahsilat Ekle modal */}
       <Dialog open={!!txTarget} onOpenChange={() => setTxTarget(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Tahsilat — {txTarget?.siparisNo}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('accounting.tahsilat.title', { no: txTarget?.siparisNo })}</DialogTitle></DialogHeader>
           <div className="space-y-3 text-sm">
             <div className="rounded-md border bg-muted/30 p-3 space-y-1">
-              <div className="flex justify-between"><span>Toplam:</span><span>{formatCurrency(txTarget?.toplamFiyat ?? 0, txTarget?.paraTipi)}</span></div>
-              <div className="flex justify-between"><span>Ödenen:</span><span>{formatCurrency(txTarget?.odenenMiktar ?? 0, txTarget?.paraTipi)}</span></div>
-              <div className="flex justify-between font-semibold"><span>Kalan:</span><span>{formatCurrency(txTarget?.kalanBakiye ?? 0, txTarget?.paraTipi)}</span></div>
+              <div className="flex justify-between"><span>{t('accounting.tahsilat.toplam')}:</span><span>{formatCurrency(txTarget?.toplamFiyat ?? 0, txTarget?.paraTipi)}</span></div>
+              <div className="flex justify-between"><span>{t('accounting.tahsilat.odenen')}:</span><span>{formatCurrency(txTarget?.odenenMiktar ?? 0, txTarget?.paraTipi)}</span></div>
+              <div className="flex justify-between font-semibold"><span>{t('accounting.tahsilat.kalan')}:</span><span>{formatCurrency(txTarget?.kalanBakiye ?? 0, txTarget?.paraTipi)}</span></div>
             </div>
             <div className="space-y-1">
-              <Label>Tutar ({txTarget?.paraTipi})</Label>
+              <Label>{t('accounting.tahsilat.tutar')} ({txTarget?.paraTipi})</Label>
               <DecimalInput value={txTutar} onValueChange={(v) => setTxTutar(v === '' ? 0 : v)} />
             </div>
             <div className="space-y-1">
-              <Label>Tarih</Label>
+              <Label>{t('common.date')}</Label>
               <Input type="date" value={txTarih} onChange={(e) => setTxTarih(e.target.value)} />
             </div>
             <div>
-              <Label className="text-xs">Önceki tahsilatlar:</Label>
+              <Label className="text-xs">{t('accounting.tahsilat.previous')}</Label>
               <div className="mt-1 max-h-40 overflow-y-auto rounded border">
                 {txForOrder.length === 0
-                  ? <p className="p-2 text-xs text-muted-foreground">Henüz tahsilat yok.</p>
+                  ? <p className="p-2 text-xs text-muted-foreground">{t('accounting.tahsilat.none')}</p>
                   : <table className="w-full text-xs">
                       <thead className="bg-muted/30">
-                        <tr><th className="text-left px-2 py-1">Tarih</th><th className="text-right px-2 py-1">Tutar</th></tr>
+                        <tr><th className="text-left px-2 py-1">{t('common.date')}</th><th className="text-right px-2 py-1">{t('accounting.tahsilat.tutar')}</th></tr>
                       </thead>
                       <tbody>
                         {txForOrder.map((tx: AccountingTransactionDto) => (
@@ -422,8 +423,8 @@ export function AccountingPage() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTxTarget(null)}>Kapat</Button>
-            <Button disabled={txTutar <= 0 || addMut.isPending} onClick={() => addMut.mutate()}>Kaydet</Button>
+            <Button variant="outline" onClick={() => setTxTarget(null)}>{t('common.close')}</Button>
+            <Button disabled={txTutar <= 0 || addMut.isPending} onClick={() => addMut.mutate()}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -431,9 +432,9 @@ export function AccountingPage() {
       {/* MuhasebeEk uploader */}
       <Dialog open={!!ekTarget} onOpenChange={() => setEkTarget(null)}>
         <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>MuhasebeEk — {ekTarget}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('accounting.tahsilat.ekTitle', { no: ekTarget })}</DialogTitle></DialogHeader>
           <div className="space-y-2">
-            <Label>Dosya (PDF/ZIP/JPG…)</Label>
+            <Label>{t('accounting.tahsilat.dosya')}</Label>
             <input type="file" onChange={(e) => {
               const f = e.target.files?.[0]
               if (f && ekTarget) uploadMut.mutate({ no: ekTarget, file: f })

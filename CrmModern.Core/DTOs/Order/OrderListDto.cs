@@ -23,5 +23,9 @@ public sealed record OrderListDto(
     decimal? OdenenMiktar     = null,
     string?  TeslimatCesiti   = null,
     string?  OdemeDurum       = null,
-    string?  KullaniciAdSoyad = null
+    string?  KullaniciAdSoyad = null,
+    // Round-8 §7 — düzenleme/silme rozetleri (Siparişlerim).
+    bool     Silindi           = false,
+    bool     Guncellendi       = false,
+    string?  DegisiklikGerekce = null
 );

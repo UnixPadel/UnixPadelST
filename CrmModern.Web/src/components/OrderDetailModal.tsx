@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getOrderDetail, downloadExcel } from '@/api/orders'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { resolveClause } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export function OrderDetailModal({ siparisNo, onClose }: Props) {
+  const { t } = useTranslation()
   const { toast } = useToast()
   // PROMPT-v2 §2: Fabrika rolü parasal değer görmez (Fiyatlandırma bloğu,
   // bileşen Fiyat sütunu, proforma Excel butonu). Backend de aynı gate'lere sahip.
@@ -42,14 +45,14 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
-            <span>Sipariş Detayı — {siparisNo}</span>
+            <span>{t('orderDetail.title', { no: siparisNo })}</span>
             {!hideMoney && (
-              <Button size="sm" variant="outline" onClick={handleExcel}>📥 Excel</Button>
+              <Button size="sm" variant="outline" onClick={handleExcel}>📥 {t('common.excel')}</Button>
             )}
           </DialogTitle>
         </DialogHeader>
 
-        {isLoading && <p className="text-center py-8 text-muted-foreground">Yükleniyor...</p>}
+        {isLoading && <p className="text-center py-8 text-muted-foreground">{t('common.loading')}</p>}
 
         {order && (
           <div className="space-y-6 text-sm">
@@ -65,25 +68,25 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Customer */}
               <div className="space-y-2 border rounded-md p-3">
-                <h3 className="font-semibold">Müşteri Bilgileri</h3>
-                <Row label="Müşteri" value={order.musteriAd} />
-                <Row label="Ülke" value={order.mUlke} />
-                <Row label="Telefon" value={order.mTelefon} />
-                <Row label="E-Mail" value={order.mMail} />
-                <Row label="VAT No" value={order.mVATNumarasi} />
-                <Row label="Adres" value={order.mAdres} />
+                <h3 className="font-semibold">{t('orderDetail.musteriInfo')}</h3>
+                <Row label={t('orderDetail.musteri')} value={order.musteriAd} />
+                <Row label={t('orderDetail.ulke')} value={order.mUlke} />
+                <Row label={t('orderDetail.telefon')} value={order.mTelefon} />
+                <Row label={t('orderDetail.email')} value={order.mMail} />
+                <Row label={t('orderDetail.vat')} value={order.mVATNumarasi} />
+                <Row label={t('orderDetail.adres')} value={order.mAdres} />
               </div>
 
               {/* Delivery */}
               {order.teslimatVar && (
                 <div className="space-y-2 border rounded-md p-3">
-                  <h3 className="font-semibold">Teslimat Adresi</h3>
-                  <Row label="Teslim Alan" value={order.tTeslimAlanAdi} />
-                  <Row label="İlgili Kişi" value={order.tIlgiliKisi} />
-                  <Row label="Ülke" value={order.tUlke} />
-                  <Row label="Telefon" value={order.tTelefon} />
-                  <Row label="E-Mail" value={order.tE_Mail} />
-                  <Row label="Adres" value={order.tAdres} />
+                  <h3 className="font-semibold">{t('orderDetail.teslimatAddr')}</h3>
+                  <Row label={t('orderDetail.teslimAlan')} value={order.tTeslimAlanAdi} />
+                  <Row label={t('orderDetail.ilgiliKisi')} value={order.tIlgiliKisi} />
+                  <Row label={t('orderDetail.ulke')} value={order.tUlke} />
+                  <Row label={t('orderDetail.telefon')} value={order.tTelefon} />
+                  <Row label={t('orderDetail.email')} value={order.tE_Mail} />
+                  <Row label={t('orderDetail.adres')} value={order.tAdres} />
                 </div>
               )}
             </div>
@@ -91,16 +94,16 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
             {/* Pricing — PROMPT-v2 §2: Fabrika için tamamen gizli. */}
             {!hideMoney && (
               <div className="border rounded-md p-3 space-y-2">
-                <h3 className="font-semibold">Fiyatlandırma</h3>
+                <h3 className="font-semibold">{t('orderDetail.pricing')}</h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <PriceBox label="Para Birimi" value={order.paraTipi} />
-                  <PriceBox label="Brüt Toplam" value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
-                  {(order.indirim ?? 0) > 0 && <PriceBox label="İndirim" value={`-${formatCurrency(order.indirim, order.paraTipi)}`} />}
-                  {(order.kdv ?? 0) > 0 && <PriceBox label="KDV" value={`%${order.kdv}`} />}
-                  <PriceBox label="Toplam" value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
-                  <PriceBox label="Peşin Yüzde" value={`%${order.pesinYuzde}`} />
-                  {order.montajVar && <PriceBox label="Montaj" value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
-                  {order.teslimatVar && <PriceBox label="Teslimat" value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
+                  <PriceBox label={t('orderDetail.paraBirimi')} value={order.paraTipi} />
+                  <PriceBox label={t('orderDetail.brut')} value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
+                  {(order.indirim ?? 0) > 0 && <PriceBox label={t('orderDetail.indirim')} value={`-${formatCurrency(order.indirim, order.paraTipi)}`} />}
+                  {(order.kdv ?? 0) > 0 && <PriceBox label={t('orderDetail.kdv')} value={`%${order.kdv}`} />}
+                  <PriceBox label={t('orderDetail.toplam')} value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
+                  <PriceBox label={t('orderDetail.pesinYuzde')} value={`%${order.pesinYuzde}`} />
+                  {order.montajVar && <PriceBox label={t('orderDetail.montaj')} value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
+                  {order.teslimatVar && <PriceBox label={t('orderDetail.teslimat')} value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
                 </div>
               </div>
             )}
@@ -108,21 +111,21 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
             {/* Products table */}
             {order.items && order.items.length > 0 && (
               <div className="border rounded-md p-3">
-                <h3 className="font-semibold mb-2">Ürünler / Bileşenler</h3>
+                <h3 className="font-semibold mb-2">{t('orderDetail.products')}</h3>
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b bg-muted/50">
-                      <th className="text-left px-2 py-1">Tür</th>
-                      <th className="text-left px-2 py-1">Öznitelik</th>
-                      <th className="text-right px-2 py-1">Adet</th>
+                      <th className="text-left px-2 py-1">{t('orderDetail.tur')}</th>
+                      <th className="text-left px-2 py-1">{t('orderDetail.oznitelik')}</th>
+                      <th className="text-right px-2 py-1">{t('orderDetail.adet')}</th>
                       {/* PROMPT-v2 §2: Fabrika Fiyat sütununu görmez. */}
-                      {!hideMoney && <th className="text-right px-2 py-1">Fiyat</th>}
+                      {!hideMoney && <th className="text-right px-2 py-1">{t('orderDetail.fiyat')}</th>}
                     </tr>
                   </thead>
                   <tbody>
                     {order.items.map((item, i) => (
                       <tr key={i} className={`border-b ${item.kategoriID && !item.bilesenID ? 'font-semibold bg-muted/20' : ''}`}>
-                        <td className="px-2 py-1">{item.kategoriID && !item.bilesenID ? `SET ${item.kategoriID}` : `Bileşen ${item.bilesenID}`}</td>
+                        <td className="px-2 py-1">{item.kategoriID && !item.bilesenID ? t('orderDetail.set', { id: item.kategoriID }) : t('orderDetail.bilesen', { id: item.bilesenID })}</td>
                         <td className="px-2 py-1">{item.oznitelikAdi ?? '—'}</td>
                         <td className="text-right px-2 py-1">{item.adet}</td>
                         {!hideMoney && (
@@ -138,9 +141,9 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
             {/* Details / Notes */}
             {order.details && order.details.length > 0 && (
               <div className="border rounded-md p-3">
-                <h3 className="font-semibold mb-2">Notlar</h3>
+                <h3 className="font-semibold mb-2">{t('orderDetail.notes')}</h3>
                 <ul className="space-y-1 text-muted-foreground">
-                  {order.details.map((d, i) => <li key={i}>• {d}</li>)}
+                  {order.details.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
                 </ul>
               </div>
             )}
@@ -148,7 +151,7 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
             {/* Rejection note */}
             {order.kontrol === 'Reddet' && order.red && (
               <div className="border border-red-300 rounded-md p-3 bg-red-50">
-                <h3 className="font-semibold text-red-700 mb-1">Red Notu</h3>
+                <h3 className="font-semibold text-red-700 mb-1">{t('orderDetail.redNotu')}</h3>
                 <p className="text-red-600">{order.red}</p>
               </div>
             )}
@@ -156,8 +159,8 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
             {/* Factory / Logistics notes */}
             {(order.fabrikaNot || order.lojistikNot) && (
               <div className="border rounded-md p-3 space-y-1">
-                {order.fabrikaNot && <p><span className="font-semibold">Fabrika Notu:</span> {order.fabrikaNot}</p>}
-                {order.lojistikNot && <p><span className="font-semibold">Lojistik Notu:</span> {order.lojistikNot}</p>}
+                {order.fabrikaNot && <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>}
+                {order.lojistikNot && <p><span className="font-semibold">{t('orderDetail.lojistikNot')}:</span> {order.lojistikNot}</p>}
               </div>
             )}
 

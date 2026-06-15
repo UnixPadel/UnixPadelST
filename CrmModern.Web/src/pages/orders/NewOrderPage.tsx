@@ -7,6 +7,8 @@ import {
   getDeliveryAddresses, getComponentsByCategory,
   // PROMPT.md #20: revise wire-up — pre-load + swap save mutation.
   getOrderDetail, reviseOrder,
+  // Round-8 §7 — yerinde düzenleme.
+  amendOrder,
   // PROMPT-v3 §6: Formu Getir — kendi siparişlerinden seçip forma yükleme.
   getMyOrders,
 } from '@/api/orders'
@@ -24,56 +26,18 @@ import { useAuth } from '@/hooks/useAuth'
 import { useToast } from '@/components/ToastProvider'
 import { FieldError } from '@/components/FieldError'
 import { INCOTERMS } from '@/lib/constants'
+// Round-8 §4/§5 — standart şartlar artık yapılandırılmış KOD olarak saklanır
+// (dil-duyarlı proforma/ekran). Yardımcılar src/lib/clauses.ts'te.
+import {
+  STANDART_SART_KODLARI, CLAUSE, ODEME_PREFIX, TESLIMAT_PREFIX,
+  teslimatCode, odemeCode, upsertClause, parseOdemeFromDetails,
+  resolveClause, normalizeToCode, isClauseCode,
+} from '@/lib/clauses'
 import type { CreateOrderDto, OrderDetail, OrderSetInput } from '@/types'
 
 const PARA_TIPLERI_RADIO = ['Euro', 'Dolar', 'TL'] as const
 const PARA_TIPLERI_DIGER = ['Sterlin'] as const
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk'] as const
-
-// ── PROMPT-v6 §5 — otomatik Detay satırları ─────────────────────────────────
-// Metinler VERİ olarak Türkçe kaydedilir (i18n'e girmez). Prefix'ler otomatik
-// satırı tanımanın anahtarı — idempotent upsert bu prefix'lerle çalışır.
-const DETAY_PREFIX_TESLIMAT = 'Teslimat Şekli:'
-const DETAY_PREFIX_ODEME    = 'Ödeme Şekli:'
-// Haklar-saklıdır metni — kesin ifade tek sabitte, kolay değiştirilebilir.
-const SART_HAKLAR = 'Bu belgedeki fiyat ve bilgiler üzerindeki tüm haklar saklıdır.'
-// Montaj şartı — Montaj checkbox'ı işaretlenince silinir, kaldırılınca döner.
-const SART_MONTAJ = 'Fiyatlara montaj dahil değildir.'
-// Yeni boş formda seed edilen standart şartlar (sıra korunur).
-const STANDART_SARTLAR: readonly string[] = [
-  'Fiyatlar 2 hafta geçerlidir.',
-  'Fiyatlara KDV dahil değildir.',
-  'Fiyatlara nakliye dahil değildir.',
-  SART_MONTAJ,
-  SART_HAKLAR,
-]
-
-/**
- * Prefix'le tanınan otomatik satırı idempotent günceller: varsa yerinde
- * değiştirir (çoğaltmaz), yoksa sona ekler, line=null ise siler. Kullanıcının
- * elle yazdığı satırlara dokunmaz.
- */
-function upsertDetail(details: string[], prefix: string, line: string | null): string[] {
-  const idx = details.findIndex((s) => s.startsWith(prefix))
-  if (line === null) return idx >= 0 ? details.filter((_, i) => i !== idx) : details
-  if (idx >= 0) return details.map((s, i) => (i === idx ? line : s))
-  return [...details, line]
-}
-
-/** Ödeme Şekli satırı: 'Peşin' | 'Vadeli — %x peşin' (pesinYuzde boşsa yalnız 'Vadeli'). */
-function odemeSekliLine(sekli: 'Pesin' | 'Vadeli', pesinYuzde: number | null): string {
-  if (sekli === 'Pesin') return `${DETAY_PREFIX_ODEME} Peşin`
-  return pesinYuzde != null
-    ? `${DETAY_PREFIX_ODEME} Vadeli — %${pesinYuzde} peşin`
-    : `${DETAY_PREFIX_ODEME} Vadeli`
-}
-
-/** Revize/Formu Getir hidrasyonunda Ödeme Şekli kontrolünü mevcut satırdan kur. */
-function parseOdemeSekli(details: string[]): '' | 'Pesin' | 'Vadeli' {
-  const line = details.find((s) => s.startsWith(DETAY_PREFIX_ODEME))
-  if (!line) return ''
-  return line.includes('Vadeli') ? 'Vadeli' : 'Pesin'
-}
 
 /** Currency symbol for any selected paraTipi (Euro/Dolar/TL/Sterlin). */
 function currencySymbol(paraTipi: string): string {
@@ -101,7 +65,7 @@ const blank = (): CreateOrderDto => ({
   paraTipi: 'Euro', indirim: null, kdv: null, pesinYuzde: null,
   // PROMPT-v6 §5 — yeni boş form standart şartlarla seed'li gelir.
   // Revize/Formu Getir modunda detailToForm() bunları kaynağın içeriğiyle ezer.
-  sets: [], details: [...STANDART_SARTLAR], sirket: 'Unixpadel',
+  sets: [], details: [...STANDART_SART_KODLARI], sirket: 'Unixpadel',
 })
 
 /**
@@ -233,7 +197,9 @@ function detailToForm(d: OrderDetail): CreateOrderDto {
     pesinYuzde:   d.pesinYuzde ?? null,
     sirket:       d.sirket ?? 'Unixpadel',
     sets:         [],
-    details:      d.details ?? [],
+    // Round-8 §4 — legacy TR standart satırlar koda normalleştirilir; serbest
+    // metin verbatim kalır. Böylece eski siparişler de dil-duyarlı proforma üretir.
+    details:      (d.details ?? []).map(normalizeToCode),
   }
 }
 
@@ -244,6 +210,8 @@ export function NewOrderPage() {
   const { getUser } = useAuth()
   const [params] = useSearchParams()
   const reviseFrom = params.get('revise')
+  // Round-8 §7 — yerinde düzenleme modu (numara değişmez; gerekçe zorunlu).
+  const amendFrom = params.get('amend')
 
   const user = getUser()
   const temsilciAdSoyad = [user?.ad, user?.soyad].filter(Boolean).join(' ') || user?.kullaniciAdi || ''
@@ -254,6 +222,8 @@ export function NewOrderPage() {
   // PROMPT-v6 §5 — Ödeme Şekli kontrolü; bilgi backend'e ayrı kolon olarak
   // değil, Detaylar satırı ('Ödeme Şekli: …') olarak persist olur.
   const [odemeSekli, setOdemeSekli] = useState<'' | 'Pesin' | 'Vadeli'>('')
+  // §7 — yerinde düzenleme gerekçesi (amend modunda zorunlu).
+  const [amendGerekce, setAmendGerekce] = useState('')
 
   // Sipariş 1..5 tab state (per-tab "Tekil Fiyat × Adet" before "Çarp").
   const [setTabs, setSetTabs] = useState<SetTabState[]>(
@@ -265,17 +235,20 @@ export function NewOrderPage() {
   // PROMPT.md #20: when ?revise=NO is present we pre-load that order and
   // hydrate the form; save fires reviseOrder instead of createOrder/createQuote.
   const isReviseMode = !!reviseFrom
+  const isAmendMode = !!amendFrom
+  // Revise ve Amend aynı ön-yükleme makinesini kullanır (kaynağı forma hidrate et).
+  const sourceNo = reviseFrom ?? amendFrom
   const { data: reviseSource, isLoading: reviseLoading } = useQuery({
-    queryKey: ['order-detail', reviseFrom],
-    queryFn: () => getOrderDetail(reviseFrom!),
-    enabled: isReviseMode,
+    queryKey: ['order-detail', sourceNo],
+    queryFn: () => getOrderDetail(sourceNo!),
+    enabled: isReviseMode || isAmendMode,
   })
   useEffect(() => {
     if (!reviseSource) return
     setForm(detailToForm(reviseSource))
     // PROMPT-v6 §5 — revize modunda seed YOK; Ödeme Şekli kontrolü kaynaktaki
     // mevcut satırdan kurulur ki pesinYuzde değişiklikleri senkron kalsın.
-    setOdemeSekli(parseOdemeSekli(reviseSource.details ?? []))
+    setOdemeSekli(parseOdemeFromDetails(reviseSource.details ?? []))
   }, [reviseSource])
 
   // ── Data sources ───────────────────────────────────────────────────────
@@ -320,34 +293,45 @@ export function NewOrderPage() {
     mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createOrder(form),
     onSuccess: (no) => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
-      toast({ title: isReviseMode ? 'Revize edildi' : 'Sipariş oluşturuldu', description: no })
+      toast({ title: isReviseMode ? t('orders.toast.revised') : t('orders.toast.created'), description: no })
       setCreatedNo(no)
     },
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onError: () => toast({ title: t('orders.toast.error'), variant: 'destructive' }),
   })
   const quoteMut = useMutation({
     mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createQuote(form),
     onSuccess: (no) => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
-      toast({ title: isReviseMode ? 'Revize edildi' : 'Teklif oluşturuldu', description: no })
+      toast({ title: isReviseMode ? t('orders.toast.revised') : t('orders.toast.quoteCreated'), description: no })
       setCreatedNo(no)
     },
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onError: () => toast({ title: t('orders.toast.error'), variant: 'destructive' }),
+  })
+  // Round-8 §7 — yerinde düzenleme: numara değişmez, Guncellendi damgalanır.
+  const amendMut = useMutation({
+    mutationFn: () => amendOrder(amendFrom!, form, amendGerekce),
+    onSuccess: (no) => {
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
+      toast({ title: t('orders.toast.amended'), description: no })
+      nav('/orders/mine')
+    },
+    onError: () => toast({ title: t('orders.toast.error'), variant: 'destructive' }),
   })
   const expandMut = useMutation({
     mutationFn: ({ no, kategoriId, adet }: { no: string; kategoriId: number; adet: number }) =>
       expandRecipe(no, kategoriId, adet),
-    onSuccess: () => toast({ title: 'Reçete açıldı' }),
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onSuccess: () => toast({ title: t('orders.form.receteAcildi') }),
+    onError: () => toast({ title: t('orders.toast.error'), variant: 'destructive' }),
   })
   const uploadMut = useMutation({
     mutationFn: ({ no, file }: { no: string; file: File }) => uploadAttachment(no, 'ek', file),
-    onSuccess: () => toast({ title: 'Ek yüklendi' }),
-    onError: () => toast({ title: 'Yükleme başarısız', variant: 'destructive' }),
+    onSuccess: () => toast({ title: t('orders.form.ekYuklendi') }),
+    onError: () => toast({ title: t('orders.toast.uploadFailed'), variant: 'destructive' }),
   })
 
   const submitOrder = () => { if (checkValid()) orderMut.mutate() }
   const submitQuote = () => { if (checkValid()) quoteMut.mutate() }
+  const submitAmend = () => { if (amendGerekce.trim() && checkValid()) amendMut.mutate() }
 
   // ── Set tab actions (Çarp / İptal) ────────────────────────────────────
   const updateTab = (idx: number, patch: Partial<SetTabState>) =>
@@ -388,7 +372,7 @@ export function NewOrderPage() {
           .map((c) => buildRow(c, kategoriAdi, t.adet)),
       }))
     } catch {
-      toast({ title: 'Bileşenler yüklenemedi', variant: 'destructive' })
+      toast({ title: t('orders.toast.bilesenLoadFailed'), variant: 'destructive' })
     }
   }
 
@@ -433,7 +417,7 @@ export function NewOrderPage() {
   const carp = (idx: number) => {
     const tab = setTabs[idx]
     if (!tab.kategoriID) {
-      toast({ title: 'Ana ürün seçin', variant: 'destructive' })
+      toast({ title: t('orders.form.onceAnaUrun'), variant: 'destructive' })
       return
     }
     // PROMPT-v2 §1b: Editlenmiş bileşen satırları payload'a kopyalanır.
@@ -515,12 +499,12 @@ export function NewOrderPage() {
     setForm((f) => ({
       ...f,
       teslimatCesiti: v,
-      details: upsertDetail(f.details, DETAY_PREFIX_TESLIMAT, v ? `${DETAY_PREFIX_TESLIMAT} ${v}` : null),
+      details: upsertClause(f.details, TESLIMAT_PREFIX, v ? teslimatCode(v) : null),
     }))
     if (v !== 'EXW') return
     const fabrika = (deliveryAddrs as any[]).find((d) => (d.teslimAlanAdi ?? d.TeslimAlanAdi) === 'Fabrika')
     if (!fabrika) {
-      toast({ title: 'Fabrika seçeneği mevcut değil.', variant: 'destructive' })
+      toast({ title: t('orders.toast.noFabrikaOption'), variant: 'destructive' })
       return
     }
     applyDeliveryAddress(fabrika)
@@ -535,7 +519,7 @@ export function NewOrderPage() {
   const montajCarp = () => {
     const fiyat = Number(form.montajFiyat), miktar = Number(form.mAdet)
     if (!Number.isFinite(fiyat) || !Number.isFinite(miktar)) {
-      toast({ title: 'Lütfen geçerli bir sayı giriniz.', variant: 'destructive' })
+      toast({ title: t('orders.toast.invalidNumber'), variant: 'destructive' })
       return
     }
     setForm((f) => ({ ...f, montajFiyat: fiyat * miktar, mAdet: 1 }))
@@ -543,7 +527,7 @@ export function NewOrderPage() {
   const teslimatCarp = () => {
     const fiyat = Number(form.teslimatFiyat), miktar = Number(form.mTeslimat)
     if (!Number.isFinite(fiyat) || !Number.isFinite(miktar)) {
-      toast({ title: 'Lütfen geçerli bir sayı giriniz.', variant: 'destructive' })
+      toast({ title: t('orders.toast.invalidNumber'), variant: 'destructive' })
       return
     }
     setForm((f) => ({ ...f, teslimatFiyat: fiyat * miktar, mTeslimat: 1 }))
@@ -633,12 +617,12 @@ export function NewOrderPage() {
       setSetTabs(tabs)
       setForm({ ...detailToForm(d), sets })
       // PROMPT-v6 §5 — teklif-yükleme modunda seed YOK; kontrol satırdan kurulur.
-      setOdemeSekli(parseOdemeSekli(d.details ?? []))
+      setOdemeSekli(parseOdemeFromDetails(d.details ?? []))
       setCreatedNo(null)
       setGetirOpen(false)
-      toast({ title: 'Form yüklendi', description: `${no} → yeni kayıt olarak düzenlenebilir` })
+      toast({ title: t('orders.toast.formLoaded'), description: t('orders.toast.formLoadedDesc', { no }) })
     } catch {
-      toast({ title: 'Form yüklenemedi', variant: 'destructive' })
+      toast({ title: t('orders.toast.formLoadFailed'), variant: 'destructive' })
     } finally {
       setGetirLoading(false)
     }
@@ -675,8 +659,9 @@ export function NewOrderPage() {
   return (
     <div>
       <PageHeader
-        title={isReviseMode ? `${t('orders.reviseTitle')} — ${reviseFrom}` : t('orders.newOrderTitle')}
-        description={isReviseMode ? undefined : 'Sipariş Formu — 3 kolon (Müşteri / Setler / Cari)'}
+        title={isAmendMode ? `${t('myOrders.actions.duzenle')} — ${amendFrom}`
+          : isReviseMode ? `${t('orders.reviseTitle')} — ${reviseFrom}` : t('orders.newOrderTitle')}
+        description={isReviseMode || isAmendMode ? undefined : t('orders.subtitle')}
       />
 
       <div className="p-4 lg:p-6">
@@ -686,6 +671,22 @@ export function NewOrderPage() {
             <strong>{t('orders.reviseBanner')}:</strong>{' '}
             <span className="font-mono">{reviseFrom}</span>
             {reviseLoading && <span className="ml-2 text-muted-foreground">({t('common.loading')})</span>}
+          </div>
+        )}
+
+        {/* Round-8 §7 — yerinde düzenleme bandı + zorunlu gerekçe. */}
+        {isAmendMode && (
+          <div className="mb-4 space-y-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div>
+              <strong>{t('myOrders.amend.banner')}:</strong>{' '}
+              <span className="font-mono">{amendFrom}</span>
+              {reviseLoading && <span className="ml-2 text-muted-foreground">({t('common.loading')})</span>}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('myOrders.amend.reason')}</Label>
+              <Textarea rows={2} value={amendGerekce} onChange={(e) => setAmendGerekce(e.target.value)} />
+              {submitted && !amendGerekce.trim() && <FieldError message={t('validation.required')} />}
+            </div>
           </div>
         )}
 
@@ -700,13 +701,13 @@ export function NewOrderPage() {
           {/* ╔══════════ LEFT: MÜŞTERİ + TEMSİLCİ ══════════════════════ */}
           <div className="space-y-4 min-w-0">
             <section className="rounded-md border bg-card">
-              <h3 className="text-center text-base font-semibold py-2 border-b">Müşteri</h3>
+              <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.sections.musteri')}</h3>
               <div className="p-3 space-y-2">
                 <div className="flex items-end gap-2">
                   <div className="flex-1 space-y-1">
-                    <Label className="text-xs">Müşteri</Label>
+                    <Label className="text-xs">{t('orders.form.musteri')}</Label>
                     <Select onValueChange={(v) => onCustomerSelect(Number(v))}>
-                      <SelectTrigger><SelectValue placeholder="Müşteri seç" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('orders.form.musteriSec')} /></SelectTrigger>
                       <SelectContent>
                         {customers.map((c) => (
                           <SelectItem key={c.musteriID} value={String(c.musteriID)}>
@@ -717,12 +718,12 @@ export function NewOrderPage() {
                     </Select>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => nav('/customers/new')}>
-                    Müşteri Ekle
+                    {t('orders.form.musteriEkle')}
                   </Button>
                 </div>
 
                 {/* Müşteri Adı (zorunlu) — legacy formda gizli/ad-soyad ile gelir; biz görünür tutalım. */}
-                <Field label="Müşteri Adı *" required>
+                <Field label={t('orders.form.musteriAd')} required>
                   <Input
                     value={form.musteriAd}
                     onChange={(e) => setForm((f) => ({ ...f, musteriAd: e.target.value }))}
@@ -730,39 +731,39 @@ export function NewOrderPage() {
                   {submitted && !form.musteriAd.trim() && <FieldError message={t('validation.required')} />}
                 </Field>
 
-                <Field label="Telefon">
+                <Field label={t('orders.form.telefon')}>
                   <Input value={form.mTelefon ?? ''} onChange={(e) => setForm((f) => ({ ...f, mTelefon: e.target.value }))} />
                 </Field>
-                <Field label="E-Mail">
+                <Field label={t('orders.form.email')}>
                   <Input value={form.mMail ?? ''} onChange={(e) => setForm((f) => ({ ...f, mMail: e.target.value }))} />
                 </Field>
-                <Field label="Ülke">
+                <Field label={t('orders.form.ulke')}>
                   <Select value={form.mUlke ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, mUlke: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Ülke seç" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('orders.form.ulkeSec')} /></SelectTrigger>
                     <SelectContent>
                       {ulkeler.map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </Field>
-                <Field label="Zip kodu">
+                <Field label={t('orders.form.zipCode')}>
                   <Input value={form.mZipKod ?? ''} onChange={(e) => setForm((f) => ({ ...f, mZipKod: e.target.value }))} />
                 </Field>
-                <Field label="VAT Numarası">
+                <Field label={t('orders.form.vat')}>
                   <Input value={form.mVATNumarasi ?? ''} onChange={(e) => setForm((f) => ({ ...f, mVATNumarasi: e.target.value }))} />
                 </Field>
-                <Field label="Adres">
+                <Field label={t('orders.form.adres')}>
                   <Textarea rows={3} value={form.mAdres ?? ''} onChange={(e) => setForm((f) => ({ ...f, mAdres: e.target.value }))} />
                 </Field>
               </div>
             </section>
 
             <section className="rounded-md border bg-card">
-              <h3 className="text-center text-base font-semibold py-2 border-b">Temsilci</h3>
+              <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.sections.temsilci')}</h3>
               <div className="p-3 space-y-2">
-                <Field label="Temsilci İsmi">
+                <Field label={t('orders.form.temsilciIsmi')}>
                   <Input value={temsilciAdSoyad} readOnly disabled />
                 </Field>
-                <Field label="Not">
+                <Field label={t('common.note')}>
                   <Textarea
                     rows={4}
                     value={form.siparisNotu ?? ''}
@@ -778,7 +779,7 @@ export function NewOrderPage() {
                     setOdemeSekli(sekli)
                     setForm((f) => ({
                       ...f,
-                      details: upsertDetail(f.details, DETAY_PREFIX_ODEME, odemeSekliLine(sekli, f.pesinYuzde)),
+                      details: upsertClause(f.details, ODEME_PREFIX, odemeCode(sekli, f.pesinYuzde)),
                     }))
                   }}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
@@ -789,13 +790,13 @@ export function NewOrderPage() {
                   </Select>
                 </Field>
                 <p className="text-xs text-muted-foreground text-center">
-                  Ek'i yalnızca ZIP veya RAR formatında ekleyiniz
+                  {t('orders.form.ekHint')}
                 </p>
                 <label className="block">
-                  <span className="sr-only">Ek dosya</span>
+                  <span className="sr-only">{t('orders.form.ekDosya')}</span>
                   <Button asChild variant="outline" className="w-full" disabled={!createdNo}>
                     <span>
-                      {ekFileName || 'Ek'}
+                      {ekFileName || t('orders.form.ek')}
                       <input
                         type="file"
                         accept=".zip,.rar"
@@ -817,7 +818,7 @@ export function NewOrderPage() {
                 )}
                 {!createdNo && (
                   <p className="text-[11px] text-orange-600 text-center">
-                    Ek yüklemek için önce sipariş/teklif kaydedin.
+                    {t('orders.form.saveFirstHint')}
                   </p>
                 )}
               </div>
@@ -833,27 +834,27 @@ export function NewOrderPage() {
                 <TabsList className="bg-transparent h-auto py-1">
                   {Array.from({ length: SET_COUNT }, (_, i) => (
                     <TabsTrigger key={`set-${i}`} value={`set-${i}`} className="px-3 py-1 text-xs">
-                      Sipariş {i + 1}
+                      {t('orders.form.siparisN', { n: i + 1 })}
                     </TabsTrigger>
                   ))}
-                  <TabsTrigger value="detay" className="px-3 py-1 text-xs">Detay</TabsTrigger>
+                  <TabsTrigger value="detay" className="px-3 py-1 text-xs">{t('orders.form.details')}</TabsTrigger>
                 </TabsList>
               </div>
 
               {/* Sipariş 1..5 — her sekme bir set */}
               {Array.from({ length: SET_COUNT }, (_, i) => (
                 <TabsContent key={`set-${i}`} value={`set-${i}`} className="m-0 p-4 space-y-3">
-                  <h4 className="text-center text-base font-semibold">Sipariş {i + 1}</h4>
+                  <h4 className="text-center text-base font-semibold">{t('orders.form.siparisN', { n: i + 1 })}</h4>
 
                   <div className="flex items-end gap-2">
                     <div className="flex-1 space-y-1">
-                      <Label className="text-xs text-right block">Ana Ürün</Label>
+                      <Label className="text-xs text-right block">{t('orders.form.anaUrun')}</Label>
                       <Select
                         value={setTabs[i].kategoriID ? String(setTabs[i].kategoriID) : ''}
                         // PROMPT-v2 §1b: Kategori değişimi bileşen tablosunu yükler.
                         onValueChange={(v) => onCategorySelect(i, Number(v))}
                       >
-                        <SelectTrigger><SelectValue placeholder="Ana ürün seç" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('orders.form.anaUrunSec')} /></SelectTrigger>
                         <SelectContent>
                           {categories.map((c) => (
                             <SelectItem key={c.kategoriID} value={String(c.kategoriID)}>
@@ -863,12 +864,12 @@ export function NewOrderPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => iptalTab(i)}>İptal</Button>
+                    <Button variant="outline" size="sm" onClick={() => iptalTab(i)}>{t('common.cancel')}</Button>
                   </div>
 
                   <div className="grid grid-cols-[1fr_120px_auto] gap-2 items-end">
                     <div className="space-y-1">
-                      <Label className="text-xs text-right block">Tekil Fiyat ve Adet</Label>
+                      <Label className="text-xs text-right block">{t('orders.form.tekilFiyatAdet')}</Label>
                       <div className="flex items-center gap-1">
                         <span className="text-sm w-5">{sym}</span>
                         <DecimalInput
@@ -879,7 +880,7 @@ export function NewOrderPage() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-xs text-right block">Adet</Label>
+                      <Label className="text-xs text-right block">{t('orders.form.adet')}</Label>
                       <Input
                         type="number"
                         min={1}
@@ -889,12 +890,12 @@ export function NewOrderPage() {
                         onChange={(e) => onUrunAdetChange(i, Math.max(1, Number(e.target.value)))}
                       />
                     </div>
-                    <Button size="sm" onClick={() => carp(i)}>Çarp</Button>
+                    <Button size="sm" onClick={() => carp(i)}>{t('orders.form.carp')}</Button>
                   </div>
 
                   <div className="grid grid-cols-[1fr_auto] gap-2 items-end">
                     <div className="space-y-1">
-                      <Label className="text-xs text-right block">Sipariş {i + 1}'in Fiyatı</Label>
+                      <Label className="text-xs text-right block">{t('orders.form.setFiyati')}</Label>
                       <div className="flex items-center gap-1">
                         <span className="text-sm w-5">{sym}</span>
                         <Input readOnly disabled value={fmt(tabPrice(i))} className="flex-1" />
@@ -912,7 +913,7 @@ export function NewOrderPage() {
                   <div className="rounded border bg-muted/20 h-40 overflow-y-auto p-2">
                     {setTabs[i].checklist.length === 0
                       ? <p className="text-xs text-muted-foreground text-center pt-14">
-                          {setTabs[i].kategoriID ? 'Bileşenler yükleniyor…' : 'Ana ürün seçince bileşen listesi burada görünür.'}
+                          {setTabs[i].kategoriID ? t('orders.form.bilesenlerYukleniyor') : t('orders.form.anaUrunSecHint')}
                         </p>
                       : setTabs[i].checklist.map((c) => (
                         <label key={c.bilesenID} className="flex items-center gap-2 text-xs cursor-pointer py-0.5 hover:bg-muted/40 rounded px-1">
@@ -939,18 +940,18 @@ export function NewOrderPage() {
                       <thead className="bg-muted/30">
                         <tr>
                           <th className="text-left px-2 py-1">ID</th>
-                          <th className="text-left px-2 py-1">Öznitelik</th>
-                          <th className="text-left px-2 py-1">Bileşen Adı</th>
-                          <th className="text-left px-2 py-1">Birim</th>
-                          <th className="text-right px-2 py-1 w-20">Adet</th>
-                          <th className="text-right px-2 py-1 w-28">Birim Fiyat</th>
-                          <th className="text-right px-2 py-1 w-24">Toplam</th>
+                          <th className="text-left px-2 py-1">{t('orders.form.oznitelik')}</th>
+                          <th className="text-left px-2 py-1">{t('orders.form.bilesenAdiLabel')}</th>
+                          <th className="text-left px-2 py-1">{t('orders.form.birim')}</th>
+                          <th className="text-right px-2 py-1 w-20">{t('orders.form.adet')}</th>
+                          <th className="text-right px-2 py-1 w-28">{t('orders.form.birimFiyat')}</th>
+                          <th className="text-right px-2 py-1 w-24">{t('orders.form.toplam')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {setTabs[i].components.length === 0
                           ? <tr><td colSpan={7} className="text-center text-muted-foreground px-2 py-6">
-                              {setTabs[i].kategoriID ? 'Listeden bileşen işaretleyin.' : 'Önce Ana Ürün seçin.'}
+                              {setTabs[i].kategoriID ? t('orders.form.listedenSecin') : t('orders.form.onceAnaUrun')}
                             </td></tr>
                           : setTabs[i].components.map((cmp, k) => (
                             <tr key={`${cmp.bilesenID}-${k}`} className="border-t">
@@ -995,19 +996,40 @@ export function NewOrderPage() {
                 </TabsContent>
               ))}
 
-              {/* Detay sekmesi */}
-              <TabsContent value="detay" className="m-0 p-4 space-y-2">
-                <h4 className="text-center text-base font-semibold">Detay</h4>
-                <Label className="text-xs">Detaylar (her satır bir not)</Label>
-                <Textarea
-                  rows={14}
-                  value={(form.details ?? []).join('\n')}
-                  onChange={(e) => setForm((f) => ({
-                    ...f,
-                    details: e.target.value.split('\n').filter((s) => s.length > 0),
-                  }))}
-                  placeholder={'Not 1\nNot 2\n...'}
-                />
+              {/* Detay sekmesi — §5: standart şartlar ayrı liste (kod, dil-duyarlı)
+                  + serbest notlar ayrı textarea (verbatim). */}
+              <TabsContent value="detay" className="m-0 p-4 space-y-3">
+                <h4 className="text-center text-base font-semibold">{t('orders.form.details')}</h4>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">{t('orders.form.standardTerms')}</Label>
+                  {(form.details ?? []).filter(isClauseCode).length === 0 ? (
+                    <p className="text-xs text-muted-foreground">—</p>
+                  ) : (
+                    <ul className="list-disc space-y-0.5 pl-5 text-sm">
+                      {(form.details ?? []).filter(isClauseCode).map((c, i) => (
+                        <li key={i}>{resolveClause(t, c)}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs">{t('orders.form.freeNotes')}</Label>
+                  <Textarea
+                    rows={10}
+                    value={(form.details ?? []).filter((s) => !isClauseCode(s)).join('\n')}
+                    onChange={(e) => {
+                      const free = e.target.value.split('\n').filter((s) => s.length > 0)
+                      setForm((f) => ({
+                        ...f,
+                        // Kodları koru, serbest metni değiştir (kodlar başta kalır).
+                        details: [...f.details.filter(isClauseCode), ...free],
+                      }))
+                    }}
+                    placeholder={'Not 1\nNot 2\n...'}
+                  />
+                </div>
               </TabsContent>
             </Tabs>
           </section>
@@ -1016,17 +1038,17 @@ export function NewOrderPage() {
           <div className="space-y-4 min-w-0">
             {/* Teklif / Sipariş No header */}
             <div className="rounded-md border bg-card p-3 space-y-2">
-              <Field label="Teklif No">
+              <Field label={t('common.quoteNo')}>
                 <Input readOnly disabled value={createdNo && createdNo.startsWith('T') ? createdNo : ''} />
               </Field>
-              <Field label="Sipariş No">
+              <Field label={t('common.orderNo')}>
                 <Input readOnly disabled value={createdNo && createdNo.startsWith('S') ? createdNo : ''} />
               </Field>
             </div>
 
             {/* Cari Bilgi */}
             <section className="rounded-md border bg-card">
-              <h3 className="text-center text-base font-semibold py-2 border-b">Cari Bilgi</h3>
+              <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.sections.cariBilgi')}</h3>
               <div className="p-3 space-y-3">
                 {/* Para Tipi radyolar + Diğer dropdown */}
                 <div className="flex items-center gap-3 flex-wrap text-sm">
@@ -1046,7 +1068,7 @@ export function NewOrderPage() {
                     value={isInRadio ? '' : form.paraTipi}
                     onValueChange={(v) => setForm((f) => ({ ...f, paraTipi: v }))}
                   >
-                    <SelectTrigger className="w-28 h-8"><SelectValue placeholder="Diğer" /></SelectTrigger>
+                    <SelectTrigger className="w-28 h-8"><SelectValue placeholder={t('orders.form.diger')} /></SelectTrigger>
                     <SelectContent>
                       {PARA_TIPLERI_DIGER.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                     </SelectContent>
@@ -1055,32 +1077,32 @@ export function NewOrderPage() {
 
                 <div className="grid grid-cols-2 gap-2">
                   {/* PROMPT-v2 §3: boş → null (display blank); coercion yalnız hesapta. */}
-                  <Field label="İndirim" suffix="%">
+                  <Field label={t('orders.form.indirim').replace(' %', '')} suffix="%">
                     <DecimalInput value={form.indirim ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, indirim: v === '' ? null : v }))} />
                   </Field>
-                  <Field label="KDV" suffix="%">
+                  <Field label={t('orders.form.kdv').replace(' %', '')} suffix="%">
                     <DecimalInput value={form.kdv ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, kdv: v === '' ? null : v }))} />
                   </Field>
 
-                  <Field label="Toplam Fiyat" prefix={sym}>
+                  <Field label={t('orders.form.toplamFiyatLabel')} prefix={sym}>
                     <Input readOnly disabled value={fmt(toplamFiyat)} />
                   </Field>
-                  <Field label="Peşin" suffix="%">
+                  <Field label={t('orders.form.pesin').replace(' %', '')} suffix="%">
                     <DecimalInput value={form.pesinYuzde ?? ''} onValueChange={(v) => setForm((f) => {
                       const pesinYuzde = v === '' ? null : v
                       // PROMPT-v6 §5 — Vadeli seçiliyken Ödeme Şekli satırı
                       // pesinYuzde ile senkron güncellenir.
                       const details = odemeSekli === 'Vadeli'
-                        ? upsertDetail(f.details, DETAY_PREFIX_ODEME, odemeSekliLine('Vadeli', pesinYuzde))
+                        ? upsertClause(f.details, ODEME_PREFIX, odemeCode('Vadeli', pesinYuzde))
                         : f.details
                       return { ...f, pesinYuzde, details }
                     })} />
                   </Field>
 
-                  <Field label="Kapora Miktarı" prefix={sym}>
+                  <Field label={t('orders.form.kaporaMiktari')} prefix={sym}>
                     <Input readOnly disabled value={fmt(kaporaMiktari)} />
                   </Field>
-                  <Field label="Şirket">
+                  <Field label={t('orders.form.sirket')}>
                     <Select value={form.sirket} onValueChange={(v) => setForm((f) => ({ ...f, sirket: v }))}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>{SIRKETLER.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
@@ -1094,7 +1116,7 @@ export function NewOrderPage() {
 
             {/* Teslimat ve Montaj */}
             <section className="rounded-md border bg-card">
-              <h3 className="text-center text-base font-semibold py-2 border-b">Teslimat / Montaj</h3>
+              <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.sections.teslimatMontaj')}</h3>
               <div className="p-3 space-y-3">
                 <div className="flex items-center justify-around text-sm">
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1108,13 +1130,14 @@ export function NewOrderPage() {
                         setForm((f) => ({
                           ...f,
                           montajVar,
+                          // §5 — Montaj seçilince "montaj dahil değildir" şartı kaldırılır.
                           details: montajVar
-                            ? f.details.filter((s) => s !== SART_MONTAJ)
-                            : (f.details.includes(SART_MONTAJ) ? f.details : [...f.details, SART_MONTAJ]),
+                            ? f.details.filter((s) => s !== CLAUSE.MONTAJ)
+                            : (f.details.includes(CLAUSE.MONTAJ) ? f.details : [...f.details, CLAUSE.MONTAJ]),
                         }))
                       }}
                     />
-                    Montaj
+                    {t('orders.form.montaj')}
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -1122,19 +1145,19 @@ export function NewOrderPage() {
                       checked={form.teslimatVar}
                       onChange={(e) => setForm((f) => ({ ...f, teslimatVar: e.target.checked }))}
                     />
-                    Teslimat
+                    {t('orders.form.teslimat')}
                   </label>
                 </div>
 
                 <div className="grid grid-cols-[1fr_80px_auto] gap-2 items-end">
-                  <Field label="Montaj Fiyat">
+                  <Field label={t('orders.form.montajFiyat')}>
                     <DecimalInput
                       value={form.montajFiyat}
                       onValueChange={(v) => setForm((f) => ({ ...f, montajFiyat: v === '' ? 0 : v }))}
                       disabled={!form.montajVar}
                     />
                   </Field>
-                  <Field label="Miktar">
+                  <Field label={t('orders.form.miktar')}>
                     <Input
                       type="number" min={1}
                       value={form.mAdet}
@@ -1143,18 +1166,18 @@ export function NewOrderPage() {
                     />
                   </Field>
                   {/* PROMPT-v3 §4.3: fiyat × miktar yerinde yazılır, miktar 1'e döner. */}
-                  <Button size="sm" variant="outline" disabled={!form.montajVar} onClick={montajCarp}>Çarp</Button>
+                  <Button size="sm" variant="outline" disabled={!form.montajVar} onClick={montajCarp}>{t('orders.form.carp')}</Button>
                 </div>
 
                 <div className="grid grid-cols-[1fr_80px_auto] gap-2 items-end">
-                  <Field label="Teslimat Fiyat">
+                  <Field label={t('orders.form.teslimatFiyat')}>
                     <DecimalInput
                       value={form.teslimatFiyat}
                       onValueChange={(v) => setForm((f) => ({ ...f, teslimatFiyat: v === '' ? 0 : v }))}
                       disabled={!form.teslimatVar}
                     />
                   </Field>
-                  <Field label="Miktar">
+                  <Field label={t('orders.form.miktar')}>
                     <Input
                       type="number" min={1}
                       value={form.mTeslimat}
@@ -1162,13 +1185,13 @@ export function NewOrderPage() {
                       disabled={!form.teslimatVar}
                     />
                   </Field>
-                  <Button size="sm" variant="outline" disabled={!form.teslimatVar} onClick={teslimatCarp}>Çarp</Button>
+                  <Button size="sm" variant="outline" disabled={!form.teslimatVar} onClick={teslimatCarp}>{t('orders.form.carp')}</Button>
                 </div>
 
                 <div className="border-t pt-3 space-y-2">
                   {/* PROMPT-v3 §4.1: Teslim Alan Adı + Teslimat Çeşidi (Incoterms) yan yana. */}
                   <div className="grid grid-cols-[1fr_96px] gap-2 items-end">
-                    <Field label="Teslim Alan Adı">
+                    <Field label={t('orders.form.teslimAlanAdi')}>
                       <Select
                         value={form.tTeslimAlanAdi ?? ''}
                         onValueChange={(v) => {
@@ -1178,7 +1201,7 @@ export function NewOrderPage() {
                           else setForm((f) => ({ ...f, tTeslimAlanAdi: v }))
                         }}
                       >
-                        <SelectTrigger><SelectValue placeholder="Seç" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('orders.form.sec')} /></SelectTrigger>
                         <SelectContent>
                           {/* §3: İlişkilendir sonrası müşteri adı kayıtlı adres olmasa
                               da değer olarak görünebilmeli (legacy editable combo). */}
@@ -1193,7 +1216,7 @@ export function NewOrderPage() {
                         </SelectContent>
                       </Select>
                     </Field>
-                    <Field label="Çeşidi">
+                    <Field label={t('orders.form.cesidi')}>
                       <Select value={form.teslimatCesiti ?? ''} onValueChange={onTeslimatCesitiChange}>
                         <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
@@ -1205,17 +1228,17 @@ export function NewOrderPage() {
 
                   <div className="flex items-end gap-2">
                     <div className="flex-1">
-                      <Field label="İlgili Kişi">
+                      <Field label={t('orders.form.ilgiliKisi')}>
                         <Input value={form.tIlgiliKisi ?? ''} onChange={(e) => setForm((f) => ({ ...f, tIlgiliKisi: e.target.value }))} />
                       </Field>
                     </div>
                     {/* PROMPT-v3 §3: Müşteri bloğunu teslimat alanlarına kopyalar. */}
-                    <Button variant="outline" size="sm" onClick={ilisikilendir}>İlişkilendir</Button>
+                    <Button variant="outline" size="sm" onClick={ilisikilendir}>{t('orders.form.iliskilendir')}</Button>
                   </div>
 
-                  <Field label="Ülke">
+                  <Field label={t('orders.form.ulke')}>
                     <Select value={form.tUlke ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, tUlke: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Ülke seç" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('orders.form.ulkeSec')} /></SelectTrigger>
                       <SelectContent>
                         {ulkeler.map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
                       </SelectContent>
@@ -1223,23 +1246,23 @@ export function NewOrderPage() {
                   </Field>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <Field label="Telefon">
+                    <Field label={t('orders.form.telefon')}>
                       <Input value={form.tTelefon ?? ''} onChange={(e) => setForm((f) => ({ ...f, tTelefon: e.target.value }))} />
                     </Field>
-                    <Field label="Alternatif Telefon">
+                    <Field label={t('orders.form.altTelefon')}>
                       <Input value={form.tAltTelefon ?? ''} onChange={(e) => setForm((f) => ({ ...f, tAltTelefon: e.target.value }))} />
                     </Field>
-                    <Field label="E-Mail">
+                    <Field label={t('orders.form.email')}>
                       <Input value={form.tE_Mail ?? ''} onChange={(e) => setForm((f) => ({ ...f, tE_Mail: e.target.value }))} />
                     </Field>
-                    <Field label="Zip kodu">
+                    <Field label={t('orders.form.zipCode')}>
                       <Input value={form.tZipKod ?? ''} onChange={(e) => setForm((f) => ({ ...f, tZipKod: e.target.value }))} />
                     </Field>
-                    <Field label="VAT Numarası">
+                    <Field label={t('orders.form.vat')}>
                       <Input value={form.tVATNumarasi ?? ''} onChange={(e) => setForm((f) => ({ ...f, tVATNumarasi: e.target.value }))} />
                     </Field>
                   </div>
-                  <Field label="Adres">
+                  <Field label={t('orders.form.adres')}>
                     <Textarea
                       rows={3}
                       value={form.tAdres ?? ''}
@@ -1255,44 +1278,62 @@ export function NewOrderPage() {
         {/* ╔══════════ FOOTER: AKSIYON BUTONLARI ═════════════════════════ */}
         <div className="mt-4 flex flex-wrap justify-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t">
           {/* PROMPT-v3 §6: legacy FormGetir — mevcut sipariş seçip forma yükler. */}
-          <Button variant="outline" onClick={() => setGetirOpen(true)}>Formu Getir</Button>
-          <Button
-            variant="secondary"
-            disabled={quoteMut.isPending || reviseLoading || isReviseMode}
-            onClick={submitQuote}
-          >
-            Teklifi Hazırla
-          </Button>
-          <Button
-            disabled={orderMut.isPending || reviseLoading || isReviseMode}
-            onClick={submitOrder}
-          >
-            Siparişi Hazırla
-          </Button>
-          <Button
-            variant="default"
-            disabled={!isReviseMode || orderMut.isPending || reviseLoading}
-            onClick={submitOrder}
-          >
-            Revize Et
-          </Button>
+          {!isAmendMode && (
+            <Button variant="outline" onClick={() => setGetirOpen(true)}>{t('orders.form.formuGetir')}</Button>
+          )}
+          {!isAmendMode && (
+            <Button
+              variant="secondary"
+              disabled={quoteMut.isPending || reviseLoading || isReviseMode}
+              onClick={submitQuote}
+            >
+              {t('orders.form.teklifiHazirla')}
+            </Button>
+          )}
+          {!isAmendMode && (
+            <Button
+              disabled={orderMut.isPending || reviseLoading || isReviseMode}
+              onClick={submitOrder}
+            >
+              {t('orders.form.siparisiHazirla')}
+            </Button>
+          )}
+          {isReviseMode && (
+            <Button
+              variant="default"
+              disabled={orderMut.isPending || reviseLoading}
+              onClick={submitOrder}
+            >
+              {t('orders.form.revizeEt')}
+            </Button>
+          )}
+          {/* Round-8 §7 — yerinde düzenleme kaydet (gerekçe zorunlu). */}
+          {isAmendMode && (
+            <Button
+              variant="default"
+              disabled={amendMut.isPending || reviseLoading || !amendGerekce.trim()}
+              onClick={submitAmend}
+            >
+              {t('myOrders.amend.save')}
+            </Button>
+          )}
         </div>
 
         {/* ╔══════════ FORMU GETİR DIALOG (PROMPT-v3 §6) ═════════════════ */}
         <Dialog open={getirOpen} onOpenChange={setGetirOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle>Formu Getir</DialogTitle>
+              <DialogTitle>{t('orders.form.formuGetir')}</DialogTitle>
             </DialogHeader>
             <Input
               autoFocus
-              placeholder="Teklif No / Sipariş No / Müşteri adı ara…"
+              placeholder={t('orders.form.getirSearch')}
               value={getirQuery}
               onChange={(e) => setGetirQuery(e.target.value)}
             />
             <div className="max-h-72 overflow-y-auto rounded border divide-y">
               {getirList.length === 0
-                ? <p className="text-sm text-muted-foreground text-center py-6">Kayıt bulunamadı.</p>
+                ? <p className="text-sm text-muted-foreground text-center py-6">{t('common.noData')}</p>
                 : getirList.map((o) => (
                   <button
                     key={o.siparisAlID}
@@ -1309,7 +1350,7 @@ export function NewOrderPage() {
                   </button>
                 ))}
             </div>
-            {getirLoading && <p className="text-xs text-muted-foreground">Form yükleniyor…</p>}
+            {getirLoading && <p className="text-xs text-muted-foreground">{t('orders.form.formYukleniyor')}</p>}
           </DialogContent>
         </Dialog>
       </div>

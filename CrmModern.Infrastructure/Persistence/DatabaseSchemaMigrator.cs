@@ -49,6 +49,24 @@ public static class DatabaseSchemaMigrator
         // 6) PROMPT-v6 §1.1: SiparisAlTablo.LojistikOnay — Burcu lojistik onay gate'i.
         // NULL = eski kayıt (gate uygulanmaz) | 'Bekliyor' | 'Onay'.
         await EnsureLojistikOnayColumnAsync(ctx, logger);
+
+        // 7) Round-8 §7: Kontrol onayından önce sipariş düzenleme/silme audit'i.
+        // Tümü additive + NOT NULL DEFAULT 0 / NULL — mevcut satırlar default alır.
+        await EnsureColumnAsync(ctx, logger,
+            table: "SiparisAlTablo", column: "Silindi",
+            ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN Silindi TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(ctx, logger,
+            table: "SiparisAlTablo", column: "Guncellendi",
+            ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN Guncellendi TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(ctx, logger,
+            table: "SiparisAlTablo", column: "DegisiklikGerekce",
+            ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN DegisiklikGerekce TEXT NULL");
+        await EnsureColumnAsync(ctx, logger,
+            table: "SiparisAlTablo", column: "DegisiklikKullaniciID",
+            ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN DegisiklikKullaniciID INT NULL");
+        await EnsureColumnAsync(ctx, logger,
+            table: "SiparisAlTablo", column: "DegisiklikTarihi",
+            ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN DegisiklikTarihi DATETIME NULL");
     }
 
     /// <summary>

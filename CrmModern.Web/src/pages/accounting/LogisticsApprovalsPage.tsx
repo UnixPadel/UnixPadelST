@@ -52,9 +52,9 @@ export function LogisticsApprovalsPage() {
       muhasebeApproveLogistics(sevkId, aciklama),
     onSuccess: () => {
       invalidate(); setApproveTarget(null); setAciklama('')
-      toast({ title: 'Sevk onaylandı' })
+      toast({ title: t('logApprovals.toast.approved') })
     },
-    onError: () => toast({ title: 'Onay başarısız', variant: 'destructive' }),
+    onError: () => toast({ title: t('logApprovals.toast.approveFailed'), variant: 'destructive' }),
   })
 
   const rejectMut = useMutation({
@@ -62,30 +62,30 @@ export function LogisticsApprovalsPage() {
       muhasebeRejectLogistics(sevkId, redNotu),
     onSuccess: () => {
       invalidate(); setRejectTarget(null); setRedNotu('')
-      toast({ title: 'Sevk reddedildi' })
+      toast({ title: t('logApprovals.toast.rejected') })
     },
-    onError: () => toast({ title: 'Red başarısız', variant: 'destructive' }),
+    onError: () => toast({ title: t('logApprovals.toast.rejectFailed'), variant: 'destructive' }),
   })
 
   const cols: Column<LogisticsPendingApprovalDto & Record<string, unknown>>[] = [
-    { key: 'sevkId',        header: 'Sevk #',     sortable: true },
-    { key: 'siparisNo',     header: 'Sipariş No', sortable: true },
-    { key: 'musteriAd',     header: 'Müşteri',    sortable: true },
-    { key: 'firmaAdi',      header: 'Taşıyıcı' },
-    { key: 'lojistikCesit', header: 'Tür' },
-    { key: 'fiyat',         header: 'Fiyat',      render: (r) => formatCurrency((r.fiyat as number) ?? 0) },
-    { key: 'sTarih',        header: 'Sevk Tarihi', render: (r) => r.sTarih ? formatDate(r.sTarih as string) : '—' },
-    { key: 'lojistikNot',   header: 'Not',
+    { key: 'sevkId',        header: t('logApprovals.sevkId'),     sortable: true },
+    { key: 'siparisNo',     header: t('common.orderNo'), sortable: true },
+    { key: 'musteriAd',     header: t('common.customer'),    sortable: true },
+    { key: 'firmaAdi',      header: t('logApprovals.tasiyici') },
+    { key: 'lojistikCesit', header: t('logApprovals.tur') },
+    { key: 'fiyat',         header: t('common.amount'),      render: (r) => formatCurrency((r.fiyat as number) ?? 0) },
+    { key: 'sTarih',        header: t('logApprovals.sevkTarihi'), render: (r) => r.sTarih ? formatDate(r.sTarih as string) : '—' },
+    { key: 'lojistikNot',   header: t('common.note'),
       render: (r) => <span className="text-sm text-muted-foreground">{(r.lojistikNot as string) ?? (r.lNot as string) ?? '—'}</span> },
     {
-      key: 'actions', header: 'İşlem',
+      key: 'actions', header: t('common.actions'),
       render: (r) => canMutate ? (
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => { setApproveTarget(r as LogisticsPendingApprovalDto); setAciklama('') }}>
-            Onayla
+            {t('common.approve')}
           </Button>
           <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(r as LogisticsPendingApprovalDto); setRedNotu('') }}>
-            Reddet
+            {t('common.reject')}
           </Button>
         </div>
       ) : null,
@@ -106,41 +106,41 @@ export function LogisticsApprovalsPage() {
 
       <Dialog open={!!approveTarget} onOpenChange={() => setApproveTarget(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Sevki Onayla — #{approveTarget?.sevkId}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('logApprovals.approveTitle', { id: approveTarget?.sevkId })}</DialogTitle></DialogHeader>
           <div className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Sipariş:</span> {approveTarget?.siparisNo} — {approveTarget?.musteriAd}</p>
-            <p><span className="text-muted-foreground">Taşıyıcı:</span> {approveTarget?.firmaAdi} ({approveTarget?.lojistikCesit})</p>
-            <Label>Onay Açıklaması</Label>
-            <Textarea rows={3} value={aciklama} onChange={(e) => setAciklama(e.target.value)} placeholder="(opsiyonel)" />
+            <p><span className="text-muted-foreground">{t('logApprovals.siparis')}:</span> {approveTarget?.siparisNo} — {approveTarget?.musteriAd}</p>
+            <p><span className="text-muted-foreground">{t('logApprovals.tasiyici')}:</span> {approveTarget?.firmaAdi} ({approveTarget?.lojistikCesit})</p>
+            <Label>{t('logApprovals.onayAciklama')}</Label>
+            <Textarea rows={3} value={aciklama} onChange={(e) => setAciklama(e.target.value)} placeholder={t('logApprovals.optional')} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setApproveTarget(null)}>İptal</Button>
+            <Button variant="outline" onClick={() => setApproveTarget(null)}>{t('common.cancel')}</Button>
             <Button
               disabled={approveMut.isPending}
               onClick={() => approveMut.mutate({ sevkId: approveTarget!.sevkId, aciklama: aciklama || undefined })}
-            >Onayla</Button>
+            >{t('common.approve')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!rejectTarget} onOpenChange={() => setRejectTarget(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Sevki Reddet — #{rejectTarget?.sevkId}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('logApprovals.rejectTitle', { id: rejectTarget?.sevkId })}</DialogTitle></DialogHeader>
           <div className="space-y-2 text-sm">
-            <p><span className="text-muted-foreground">Sipariş:</span> {rejectTarget?.siparisNo} — {rejectTarget?.musteriAd}</p>
-            <Label>Red Gerekçesi *</Label>
+            <p><span className="text-muted-foreground">{t('logApprovals.siparis')}:</span> {rejectTarget?.siparisNo} — {rejectTarget?.musteriAd}</p>
+            <Label>{t('logApprovals.redGerekce')}</Label>
             <Textarea rows={3} value={redNotu} onChange={(e) => setRedNotu(e.target.value)} />
             <p className="text-xs text-muted-foreground">
-              Red sonrası LojistikTablo'daki sevk satırı silinir, sipariş "Hazır"da kalır.
+              {t('logApprovals.rejectHint')}
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>İptal</Button>
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>{t('common.cancel')}</Button>
             <Button
               variant="destructive"
               disabled={!redNotu.trim() || rejectMut.isPending}
               onClick={() => rejectMut.mutate({ sevkId: rejectTarget!.sevkId, redNotu })}
-            >Reddet</Button>
+            >{t('common.reject')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

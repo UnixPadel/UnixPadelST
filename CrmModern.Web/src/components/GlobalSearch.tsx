@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Search, X, Loader2, Clock } from 'lucide-react'
 import { unifiedSearch } from '@/api/search'
 import type { UnifiedSearchHit } from '@/types'
@@ -21,6 +22,7 @@ function saveRecents(hits: UnifiedSearchHit[]) {
  * 300 ms debounce sonrası `/api/search/unified` çağrılır, kategori bazlı gruplanmış dropdown gösterilir.
  */
 export function GlobalSearch() {
+  const { t } = useTranslation()
   const [open,    setOpen]    = useState(false)
   const [query,   setQuery]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -120,7 +122,7 @@ export function GlobalSearch() {
                 ref={inputRef}
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="En az 2 karakter yazın…"
+                placeholder={t('topbar.searchMinChars')}
                 className="flex-1 bg-transparent outline-none text-sm"
               />
               {loading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}

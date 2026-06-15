@@ -10,7 +10,11 @@ namespace CrmModern.Core.Interfaces.Services;
 public interface IReportingService
 {
     Task<byte[]> ExportAccountingOrdersAsync();
-    Task<byte[]> ExportOrderProformaAsync(string siparisNo);
+    /// <summary>
+    /// Sipariş proforması. <paramref name="lang"/> ("tr"|"en") standart şart
+    /// kodlarının (#DETAY) hangi dilde yazılacağını belirler (Round-8 §4).
+    /// </summary>
+    Task<byte[]> ExportOrderProformaAsync(string siparisNo, string lang = "tr");
 
     // ── Faz 7 Dashboard ───────────────────────────────────────────────────────
 
@@ -28,4 +32,7 @@ public interface IReportingService
 
     /// <summary>Son N günde para birimi dağılımı.</summary>
     Task<IReadOnlyList<CurrencyDistributionDto>> GetCurrencyDistributionAsync(int days = 90);
+
+    /// <summary>Round-8 §13 — Tarih aralığında Temsilci-rolü kullanıcı başına performans.</summary>
+    Task<IReadOnlyList<RepPerformanceDto>> GetRepPerformanceAsync(DateTime start, DateTime end);
 }

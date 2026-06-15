@@ -37,9 +37,9 @@ export function FinalApprovalPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['final-pending'] })
       setDetailId(null)
-      toast({ title: 'Onaylandı' })
+      toast({ title: t('purchase.final.approved') })
     },
-    onError: (e: unknown) => toast({ title: 'Onay başarısız', description: (e as Error).message, variant: 'destructive' }),
+    onError: (e: unknown) => toast({ title: t('purchase.final.approveFailed'), description: (e as Error).message, variant: 'destructive' }),
   })
 
   const rejectMut = useMutation({
@@ -47,9 +47,9 @@ export function FinalApprovalPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['final-pending'] })
       setRejectTarget(null); setRedNotu(''); setDetailId(null)
-      toast({ title: 'Reddedildi' })
+      toast({ title: t('purchase.final.rejected') })
     },
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
   })
 
   const isSatinAlma = (r: PurchaseRequestListDto) =>
@@ -65,19 +65,19 @@ export function FinalApprovalPage() {
   }
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',       header: 'ID', sortable: true },
-    { key: 'urunAdi',       header: 'Ürün' },
-    { key: 'urunMaliyeti',  header: 'Maliyet', render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
-    { key: 'departman',     header: 'Departman' },
-    { key: 'talepTipi',     header: 'Tip', render: (r) => r.talepTipi ?? 'SatinAlma' },
-    { key: 'talepEdenKullaniciAdi', header: 'Talep Eden' },
-    { key: 'talepTarihi',   header: 'Tarih', render: (r) => formatDate(r.talepTarihi as string) },
-    { key: 'durum',         header: 'Durum', render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
+    { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
+    { key: 'urunAdi',       header: t('purchase.cols.urun') },
+    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
+    { key: 'talepTipi',     header: t('purchase.cols.tip'), render: (r) => t(`purchase.tipLabel.${(r.talepTipi as string) ?? 'SatinAlma'}`, { defaultValue: (r.talepTipi as string) ?? 'SatinAlma' }) },
+    { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
+    { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
+    { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     {
-      key: 'actions', header: 'İşlem',
+      key: 'actions', header: t('purchase.cols.islem'),
       render: (r) => (
         <Button size="sm" variant="outline" onClick={() => setDetailId(r.talepID as number)}>
-          İncele / Onayla
+          {t('purchase.final.reviewApprove')}
         </Button>
       ),
     },
@@ -94,65 +94,65 @@ export function FinalApprovalPage() {
       <Dialog open={!!detailId} onOpenChange={() => setDetailId(null)}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Talep İnceleme — #{detailId}</DialogTitle>
+            <DialogTitle>{t('purchase.final.reviewTitle', { id: detailId })}</DialogTitle>
           </DialogHeader>
 
           {detail && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Sol: Talep + Muhasebe paneli */}
               <div className="rounded-md border bg-card p-3 space-y-2 text-sm">
-                <h3 className="font-semibold border-b pb-1">Talep</h3>
-                <Row label="Ürün"        value={detail.urunAdi} />
-                <Row label="Tür"         value={detail.urunTuru} />
-                <Row label="Maliyet"     value={formatCurrency(detail.urunMaliyeti ?? 0)} />
-                <Row label="Alınan Yer"  value={detail.alinanYer} />
-                <Row label="Departman"   value={detail.departman} />
-                <Row label="Talep Eden"  value={detail.talepEdenKullaniciAdi} />
-                <Row label="Tarih"       value={formatDate(detail.talepTarihi)} />
-                <Row label="Notlar"      value={detail.notlar} />
+                <h3 className="font-semibold border-b pb-1">{t('purchase.final.talep')}</h3>
+                <Row label={t('purchase.final.fields.urun')}       value={detail.urunAdi} />
+                <Row label={t('purchase.final.fields.tur')}        value={detail.urunTuru} />
+                <Row label={t('purchase.final.fields.maliyet')}    value={formatCurrency(detail.urunMaliyeti ?? 0)} />
+                <Row label={t('purchase.final.fields.alinanYer')}  value={detail.alinanYer} />
+                <Row label={t('purchase.final.fields.departman')}  value={detail.departman ? t(`roles.${detail.departman}`, { defaultValue: detail.departman }) : null} />
+                <Row label={t('purchase.final.fields.talepEden')}  value={detail.talepEdenKullaniciAdi} />
+                <Row label={t('purchase.final.fields.tarih')}      value={formatDate(detail.talepTarihi)} />
+                <Row label={t('purchase.final.fields.notlar')}     value={detail.notlar} />
                 {detail.onIzlemeYapan && (
-                  <Row label="Ön Onay" value={`${detail.onIzlemeYapan} (${detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''})`} />
+                  <Row label={t('purchase.final.fields.onOnay')} value={`${detail.onIzlemeYapan} (${detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''})`} />
                 )}
               </div>
 
               <div className="rounded-md border bg-muted/20 p-3 space-y-2 text-sm">
-                <h3 className="font-semibold border-b pb-1">Muhasebe Ödeme Detayı (read-only)</h3>
+                <h3 className="font-semibold border-b pb-1">{t('purchase.final.muhasebeReadonly')}</h3>
                 {detail.odemeTuru
                   ? <>
-                      <Row label="Ödeme Türü"       value={detail.odemeTuru} />
-                      <Row label="Ödenen Tutar"    value={detail.odenenTutar != null ? formatCurrency(detail.odenenTutar) : null} />
-                      <Row label="Ödeme Tutarı"    value={detail.odemeTutari != null ? formatCurrency(detail.odemeTutari) : null} />
-                      <Row label="Vade Süresi"     value={detail.odemeVadeSuresi} />
-                      <Row label="Vade Tutarı"     value={detail.odemeVadeTutari != null ? formatCurrency(detail.odemeVadeTutari) : null} />
-                      <Row label="Vade Tarihi"     value={detail.odemeVadeTarihi} />
-                      <Row label="Belge No"        value={detail.odemeBelgeNo} />
-                      <Row label="Banka Adı"       value={detail.odemeBankaAdi} />
-                      <Row label="İşlem Tarihi"    value={detail.odemeIslemTarihi ? formatDate(detail.odemeIslemTarihi) : null} />
-                      <Row label="Kart Tipi"       value={detail.odemeKartTipi} />
-                      <Row label="Taksit"          value={detail.odemeTaksitSayisi?.toString()} />
-                      <Row label="Açıklama"        value={detail.odemeAciklama} />
-                      <Row label="Muhasebe Yapan"  value={detail.muhasebeYapanKullanici} />
-                      <Row label="Muhasebe Tarihi" value={detail.muhasebeTarihi ? formatDate(detail.muhasebeTarihi) : null} />
+                      <Row label={t('purchase.final.fields.odemeTuru')}    value={detail.odemeTuru} />
+                      <Row label={t('purchase.final.fields.odenenTutar')}  value={detail.odenenTutar != null ? formatCurrency(detail.odenenTutar) : null} />
+                      <Row label={t('purchase.final.fields.odemeTutari')}  value={detail.odemeTutari != null ? formatCurrency(detail.odemeTutari) : null} />
+                      <Row label={t('purchase.final.fields.vadeSuresi')}   value={detail.odemeVadeSuresi} />
+                      <Row label={t('purchase.final.fields.vadeTutari')}   value={detail.odemeVadeTutari != null ? formatCurrency(detail.odemeVadeTutari) : null} />
+                      <Row label={t('purchase.final.fields.vadeTarihi')}   value={detail.odemeVadeTarihi} />
+                      <Row label={t('purchase.final.fields.belgeNo')}      value={detail.odemeBelgeNo} />
+                      <Row label={t('purchase.final.fields.bankaAdi')}     value={detail.odemeBankaAdi} />
+                      <Row label={t('purchase.final.fields.islemTarihi')}  value={detail.odemeIslemTarihi ? formatDate(detail.odemeIslemTarihi) : null} />
+                      <Row label={t('purchase.final.fields.kartTipi')}     value={detail.odemeKartTipi} />
+                      <Row label={t('purchase.final.fields.taksit')}       value={detail.odemeTaksitSayisi?.toString()} />
+                      <Row label={t('purchase.final.fields.aciklama')}     value={detail.odemeAciklama} />
+                      <Row label={t('purchase.final.fields.muhasebeYapan')} value={detail.muhasebeYapanKullanici} />
+                      <Row label={t('purchase.final.fields.muhasebeTarihi')} value={detail.muhasebeTarihi ? formatDate(detail.muhasebeTarihi) : null} />
                     </>
                   : <p className="text-orange-700 text-xs">
-                      ⚠ Ödeme detayı henüz girilmemiş (RULE 4: SatinAlma tipi için zorunlu).
+                      {t('purchase.final.noPayment')}
                     </p>}
               </div>
             </div>
           )}
 
-          <DialogFooter className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setDetailId(null)}>Kapat</Button>
+          <DialogFooter className="flex flex-wrap justify-end gap-2">
+            <Button variant="outline" onClick={() => setDetailId(null)}>{t('common.close')}</Button>
             <Button
               variant="destructive"
               onClick={() => { setRejectTarget(detailId); setRedNotu('') }}
               disabled={rejectMut.isPending}
-            >Reddet</Button>
+            >{t('common.reject')}</Button>
             <Button
               disabled={approveMut.isPending || (detail && !detail.odemeTuru && (!detail.talepTipi || detail.talepTipi === 'SatinAlma'))}
-              title={detail && !detail.odemeTuru && (!detail.talepTipi || detail.talepTipi === 'SatinAlma') ? 'RULE 4: Ödeme detayı eksik' : ''}
+              title={detail && !detail.odemeTuru && (!detail.talepTipi || detail.talepTipi === 'SatinAlma') ? t('purchase.final.ruleBlocked') : ''}
               onClick={() => approveMut.mutate(detailId!)}
-            >Onayla</Button>
+            >{t('common.approve')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -160,15 +160,15 @@ export function FinalApprovalPage() {
       {/* Reject sub-modal */}
       <Dialog open={rejectTarget !== null} onOpenChange={() => setRejectTarget(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Reddet — #{rejectTarget}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('purchase.reject.title', { id: rejectTarget })}</DialogTitle></DialogHeader>
           <div className="space-y-2">
-            <Label>Red Notu *</Label>
+            <Label>{t('purchase.reject.note')}</Label>
             <Textarea rows={3} value={redNotu} onChange={(e) => setRedNotu(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>İptal</Button>
+            <Button variant="outline" onClick={() => setRejectTarget(null)}>{t('common.cancel')}</Button>
             <Button variant="destructive" disabled={!redNotu.trim() || rejectMut.isPending}
-              onClick={() => rejectMut.mutate({ id: rejectTarget!, not: redNotu })}>Reddet</Button>
+              onClick={() => rejectMut.mutate({ id: rejectTarget!, not: redNotu })}>{t('common.reject')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -23,6 +23,7 @@ import { PreApprovalPage } from '@/pages/approval/PreApprovalPage'
 import { PaymentDetailsPage } from '@/pages/approval/PaymentDetailsPage'
 import { FinalApprovalPage } from '@/pages/approval/FinalApprovalPage'
 import { UsersPage } from '@/pages/users/UsersPage'
+import { RepPerformancePage } from '@/pages/reporting/RepPerformancePage'
 import { SearchPage } from '@/pages/search/SearchPage'
 import { UpdatesPage } from '@/pages/UpdatesPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -41,6 +42,8 @@ export default function App() {
         {/* PROMPT.md #20 — Siparişlerim: only roles that can create orders.
             PROMPT-v4 §6.2: elshan.rasulov tüm siparişleri buradan izler. */}
         <Route path="/orders/mine"     element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']} usernames={['elshan.rasulov']}><MyOrdersPage /></RoleGuard>} />
+        {/* Round-8 §13 — Temsilci performans raporu YALNIZ Yonetici. */}
+        <Route path="/reporting/representatives" element={<RoleGuard roles={['Yonetici']}><RepPerformancePage /></RoleGuard>} />
         {/* PROMPT.md #16 + #19 — Müşteri CRUD. Per-row matrix:
               list   — Yonetici, Temsilci, Gozlemci, Muhasebe (read-only)
               new    — Yonetici, Temsilci, Gozlemci

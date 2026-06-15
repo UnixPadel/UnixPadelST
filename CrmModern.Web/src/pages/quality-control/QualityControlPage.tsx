@@ -22,6 +22,8 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useToast } from '@/components/ToastProvider'
 import { describeApiError } from '@/lib/axios'
 import { formatDateShort, formatCurrency, cn } from '@/lib/utils'
+import { statusLabel } from '@/lib/status'
+import { resolveClause } from '@/lib/clauses'
 import type { OrderListDto, QualityControlListDto } from '@/types'
 
 /**
@@ -389,8 +391,9 @@ export function QualityControlPage() {
       render: (r) => r.teslimatCesiti || t('qc.grid.veriYok') },
     { key: 'paraTipi', header: t('qc.grid.paraTipi'), sortable: true },
     { key: 'odemeDurum', header: t('qc.grid.odemeDurumu'), sortable: true,
-      render: (r) => r.odemeDurum || '' },
-    { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true },
+      render: (r) => statusLabel(t, r.odemeDurum) },
+    { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true,
+      render: (r) => statusLabel(t, r.siparisMiTeklifMi) },
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)
     { key: 'tarih', header: t('qc.grid.tarih'), sortable: true,
       render: (r) => formatDateShort(r.tarih) },
@@ -422,7 +425,7 @@ export function QualityControlPage() {
            Bölge aktif sekmenin doğal yüksekliğine oturur (h-auto, iç scroll
            yok). Paneller seçim olmasa da hep görünür; alanlar '—' gösterir,
            aksiyonlar select-first toast'ını atar. */}
-      <div className="flex h-auto shrink-0 items-stretch gap-2 px-4 py-2">
+      <div className="flex h-auto shrink-0 items-stretch gap-2 px-4 py-1.5">
 
         {/* PROMPT-v7 §4 — Filtreme dikey kartı kaldırıldı; filtreler gridin
             hemen üstüne kompakt yatay bar olarak taşındı (aşağıda). Üst bölgede
@@ -539,13 +542,13 @@ export function QualityControlPage() {
             <TabsContent value="detay" className="flex flex-col gap-2">
               <div className="flex flex-col">
                 <p className="mb-1 text-xs font-semibold">{t('qc.blocks.detay')}</p>
-                <div className="max-h-[16vh] overflow-y-auto rounded border">
+                <div className="max-h-[12vh] overflow-y-auto rounded border">
                   {!d || d.details.length === 0 ? (
                     <p className="p-2 text-xs text-muted-foreground">{t('common.noData')}</p>
                   ) : (
                     <ul className="divide-y">
                       {d.details.map((line, i) => (
-                        <li key={i} className="px-2 py-1 text-xs">{line}</li>
+                        <li key={i} className="px-2 py-1 text-xs">{resolveClause(t, line)}</li>
                       ))}
                     </ul>
                   )}
@@ -553,7 +556,7 @@ export function QualityControlPage() {
               </div>
               <div className="flex flex-col">
                 <p className="mb-1 text-xs font-semibold">{t('qc.blocks.urunBilesen')}</p>
-                <div className="max-h-[20vh] overflow-auto rounded border">
+                <div className="max-h-[16vh] overflow-auto rounded border">
                   <table className="w-full text-xs">
                     <thead className="sticky top-0 bg-muted/80">
                       <tr>
@@ -602,7 +605,7 @@ export function QualityControlPage() {
             <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
             {/* Sipariş notu serbest metin — yalnız bu kutu max-h ile sınırlı
                  (alan-düzeyi sınır; §2'nin hedefi yarım görünen sekmelerdi). */}
-            <div className="min-h-[5rem] max-h-32 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
+            <div className="min-h-[4rem] max-h-24 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
               {d?.siparisNotu || '—'}
             </div>
           </div>
@@ -619,11 +622,12 @@ export function QualityControlPage() {
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleFormGetir}>
               {t('qc.actions.formGetir')}
             </Button>
-            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handleRejectOpen}>
-              {t('qc.actions.reddet')}
-            </Button>
+            {/* Round-8 §3 — Onayla solda/üstte, Reddet sağda/altta. */}
             <Button size="sm" className="h-7 text-xs" disabled={approveMut.isPending} onClick={handleApprove}>
               {t('qc.actions.onayla')}
+            </Button>
+            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handleRejectOpen}>
+              {t('qc.actions.reddet')}
             </Button>
           </div>
         </div>
@@ -689,7 +693,7 @@ export function QualityControlPage() {
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
-                {CONTROLS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {CONTROLS.map((c) => <SelectItem key={c} value={c}>{statusLabel(t, c)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -699,7 +703,7 @@ export function QualityControlPage() {
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
-                {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{statusLabel(t, p)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -709,7 +713,7 @@ export function QualityControlPage() {
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
-                {STAGES.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {STAGES.map((s) => <SelectItem key={s} value={s}>{statusLabel(t, s)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

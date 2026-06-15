@@ -77,8 +77,10 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="rounded-md border overflow-hidden">
+      {/* Round-8 §1 — yatay kaydırma güvenli: tablo doğal genişliğine (min-w-max)
+          oturur; dar viewport'ta sütunlar ezilmek yerine kendi kabında kayar. */}
       <div className="overflow-x-auto">
-        <table className={cn('w-full', compact ? 'text-xs' : 'text-sm')}>
+        <table className={cn('w-full min-w-max', compact ? 'text-xs' : 'text-sm')}>
           <thead className="bg-muted/50">
             <tr>
               {columns.map((col) => (

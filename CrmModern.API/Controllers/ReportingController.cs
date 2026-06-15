@@ -52,11 +52,11 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     /// GET /api/reporting/orders/{siparisNo}/proforma
     /// </summary>
     [HttpGet("orders/{siparisNo}/proforma")]
-    public async Task<IActionResult> ExportProforma(string siparisNo)
+    public async Task<IActionResult> ExportProforma(string siparisNo, [FromQuery] string lang = "tr")
     {
         // PROMPT-v5 §2: proforma fiyat içerir — Fabrika alamaz.
         if (User.IsInRole("Fabrika")) return Forbid();
-        var bytes = await reportingService.ExportOrderProformaAsync(siparisNo);
+        var bytes = await reportingService.ExportOrderProformaAsync(siparisNo, lang);
         var filename = $"proforma_{siparisNo}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes, ContentType, filename);
     }
@@ -123,5 +123,19 @@ public sealed class ReportingController(IReportingService reportingService) : Co
             result = result.Select(c => c with { ToplamCiro = 0m }).ToList();
 
         return Ok(ApiResponse<IReadOnlyList<CurrencyDistributionDto>>.Ok(result));
+    }
+
+    /// <summary>Round-8 §13 — Temsilci performans raporu (yalnız Yönetici).</summary>
+    [HttpGet("rep-performance")]
+    [Authorize(Roles = "Yonetici")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<RepPerformanceDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRepPerformance(
+        [FromQuery] DateTime? baslangic = null, [FromQuery] DateTime? bitis = null)
+    {
+        // Varsayılan: son 30 gün (frontend gün/hafta/ay seçicisi açık aralık gönderir).
+        var end   = bitis ?? DateTime.Now;
+        var start = baslangic ?? end.AddDays(-30);
+        var result = await reportingService.GetRepPerformanceAsync(start, end);
+        return Ok(ApiResponse<IReadOnlyList<RepPerformanceDto>>.Ok(result));
     }
 }

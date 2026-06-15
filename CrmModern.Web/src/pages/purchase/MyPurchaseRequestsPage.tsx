@@ -22,14 +22,14 @@ export function MyPurchaseRequestsPage() {
   const { data = [], isLoading } = useQuery({ queryKey: ['purchase-mine'], queryFn: getMyPurchaseRequests })
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',       header: 'ID', sortable: true },
-    { key: 'urunAdi',       header: t('common.name') },
-    { key: 'urunTuru',      header: t('common.module') },
-    { key: 'urunMaliyeti',  header: t('common.amount'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
-    { key: 'alinanYer',     header: t('common.address') },
-    { key: 'departman',     header: t('users.yetkiTuru') },
-    { key: 'talepTarihi',   header: t('common.date'), render: (r) => formatDate(r.talepTarihi as string) },
-    { key: 'durum',         header: t('common.status'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
+    { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
+    { key: 'urunAdi',       header: t('purchase.cols.urun') },
+    { key: 'urunTuru',      header: t('purchase.cols.tur') },
+    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    { key: 'alinanYer',     header: t('purchase.cols.alinanYer') },
+    { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
+    { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
+    { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     { key: 'redNotu',       header: t('common.note'), render: (r) => <span className="text-xs text-muted-foreground">{(r.redNotu as string) ?? '—'}</span> },
   ]
 

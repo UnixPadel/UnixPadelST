@@ -25,6 +25,10 @@ public interface IOrderService
     Task<string> ReviseAsync(int kullaniciID, string eskiNo, CreateOrderDto dto);
     Task<string> CloneFromExistingAsync(int kullaniciID, string sourceNo);
 
+    // ── Round-8 §7 — Kontrol onayı öncesi yerinde düzenleme / yumuşak silme ─
+    Task<string> AmendOrderAsync(int kullaniciID, string no, CreateOrderDto dto, string gerekce, bool isManagerOrElshan);
+    Task SoftDeleteOrderAsync(int kullaniciID, string no, string gerekce, bool isManagerOrElshan);
+
     // ── Status transitions ────────────────────────────────────────────────
     Task ConvertToOrderAsync(string teklifNo);
     Task SubmitForApprovalAsync(string siparisNo, int kullaniciID);

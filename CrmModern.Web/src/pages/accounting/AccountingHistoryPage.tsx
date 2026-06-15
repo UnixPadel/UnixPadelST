@@ -76,6 +76,9 @@ export function AccountingHistoryPage() {
   const { data: ulkeler   = [] } = useQuery({ queryKey: ['ulkeler'],   queryFn: getUlkeler })
   const { data: users     = [] } = useQuery({ queryKey: ['users-lookup'], queryFn: getUsersLookup })
 
+  // Round-8 §15 — temsilci boyutu yalnız Temsilci rolündeki kullanıcıları gösterir.
+  const temsilciUsers = useMemo(() => users.filter((u) => u.yetkiTuru === 'Temsilci'), [users])
+
   const musteriOptions = useMemo(
     () => Array.from(new Set(customers.map((c) => c.musteriAd).filter(Boolean))).sort((a, b) =>
       a.localeCompare(b, 'tr-TR', { sensitivity: 'base' })),
@@ -133,7 +136,7 @@ export function AccountingHistoryPage() {
     { key: 'tarih',        header: t('common.date'),     render: (r) => formatDate(r.tarih as string) },
     { key: 'siparisNo',    header: t('common.orderNo') },
     { key: 'musteriAd',    header: t('common.customer') },
-    { key: 'kullanici',    header: t('accounting.filter.temsilci') },
+    { key: 'kullanici',    header: t('common.representative') },
     { key: 'paraTipi',     header: t('common.currency') },
     { key: 'odenenMiktar', header: t('common.amount'),
       render: (r) => formatCurrency((r.odenenMiktar as number) ?? 0, r.paraTipi as string) },
@@ -190,7 +193,7 @@ export function AccountingHistoryPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>{t('accounting.filter.temsilci')}</Label>
+              <Label>{t('common.representative')}</Label>
               <Select
                 value={filter.kullaniciID ? String(filter.kullaniciID) : SENTINEL_ALL}
                 onValueChange={(v) => update('kullaniciID', v === SENTINEL_ALL ? undefined : Number(v))}
@@ -198,7 +201,7 @@ export function AccountingHistoryPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
-                  {users.map((u) => (
+                  {temsilciUsers.map((u) => (
                     <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
                       {`${u.ad} ${u.soyad}`.trim()}
                     </SelectItem>
@@ -311,11 +314,12 @@ function InstallmentTable({
   loading: boolean
   onMaliyet: (siparisNo: string) => void
 }) {
+  const { t } = useTranslation()
   if (loading) {
-    return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">Yükleniyor…</div>
+    return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">{t('common.loading')}</div>
   }
   if (rows.length === 0) {
-    return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">Kayıt yok.</div>
+    return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">{t('accountingHistory.empty')}</div>
   }
   // Sayfa için en yüksek installment sayısı sütun sayısını belirler.
   const maxN = Math.min(
@@ -328,16 +332,16 @@ function InstallmentTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/30 text-xs uppercase">
           <tr>
-            <th className="px-2 py-2 text-left w-32">Maliyet Reçetesi</th>
-            <th className="px-2 py-2 text-left">Sipariş No</th>
-            <th className="px-2 py-2 text-left">Müşteri</th>
-            <th className="px-2 py-2 text-left">Temsilci</th>
-            <th className="px-2 py-2 text-left">Para Tipi</th>
+            <th className="px-2 py-2 text-left w-32">{t('accountingHistory.maliyetRecetesi')}</th>
+            <th className="px-2 py-2 text-left">{t('accountingHistory.cols.siparisNo')}</th>
+            <th className="px-2 py-2 text-left">{t('accountingHistory.cols.musteri')}</th>
+            <th className="px-2 py-2 text-left">{t('accountingHistory.cols.temsilci')}</th>
+            <th className="px-2 py-2 text-left">{t('accountingHistory.cols.paraTipi')}</th>
             {Array.from({ length: maxN }, (_, i) => (
-              <th key={i} className="px-2 py-2 text-right">{i + 1}. Peşinat</th>
+              <th key={i} className="px-2 py-2 text-right">{t('accountingHistory.cols.pesinat', { n: i + 1 })}</th>
             ))}
-            <th className="px-2 py-2 text-right">Fark (1→2)</th>
-            <th className="px-2 py-2 text-right">Diğer</th>
+            <th className="px-2 py-2 text-right">{t('accountingHistory.cols.fark')}</th>
+            <th className="px-2 py-2 text-right">{t('accountingHistory.cols.diger')}</th>
           </tr>
         </thead>
         <tbody>
@@ -351,7 +355,7 @@ function InstallmentTable({
               <tr key={r.siparisNo} className="border-t hover:bg-muted/20">
                 <td className="px-2 py-1">
                   <Button size="sm" variant="outline" onClick={() => onMaliyet(r.siparisNo)}>
-                    Maliyet Reçetesi
+                    {t('accountingHistory.maliyetRecetesi')}
                   </Button>
                 </td>
                 <td className="px-2 py-1 font-mono text-xs">{r.siparisNo}</td>
@@ -383,7 +387,7 @@ function InstallmentTable({
                           .join('\n')}
                         className="underline cursor-help text-xs"
                       >
-                        +{overflow.length} daha
+                        {t('accountingHistory.moreCount', { count: overflow.length })}
                       </span>
                     )}
                 </td>
@@ -406,6 +410,7 @@ function MaliyetRecetesiDialog({
   siparisNo: string | null
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const qc = useQueryClient()
   const { toast } = useToast()
 
@@ -430,13 +435,13 @@ function MaliyetRecetesiDialog({
       pesinYuzde:       order?.pesinYuzde,
     }),
     onSuccess: () => {
-      toast({ title: 'Maliyet kaydedildi' })
+      toast({ title: t('accountingHistory.dialog.saved') })
       // Parent grid'i yenile — Kar / Maliyet sütunları güncelsin.
       qc.invalidateQueries({ queryKey: ['accounting-orders'] })
       qc.invalidateQueries({ queryKey: ['accounting-order-detail', siparisNo] })
       qc.invalidateQueries({ queryKey: ['tx-history'] })
     },
-    onError: () => toast({ title: 'Maliyet kaydedilemedi', variant: 'destructive' }),
+    onError: () => toast({ title: t('accountingHistory.dialog.saveFailed'), variant: 'destructive' }),
   })
 
   // ── Computed math ─────────────────────────────────────────────────────
@@ -462,26 +467,26 @@ function MaliyetRecetesiDialog({
     <Dialog open={!!siparisNo} onOpenChange={(v) => { if (!v) handleClose() }}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Maliyet Reçetesi — {siparisNo}</DialogTitle>
+          <DialogTitle>{t('accountingHistory.dialog.title', { no: siparisNo })}</DialogTitle>
         </DialogHeader>
 
         {isLoading || !order ? (
-          <p className="text-center py-8 text-muted-foreground">Yükleniyor…</p>
+          <p className="text-center py-8 text-muted-foreground">{t('common.loading')}</p>
         ) : (
           <div className="space-y-4 text-sm">
             {/* Read-only girdiler */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <ReadOnlyCell label="Toplam Fiyat" value={formatCurrency(toplam, cur)} />
-              <ReadOnlyCell label="Ödenen Miktar" value={formatCurrency(odenen, cur)} />
-              <ReadOnlyCell label="İndirim %" value={`%${indirimPct}`} />
-              <ReadOnlyCell label="KDV %" value={`%${kdvPct}`} />
-              <ReadOnlyCell label="Peşin %" value={`%${order.pesinYuzde}`} />
-              <ReadOnlyCell label="Para Tipi" value={cur} />
+              <ReadOnlyCell label={t('accountingHistory.dialog.toplamFiyat')} value={formatCurrency(toplam, cur)} />
+              <ReadOnlyCell label={t('accountingHistory.dialog.odenenMiktar')} value={formatCurrency(odenen, cur)} />
+              <ReadOnlyCell label={t('accountingHistory.dialog.indirim')} value={`%${indirimPct}`} />
+              <ReadOnlyCell label={t('accountingHistory.dialog.kdv')} value={`%${kdvPct}`} />
+              <ReadOnlyCell label={t('accountingHistory.dialog.pesin')} value={`%${order.pesinYuzde}`} />
+              <ReadOnlyCell label={t('accountingHistory.dialog.paraTipi')} value={cur} />
             </div>
 
             {/* Maliyet — editlenebilir */}
             <div className="border rounded-md p-3 bg-muted/20 space-y-2">
-              <Label className="text-xs">Maliyet (editlenebilir)</Label>
+              <Label className="text-xs">{t('accountingHistory.dialog.maliyetEdit')}</Label>
               <div className="flex items-center gap-2">
                 <DecimalInput
                   value={maliyetEdit ?? baseMaliyet ?? ''}
@@ -494,11 +499,11 @@ function MaliyetRecetesiDialog({
                   disabled={saveMut.isPending || maliyetEdit === null}
                   onClick={() => saveMut.mutate()}
                 >
-                  {saveMut.isPending ? 'Kaydediliyor…' : 'Maliyet Kaydet'}
+                  {saveMut.isPending ? t('common.saving') : t('accountingHistory.dialog.maliyetKaydet')}
                 </Button>
               </div>
               {order.maliyetDetayi && (
-                <p className="text-[11px] text-muted-foreground">Detay: {order.maliyetDetayi}</p>
+                <p className="text-[11px] text-muted-foreground">{t('accountingHistory.dialog.detay')}: {order.maliyetDetayi}</p>
               )}
             </div>
 
@@ -507,21 +512,21 @@ function MaliyetRecetesiDialog({
               isLoss ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'
             }`}>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KPICell label="Brüt Kar"      value={formatCurrency(brutKar, cur)} />
+                <KPICell label={t('accountingHistory.dialog.brutKar')}      value={formatCurrency(brutKar, cur)} />
                 <KPICell
-                  label={isLoss ? 'Zarar' : 'Net Kar'}
+                  label={isLoss ? t('accountingHistory.dialog.zarar') : t('accountingHistory.dialog.netKar')}
                   value={formatCurrency(netKar, cur)}
                   highlight={isLoss ? 'loss' : 'profit'}
                 />
-                <KPICell label="Marj %"        value={`%${marjPct.toFixed(2)}`} />
-                <KPICell label="Tahsilat %"    value={`%${tahsilatPct.toFixed(2)}`} />
+                <KPICell label={t('accountingHistory.dialog.marj')}        value={`%${marjPct.toFixed(2)}`} />
+                <KPICell label={t('accountingHistory.dialog.tahsilat')}    value={`%${tahsilatPct.toFixed(2)}`} />
               </div>
             </div>
           </div>
         )}
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>Kapat</Button>
+          <Button variant="outline" onClick={handleClose}>{t('common.close')}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

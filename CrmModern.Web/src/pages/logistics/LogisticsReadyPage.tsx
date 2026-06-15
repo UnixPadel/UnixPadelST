@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
 import { getReadyForShipment, createShipment, getCarriers } from '@/api/logistics'
 import { INCOTERMS } from '@/lib/constants'
 import { PageHeader } from '@/components/PageHeader'
@@ -17,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { FieldError } from '@/components/FieldError'
 import { useToast } from '@/components/ToastProvider'
-import { formatDate } from '@/lib/utils'
+import { formatDate, formatCurrency } from '@/lib/utils'
 import type { LogisticsOrderListDto } from '@/types'
 
 // PROMPT-v6 §4 — firma Select'inde "Diğer" seçeneği için sentinel değer
@@ -29,13 +28,6 @@ const blank = () => ({
   sTarih: new Date().toISOString().slice(0, 10),
   lojistikNot: '',
 })
-
-/** PROMPT-v6 §4 — ödeme türü etiketi: Peşin veya Vadeli (%x peşin). Tutar yok. */
-function odemeTuru(o: LogisticsOrderListDto, t: TFunction): string {
-  return o.pesinYuzde >= 100
-    ? t('logistics.payment.pesin')
-    : t('logistics.payment.vadeli', { pesinYuzde: o.pesinYuzde })
-}
 
 export function LogisticsReadyPage() {
   const qc = useQueryClient()
@@ -74,28 +66,28 @@ export function LogisticsReadyPage() {
       qc.invalidateQueries({ queryKey: ['my-orders'] })
       setTarget(null); setForm(blank()); setCarrierChoice(OTHER_CARRIER); setSubmitted(false)
       // Paket 3: yeni akış — sevk talebi muhasebe onayını bekler.
-      toast({ title: 'Sevk talebi oluşturuldu — Muhasebe onayı bekliyor.' })
+      toast({ title: t('logistics.toast.created') })
     },
-    onError: () => toast({ title: 'Hata', variant: 'destructive' }),
+    onError: () => toast({ title: t('logistics.toast.error'), variant: 'destructive' }),
   })
 
+  // Round-8 §12 — müşteri Peşin/Vadeli kolonu kaldırıldı; taşıyıcı anlaşması
+  // sevkiyat oluşturulurken girilir (Ready listesi sevk-öncesi olduğundan
+  // satır bazında taşıyıcı tutarı yoktur — anlaşma dialog'da özetlenir).
   const cols: Column<LogisticsOrderListDto & Record<string, unknown>>[] = [
-    { key: 'siparisNo',         header: 'Sipariş No', sortable: true },
-    { key: 'musteriAd',         header: 'Müşteri',    sortable: true },
-    { key: 'mUlke',             header: 'Ülke' },
-    { key: 'siparisMiTeklifMi', header: 'Aşama', render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
-    // PROMPT-v6 §4 — ödeme türü kolonu (tutar içermez).
-    { key: 'odeme', header: t('logistics.payment.col'),
-      render: (r) => odemeTuru(r as LogisticsOrderListDto, t) },
-    { key: 'tarih',             header: 'Tarih', render: (r) => formatDate((r.tarih as string) ?? '-') },
+    { key: 'siparisNo',         header: t('common.orderNo'), sortable: true },
+    { key: 'musteriAd',         header: t('common.customer'), sortable: true },
+    { key: 'mUlke',             header: t('common.country') },
+    { key: 'siparisMiTeklifMi', header: t('common.stage'), render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
+    { key: 'tarih',             header: t('common.date'), render: (r) => formatDate((r.tarih as string) ?? '-') },
     {
-      key: 'actions', header: 'İşlem',
+      key: 'actions', header: t('common.actions'),
       render: (r) => (
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>Detay</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.details')}</Button>
           <Button size="sm" onClick={() => {
             setTarget(r as LogisticsOrderListDto); setForm(blank()); setCarrierChoice(OTHER_CARRIER); setSubmitted(false)
-          }}>Sevkiyat Oluştur</Button>
+          }}>{t('logistics.createShipment')}</Button>
         </div>
       ),
     },
@@ -110,10 +102,10 @@ export function LogisticsReadyPage() {
 
       <Dialog open={!!target} onOpenChange={() => setTarget(null)}>
         <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>Sevkiyat Oluştur — {target?.siparisNo}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('logistics.shipmentTitle', { no: target?.siparisNo })}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Taşıyıcı / Firma *</Label>
+              <Label>{t('logistics.carrierLabel')}</Label>
               <Select value={carrierChoice || undefined}
                 onValueChange={(v) => setCarrierChoice(v)}>
                 <SelectTrigger><SelectValue placeholder={t('logistics.carrier.select')} /></SelectTrigger>
@@ -130,7 +122,7 @@ export function LogisticsReadyPage() {
               {submitted && !firmaAdi && <FieldError message={t('validation.required')} />}
             </div>
             <div className="space-y-1">
-              <Label>Taşıma Türü *</Label>
+              <Label>{t('logistics.transportType')}</Label>
               {/* PROMPT-v7 §5 — serbest metin/datalist yerine Incoterms dropdown'u (ortak sabit). */}
               <Select value={form.lojistikCesit || undefined}
                 onValueChange={(v) => setForm((f) => ({ ...f, lojistikCesit: v }))}>
@@ -141,23 +133,25 @@ export function LogisticsReadyPage() {
               </Select>
               {submitted && !form.lojistikCesit.trim() && <FieldError message={t('validation.required')} />}
             </div>
-            {/* PROMPT-v7 §5 — ödeme türü read-only alan (Taşıma Türü altında; tutar yok) */}
-            {target && (
-              <div className="space-y-1">
-                <Label>{t('logistics.payment.col')}</Label>
-                <div className="flex items-center justify-between rounded-md border bg-muted/40 px-3 py-2 text-sm">
-                  <span className="font-medium">{odemeTuru(target, t)}</span>
-                  {target.odemeDurum && <StatusBadge value={target.odemeDurum} />}
-                </div>
+            <div className="space-y-1"><Label>{t('logistics.agreedAmount')}</Label><DecimalInput value={form.fiyat} onValueChange={(v) => setForm((f) => ({ ...f, fiyat: v === '' ? 0 : v }))} /></div>
+            <div className="space-y-1"><Label>{t('logistics.shipDate')}</Label><Input type="date" value={form.sTarih} onChange={(e) => setForm((f) => ({ ...f, sTarih: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>{t('logistics.note')}</Label><Textarea rows={2} value={form.lojistikNot} onChange={(e) => setForm((f) => ({ ...f, lojistikNot: e.target.value }))} /></div>
+
+            {/* Round-8 §12 — taşıyıcı anlaşması özeti (müşteri ödeme türünün yerini aldı):
+                kiminle, nasıl ve ne kadara anlaşıldığı. */}
+            <div className="space-y-1">
+              <Label>{t('logistics.agreement.title')}</Label>
+              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-0.5">
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">{t('logistics.agreement.firm')}</span><span className="font-medium">{firmaAdi || t('logistics.agreement.empty')}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">{t('logistics.agreement.type')}</span><span>{form.lojistikCesit || t('logistics.agreement.empty')}</span></div>
+                <div className="flex justify-between gap-2"><span className="text-muted-foreground">{t('logistics.agreement.amount')}</span><span className="font-medium">{form.fiyat > 0 ? formatCurrency(form.fiyat) : t('logistics.agreement.empty')}</span></div>
+                {form.lojistikNot.trim() && <div className="pt-1 text-xs text-muted-foreground whitespace-pre-wrap">{t('logistics.agreement.note')}: {form.lojistikNot}</div>}
               </div>
-            )}
-            <div className="space-y-1"><Label>Fiyat</Label><DecimalInput value={form.fiyat} onValueChange={(v) => setForm((f) => ({ ...f, fiyat: v === '' ? 0 : v }))} /></div>
-            <div className="space-y-1"><Label>Sevkiyat Tarihi</Label><Input type="date" value={form.sTarih} onChange={(e) => setForm((f) => ({ ...f, sTarih: e.target.value }))} /></div>
-            <div className="space-y-1"><Label>Lojistik Notu</Label><Textarea rows={2} value={form.lojistikNot} onChange={(e) => setForm((f) => ({ ...f, lojistikNot: e.target.value }))} /></div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setTarget(null)}>İptal</Button>
-            <Button disabled={createMut.isPending} onClick={onSubmit}>Sevk et</Button>
+            <Button variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
+            <Button disabled={createMut.isPending} onClick={onSubmit}>{t('logistics.ship')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

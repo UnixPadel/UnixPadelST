@@ -13,6 +13,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { statusLabel } from '@/lib/status'
+import { Eye, Plus, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
@@ -202,15 +203,17 @@ export function AccountingPage() {
       render: (r) => formatDateShort((r.tarih as string) ?? '-') },
     {
       key: 'actions', header: t('common.actions'),
+      // Round-Next §12 — ikon butonlar (eski 3 metin buton en geniş hücreydi);
+      // genişlikten ~100px tasarruf, böylece 17 kolon ekrana sığar (veri gizlenmez).
       render: (r) => (
-        <div className="flex gap-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
-          <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.details')}</Button>
-          <Button size="sm" onClick={() => {
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          <Button size="sm" variant="outline" className="h-7 w-7 p-0" title={t('common.details')} onClick={() => setDetailNo(r.siparisNo as string)}><Eye className="h-3.5 w-3.5" /></Button>
+          <Button size="sm" className="h-7 w-7 p-0" title={t('common.add')} onClick={() => {
             setTxTarget(r as AccountingOrderListDto)
             setTxTutar(Number((r.kalanBakiye as number) ?? 0))
             setTxTarih(new Date().toISOString().slice(0, 10))
-          }}>{t('common.add')}</Button>
-          <Button size="sm" variant="outline" onClick={() => setEkTarget(r.siparisNo as string)}>{t('common.upload')}</Button>
+          }}><Plus className="h-3.5 w-3.5" /></Button>
+          <Button size="sm" variant="outline" className="h-7 w-7 p-0" title={t('common.upload')} onClick={() => setEkTarget(r.siparisNo as string)}><Upload className="h-3.5 w-3.5" /></Button>
         </div>
       ),
     },
@@ -223,9 +226,10 @@ export function AccountingPage() {
         actions={<Button variant="outline" onClick={() => downloadAccountingExcel()}>{t('common.excel')}</Button>}
       />
 
-      {/* Round-11 §7 — Tahsilat/Muhasebe yoğun grid: yatay alanı genişletmek için
-          sayfa dolgusu azaltıldı (p-6→p-4); grid fit-first DataTable ile sığar. */}
-      <div className="p-4 space-y-3">
+      {/* Round-11 §7 + Round-Next §12 — Tahsilat/Muhasebe yoğun grid: yatay alanı
+          genişletmek için sayfa dolgusu azaltıldı (p-6→p-3) + aksiyonlar ikon buton;
+          grid fit-first DataTable ile sığar, yatay kaydırma son çare. */}
+      <div className="p-3 space-y-2">
 
         {/* ── TOP FORM (only when a row is selected) ──────────────────── */}
         {selectedNo && (

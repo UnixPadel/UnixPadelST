@@ -52,18 +52,12 @@ interface Filters {
   odemeDurum: string  // 'all' | Ödendi | Beklemede
   asama: string       // 'all' | stage
   kontrol: string     // 'all' | Kontrol | Onay | Reddet — default Kontrol
-  baslangic: string
-  bitis: string
+  // Round-Next §11 — tarih (Başlangıç/Bitiş) filtreleri kaldırıldı.
 }
 
-function tomorrowISO(): string {
-  return new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
-}
-
-const defaultFilters = (baslangic = ''): Filters => ({
+const defaultFilters = (): Filters => ({
   siparisNo: '', musteriAd: 'all', ulke: 'all', kullaniciID: 'all',
   odemeDurum: 'all', asama: 'all', kontrol: 'Kontrol',
-  baslangic, bitis: tomorrowISO(),
 })
 
 /** Legacy araButtonInTab_Click_1 semantiği: SiparişNo doluysa TÜM diğer filtreler yok sayılır. */
@@ -82,10 +76,7 @@ function buildSearchParams(f: Filters): OrderFilter {
   if (f.asama !== 'all') p.asama = f.asama
   // Legacy guard: Aşama = Iptal iken Kontrol Durumu filtresi atlanır.
   if (f.kontrol !== 'all' && f.asama !== 'Iptal') p.kontrol = f.kontrol
-  if (f.baslangic && f.bitis && f.baslangic <= f.bitis) {
-    p.baslangicTarih = f.baslangic
-    p.bitisTarih = f.bitis
-  }
+  // Round-Next §11 — tarih aralığı filtresi kaldırıldı.
   return p
 }
 
@@ -207,17 +198,6 @@ export function QualityControlPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchPage])
 
-  // Baş tarih default = pending listesindeki MIN(Tarih) (legacy DataGrid())
-  const minTarih = useMemo(
-    () => (pending.length > 0
-      ? pending.reduce((acc, r) => (r.tarih && r.tarih < acc ? r.tarih : acc), pending[0].tarih).slice(0, 10)
-      : ''),
-    [pending],
-  )
-  useEffect(() => {
-    if (minTarih) setFilters((f) => (f.baslangic === '' ? { ...f, baslangic: minTarih } : f))
-  }, [minTarih])
-
   const rows: KontrolRow[] = useMemo(
     () => (submitted !== null
       ? (searchPage?.items ?? []).map(fromSearch)
@@ -247,19 +227,22 @@ export function QualityControlPage() {
   const [formNo, setFormNo] = useState<string | null>(null)
   const [odenenInput, setOdenenInput] = useState<number | ''>('')
 
-  // PROMPT-v6 §2 — splitter: null = varsayılan (kalan alanı doldur),
-  // sayı = kullanıcı sürüklemesiyle sabitlenmiş grid yüksekliği (px).
-  const [gridH, setGridH] = useState<number | null>(null)
-  const gridRef = useRef<HTMLDivElement>(null)
+  // Round-Next §11 — splitter ARTIK ÜST bölgenin yüksekliğini ayarlar (eskiden
+  // grid'i sabitliyordu; üst h-auto + sayfa scroll'u yüzünden tablo yalnız aşağı
+  // uzuyor, yukarı çıkmıyordu). topH=null → üst doğal yükseklik, grid flex-1 kalanı
+  // doldurur. Sürüklenince üst sabitlenir; yukarı çekince üst küçülür, grid yukarı
+  // çıkar ve satır sayısı artar (boş alan kalmaz; container overflow-hidden).
+  const [topH, setTopH] = useState<number | null>(null)
+  const topRef = useRef<HTMLDivElement>(null)
 
   const startSplitterDrag = (e: React.PointerEvent) => {
     e.preventDefault()
     const startY = e.clientY
-    const startH = gridRef.current?.getBoundingClientRect().height ?? 300
+    const startH = topRef.current?.getBoundingClientRect().height ?? 240
     const onMove = (ev: PointerEvent) => {
-      // Splitter yukarı çekilince grid büyür, aşağı itilince küçülür.
+      // Yukarı çekilince (dy<0) üst küçülür → grid büyür ve yukarı çıkar.
       const dy = ev.clientY - startY
-      setGridH(Math.min(Math.max(startH - dy, 120), window.innerHeight - 160))
+      setTopH(Math.min(Math.max(startH + dy, 72), window.innerHeight - 220))
     }
     const onUp = () => {
       window.removeEventListener('pointermove', onMove)
@@ -411,10 +394,10 @@ export function QualityControlPage() {
   const loading = submitted !== null ? searchLoading : pendingLoading
 
   return (
-    // h-full sütun düzeni; üst bölge doğal yüksekliğini alır, grid kalan alanı
-    // doldurur. İçerik sığmazsa (küçük ekran) sayfa dikeyde kayar — üst
-    // kartlarda iç scroll yok (PROMPT-v6 §2).
-    <div className="flex h-full flex-col overflow-y-auto overflow-x-hidden">
+    // Round-Next §11 — sabit-viewport bölünmüş düzen: container overflow-hidden;
+    // üst bölge (topH, kendi içinde kayar) ile grid (flex-1) viewport'u paylaşır,
+    // sayfa dikeyde kaymaz. Splitter yukarı çekilince grid gerçekten yukarı çıkar.
+    <div className="flex h-full flex-col overflow-hidden">
       {/* ── Kompakt başlık ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
         <h1 className="text-base font-semibold">{t('qc.title')}</h1>
@@ -425,7 +408,11 @@ export function QualityControlPage() {
            Bölge aktif sekmenin doğal yüksekliğine oturur (h-auto, iç scroll
            yok). Paneller seçim olmasa da hep görünür; alanlar '—' gösterir,
            aksiyonlar select-first toast'ını atar. */}
-      <div className="flex h-auto shrink-0 items-stretch gap-2 px-4 py-1.5">
+      <div
+        ref={topRef}
+        className="flex shrink-0 items-stretch gap-2 overflow-y-auto px-4 py-1.5"
+        style={topH !== null ? { height: topH } : undefined}
+      >
 
         {/* PROMPT-v7 §4 — Filtreme dikey kartı kaldırıldı; filtreler gridin
             hemen üstüne kompakt yatay bar olarak taşındı (aşağıda). Üst bölgede
@@ -717,20 +704,11 @@ export function QualityControlPage() {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.bas')}</Label>
-            <Input className="h-8 text-xs" type="date" value={filters.baslangic}
-              onChange={(e) => setFilters((f) => ({ ...f, baslangic: e.target.value }))} />
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.son')}</Label>
-            <Input className="h-8 text-xs" type="date" value={filters.bitis}
-              onChange={(e) => setFilters((f) => ({ ...f, bitis: e.target.value }))} />
-          </div>
+          {/* Round-Next §11 — Başlangıç/Bitiş Tarihi filtreleri kaldırıldı. */}
           <div className="col-span-2 flex items-end gap-1.5 md:col-span-2 lg:col-span-1">
             <Button size="sm" variant="outline" className="h-8 flex-1" onClick={() => {
               // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
-              setFilters(defaultFilters(minTarih))
+              setFilters(defaultFilters())
               setSubmitted(null)
               setSelected(null)
             }}>
@@ -744,11 +722,7 @@ export function QualityControlPage() {
       </div>
 
       {/* ── Alt bölge: master grid (tam genişlik, iç scroll) ───────────── */}
-      <div
-        ref={gridRef}
-        className={cn('min-h-[120px] px-4 pb-2', gridH === null && 'flex-1 min-h-0')}
-        style={gridH !== null ? { height: gridH, flex: 'none' } : undefined}
-      >
+      <div className="flex-1 min-h-0 px-4 pb-2">
         <div className="h-full overflow-auto rounded-md">
           <DataTable
             columns={columns}

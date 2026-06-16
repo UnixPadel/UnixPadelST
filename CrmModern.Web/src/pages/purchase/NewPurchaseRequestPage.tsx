@@ -29,12 +29,16 @@ const PARA_BIRIMLERI = [
   { value: 'Sterlin', label: 'GBP (£)' },
 ] as const
 
+type IndirimTipi = 'yuzde' | 'tutar'
+
 /**
- * Round-11 §9 — temiz ERP satırı: Ürün / Miktar / Birim / Birim Fiyat / İndirim.
- *   Ara Toplam   = Miktar × Birim Fiyat
- *   Satır Toplamı = Ara Toplam − İndirim   (İndirim, talep para biriminde tutar)
- * Eski fiyatModu (miktar/toplam) geçişi kaldırıldı; backend kalemleri her zaman
- * fiyatModu='miktar', indirimTipi='tutar' olarak alır.
+ * Round-11 §9 + Round-Next §14 — ERP satırı: Ürün / Miktar / Birim / Birim Fiyat /
+ * İndirim Tipi / İndirim.
+ *   Ara Toplam    = Miktar × Birim Fiyat
+ *   İndirim Tipi='%'    → uygulanan indirim = Ara Toplam × İndirim/100
+ *   İndirim Tipi='Tutar'→ uygulanan indirim = İndirim (sabit, talep para biriminde)
+ *   Satır Toplamı = Ara Toplam − uygulanan indirim   (canlı hesap)
+ * Backend kalemi fiyatModu='miktar' + indirimTipi (yuzde|tutar) olarak alır.
  */
 interface LineRow {
   id: number
@@ -43,19 +47,23 @@ interface LineRow {
   birimOther: string
   miktar: number | null
   birimFiyat: number | null
-  indirim: number | null   // tutar (talep para biriminde)
+  indirimTipi: IndirimTipi
+  indirim: number | null
 }
 
 let _seq = 1
 const blankRow = (): LineRow => ({
   id: _seq++,
   urunAdi: '', birimChoice: 'Adet', birimOther: '',
-  miktar: 1, birimFiyat: null, indirim: null,
+  miktar: 1, birimFiyat: null, indirimTipi: 'tutar', indirim: null,
 })
 
 const resolveBirim = (r: LineRow) => (r.birimChoice === OTHER_UNIT ? r.birimOther.trim() : r.birimChoice)
 const araToplam = (r: LineRow): number => (r.miktar ?? 0) * (r.birimFiyat ?? 0)
-const lineTotal = (r: LineRow): number => Math.max(araToplam(r) - (r.indirim ?? 0), 0)
+// Round-Next §14 — uygulanan indirim tutarı (% ise Ara Toplam'a oranlanır).
+const indirimTutari = (r: LineRow): number =>
+  r.indirimTipi === 'yuzde' ? araToplam(r) * (r.indirim ?? 0) / 100 : (r.indirim ?? 0)
+const lineTotal = (r: LineRow): number => Math.max(araToplam(r) - indirimTutari(r), 0)
 
 const lineValid = (r: LineRow): boolean =>
   !!(r.urunAdi.trim() && resolveBirim(r) && (r.miktar ?? 0) > 0 && (r.birimFiyat ?? 0) > 0)
@@ -93,7 +101,7 @@ export function NewPurchaseRequestPage() {
         birimFiyat: r.birimFiyat ?? 0,
         toplam: lineTotal(r),
         indirim: r.indirim ?? null,
-        indirimTipi: 'tutar',
+        indirimTipi: r.indirimTipi,
         fiyatModu: 'miktar',
       }))
       // Parent UrunAdi: ilk kalem + (varsa) "+N kalem" özeti (NOT NULL, ≤500).
@@ -160,6 +168,7 @@ export function NewPurchaseRequestPage() {
                   <th className="px-2 py-2 text-left w-32">{t('purchase.lines.birim')} *</th>
                   <th className="px-2 py-2 text-right w-24">{t('purchase.lines.miktar')} *</th>
                   <th className="px-2 py-2 text-right w-32">{t('purchase.lines.birimFiyat')} *</th>
+                  <th className="px-2 py-2 text-left w-24">{t('purchase.lines.indirimTipi')}</th>
                   <th className="px-2 py-2 text-right w-28">{t('purchase.lines.indirim')}</th>
                   <th className="px-2 py-2 text-right w-32">{t('purchase.lines.araToplam')}</th>
                   <th className="px-2 py-2 text-right w-32">{t('purchase.lines.satirToplam')}</th>
@@ -199,9 +208,24 @@ export function NewPurchaseRequestPage() {
                           placeholder={t('purchase.lines.birimFiyat')} />
                       </td>
                       <td className="px-2 py-1.5">
+                        <Select value={r.indirimTipi} onValueChange={(v) => patchRow(r.id, { indirimTipi: v as IndirimTipi })}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="yuzde">{t('purchase.lines.indirimYuzde')}</SelectItem>
+                            <SelectItem value="tutar">{t('purchase.lines.indirimTutar')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-1.5">
                         <DecimalInput className="text-right" value={r.indirim ?? ''}
                           onValueChange={(v) => patchRow(r.id, { indirim: v === '' ? null : v })}
                           placeholder="0" />
+                        {/* Round-Next §14 — % seçiliyse uygulanan indirim tutarını net göster. */}
+                        {r.indirimTipi === 'yuzde' && (r.indirim ?? 0) > 0 && (
+                          <div className="text-[10px] text-muted-foreground text-right whitespace-nowrap">
+                            = {formatCurrency(indirimTutari(r), paraBirimi)}
+                          </div>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground whitespace-nowrap">
                         {formatCurrency(araToplam(r), paraBirimi)}
@@ -221,7 +245,7 @@ export function NewPurchaseRequestPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t bg-muted/20">
-                  <td colSpan={6} className="px-2 py-2 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
+                  <td colSpan={7} className="px-2 py-2 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
                   <td className="px-2 py-2 text-right tabular-nums font-bold whitespace-nowrap">{formatCurrency(grandTotal, paraBirimi)}</td>
                   <td></td>
                 </tr>

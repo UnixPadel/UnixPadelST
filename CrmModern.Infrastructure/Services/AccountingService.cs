@@ -144,6 +144,35 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         return MapTx(entity);
     }
 
+    /// <summary>
+    /// Round-Next §13 — peşinatı (MuhasebeIslemTablo tahsilat satırı +
+    /// Order.OdenenMiktar/OdemeDurum) İZLENEN order örneği üzerinde HAZIRLAR;
+    /// SaveChanges ÇAĞIRMAZ — çağıran (Cari/Lojistik onay) aşama geçişi + audit ile
+    /// birlikte TEK atomik SaveChanges'te kaydeder.
+    ///
+    /// Neden ayrı: AddTransactionAsync order'ı kendi içinde TEKRAR (AsNoTracking)
+    /// okuyup Update ediyor; onay metodu da order'ı ayrı okuyup Update edince EF aynı
+    /// anahtarlı İKİ Order örneğini izleyemez → InvalidOperationException (500). Üstelik
+    /// AddTransactionAsync tahsilatı kendi SaveChanges'inde commit ettiğinden, sonraki
+    /// adım patlayınca tahsilat orphan kalıp retry'da duplicate oluşuyordu. Tek örnek +
+    /// tek atomik kayıt her ikisini de çözer.
+    /// </summary>
+    private async Task StagePesinatAsync(Order order, decimal amount, DateTime? tarih, int currentUserId)
+    {
+        decimal existingSum = await uow.Accounting.GetSumBySiparisNoAsync(order.SiparisNo);
+        await uow.Accounting.AddAsync(new AccountingTransaction
+        {
+            SiparisNo    = order.SiparisNo,
+            KullaniciID  = currentUserId,
+            MusteriID    = order.MusteriId ?? 0,
+            OdenenMiktar = amount,
+            Tarih        = (tarih ?? DateTime.Today).Date,
+        });
+        decimal newSum = existingSum + amount;
+        order.OdenenMiktar = newSum;
+        order.OdemeDurum   = ((order.ToplamFiyat ?? 0m) - newSum <= 0m) ? "Ödendi" : "Beklemede";
+    }
+
     public async Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionHistoryAsync()
     {
         var transactions = await uow.Accounting.GetAllOrderedAsync();
@@ -418,11 +447,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 $"Sipariş zaten '{order.SiparisMiTeklifMi}' aşamasında. " +
                 "Muhasebe onayı yalnız 'Siparis' aşamasındaki kayıtlara uygulanır.");
 
-        // 1. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + Order.OdenenMiktar/OdemeDurum.
-        // SatinAlmaTalep.Maliyet'e DOKUNMAZ (peşinat bir ödemedir, maliyet değil).
+        // 1. Peşinat (varsa) → aynı izlenen order üzerinde HAZIRLA (tek atomik
+        // SaveChanges). SatinAlmaTalep.Maliyet'e DOKUNMAZ (peşinat ödemedir, maliyet değil).
         if (pesinat is > 0m)
-            await AddTransactionAsync(
-                new AddTransactionDto(no, pesinat.Value, pesinatTarihi), currentUserId);
+            await StagePesinatAsync(order, pesinat.Value, pesinatTarihi, currentUserId);
 
         // Siparis → Planlama. Legacy ayrıca `Muhasebe=1` flag'i yazıyordu
         // (lines 2251-2252) ama modern Order entity'sinde bu kolon
@@ -465,11 +493,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         if (order.LojistikOnay is null or "Onay")
             return;
 
-        // 2. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + Order.OdenenMiktar/OdemeDurum.
-        // SatinAlmaTalep.Maliyet'e DOKUNMAZ.
+        // 2. Peşinat (varsa) → aynı izlenen order üzerinde HAZIRLA (tek atomik
+        // SaveChanges; bkz. ApproveMuhasebe §13 notu). Maliyet'e DOKUNMAZ.
         if (pesinat is > 0m)
-            await AddTransactionAsync(
-                new AddTransactionDto(no, pesinat.Value, pesinatTarihi), currentUserId);
+            await StagePesinatAsync(order, pesinat.Value, pesinatTarihi, currentUserId);
 
         order.LojistikOnay = "Onay";
         uow.Orders.Update(order);

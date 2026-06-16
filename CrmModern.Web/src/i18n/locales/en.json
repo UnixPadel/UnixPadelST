@@ -786,6 +786,7 @@
       "moduToplam": "Total + Discount",
       "birimFiyat": "Unit Price",
       "brutToplam": "Total",
+      "indirimTipi": "Discount Type",
       "indirim": "Discount",
       "indirimYuzde": "%",
       "indirimTutar": "Amount",

@@ -46,4 +46,6 @@ public sealed record PurchaseRequestDetailDto(
     decimal?  Kar,
     string?   SiparisNo,
     string?   IslemYapanKullanici,
-    DateTime? IslemTarihi);
+    DateTime? IslemTarihi,
+    // Round-9 §9 — kalem satırları (boşsa tek-satırlık legacy talep)
+    IReadOnlyList<PurchaseRequestLineDto> Kalemler);

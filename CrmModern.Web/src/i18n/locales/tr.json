@@ -83,6 +83,7 @@
     "password": "Şifre",
     "submit": "Giriş Yap",
     "submitting": "Giriş yapılıyor...",
+    "rememberMe": "Beni Hatırla",
     "invalidCredentials": "Kullanıcı adı veya şifre hatalı."
   },
   "nav": {
@@ -95,8 +96,7 @@
     "logisticsCarriers": "Lojistik · Taşıyıcılar",
     "accounting": "Muhasebe · Tahsilat",
     "accountingApproval": "Muhasebe · Onay",
-    "accountingLogisticsApprovals": "Muhasebe · Lojistik Onayları",
-    "accountingHistory": "Muhasebe · Geçmiş",
+    "accountingHistory": "Muhasebe · İşlem",
     "accountingBalance": "Muhasebe · Bakiye",
     "purchaseNew": "Satın Alma · Yeni",
     "purchaseMine": "Satın Alma · Taleplerim",
@@ -187,6 +187,13 @@
   },
   "myOrders": {
     "title": "Siparişlerim",
+    "filter": {
+      "all": "— Tümü —",
+      "stage": "Aşama",
+      "kontrol": "Kontrol Durumu",
+      "odeme": "Ödeme Durumu",
+      "reset": "Sıfırla"
+    },
     "cols": {
       "numara": "Numara",
       "musteriAd": "Müşteri Adı",
@@ -551,6 +558,7 @@
     "views": {
       "cariQueue": "Cari Onay Bekleyen",
       "lojistikQueue": "Lojistik Onay Bekleyen",
+      "tamamlanmaQueue": "Tamamlanmayı Bekleyen",
       "hepsi": "Hepsi",
       "beklenen": "Beklenen",
       "onaylanan": "Onaylanan"
@@ -560,7 +568,26 @@
     },
     "queueBadge": {
       "cari": "Cari Onay Bekliyor",
-      "lojistik": "Lojistik Onay Bekliyor"
+      "lojistik": "Lojistik Onay Bekliyor",
+      "tamamlanma": "Tamamlanmayı Bekliyor"
+    },
+    "cariLabel": {
+      "pesinat1": "1. Peşinat",
+      "pesinat2": "2. Peşinat",
+      "maliyet": "Maliyet"
+    },
+    "pesinat": {
+      "hint": "Peşinat, onayla birlikte tahsilat olarak kaydedilir. Maliyet'e yazılmaz."
+    },
+    "finalize": {
+      "title": "Tamamla — {{no}}",
+      "pesinat": "3. Peşinat",
+      "pesinatTarihi": "Peşinat Tarihi",
+      "finalMaliyet": "Final Maliyet",
+      "maliyetNotu": "Maliyet Notu",
+      "hint": "3. Peşinat tahsilat olarak kaydedilir; Final Maliyet maliyet reçetesine işlenir. Sipariş 'Tamamlandı' olur.",
+      "submit": "Tamamla",
+      "done": "Sipariş tamamlandı."
     },
     "blocks": {
       "ozet": "Özet"
@@ -574,7 +601,8 @@
     },
     "actions": {
       "cariOnayla": "Cari Onayla",
-      "lojistikOnayla": "Lojistik Onayla"
+      "lojistikOnayla": "Lojistik Onayla",
+      "tamamla": "Tamamla"
     },
     "disabled": {
       "cari": "Sipariş 'Siparis' aşamasında ve Kontrol='Onay' olmalı."
@@ -586,9 +614,8 @@
   },
   "accounting": {
     "title": "Muhasebe · Tahsilat",
-    "historyTitle": "Muhasebe · Geçmiş",
+    "historyTitle": "Muhasebe · İşlem",
     "balanceTitle": "Muhasebe · Bakiye",
-    "logisticsApprovalsTitle": "Muhasebe · Lojistik Onayları",
     "rowDetailTitle": "Talep Detayları",
     "filter": {
       "all": "— Tümü —",
@@ -744,6 +771,27 @@
     "creating": "Gönderiliyor...",
     "createSuccess": "Talep oluşturuldu",
     "createError": "Hata",
+    "lines": {
+      "title": "Kalemler",
+      "urunAdi": "Ürün Adı",
+      "birim": "Birim",
+      "birimOther": "Diğer (yazınız)",
+      "miktar": "Miktar",
+      "fiyatModu": "Fiyat Modu",
+      "moduMiktar": "Miktar × Birim Fiyat",
+      "moduToplam": "Toplam + İndirim",
+      "birimFiyat": "Birim Fiyat",
+      "brutToplam": "Toplam",
+      "indirim": "İndirim",
+      "indirimYuzde": "%",
+      "indirimTutar": "Tutar",
+      "satirToplam": "Satır Toplamı",
+      "genelToplam": "Genel Toplam",
+      "ekle": "Satır Ekle",
+      "sil": "Sil",
+      "enAzBir": "En az bir geçerli kalem girilmeli."
+    },
+    "summarySuffix": "+{{count}} kalem",
     "approvalFlowNote": "Talep \"Bekliyor\" durumunda kaydedilir, ön onay için omur.caliskan'a düşer.",
     "actionCol": "İşlem",
     "overrideApprove": "Onayla",
@@ -945,6 +993,7 @@
       "production": "Üretim",
       "ready": "Hazır",
       "logistics": "Lojistik",
+      "pendingCompletion": "Tamamlanmayı Bekliyor",
       "completed": "Tamamlandı",
       "cancelled": "İptal"
     },

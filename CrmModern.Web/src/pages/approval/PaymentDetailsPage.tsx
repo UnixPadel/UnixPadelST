@@ -118,6 +118,33 @@ export function PaymentDetailsPage() {
                 {detail.notlar && <div className="col-span-2"><span className="text-muted-foreground">{t('purchase.detailPanel.not')}:</span> {detail.notlar}</div>}
                 {detail.onIzlemeYapan && <div className="col-span-2 text-xs text-blue-700">{t('purchase.detailPanel.onOnaylayan')}: {detail.onIzlemeYapan} · {detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''}</div>}
               </div>
+              {/* Round-9 §9 — kalem satırları (varsa) */}
+              {detail.kalemler && detail.kalemler.length > 0 && (
+                <div className="mt-2 overflow-x-auto border-t pt-2">
+                  <table className="w-full text-xs">
+                    <thead className="uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-1 py-1 text-left">{t('purchase.lines.urunAdi')}</th>
+                        <th className="px-1 py-1 text-left">{t('purchase.lines.birim')}</th>
+                        <th className="px-1 py-1 text-right">{t('purchase.lines.miktar')}</th>
+                        <th className="px-1 py-1 text-right">{t('purchase.lines.birimFiyat')}</th>
+                        <th className="px-1 py-1 text-right">{t('purchase.lines.satirToplam')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {detail.kalemler.map((k) => (
+                        <tr key={k.kalemID} className="border-t">
+                          <td className="px-1 py-0.5">{k.urunAdi}</td>
+                          <td className="px-1 py-0.5">{k.birim}</td>
+                          <td className="px-1 py-0.5 text-right tabular-nums">{k.miktar}</td>
+                          <td className="px-1 py-0.5 text-right tabular-nums">{k.birimFiyat != null ? formatCurrency(k.birimFiyat) : '—'}</td>
+                          <td className="px-1 py-0.5 text-right tabular-nums font-medium">{formatCurrency(k.toplam)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 

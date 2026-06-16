@@ -138,6 +138,47 @@ export function FinalApprovalPage() {
                       {t('purchase.final.noPayment')}
                     </p>}
               </div>
+
+              {/* Round-9 §9 — kalem satırları (varsa) */}
+              {detail.kalemler && detail.kalemler.length > 0 && (
+                <div className="md:col-span-2 rounded-md border bg-card p-3">
+                  <h3 className="font-semibold border-b pb-1 mb-2 text-sm">{t('purchase.lines.title')}</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-muted/30 uppercase">
+                        <tr>
+                          <th className="px-2 py-1 text-left">{t('purchase.lines.urunAdi')}</th>
+                          <th className="px-2 py-1 text-left">{t('purchase.lines.birim')}</th>
+                          <th className="px-2 py-1 text-right">{t('purchase.lines.miktar')}</th>
+                          <th className="px-2 py-1 text-right">{t('purchase.lines.birimFiyat')}</th>
+                          <th className="px-2 py-1 text-right">{t('purchase.lines.indirim')}</th>
+                          <th className="px-2 py-1 text-right">{t('purchase.lines.satirToplam')}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {detail.kalemler.map((k) => (
+                          <tr key={k.kalemID} className="border-t">
+                            <td className="px-2 py-1">{k.urunAdi}</td>
+                            <td className="px-2 py-1">{k.birim}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">{k.miktar}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">{k.birimFiyat != null ? formatCurrency(k.birimFiyat) : '—'}</td>
+                            <td className="px-2 py-1 text-right tabular-nums">
+                              {k.indirim != null ? `${k.indirim}${k.indirimTipi === 'yuzde' ? '%' : ''}` : '—'}
+                            </td>
+                            <td className="px-2 py-1 text-right tabular-nums font-medium">{formatCurrency(k.toplam)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t bg-muted/20">
+                          <td colSpan={5} className="px-2 py-1 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
+                          <td className="px-2 py-1 text-right tabular-nums font-bold">{formatCurrency(detail.urunMaliyeti ?? 0)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

@@ -86,6 +86,18 @@ internal sealed class PurchaseRepository(AppDbContext context)
             .ToListAsync();
     }
 
+    // ── Round-9 §9 — kalem satırları ──────────────────────────────────────────
+
+    public async Task AddLinesAsync(IEnumerable<PurchaseRequestLine> lines) =>
+        await _context.SatinAlmaTalepKalem.AddRangeAsync(lines);
+
+    public async Task<IReadOnlyList<PurchaseRequestLine>> GetLinesByTalepIdAsync(int talepId) =>
+        await _context.SatinAlmaTalepKalem
+            .AsNoTracking()
+            .Where(k => k.TalepID == talepId)
+            .OrderBy(k => k.KalemID)
+            .ToListAsync();
+
     public async Task<IReadOnlyList<PurchaseRequest>> SearchAsync(
         string? talepEden, string? departman, string? durum, string? talepTipi,
         DateTime? baslangic, DateTime? bitis)

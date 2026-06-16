@@ -4,6 +4,7 @@ using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 
 namespace CrmModern.API.Controllers;
 
@@ -136,10 +137,13 @@ public sealed class AccountingController(IAccountingService accountingService) :
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ApproveMuhasebeAndMoveToPlanning(string siparisNo)
+    public async Task<IActionResult> ApproveMuhasebeAndMoveToPlanning(
+        string siparisNo,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ApprovalPesinatDto? dto = null)
     {
         if (!IsAccountingApprover) return Forbid();
-        await accountingService.ApproveMuhasebeAndMoveToPlanningAsync(siparisNo, CurrentUserId);
+        await accountingService.ApproveMuhasebeAndMoveToPlanningAsync(
+            siparisNo, CurrentUserId, dto?.Pesinat, dto?.PesinatTarihi);
         return Ok(ApiResponse<object>.Ok(null!, "Cari onay verildi — sipariş Planlama aşamasında."));
     }
 
@@ -152,11 +156,29 @@ public sealed class AccountingController(IAccountingService accountingService) :
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
-    public async Task<IActionResult> ApproveLogistics(string siparisNo)
+    public async Task<IActionResult> ApproveLogistics(
+        string siparisNo,
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] ApprovalPesinatDto? dto = null)
     {
         if (!IsAccountingApprover) return Forbid();
-        await accountingService.ApproveLogisticsAsync(siparisNo, CurrentUserId);
+        await accountingService.ApproveLogisticsAsync(
+            siparisNo, CurrentUserId, dto?.Pesinat, dto?.PesinatTarihi);
         return Ok(ApiResponse<object>.Ok(null!, "Lojistik onay verildi — sipariş sevkiyat kuyruğunda."));
+    }
+
+    /// <summary>
+    /// Round-9 §19 — "Tamamlanmayı Bekleyen" finalize: 1. Peşinat (tahsilat) +
+    /// Final Maliyet → sipariş Tamamlandı. Yalnız burcu.karaman / elshan.rasulov.
+    /// </summary>
+    [HttpPost("orders/{siparisNo}/finalize-completion")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> FinalizeCompletion(string siparisNo, [FromBody] FinalizeCompletionDto dto)
+    {
+        if (!IsAccountingApprover) return Forbid();
+        await accountingService.FinalizeCompletionAsync(siparisNo, dto, CurrentUserId, CurrentUserName);
+        return Ok(ApiResponse<object>.Ok(null!, "Sipariş tamamlandı."));
     }
 
     /// <summary>MuhasebeEk yükle (Faz 3 blok kaldırıldı, yetki: Yonetici, Muhasebe).</summary>

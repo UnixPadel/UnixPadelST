@@ -10,8 +10,51 @@ import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FieldError } from '@/components/FieldError'
 import { useToast } from '@/components/ToastProvider'
+import { formatCurrency } from '@/lib/utils'
+import type { CreatePurchaseRequestLine } from '@/types'
+
+// Round-9 §9 — birim dropdown'u + "Diğer" serbest-metin alternatifi.
+const UNITS = ['Adet', 'Kg', 'Gram', 'Ton', 'Metre', 'm²', 'm³', 'Litre', 'Paket', 'Kutu', 'Koli', 'Rulo', 'Set'] as const
+const OTHER_UNIT = '__other__'
+
+type FiyatModu = 'miktar' | 'toplam'
+type IndirimTipi = 'yuzde' | 'tutar'
+
+interface LineRow {
+  id: number
+  urunAdi: string
+  birimChoice: string   // UNITS değeri | OTHER_UNIT
+  birimOther: string
+  miktar: number | null
+  fiyatModu: FiyatModu
+  birimFiyat: number | null   // 'miktar' modu
+  brutToplam: number | null   // 'toplam' modu
+  indirim: number | null      // 'toplam' modu
+  indirimTipi: IndirimTipi    // 'toplam' modu
+}
+
+let _seq = 1
+const blankRow = (): LineRow => ({
+  id: _seq++,
+  urunAdi: '', birimChoice: 'Adet', birimOther: '',
+  miktar: 1, fiyatModu: 'miktar', birimFiyat: null,
+  brutToplam: null, indirim: null, indirimTipi: 'yuzde',
+})
+
+const resolveBirim = (r: LineRow) => (r.birimChoice === OTHER_UNIT ? r.birimOther.trim() : r.birimChoice)
+
+const lineTotal = (r: LineRow): number => {
+  if (r.fiyatModu === 'miktar') return (r.miktar ?? 0) * (r.birimFiyat ?? 0)
+  const gross = r.brutToplam ?? 0
+  const disc = r.indirimTipi === 'yuzde' ? gross * (r.indirim ?? 0) / 100 : (r.indirim ?? 0)
+  return Math.max(gross - disc, 0)
+}
+
+const lineValid = (r: LineRow): boolean =>
+  !!(r.urunAdi.trim() && resolveBirim(r) && (r.miktar ?? 0) > 0 && lineTotal(r) > 0)
 
 export function NewPurchaseRequestPage() {
   const nav = useNavigate()
@@ -20,33 +63,50 @@ export function NewPurchaseRequestPage() {
   const { t } = useTranslation()
   const { getUser } = useAuth()
   const user = getUser()
-  // PROMPT-v2 §4: Maliyet alanı boş başlar; submit guard (urunMaliyeti > 0)
-  // sıfırla / NULL ile kayıt açılmasını engeller.
-  const [form, setForm] = useState<{
-    urunAdi: string
-    urunTuru: string
-    urunMaliyeti: number | null
-    alinanYer: string
-    notlar: string
-    departman: string
-  }>({
-    urunAdi: '', urunTuru: '', urunMaliyeti: null, alinanYer: '', notlar: '',
-    departman: user?.yetkiTuru ?? '',
-  })
+
+  const [rows, setRows] = useState<LineRow[]>([blankRow()])
+  const [alinanYer, setAlinanYer] = useState('')
+  const [notlar, setNotlar] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const departman = user?.yetkiTuru ?? ''
+
+  const patchRow = (id: number, patch: Partial<LineRow>) =>
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+  const addRow = () => setRows((rs) => [...rs, blankRow()])
+  const removeRow = (id: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.id !== id) : rs))
+
+  const grandTotal = rows.reduce((acc, r) => acc + lineTotal(r), 0)
+  const filledRows = rows.filter((r) => r.urunAdi.trim() || (r.miktar ?? 0) > 0 || (r.birimFiyat ?? 0) > 0 || (r.brutToplam ?? 0) > 0)
+  const valid = !!(alinanYer.trim() && filledRows.length > 0 && filledRows.every(lineValid))
 
   const createMut = useMutation({
-    mutationFn: () => createPurchaseRequest({
-      urunAdi:               form.urunAdi,
-      urunTuru:              form.urunTuru || undefined,
-      // PROMPT-v2 §4: valid guard zaten >0 zorunlu; burada non-null garantisi.
-      urunMaliyeti:          form.urunMaliyeti ?? 0,
-      alinanYer:             form.alinanYer || undefined,
-      notlar:                form.notlar || undefined,
-      talepEdenKullaniciAdi: user!.kullaniciAdi,
-      departman:             form.departman,
-      talepTipi:             'SatinAlma',
-    }),
+    mutationFn: () => {
+      const kalemler: CreatePurchaseRequestLine[] = filledRows.map((r) => ({
+        urunAdi: r.urunAdi.trim(),
+        birim: resolveBirim(r),
+        miktar: r.miktar ?? 0,
+        birimFiyat: r.fiyatModu === 'miktar' ? (r.birimFiyat ?? 0) : null,
+        toplam: lineTotal(r),
+        indirim: r.fiyatModu === 'toplam' ? (r.indirim ?? 0) : null,
+        indirimTipi: r.fiyatModu === 'toplam' ? r.indirimTipi : null,
+        fiyatModu: r.fiyatModu,
+      }))
+      // Parent UrunAdi: ilk kalem + (varsa) "+N kalem" özeti (NOT NULL, ≤500).
+      const first = kalemler[0]?.urunAdi ?? ''
+      const summary = kalemler.length > 1
+        ? `${first} (${t('purchase.summarySuffix', { count: kalemler.length - 1 })})`
+        : first
+      return createPurchaseRequest({
+        urunAdi: summary.slice(0, 500),
+        urunMaliyeti: grandTotal,
+        alinanYer: alinanYer.trim() || undefined,
+        notlar: notlar || undefined,
+        talepEdenKullaniciAdi: user!.kullaniciAdi,
+        departman,
+        talepTipi: 'SatinAlma',
+        kalemler,
+      })
+    },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['purchase-mine'] })
       toast({ title: t('purchase.createSuccess') })
@@ -54,10 +114,6 @@ export function NewPurchaseRequestPage() {
     },
     onError: () => toast({ title: t('purchase.createError'), variant: 'destructive' }),
   })
-
-  // PROMPT-v2 §4: urunMaliyeti null/0 ise valid değil — kullanıcı sıfır
-  // maliyetli talep gönderemez. Null karşılaştırması "> 0" ile zaten false.
-  const valid = !!(form.urunAdi.trim() && (form.urunMaliyeti ?? 0) > 0 && form.departman.trim() && form.alinanYer.trim() && form.urunTuru.trim())
 
   const onSubmit = () => {
     setSubmitted(true)
@@ -68,35 +124,132 @@ export function NewPurchaseRequestPage() {
   return (
     <div>
       <PageHeader title={t('purchase.newTitle')} />
-      <div className="p-6 max-w-2xl space-y-3">
-        <div className="space-y-1">
-          <Label>{t('purchase.urunAdi')} *</Label>
-          <Input value={form.urunAdi} onChange={(e) => setForm((f) => ({ ...f, urunAdi: e.target.value }))} />
-          {submitted && !form.urunAdi.trim() && <FieldError message={t('validation.required')} />}
+      <div className="p-6 max-w-5xl space-y-4">
+
+        {/* Kalemler tablosu */}
+        <div className="rounded-md border bg-card">
+          <div className="flex items-center justify-between border-b px-3 py-2">
+            <h3 className="text-sm font-semibold">{t('purchase.lines.title')}</h3>
+            <Button size="sm" variant="outline" onClick={addRow}>{t('purchase.lines.ekle')}</Button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/30 text-xs uppercase">
+                <tr>
+                  <th className="px-2 py-2 text-left min-w-44">{t('purchase.lines.urunAdi')} *</th>
+                  <th className="px-2 py-2 text-left w-32">{t('purchase.lines.birim')} *</th>
+                  <th className="px-2 py-2 text-right w-24">{t('purchase.lines.miktar')} *</th>
+                  <th className="px-2 py-2 text-left w-44">{t('purchase.lines.fiyatModu')}</th>
+                  <th className="px-2 py-2 text-left w-56">{t('purchase.lines.birimFiyat')} / {t('purchase.lines.indirim')}</th>
+                  <th className="px-2 py-2 text-right w-32">{t('purchase.lines.satirToplam')}</th>
+                  <th className="px-2 py-2 w-12"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const invalid = submitted && (r.urunAdi.trim() || (r.miktar ?? 0) > 0) ? !lineValid(r) : false
+                  return (
+                    <tr key={r.id} className="border-t align-top">
+                      <td className="px-2 py-1.5">
+                        <Input value={r.urunAdi} onChange={(e) => patchRow(r.id, { urunAdi: e.target.value })} />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Select value={r.birimChoice} onValueChange={(v) => patchRow(r.id, { birimChoice: v })}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            <SelectItem value={OTHER_UNIT}>{t('purchase.lines.birimOther')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {r.birimChoice === OTHER_UNIT && (
+                          <Input className="mt-1" value={r.birimOther}
+                            onChange={(e) => patchRow(r.id, { birimOther: e.target.value })}
+                            placeholder={t('purchase.lines.birim')} />
+                        )}
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <DecimalInput className="text-right" value={r.miktar ?? ''}
+                          onValueChange={(v) => patchRow(r.id, { miktar: v === '' ? null : v })} />
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <Select value={r.fiyatModu} onValueChange={(v) => patchRow(r.id, { fiyatModu: v as FiyatModu })}>
+                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="miktar">{t('purchase.lines.moduMiktar')}</SelectItem>
+                            <SelectItem value="toplam">{t('purchase.lines.moduToplam')}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        {r.fiyatModu === 'miktar' ? (
+                          <DecimalInput value={r.birimFiyat ?? ''}
+                            onValueChange={(v) => patchRow(r.id, { birimFiyat: v === '' ? null : v })}
+                            placeholder={t('purchase.lines.birimFiyat')} />
+                        ) : (
+                          <div className="space-y-1">
+                            <DecimalInput value={r.brutToplam ?? ''}
+                              onValueChange={(v) => patchRow(r.id, { brutToplam: v === '' ? null : v })}
+                              placeholder={t('purchase.lines.brutToplam')} />
+                            <div className="flex gap-1">
+                              <DecimalInput className="flex-1" value={r.indirim ?? ''}
+                                onValueChange={(v) => patchRow(r.id, { indirim: v === '' ? null : v })}
+                                placeholder={t('purchase.lines.indirim')} />
+                              <Select value={r.indirimTipi} onValueChange={(v) => patchRow(r.id, { indirimTipi: v as IndirimTipi })}>
+                                <SelectTrigger className="h-9 w-20"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="yuzde">{t('purchase.lines.indirimYuzde')}</SelectItem>
+                                  <SelectItem value="tutar">{t('purchase.lines.indirimTutar')}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        )}
+                        {invalid && <FieldError message={t('validation.required')} />}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums font-medium whitespace-nowrap">
+                        {formatCurrency(lineTotal(r))}
+                      </td>
+                      <td className="px-2 py-1.5 text-center">
+                        <Button size="sm" variant="ghost" className="text-destructive"
+                          disabled={rows.length <= 1} onClick={() => removeRow(r.id)}>
+                          {t('purchase.lines.sil')}
+                        </Button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t bg-muted/20">
+                  <td colSpan={5} className="px-2 py-2 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-bold">{formatCurrency(grandTotal)}</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          {submitted && filledRows.length === 0 && (
+            <div className="px-3 py-2"><FieldError message={t('purchase.lines.enAzBir')} /></div>
+          )}
         </div>
-        <div className="space-y-1">
-          <Label>{t('purchase.urunTuru')} *</Label>
-          <Input value={form.urunTuru} onChange={(e) => setForm((f) => ({ ...f, urunTuru: e.target.value }))} />
-          {submitted && !form.urunTuru.trim() && <FieldError message={t('validation.required')} />}
+
+        {/* Talep geneli alanlar */}
+        <div className="grid gap-3 md:grid-cols-2 max-w-3xl">
+          <div className="space-y-1">
+            <Label>{t('purchase.alinanYer')} *</Label>
+            <Input value={alinanYer} onChange={(e) => setAlinanYer(e.target.value)} />
+            {submitted && !alinanYer.trim() && <FieldError message={t('validation.required')} />}
+          </div>
+          <div className="space-y-1">
+            <Label>{t('purchase.departman')} *</Label>
+            <Input value={departman} disabled readOnly />
+            <p className="text-xs text-muted-foreground">{t('purchase.departmanHint')}</p>
+          </div>
+          <div className="space-y-1 md:col-span-2">
+            <Label>{t('purchase.notlar')}</Label>
+            <Textarea rows={3} value={notlar} onChange={(e) => setNotlar(e.target.value)} />
+          </div>
         </div>
-        <div className="space-y-1">
-          <Label>{t('purchase.maliyet')} *</Label>
-          {/* PROMPT-v2 §4: boş başlar; null gönderilince valid guard tetiklenir. */}
-          <DecimalInput value={form.urunMaliyeti ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, urunMaliyeti: v === '' ? null : v }))} />
-          {submitted && !((form.urunMaliyeti ?? 0) > 0) && <FieldError message={t('validation.required')} />}
-        </div>
-        <div className="space-y-1">
-          <Label>{t('purchase.alinanYer')} *</Label>
-          <Input value={form.alinanYer} onChange={(e) => setForm((f) => ({ ...f, alinanYer: e.target.value }))} />
-          {submitted && !form.alinanYer.trim() && <FieldError message={t('validation.required')} />}
-        </div>
-        {/* Departman — giriş yapan kullanıcının rolünden otomatik dolar, değiştirilemez. */}
-        <div className="space-y-1">
-          <Label>{t('purchase.departman')} *</Label>
-          <Input value={form.departman} disabled readOnly />
-          <p className="text-xs text-muted-foreground">{t('purchase.departmanHint')}</p>
-        </div>
-        <div className="space-y-1"><Label>{t('purchase.notlar')}</Label><Textarea rows={3} value={form.notlar} onChange={(e) => setForm((f) => ({ ...f, notlar: e.target.value }))} /></div>
 
         <div className="pt-2 flex gap-2">
           <Button variant="outline" onClick={() => nav(-1)}>{t('purchase.cancel')}</Button>

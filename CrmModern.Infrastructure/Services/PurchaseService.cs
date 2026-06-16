@@ -54,7 +54,8 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
     {
         var p = await uow.PurchaseRequests.GetByIdAsync(talepId)
             ?? throw new NotFoundException("PurchaseRequest", talepId);
-        return MapDetail(p);
+        var kalemler = await uow.PurchaseRequests.GetLinesByTalepIdAsync(talepId);
+        return MapDetail(p, kalemler);
     }
 
     public async Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingAsync()
@@ -102,11 +103,16 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
 
     public async Task CreateAsync(CreatePurchaseRequestDto dto)
     {
+        // Round-9 §9 — kalem varsa genel toplam kalemlerden türetilir
+        // (parent.UrunMaliyeti otorite olarak kalemlerin Toplam toplamı olur).
+        var kalemler = dto.Kalemler ?? Array.Empty<CreatePurchaseRequestLineDto>();
+        decimal grandTotal = kalemler.Count > 0 ? kalemler.Sum(k => k.Toplam) : dto.UrunMaliyeti;
+
         var entity = new PurchaseRequest
         {
             UrunAdi               = dto.UrunAdi,
             UrunTuru              = dto.UrunTuru,
-            UrunMaliyeti          = dto.UrunMaliyeti,
+            UrunMaliyeti          = grandTotal,
             AlinanYer             = dto.AlinanYer,
             TalepEdenKullaniciAdi = dto.TalepEdenKullaniciAdi,
             Departman             = dto.Departman,
@@ -125,7 +131,25 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             SiparisNo             = dto.SiparisNo
         };
         await uow.PurchaseRequests.AddAsync(entity);
-        await uow.SaveChangesAsync();
+        await uow.SaveChangesAsync();   // entity.TalepID üretildi
+
+        if (kalemler.Count > 0)
+        {
+            var lines = kalemler.Select(k => new PurchaseRequestLine
+            {
+                TalepID     = entity.TalepID,
+                UrunAdi     = k.UrunAdi,
+                Birim       = k.Birim,
+                Miktar      = k.Miktar,
+                BirimFiyat  = k.BirimFiyat,
+                Toplam      = k.Toplam,
+                Indirim     = k.Indirim,
+                IndirimTipi = k.IndirimTipi,
+                FiyatModu   = string.IsNullOrWhiteSpace(k.FiyatModu) ? "miktar" : k.FiyatModu,
+            });
+            await uow.PurchaseRequests.AddLinesAsync(lines);
+            await uow.SaveChangesAsync();
+        }
     }
 
     // ── Aşama 1: Ön Onay ─────────────────────────────────────────────────────
@@ -380,7 +404,8 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             p.MusteriAdi, p.ToplamSiparis, p.KaporaBakiyesi, p.KalanBakiyeTalep,
             p.PesinYuzde, p.Maliyet, p.MaliyetDetayi, p.Kar, p.SiparisNo);
 
-    private static PurchaseRequestDetailDto MapDetail(PurchaseRequest p) =>
+    private static PurchaseRequestDetailDto MapDetail(
+        PurchaseRequest p, IReadOnlyList<PurchaseRequestLine>? kalemler = null) =>
         new(p.TalepID, p.UrunAdi, p.UrunTuru, p.UrunMaliyeti, p.AlinanYer, p.Notlar,
             p.TalepEdenKullaniciAdi, p.Departman, p.TalepTarihi, p.Durum, p.RedNotu, p.TalepTipi,
             p.OnIzlemeYapan, p.OnIzlemeTarihi,
@@ -390,5 +415,10 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             p.MuhasebeYapanKullanici, p.MuhasebeTarihi,
             p.MusteriAdi, p.ToplamSiparis, p.KaporaBakiyesi, p.KalanBakiyeTalep,
             p.PesinYuzde, p.Maliyet, p.MaliyetDetayi, p.Kar, p.SiparisNo,
-            p.IslemYapanKullanici, p.IslemTarihi);
+            p.IslemYapanKullanici, p.IslemTarihi,
+            (kalemler ?? Array.Empty<PurchaseRequestLine>())
+                .Select(k => new PurchaseRequestLineDto(
+                    k.KalemID, k.UrunAdi, k.Birim, k.Miktar, k.BirimFiyat,
+                    k.Toplam, k.Indirim, k.IndirimTipi, k.FiyatModu))
+                .ToList());
 }

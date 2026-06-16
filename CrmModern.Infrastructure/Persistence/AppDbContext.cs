@@ -34,6 +34,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
     public DbSet<LogisticsEntry>        LojistikTablo      => Set<LogisticsEntry>();
     public DbSet<AccountingTransaction> MuhasebeIslemTablo => Set<AccountingTransaction>();
     public DbSet<PurchaseRequest>       SatinAlmaTalep     => Set<PurchaseRequest>();
+    public DbSet<PurchaseRequestLine>   SatinAlmaTalepKalem => Set<PurchaseRequestLine>();
 
     // ── Order lifecycle (Faz 3) ──────────────────────────────────────────
     public DbSet<OrderApproval>  SiparisOnaylari      => Set<OrderApproval>();

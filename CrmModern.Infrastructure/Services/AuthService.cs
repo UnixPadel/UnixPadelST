@@ -62,7 +62,7 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
         if (!kullanici.Durum.Equals("Aktif", StringComparison.OrdinalIgnoreCase))
             throw new UnauthorizedException("Hesabınız pasif durumda.");
 
-        var token = GenerateJwtToken(kullanici);
+        var token = GenerateJwtToken(kullanici, request.RememberMe);
 
         return new LoginResponseDto(
             KullaniciID            : kullanici.KullaniciID,
@@ -93,7 +93,7 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
         );
     }
 
-    private string GenerateJwtToken(Core.Entities.Kullanici kullanici)
+    private string GenerateJwtToken(Core.Entities.Kullanici kullanici, bool rememberMe = false)
     {
         var jwtSettings = configuration.GetSection("JwtSettings");
         var key         = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"]!);
@@ -117,7 +117,10 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject            = new ClaimsIdentity(claims),
-            Expires            = DateTime.UtcNow.AddHours(int.Parse(jwtSettings["ExpiryHours"] ?? "8")),
+            // "Beni Hatırla": uzun ömürlü token (gün). Aksi halde normal oturum (saat).
+            Expires            = rememberMe
+                ? DateTime.UtcNow.AddDays(int.Parse(jwtSettings["RememberMeExpiryDays"] ?? "30"))
+                : DateTime.UtcNow.AddHours(int.Parse(jwtSettings["ExpiryHours"] ?? "8")),
             Issuer             = jwtSettings["Issuer"],
             Audience           = jwtSettings["Audience"],
             SigningCredentials = new SigningCredentials(

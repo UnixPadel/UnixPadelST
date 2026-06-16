@@ -110,40 +110,6 @@ public sealed class LogisticsController(ILogisticsService logisticsService) : Co
         return Ok(ApiResponse<IReadOnlyList<LogisticsHistoryDto>>.Ok(result));
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Paket 3 — Muhasebe Onay Zinciri
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>Paket 3: Muhasebe onayı bekleyen sevk talepleri (read, elshan dahil).</summary>
-    [HttpGet("pending-muhasebe-approval")]
-    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<LogisticsPendingApprovalDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetPendingMuhasebeApproval()
-    {
-        if (!CanReadLogistics()) return Forbid();
-        var result = await logisticsService.GetPendingMuhasebeApprovalAsync();
-        return Ok(ApiResponse<IReadOnlyList<LogisticsPendingApprovalDto>>.Ok(result));
-    }
-
-    /// <summary>Paket 3: Muhasebe sevk onayı — Order Hazir→Lojistik + audit.</summary>
-    [HttpPost("{sevkId:int}/muhasebe-approve")]
-    [Authorize(Roles = "Yonetici,Muhasebe")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> MuhasebeApprove(int sevkId, [FromBody] MuhasebeApproveLogisticsDto? dto)
-    {
-        await logisticsService.MuhasebeApproveLogisticsAsync(sevkId, CurrentUserId, dto?.Aciklama);
-        return Ok(ApiResponse<object>.Ok(null!, "Sevk Muhasebe tarafından onaylandı."));
-    }
-
-    /// <summary>Paket 3: Muhasebe sevk reddi — LojistikTablo DELETE + audit.</summary>
-    [HttpPost("{sevkId:int}/muhasebe-reject")]
-    [Authorize(Roles = "Yonetici,Muhasebe")]
-    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> MuhasebeReject(int sevkId, [FromBody] MuhasebeRejectLogisticsDto dto)
-    {
-        await logisticsService.MuhasebeRejectLogisticsAsync(sevkId, CurrentUserId, dto.RedNotu);
-        return Ok(ApiResponse<object>.Ok(null!, "Sevk reddedildi."));
-    }
-
     [HttpGet("carriers")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<string>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetCarriers()
@@ -172,6 +138,3 @@ public sealed record CreateShipmentRequest(
 
 public sealed record CompleteShipmentDto(string? Not);
 public sealed record CancelShipmentDto(string Sebep);
-
-public sealed record MuhasebeApproveLogisticsDto(string? Aciklama);
-public sealed record MuhasebeRejectLogisticsDto(string RedNotu);

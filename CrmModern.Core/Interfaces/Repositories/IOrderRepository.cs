@@ -70,6 +70,12 @@ public interface IOrderRepository : IBaseRepository<Order>
     /// <summary>Completes an order: SiparisMiTeklifMi = 'Tamamlandi'. Returns rows affected.</summary>
     Task<int> CompleteOrderAsync(string siparisNo);
 
+    /// <summary>Round-9 §19: 'Lojistik' → 'TamamlanmaBekliyor' (muhasebe tamamlama onayı bekler).</summary>
+    Task<int> CompleteShipmentToPendingAsync(string siparisNo);
+
+    /// <summary>Round-9 §19: 'TamamlanmaBekliyor' → 'Tamamlandi' (Burcu finalize). Returns rows affected.</summary>
+    Task<int> FinalizeCompletionAsync(string siparisNo);
+
     // ── Search ────────────────────────────────────────────────────────────────
 
     /// <summary>Returns orders matching the given filter parameters. All parameters are optional.</summary>

@@ -3,7 +3,6 @@ import type {
   ApiResponse,
   LogisticsHistoryDto,
   LogisticsOrderListDto,
-  LogisticsPendingApprovalDto,
   MoveToLogisticsDto,
 } from '@/types'
 
@@ -66,21 +65,4 @@ export const cancelShipment = async (sevkId: number, sebep: string): Promise<voi
 
 export const completeOrder = async (siparisNo: string): Promise<void> => {
   await api.put(`/api/logistics/${siparisNo}/complete`)
-}
-
-// ── Paket 3: Muhasebe Onay Zinciri ───────────────────────────────────────────
-
-export const getPendingMuhasebeApproval = async (): Promise<LogisticsPendingApprovalDto[]> => {
-  const res = await api.get<ApiResponse<LogisticsPendingApprovalDto[]>>(
-    '/api/logistics/pending-muhasebe-approval',
-  )
-  return res.data.data
-}
-
-export const muhasebeApproveLogistics = async (sevkId: number, aciklama?: string): Promise<void> => {
-  await api.post(`/api/logistics/${sevkId}/muhasebe-approve`, { aciklama })
-}
-
-export const muhasebeRejectLogistics = async (sevkId: number, redNotu: string): Promise<void> => {
-  await api.post(`/api/logistics/${sevkId}/muhasebe-reject`, { redNotu })
 }

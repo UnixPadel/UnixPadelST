@@ -144,15 +144,39 @@ export interface SubmitMaliyetRequest {
 export const submitMaliyetTalep = (siparisNo: string, dto: SubmitMaliyetRequest) =>
   api.post(`/api/accounting/orders/${siparisNo}/maliyet`, dto).then((r) => r.data)
 
-/** PROMPT-v6 §1 — Burcu ekranı "Cari Onayla" — Siparis → Planlama (yalnız burcu.karaman). */
-export const approveMuhasebeAndMoveToPlanning = (siparisNo: string) =>
-  api.put(`/api/accounting/orders/${siparisNo}/approve-and-move-to-planning`)
+// Cari/Lojistik onayında opsiyonel peşinat (tahsilat). Maliyet'e yazılmaz.
+export interface ApprovalPesinatRequest {
+  pesinat?: number
+  pesinatTarihi?: string
+}
+
+/**
+ * PROMPT-v6 §1 — Burcu ekranı "Cari Onayla" — Siparis → Planlama (yalnız burcu.karaman).
+ * Opsiyonel peşinat girilirse 1. Peşinat tahsilatı olarak MuhasebeIslemTablo'ya yazılır.
+ */
+export const approveMuhasebeAndMoveToPlanning = (siparisNo: string, dto: ApprovalPesinatRequest = {}) =>
+  api.put(`/api/accounting/orders/${siparisNo}/approve-and-move-to-planning`, dto)
     .then((r) => r.data)
 
-/** PROMPT-v6 §1 — Burcu ekranı "Lojistik Onayla" — LojistikOnay: Bekliyor → Onay (yalnız burcu.karaman). */
-export const approveLogistics = (siparisNo: string) =>
-  api.post(`/api/accounting/orders/${siparisNo}/approve-logistics`)
+/**
+ * PROMPT-v6 §1 — Burcu ekranı "Lojistik Onayla" — LojistikOnay: Bekliyor → Onay (yalnız burcu.karaman).
+ * Opsiyonel peşinat girilirse 2. Peşinat tahsilatı olarak MuhasebeIslemTablo'ya yazılır.
+ */
+export const approveLogistics = (siparisNo: string, dto: ApprovalPesinatRequest = {}) =>
+  api.post(`/api/accounting/orders/${siparisNo}/approve-logistics`, dto)
     .then((r) => r.data)
+
+// Round-9 §19 — "Tamamlanmayı Bekleyen" finalize (1. Peşinat + Final Maliyet).
+export interface FinalizeCompletionRequest {
+  pesinat?: number
+  pesinatTarihi?: string
+  finalMaliyet: number
+  maliyetDetayi?: string
+}
+
+/** Round-9 §19 — Burcu finalize: peşinat (tahsilat) + final maliyet → Tamamlandı. */
+export const finalizeCompletion = (siparisNo: string, dto: FinalizeCompletionRequest) =>
+  api.post(`/api/accounting/orders/${siparisNo}/finalize-completion`, dto).then((r) => r.data)
 
 export const uploadMuhasebeEk = async (siparisNo: string, file: File) => {
   const fd = new FormData()

@@ -60,7 +60,6 @@ export function LogisticsReadyPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logistics-ready'] })
       qc.invalidateQueries({ queryKey: ['logistics-history'] })
-      qc.invalidateQueries({ queryKey: ['logistics-pending-approval'] })
       qc.invalidateQueries({ queryKey: ['carriers'] })
       // PROMPT-v5 §3 — sipariş statüsü değişti: Siparişlerim canlı yansısın.
       qc.invalidateQueries({ queryKey: ['my-orders'] })

@@ -11,6 +11,8 @@ export interface ApiResponse<T> {
 export interface LoginRequest {
   kullaniciAdi: string
   sifre: string
+  // "Beni Hatırla" — true ise sunucu uzun ömürlü token üretir, istemci localStorage'a yazar.
+  rememberMe?: boolean
 }
 
 export interface LoginResponse {
@@ -372,6 +374,18 @@ export interface PurchaseRequestListDto {
   siparisNo?: string
 }
 
+// Round-9 §9 — yeni talep oluştururken gönderilen kalem satırı
+export interface CreatePurchaseRequestLine {
+  urunAdi: string
+  birim: string
+  miktar: number
+  birimFiyat?: number | null
+  toplam: number
+  indirim?: number | null
+  indirimTipi?: string | null
+  fiyatModu: string
+}
+
 export interface CreatePurchaseRequestDto {
   urunAdi: string
   urunTuru?: string
@@ -390,6 +404,8 @@ export interface CreatePurchaseRequestDto {
   maliyetDetayi?: string
   kar?: number
   siparisNo?: string
+  // Round-9 §9 — çok kalemli talep satırları
+  kalemler?: CreatePurchaseRequestLine[]
 }
 
 // ── Product Catalog ───────────────────────────────────────────────────────────

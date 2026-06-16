@@ -156,6 +156,21 @@ internal sealed class OrderRepository(AppDbContext context)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.SiparisMiTeklifMi, "Tamamlandi"));
 
+    // Round-9 §19 — sevkiyat tamamlanınca sipariş doğrudan 'Tamamlandi' olmaz;
+    // muhasebe (Burcu) 1. Peşinat + Final Maliyet girişini bekleyen ara aşamaya geçer.
+    public async Task<int> CompleteShipmentToPendingAsync(string siparisNo) =>
+        await _context.SiparisAlTablo
+            .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "Lojistik")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.SiparisMiTeklifMi, "TamamlanmaBekliyor"));
+
+    // Round-9 §19 — Burcu finalize: 'TamamlanmaBekliyor' → 'Tamamlandi'.
+    public async Task<int> FinalizeCompletionAsync(string siparisNo) =>
+        await _context.SiparisAlTablo
+            .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "TamamlanmaBekliyor")
+            .ExecuteUpdateAsync(s => s
+                .SetProperty(o => o.SiparisMiTeklifMi, "Tamamlandi"));
+
     // ── Search ────────────────────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<Order>> SearchAsync(

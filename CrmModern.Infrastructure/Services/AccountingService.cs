@@ -383,8 +383,12 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         await uow.SaveChangesAsync();
     }
 
-    public async Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo, int currentUserId)
+    public async Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo, int currentUserId,
+        decimal? pesinat = null, DateTime? pesinatTarihi = null)
     {
+        if (pesinat is < 0m)
+            throw new BusinessException("Peşinat negatif olamaz.");
+
         var no = NormalizeNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
@@ -395,6 +399,7 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 "Sipariş henüz Kontrol onayı almamış. Önce Kontrol aşamasında onaylanmalı.");
 
         // İdempotent no-op: zaten Planlama'daysa ikinci tık zararsız.
+        // Peşinat da yazılmaz — çift tıkta duplicate tahsilat oluşmasın.
         if (order.SiparisMiTeklifMi == "Planlama")
             return;
 
@@ -402,6 +407,12 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             throw new BusinessException(
                 $"Sipariş zaten '{order.SiparisMiTeklifMi}' aşamasında. " +
                 "Muhasebe onayı yalnız 'Siparis' aşamasındaki kayıtlara uygulanır.");
+
+        // 1. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + Order.OdenenMiktar/OdemeDurum.
+        // SatinAlmaTalep.Maliyet'e DOKUNMAZ (peşinat bir ödemedir, maliyet değil).
+        if (pesinat is > 0m)
+            await AddTransactionAsync(
+                new AddTransactionDto(no, pesinat.Value, pesinatTarihi), currentUserId);
 
         // Siparis → Planlama. Legacy ayrıca `Muhasebe=1` flag'i yazıyordu
         // (lines 2251-2252) ama modern Order entity'sinde bu kolon
@@ -414,7 +425,8 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         // PROMPT-v6 §1.1 — Burcu Cari onayı SiparisOnaylari'na audit yazar.
         await uow.OrderApprovals.UpsertAsync(
             order.SiparisNo, currentUserId, "MuhasebeOnaylandi",
-            "Cari onay — sipariş Planlama aşamasına alındı.");
+            "Cari onay — sipariş Planlama aşamasına alındı." +
+            (pesinat is > 0m ? $" 1. Peşinat: {pesinat:N2}" : ""));
 
         await uow.SaveChangesAsync();
     }
@@ -423,8 +435,12 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
     /// PROMPT-v6 §1.1 — Burcu lojistik onayı: Hazir + LojistikOnay='Bekliyor'
     /// siparişi 'Onay' yapar; sipariş lojistik ready-listte belirir.
     /// </summary>
-    public async Task ApproveLogisticsAsync(string siparisNo, int currentUserId)
+    public async Task ApproveLogisticsAsync(string siparisNo, int currentUserId,
+        decimal? pesinat = null, DateTime? pesinatTarihi = null)
     {
+        if (pesinat is < 0m)
+            throw new BusinessException("Peşinat negatif olamaz.");
+
         var no = NormalizeNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
@@ -435,9 +451,15 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 "Lojistik onayı yalnız 'Hazir' aşamasındaki kayıtlara uygulanır.");
 
         // İdempotent no-op: zaten onaylıysa (veya NULL = gate'siz eski kayıt)
-        // ikinci tık zararsız.
+        // ikinci tık zararsız. Peşinat da yazılmaz — duplicate tahsilat olmasın.
         if (order.LojistikOnay is null or "Onay")
             return;
+
+        // 2. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + Order.OdenenMiktar/OdemeDurum.
+        // SatinAlmaTalep.Maliyet'e DOKUNMAZ.
+        if (pesinat is > 0m)
+            await AddTransactionAsync(
+                new AddTransactionDto(no, pesinat.Value, pesinatTarihi), currentUserId);
 
         order.LojistikOnay = "Onay";
         uow.Orders.Update(order);
@@ -445,7 +467,60 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         // PROMPT-v6 §1.1 — Burcu lojistik onayı SiparisOnaylari'na audit yazar.
         await uow.OrderApprovals.UpsertAsync(
             order.SiparisNo, currentUserId, "LojistikOnaylandi",
-            "Lojistik onay — sipariş sevkiyat kuyruğuna açıldı.");
+            "Lojistik onay — sipariş sevkiyat kuyruğuna açıldı." +
+            (pesinat is > 0m ? $" 2. Peşinat: {pesinat:N2}" : ""));
+
+        await uow.SaveChangesAsync();
+    }
+
+    public async Task FinalizeCompletionAsync(string siparisNo, FinalizeCompletionDto dto,
+        int currentUserId, string currentUserName)
+    {
+        if (dto.FinalMaliyet < 0m)
+            throw new BusinessException("Final maliyet 0'dan küçük olamaz.");
+        if (dto.Pesinat is < 0m)
+            throw new BusinessException("Peşinat negatif olamaz.");
+
+        var no = NormalizeNo(siparisNo);
+        var order = await uow.Orders.GetByNoAsync(no)
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        if (order.SiparisMiTeklifMi != "TamamlanmaBekliyor")
+            throw new BusinessException(
+                $"Sipariş '{order.SiparisMiTeklifMi}' aşamasında. Finalize yalnız " +
+                "'TamamlanmaBekliyor' aşamasındaki siparişlere uygulanır.");
+
+        // 1) 3. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + OdenenMiktar/OdemeDurum.
+        if (dto.Pesinat is > 0m)
+            await AddTransactionAsync(
+                new AddTransactionDto(no, dto.Pesinat.Value, dto.PesinatTarihi), currentUserId);
+
+        // 2) Final Maliyet → Muhasebe talebi upsert (Maliyet Reçetesi bu alanı okur).
+        await SubmitMaliyetTalepAsync(no, new SubmitMaliyetTalepDto(
+            Maliyet:          dto.FinalMaliyet,
+            MaliyetDetayi:    dto.MaliyetDetayi,
+            ToplamSiparis:    order.ToplamFiyat,
+            KaporaBakiyesi:   null,
+            KalanBakiyeTalep: null,
+            PesinYuzde:       order.PesinYüzde), currentUserName);
+
+        // 3) Aşama: TamamlanmaBekliyor → Tamamlandi.
+        int rows = await uow.Orders.FinalizeCompletionAsync(no);
+        if (rows == 0)
+            throw new BusinessException(
+                $"'{no}' 'TamamlanmaBekliyor' aşamasında değil — tamamlanamaz.");
+
+        // 4) TamamlandiTablo + SiparisOnaylari audit (CompleteShipment'tan ertelendi).
+        await uow.CompletedOrders.AddAsync(new CompletedOrder
+        {
+            SiparisNo   = no,
+            KullaniciID = currentUserId,
+            Tarih       = DateTime.Now
+        });
+        await uow.OrderApprovals.UpsertAsync(
+            no, currentUserId, "Onaylandi",
+            $"Sipariş tamamlandı — Final Maliyet: {dto.FinalMaliyet:N2}" +
+            (dto.Pesinat is > 0m ? $", 3. Peşinat: {dto.Pesinat:N2}" : ""));
 
         await uow.SaveChangesAsync();
     }

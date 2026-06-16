@@ -47,13 +47,34 @@ public interface IAccountingService
     /// PROMPT-v6 §1 — Burcu ekranı "Cari Onayla" butonu: SiparisAlTablo durumunu
     /// 'Siparis' → 'Planlama' yap. Yalnız Kontrol='Onay' olanlar geçer; aksi
     /// halde BusinessException. SiparisOnaylari'na 'MuhasebeOnaylandi' audit yazar.
+    /// <para>
+    /// pesinat (> 0 ise) aşama geçişiyle aynı çağrıda 1. Peşinat tahsilatı olarak
+    /// MuhasebeIslemTablo'ya işlenir. Maliyet'e ASLA yazılmaz. İdempotent no-op
+    /// dallarında (zaten Planlama) peşinat da tekrar yazılmaz.
+    /// </para>
     /// </summary>
-    Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo, int currentUserId);
+    Task ApproveMuhasebeAndMoveToPlanningAsync(string siparisNo, int currentUserId,
+        decimal? pesinat = null, DateTime? pesinatTarihi = null);
 
     /// <summary>
     /// PROMPT-v6 §1 — Burcu ekranı "Lojistik Onayla" butonu: Hazir +
     /// LojistikOnay='Bekliyor' → 'Onay'. SiparisOnaylari'na 'LojistikOnaylandi'
     /// audit yazar. Zaten 'Onay'/NULL ise idempotent no-op.
+    /// <para>
+    /// pesinat (> 0 ise) aşama geçişiyle aynı çağrıda 2. Peşinat tahsilatı olarak
+    /// MuhasebeIslemTablo'ya işlenir. Maliyet'e ASLA yazılmaz. İdempotent no-op
+    /// dallarında (zaten Onay/NULL) peşinat da tekrar yazılmaz.
+    /// </para>
     /// </summary>
-    Task ApproveLogisticsAsync(string siparisNo, int currentUserId);
+    Task ApproveLogisticsAsync(string siparisNo, int currentUserId,
+        decimal? pesinat = null, DateTime? pesinatTarihi = null);
+
+    /// <summary>
+    /// Round-9 §19 — "Tamamlanmayı Bekleyen" finalize: Pesinat (>0 ise) tahsilat
+    /// olarak işlenir, FinalMaliyet SatinAlmaTalep.Maliyet'e yazılır (Maliyet
+    /// Reçetesi okur), sipariş 'TamamlanmaBekliyor' → 'Tamamlandi' yapılır +
+    /// TamamlandiTablo / SiparisOnaylari audit.
+    /// </summary>
+    Task FinalizeCompletionAsync(string siparisNo, FinalizeCompletionDto dto,
+        int currentUserId, string currentUserName);
 }

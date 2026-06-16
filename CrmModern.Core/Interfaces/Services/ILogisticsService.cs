@@ -14,28 +14,16 @@ public interface ILogisticsService
     Task<IReadOnlyList<LogisticsOrderListDto>> GetReadyForShipmentAsync();
 
     /// <summary>
-    /// Paket 3: Sevk talebi oluştur. LojistikTablo INSERT + Order.STarih/LojistikNot UPDATE
-    /// (Order.SiparisMiTeklifMi DEĞİŞMEZ — Muhasebe onayı bekleniyor) + SiparisOnaylari UPSERT
-    /// durum='LojistikOnayBekliyor'.
+    /// Round-9 §19: Sevk oluştur. LojistikTablo INSERT + Order Hazir → Lojistik
+    /// (STarih/LojistikNot setlenir) + SiparisOnaylari UPSERT. Ayrı muhasebe sevk
+    /// onay gate'i kaldırıldı.
     /// </summary>
     Task MoveToLogisticsAsync(string siparisNo, MoveToLogisticsDto dto);
 
-    /// <summary>Paket 3: Muhasebe onayı bekleyen sevk talepleri listesi.</summary>
-    Task<IReadOnlyList<LogisticsPendingApprovalDto>> GetPendingMuhasebeApprovalAsync();
-
     /// <summary>
-    /// Paket 3: Muhasebe sevk talebini onaylar.
-    /// Order: Hazir → Lojistik + SiparisOnaylari UPSERT durum='LojistikOnaylandi'.
+    /// Round-9 §19: Sevki tamamla (sevkID): Order Lojistik → 'TamamlanmaBekliyor'
+    /// (muhasebe tamamlama onayı bekler). Nihai 'Tamamlandi' FinalizeCompletion'da yazılır.
     /// </summary>
-    Task MuhasebeApproveLogisticsAsync(int sevkId, int currentUserId, string? aciklama);
-
-    /// <summary>
-    /// Paket 3: Muhasebe sevk talebini reddeder.
-    /// LojistikTablo DELETE + Order='Hazir' kalır + SiparisOnaylari UPSERT durum='LojistikReddedildi'.
-    /// </summary>
-    Task MuhasebeRejectLogisticsAsync(int sevkId, int currentUserId, string redNotu);
-
-    /// <summary>Sevki tamamla (sevkID üzerinden): Order='Tamamlandi' + TamamlandiTablo audit.</summary>
     Task CompleteShipmentAsync(int sevkId, int currentUserId, string? not);
 
     /// <summary>Sevki iptal et: LojistikTablo DELETE + Order rollback ('Hazir').</summary>

@@ -34,7 +34,9 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
 
     public async Task MoveToLogisticsAsync(string siparisNo, MoveToLogisticsDto dto)
     {
-        // Paket 3: Sevk talebi akışı. Order 'Hazir'da kalır, Muhasebe onayı beklenir.
+        // Round-9 §19: Sevk oluşturma artık doğrudan Hazir → Lojistik geçişi yapar.
+        // Ayrı "Muhasebe Lojistik Onayları" gate'i kaldırıldı (Burcu lojistik onayını
+        // cari/lojistik kuyruğunda zaten verdi).
 
         // Önce siparişin Hazir aşamasında olduğunu garanti et (idempotent kontrol).
         var existing = await uow.Orders.GetByNoAsync(siparisNo)
@@ -42,7 +44,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
 
         if (existing.SiparisMiTeklifMi != "Hazir")
             throw new BusinessException(
-                $"'{siparisNo}' 'Hazir' aşamasında değil — sevk talebi oluşturulamaz.");
+                $"'{siparisNo}' 'Hazir' aşamasında değil — sevk oluşturulamaz.");
 
         // 1) LojistikTablo INSERT
         var entry = new LogisticsEntry
@@ -56,65 +58,13 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         };
         await uow.LogisticsEntries.AddAsync(entry);
 
-        // 2) Order: STarih + LojistikNot setle; SiparisMiTeklifMi DEĞİŞMEZ ('Hazir' kalır).
-        await uow.Orders.UpdateLogisticsFieldsAsync(siparisNo, dto.STarih, dto.LojistikNot);
+        // 2) Order: Hazir → Lojistik + STarih/LojistikNot setle (sevk yola çıktı).
+        await uow.Orders.MoveToLogisticsAsync(siparisNo, dto.STarih, dto.LojistikNot);
 
-        // 3) SiparisOnaylari UPSERT (Paket 2 audit) — Muhasebe onayını bekliyor sinyali.
-        var note = string.IsNullOrWhiteSpace(dto.LojistikNot) ? "Sevk talebi açıldı." : dto.LojistikNot;
+        // 3) SiparisOnaylari UPSERT (Paket 2 audit).
+        var note = string.IsNullOrWhiteSpace(dto.LojistikNot) ? "Sevkiyat oluşturuldu." : dto.LojistikNot;
         await uow.OrderApprovals.UpsertAsync(
-            siparisNo, dto.KullaniciID, "LojistikOnayBekliyor", note);
-
-        await uow.SaveChangesAsync();
-    }
-
-    public Task<IReadOnlyList<LogisticsPendingApprovalDto>> GetPendingMuhasebeApprovalAsync() =>
-        uow.LogisticsEntries.GetPendingApprovalAsync();
-
-    public async Task MuhasebeApproveLogisticsAsync(int sevkId, int currentUserId, string? aciklama)
-    {
-        var sevk = await uow.LogisticsEntries.GetByIdAsync(sevkId)
-            ?? throw new NotFoundException("LogisticsEntry", sevkId);
-
-        int rows = await uow.Orders.PromoteHazirToLogisticsAsync(sevk.SiparisNo);
-        if (rows == 0)
-        {
-            var existing = await uow.Orders.GetByNoAsync(sevk.SiparisNo);
-            if (existing is null)
-                throw new NotFoundException("Order", sevk.SiparisNo);
-
-            throw new BusinessException(
-                $"'{sevk.SiparisNo}' 'Hazir' aşamasında değil — Muhasebe onayı yapılamaz.");
-        }
-
-        await uow.OrderApprovals.UpsertAsync(
-            sevk.SiparisNo, currentUserId, "LojistikOnaylandi",
-            string.IsNullOrWhiteSpace(aciklama) ? "Sevkiyat Muhasebe tarafından onaylandı." : aciklama);
-
-        await uow.SaveChangesAsync();
-    }
-
-    public async Task MuhasebeRejectLogisticsAsync(int sevkId, int currentUserId, string redNotu)
-    {
-        if (string.IsNullOrWhiteSpace(redNotu))
-            throw new BusinessException("Red gerekçesi zorunlu.");
-
-        var sevk = await uow.LogisticsEntries.GetByIdAsync(sevkId)
-            ?? throw new NotFoundException("LogisticsEntry", sevkId);
-
-        var order = await uow.Orders.GetByNoAsync(sevk.SiparisNo);
-        if (order is null)
-            throw new NotFoundException("Order", sevk.SiparisNo);
-
-        if (order.SiparisMiTeklifMi != "Hazir")
-            throw new BusinessException(
-                $"'{sevk.SiparisNo}' 'Hazir' aşamasında değil — sevk reddedilemez.");
-
-        // LojistikTablo'dan satırı sil — sevk talebi iptal.
-        uow.LogisticsEntries.Remove(sevk);
-
-        await uow.OrderApprovals.UpsertAsync(
-            sevk.SiparisNo, currentUserId, "LojistikReddedildi",
-            $"Sevk reddi (#{sevkId}): {redNotu}");
+            siparisNo, dto.KullaniciID, "LojistikOnaylandi", note);
 
         await uow.SaveChangesAsync();
     }
@@ -124,8 +74,10 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         var sevk = await uow.LogisticsEntries.GetByIdAsync(sevkId)
             ?? throw new NotFoundException("LogisticsEntry", sevkId);
 
-        // Order'ı Tamamlandi'ya çek
-        int rows = await uow.Orders.CompleteOrderAsync(sevk.SiparisNo);
+        // Round-9 §19: Sevkiyat tamamlanınca sipariş 'Tamamlandi' OLMAZ; muhasebe
+        // (Burcu) 1. Peşinat + Final Maliyet girişini bekleyen ara aşamaya geçer.
+        // Nihai 'Tamamlandi' + TamamlandiTablo audit, FinalizeCompletion adımında yazılır.
+        int rows = await uow.Orders.CompleteShipmentToPendingAsync(sevk.SiparisNo);
         if (rows == 0)
         {
             var exists = await uow.Orders.GetByNoAsync(sevk.SiparisNo);
@@ -135,18 +87,12 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
                 $"'{sevk.SiparisNo}' 'Lojistik' aşamasında değil — tamamlanamaz.");
         }
 
-        // TamamlandiTablo audit (Faz 3 entity)
-        await uow.CompletedOrders.AddAsync(new CompletedOrder
-        {
-            SiparisNo   = sevk.SiparisNo,
-            KullaniciID = currentUserId,
-            Tarih       = DateTime.Now
-        });
-
         // SiparisOnaylari audit (Paket 2 — UPSERT)
         await uow.OrderApprovals.UpsertAsync(
-            sevk.SiparisNo, currentUserId, "Onaylandi",
-            string.IsNullOrWhiteSpace(not) ? "Sevkiyat tamamlandı." : $"Tamamlandı: {not}");
+            sevk.SiparisNo, currentUserId, "LojistikOnaylandi",
+            string.IsNullOrWhiteSpace(not)
+                ? "Sevkiyat tamamlandı — muhasebe tamamlama onayı bekliyor."
+                : $"Sevkiyat tamamlandı ({not}) — muhasebe tamamlama onayı bekliyor.");
 
         await uow.SaveChangesAsync();
     }

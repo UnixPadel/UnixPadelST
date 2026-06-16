@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   getAccountingOrders, getTransactionsForOrder,
   approveMuhasebeAndMoveToPlanning, approveLogistics,
-  submitMaliyetTalep, uploadMuhasebeEk,
+  submitMaliyetTalep, uploadMuhasebeEk, finalizeCompletion,
   type SubmitMaliyetRequest,
 } from '@/api/accounting'
 import { getOrderDetail, downloadAttachment, downloadExcel } from '@/api/orders'
@@ -41,15 +41,17 @@ import type { AccountingOrderListDto } from '@/types'
 
 // Master grid görünümleri: 2 kuyruk + legacy hızlı filtre üçlüsü
 // (siparisAlDataGridHepsi/Beklenen/Onaylanan_Click, Muhasebe.cs 1206/1267/1328).
-type ViewId = 'cariQueue' | 'lojistikQueue' | 'hepsi' | 'beklenen' | 'onaylanan'
+type ViewId = 'cariQueue' | 'lojistikQueue' | 'tamamlanmaQueue' | 'hepsi' | 'beklenen' | 'onaylanan'
 
-const VIEWS: ViewId[] = ['cariQueue', 'lojistikQueue', 'hepsi', 'beklenen', 'onaylanan']
+const VIEWS: ViewId[] = ['cariQueue', 'lojistikQueue', 'tamamlanmaQueue', 'hepsi', 'beklenen', 'onaylanan']
 
 function matchesView(o: AccountingOrderListDto, view: ViewId): boolean {
   switch (view) {
     // Kontrol='Onay' listede zaten garanti (GetAccountingOrdersAsync filtresi).
     case 'cariQueue':     return o.siparisMiTeklifMi === 'Siparis'
     case 'lojistikQueue': return o.siparisMiTeklifMi === 'Hazir' && o.lojistikOnay === 'Bekliyor'
+    // Round-9 §19 — sevkiyat tamamlandı, muhasebe finalize bekliyor.
+    case 'tamamlanmaQueue': return o.siparisMiTeklifMi === 'TamamlanmaBekliyor'
     case 'hepsi':         return o.siparisMiTeklifMi !== 'Teklif'
     case 'beklenen':      return o.odemeDurum === 'Beklemede' && o.siparisMiTeklifMi === 'Siparis'
     case 'onaylanan':     return o.odemeDurum === 'Ödendi' && o.siparisMiTeklifMi === 'Siparis'
@@ -119,6 +121,17 @@ export function AccountingApprovalPage() {
     maliyet: 0, maliyetDetayi: '',
   })
 
+  // Round-9 §19 — "Tamamlanmayı Bekleyen" finalize formu (3. Peşinat + Final Maliyet)
+  const [finalizeForm, setFinalizeForm] = useState<{
+    pesinat: number | null; pesinatTarihi: string; finalMaliyet: number | null; maliyetDetayi: string
+  }>({ pesinat: null, pesinatTarihi: new Date().toISOString().slice(0, 10), finalMaliyet: null, maliyetDetayi: '' })
+
+  // Round-10 — Cari/Lojistik kuyruğunda peşinat girişi (tahsilat). Maliyet
+  // talep alanından TAMAMEN bağımsız; onay butonuyla birlikte kaydedilir.
+  const [pesinatForm, setPesinatForm] = useState<{ pesinat: number | null; pesinatTarihi: string }>({
+    pesinat: null, pesinatTarihi: new Date().toISOString().slice(0, 10),
+  })
+
   // ── Veri ────────────────────────────────────────────────────────────────
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['accounting-orders'],
@@ -153,6 +166,13 @@ export function AccountingApprovalPage() {
       maliyet:       selectedRow?.maliyet ?? 0,
       maliyetDetayi: selectedRow?.maliyetDetayi ?? '',
     })
+    setFinalizeForm({
+      pesinat:       null,
+      pesinatTarihi: new Date().toISOString().slice(0, 10),
+      finalMaliyet:  selectedRow?.maliyet ?? null,
+      maliyetDetayi: selectedRow?.maliyetDetayi ?? '',
+    })
+    setPesinatForm({ pesinat: null, pesinatTarihi: new Date().toISOString().slice(0, 10) })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected])
 
@@ -170,6 +190,7 @@ export function AccountingApprovalPage() {
   // Kuyruk sayaçları (sekme başlıklarında gösterilir)
   const cariCount = useMemo(() => orders.filter((o) => matchesView(o, 'cariQueue')).length, [orders])
   const lojCount  = useMemo(() => orders.filter((o) => matchesView(o, 'lojistikQueue')).length, [orders])
+  const tamCount  = useMemo(() => orders.filter((o) => matchesView(o, 'tamamlanmaQueue')).length, [orders])
 
   const refreshAll = () => {
     qc.invalidateQueries({ queryKey: ['accounting-orders'] })
@@ -191,7 +212,10 @@ export function AccountingApprovalPage() {
 
   // ── Mutations ───────────────────────────────────────────────────────────
   const cariMut = useMutation({
-    mutationFn: (no: string) => approveMuhasebeAndMoveToPlanning(no),
+    mutationFn: (no: string) => approveMuhasebeAndMoveToPlanning(no, {
+      pesinat:       pesinatForm.pesinat ?? undefined,
+      pesinatTarihi: pesinatForm.pesinat && pesinatForm.pesinatTarihi ? pesinatForm.pesinatTarihi : undefined,
+    }),
     onSuccess: () => {
       refreshAll(); setSelected(null)
       toast({ title: t('accApproval.toast.cariApproved') })
@@ -200,10 +224,27 @@ export function AccountingApprovalPage() {
   })
 
   const lojMut = useMutation({
-    mutationFn: (no: string) => approveLogistics(no),
+    mutationFn: (no: string) => approveLogistics(no, {
+      pesinat:       pesinatForm.pesinat ?? undefined,
+      pesinatTarihi: pesinatForm.pesinat && pesinatForm.pesinatTarihi ? pesinatForm.pesinatTarihi : undefined,
+    }),
     onSuccess: () => {
       refreshAll(); setSelected(null)
       toast({ title: t('accApproval.toast.logisticsApproved') })
+    },
+    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+  })
+
+  const finalizeMut = useMutation({
+    mutationFn: (no: string) => finalizeCompletion(no, {
+      pesinat:       finalizeForm.pesinat ?? undefined,
+      pesinatTarihi: finalizeForm.pesinat && finalizeForm.pesinatTarihi ? finalizeForm.pesinatTarihi : undefined,
+      finalMaliyet:  finalizeForm.finalMaliyet ?? 0,
+      maliyetDetayi: finalizeForm.maliyetDetayi.trim() || undefined,
+    }),
+    onSuccess: () => {
+      refreshAll(); setSelected(null)
+      toast({ title: t('accApproval.finalize.done') })
     },
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
@@ -256,6 +297,7 @@ export function AccountingApprovalPage() {
   // Seçili satırın kuyruğuna göre tek bağlamsal onay aksiyonu.
   const canCari = !!selectedRow && matchesView(selectedRow, 'cariQueue')
   const canLoj  = !!selectedRow && matchesView(selectedRow, 'lojistikQueue')
+  const canFinalize = !!selectedRow && matchesView(selectedRow, 'tamamlanmaQueue')
 
   // ── Master grid kolonları ───────────────────────────────────────────────
   const columns: Column<AccountingOrderListDto & Record<string, unknown>>[] = [
@@ -281,6 +323,7 @@ export function AccountingApprovalPage() {
         const o = r as AccountingOrderListDto
         if (matchesView(o, 'cariQueue')) return <span className="text-xs font-medium text-amber-600">{t('accApproval.queueBadge.cari')}</span>
         if (matchesView(o, 'lojistikQueue')) return <span className="text-xs font-medium text-sky-600">{t('accApproval.queueBadge.lojistik')}</span>
+        if (matchesView(o, 'tamamlanmaQueue')) return <span className="text-xs font-medium text-emerald-600">{t('accApproval.queueBadge.tamamlanma')}</span>
         return <span className="text-xs text-muted-foreground">—</span>
       } },
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)
@@ -518,30 +561,82 @@ export function AccountingApprovalPage() {
           <CariRow label={t('qc.fields.siparisBakiye')}>
             <CariValue value={selectedRow ? formatCurrency(Math.max(selectedRow.kalanBakiye ?? 0, 0), pt) : ''} />
           </CariRow>
-          <CariRow label={t('accountingFull.maliyet.maliyet')}>
-            <DecimalInput className="h-7 text-xs" value={maliyetForm.maliyet}
-              onValueChange={(v) => setMaliyetForm((f) => ({ ...f, maliyet: v === '' ? 0 : v }))} />
-          </CariRow>
-          <Textarea
-            className="min-h-[3rem] resize-none text-xs"
-            placeholder={t('accountingFull.maliyet.notu')}
-            value={maliyetForm.maliyetDetayi}
-            onChange={(e) => setMaliyetForm((f) => ({ ...f, maliyetDetayi: e.target.value }))}
-          />
-          <Button size="sm" variant="outline" className="h-7 text-xs"
-            disabled={maliyetMut.isPending || maliyetForm.maliyet < 0}
-            onClick={() => { const no = requireSelection(); if (no) maliyetMut.mutate(no) }}>
-            {t('accountingFull.actions.talepGonder')}
-          </Button>
-          {selectedRow?.muhasebeDurumu && (
-            <p className="text-[10px] text-muted-foreground">
-              {t('accountingFull.maliyet.lastStatus')}: <strong>{selectedRow.muhasebeDurumu}</strong>
-              {selectedRow.muhasebeRedNotu && <> — {selectedRow.muhasebeRedNotu}</>}
-            </p>
+          {/* Round-9 §19 — "Tamamlanmayı Bekleyen" seçiliyse finalize paneli;
+              aksi halde §18 etiketli Maliyet/Peşinat talep alanı. */}
+          {canFinalize ? (
+            <div className="space-y-1.5 rounded border border-emerald-300 bg-emerald-50 p-2">
+              <p className="text-[11px] text-muted-foreground">{t('accApproval.finalize.hint')}</p>
+              <CariRow label={t('accApproval.finalize.pesinat')}>
+                <DecimalInput className="h-7 text-xs" value={finalizeForm.pesinat ?? ''}
+                  onValueChange={(v) => setFinalizeForm((f) => ({ ...f, pesinat: v === '' ? null : v }))} />
+              </CariRow>
+              <CariRow label={t('accApproval.finalize.pesinatTarihi')}>
+                <Input type="date" className="h-7 text-xs" value={finalizeForm.pesinatTarihi}
+                  onChange={(e) => setFinalizeForm((f) => ({ ...f, pesinatTarihi: e.target.value }))} />
+              </CariRow>
+              <CariRow label={t('accApproval.finalize.finalMaliyet')}>
+                <DecimalInput className="h-7 text-xs" value={finalizeForm.finalMaliyet ?? ''}
+                  onValueChange={(v) => setFinalizeForm((f) => ({ ...f, finalMaliyet: v === '' ? null : v }))} />
+              </CariRow>
+              <Textarea
+                className="min-h-[2.5rem] resize-none text-xs"
+                placeholder={t('accApproval.finalize.maliyetNotu')}
+                value={finalizeForm.maliyetDetayi}
+                onChange={(e) => setFinalizeForm((f) => ({ ...f, maliyetDetayi: e.target.value }))}
+              />
+            </div>
+          ) : (
+            <>
+              {/* Round-10 — Peşinat alanı (yalnız Cari/Lojistik kuyruğu): onayla
+                  birlikte MuhasebeIslemTablo'ya tahsilat olarak kaydedilir.
+                  Maliyet talebinden TAMAMEN bağımsız — Maliyet'e yazmaz. */}
+              {(canCari || canLoj) && (
+                <div className="space-y-1.5 rounded border border-sky-300 bg-sky-50 p-2">
+                  <CariRow label={t(canLoj ? 'accApproval.cariLabel.pesinat2' : 'accApproval.cariLabel.pesinat1')}>
+                    <DecimalInput className="h-7 text-xs" value={pesinatForm.pesinat ?? ''}
+                      onValueChange={(v) => setPesinatForm((f) => ({ ...f, pesinat: v === '' ? null : v }))} />
+                  </CariRow>
+                  <CariRow label={t('accApproval.finalize.pesinatTarihi')}>
+                    <Input type="date" className="h-7 text-xs" value={pesinatForm.pesinatTarihi}
+                      onChange={(e) => setPesinatForm((f) => ({ ...f, pesinatTarihi: e.target.value }))} />
+                  </CariRow>
+                  <p className="text-[10px] text-muted-foreground">{t('accApproval.pesinat.hint')}</p>
+                </div>
+              )}
+
+              {/* Maliyet Talebi — "Talep Gönder" (SubmitMaliyetTalep) davranışı değişmedi. */}
+              <CariRow label={t('accApproval.cariLabel.maliyet')}>
+                <DecimalInput className="h-7 text-xs" value={maliyetForm.maliyet}
+                  onValueChange={(v) => setMaliyetForm((f) => ({ ...f, maliyet: v === '' ? 0 : v }))} />
+              </CariRow>
+              <Textarea
+                className="min-h-[3rem] resize-none text-xs"
+                placeholder={t('accountingFull.maliyet.notu')}
+                value={maliyetForm.maliyetDetayi}
+                onChange={(e) => setMaliyetForm((f) => ({ ...f, maliyetDetayi: e.target.value }))}
+              />
+              <Button size="sm" variant="outline" className="h-7 text-xs"
+                disabled={maliyetMut.isPending || maliyetForm.maliyet < 0}
+                onClick={() => { const no = requireSelection(); if (no) maliyetMut.mutate(no) }}>
+                {t('accountingFull.actions.talepGonder')}
+              </Button>
+              {selectedRow?.muhasebeDurumu && (
+                <p className="text-[10px] text-muted-foreground">
+                  {t('accountingFull.maliyet.lastStatus')}: <strong>{selectedRow.muhasebeDurumu}</strong>
+                  {selectedRow.muhasebeRedNotu && <> — {selectedRow.muhasebeRedNotu}</>}
+                </p>
+              )}
+            </>
           )}
           {/* Kuyruğa göre bağlamsal onay aksiyonu */}
           <div className="mt-auto space-y-1 pt-1">
-            {canLoj ? (
+            {canFinalize ? (
+              <Button size="sm" className="h-8 w-full text-xs"
+                disabled={finalizeMut.isPending || (finalizeForm.finalMaliyet ?? -1) < 0}
+                onClick={() => { const no = requireSelection(); if (no) finalizeMut.mutate(no) }}>
+                {t('accApproval.actions.tamamla')}
+              </Button>
+            ) : canLoj ? (
               <Button size="sm" className="h-8 w-full text-xs"
                 disabled={lojMut.isPending}
                 onClick={() => { const no = requireSelection(); if (no) lojMut.mutate(no) }}>
@@ -572,6 +667,7 @@ export function AccountingApprovalPage() {
                 {t(`accApproval.views.${v}`)}
                 {v === 'cariQueue' && cariCount > 0 && ` (${cariCount})`}
                 {v === 'lojistikQueue' && lojCount > 0 && ` (${lojCount})`}
+                {v === 'tamamlanmaQueue' && tamCount > 0 && ` (${tamCount})`}
               </Button>
             ))}
           </div>

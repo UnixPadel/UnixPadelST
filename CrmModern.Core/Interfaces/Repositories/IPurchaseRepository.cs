@@ -36,4 +36,8 @@ public interface IPurchaseRepository : IBaseRepository<PurchaseRequest>
 
     /// <summary>Faz 7 — Topbar global arama. UrunAdi/TalepEdenKullaniciAdi/Departman üzerinde LIKE.</summary>
     Task<IReadOnlyList<PurchaseRequest>> QuickFindAsync(string query, int limit);
+
+    // ── Round-9 §9 — çok kalemli talep satırları (SatinAlmaTalepKalem) ───────
+    Task AddLinesAsync(IEnumerable<PurchaseRequestLine> lines);
+    Task<IReadOnlyList<PurchaseRequestLine>> GetLinesByTalepIdAsync(int talepId);
 }

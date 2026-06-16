@@ -36,6 +36,10 @@ public static class DatabaseSchemaMigrator
         // 3) TalepOnaylari (Faz 8.4): yoksa CREATE et — audit log
         await EnsureTalepOnaylariTableAsync(ctx, logger);
 
+        // 3b) Round-9 §9: SatinAlmaTalepKalem — çok kalemli satın alma talebi.
+        // Additive: parent SatinAlmaTalep değişmez, eski talepler kalemsiz çalışır.
+        await EnsureSatinAlmaTalepKalemTableAsync(ctx, logger);
+
         // 4) PROMPT-v2 §7: MusteriBilgileri.CreatedByKullaniciID + tek seferlik backfill.
         await EnsureMusteriCreatedByColumnAsync(ctx, logger);
 
@@ -181,6 +185,28 @@ public static class DatabaseSchemaMigrator
                 INDEX IX_TalepOnaylari_TalepID (TalepID)
             )");
         logger?.LogInformation("TalepOnaylari tablosu hazırlandı (CREATE IF NOT EXISTS).");
+    }
+
+    private static async Task EnsureSatinAlmaTalepKalemTableAsync(AppDbContext ctx, ILogger? logger)
+    {
+        // Round-9 §9 — çok satırlı satın alma talebi kalemleri.
+        // CREATE IF NOT EXISTS → idempotent; tablo varsa dokunmaz.
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS SatinAlmaTalepKalem (
+                KalemID     INT            NOT NULL AUTO_INCREMENT,
+                TalepID     INT            NOT NULL,
+                UrunAdi     VARCHAR(255)   NOT NULL,
+                Birim       VARCHAR(50)    NOT NULL,
+                Miktar      DECIMAL(18,2)  NOT NULL,
+                BirimFiyat  DECIMAL(18,2)  NULL,
+                Toplam      DECIMAL(18,2)  NOT NULL,
+                Indirim     DECIMAL(18,2)  NULL,
+                IndirimTipi VARCHAR(8)     NULL,
+                FiyatModu   VARCHAR(8)     NOT NULL,
+                PRIMARY KEY (KalemID),
+                INDEX IX_SatinAlmaTalepKalem_TalepID (TalepID)
+            )");
+        logger?.LogInformation("SatinAlmaTalepKalem tablosu hazırlandı (CREATE IF NOT EXISTS).");
     }
 
     /// <summary>

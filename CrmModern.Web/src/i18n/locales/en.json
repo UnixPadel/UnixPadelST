@@ -83,6 +83,7 @@
     "password": "Password",
     "submit": "Sign In",
     "submitting": "Signing in...",
+    "rememberMe": "Remember Me",
     "invalidCredentials": "Invalid username or password."
   },
   "nav": {
@@ -95,8 +96,7 @@
     "logisticsCarriers": "Logistics · Carriers",
     "accounting": "Accounting · Collections",
     "accountingApproval": "Accounting · Approval",
-    "accountingLogisticsApprovals": "Accounting · Logistics Approvals",
-    "accountingHistory": "Accounting · History",
+    "accountingHistory": "Accounting · Transactions",
     "accountingBalance": "Accounting · Balance",
     "purchaseNew": "Purchase · New",
     "purchaseMine": "Purchase · My Requests",
@@ -187,6 +187,13 @@
   },
   "myOrders": {
     "title": "My Orders",
+    "filter": {
+      "all": "— All —",
+      "stage": "Stage",
+      "kontrol": "Control Status",
+      "odeme": "Payment Status",
+      "reset": "Reset"
+    },
     "cols": {
       "numara": "Number",
       "musteriAd": "Customer Name",
@@ -551,6 +558,7 @@
     "views": {
       "cariQueue": "Pending Account Approval",
       "lojistikQueue": "Pending Logistics Approval",
+      "tamamlanmaQueue": "Pending Completion",
       "hepsi": "All",
       "beklenen": "Pending",
       "onaylanan": "Paid"
@@ -560,7 +568,26 @@
     },
     "queueBadge": {
       "cari": "Awaiting Account Approval",
-      "lojistik": "Awaiting Logistics Approval"
+      "lojistik": "Awaiting Logistics Approval",
+      "tamamlanma": "Awaiting Completion"
+    },
+    "cariLabel": {
+      "pesinat1": "1st Down Payment",
+      "pesinat2": "2nd Down Payment",
+      "maliyet": "Cost"
+    },
+    "pesinat": {
+      "hint": "The down payment is recorded as a collection on approval. It is not written to Cost."
+    },
+    "finalize": {
+      "title": "Complete — {{no}}",
+      "pesinat": "3rd Down Payment",
+      "pesinatTarihi": "Down Payment Date",
+      "finalMaliyet": "Final Cost",
+      "maliyetNotu": "Cost Note",
+      "hint": "The 3rd down payment is recorded as a collection; Final Cost feeds the cost sheet. The order becomes 'Completed'.",
+      "submit": "Complete",
+      "done": "Order completed."
     },
     "blocks": {
       "ozet": "Summary"
@@ -574,7 +601,8 @@
     },
     "actions": {
       "cariOnayla": "Approve Account",
-      "lojistikOnayla": "Approve Logistics"
+      "lojistikOnayla": "Approve Logistics",
+      "tamamla": "Complete"
     },
     "disabled": {
       "cari": "Order must be in 'Siparis' stage with Kontrol='Onay'."
@@ -586,9 +614,8 @@
   },
   "accounting": {
     "title": "Accounting · Collections",
-    "historyTitle": "Accounting · History",
+    "historyTitle": "Accounting · Transactions",
     "balanceTitle": "Accounting · Balance",
-    "logisticsApprovalsTitle": "Accounting · Logistics Approvals",
     "rowDetailTitle": "Request Details",
     "filter": {
       "all": "— All —",
@@ -744,6 +771,27 @@
     "creating": "Submitting...",
     "createSuccess": "Request created",
     "createError": "Error",
+    "lines": {
+      "title": "Line Items",
+      "urunAdi": "Product Name",
+      "birim": "Unit",
+      "birimOther": "Other (type)",
+      "miktar": "Quantity",
+      "fiyatModu": "Pricing Mode",
+      "moduMiktar": "Quantity × Unit Price",
+      "moduToplam": "Total + Discount",
+      "birimFiyat": "Unit Price",
+      "brutToplam": "Total",
+      "indirim": "Discount",
+      "indirimYuzde": "%",
+      "indirimTutar": "Amount",
+      "satirToplam": "Line Total",
+      "genelToplam": "Grand Total",
+      "ekle": "Add Row",
+      "sil": "Remove",
+      "enAzBir": "At least one valid line item is required."
+    },
+    "summarySuffix": "+{{count}} items",
     "actionCol": "Action",
     "overrideApprove": "Approve",
     "overrideSuccess": "Request approved (all stages skipped).",
@@ -944,6 +992,7 @@
       "production": "Production",
       "ready": "Ready",
       "logistics": "Logistics",
+      "pendingCompletion": "Awaiting Completion",
       "completed": "Completed",
       "cancelled": "Cancelled"
     },

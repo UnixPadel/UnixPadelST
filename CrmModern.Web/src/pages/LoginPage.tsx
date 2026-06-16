@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { login } from '@/api/auth'
@@ -14,16 +14,17 @@ import { FieldError } from '@/components/FieldError'
 
 export function LoginPage() {
   const navigate = useNavigate()
-  const { saveUser } = useAuth()
+  const { saveUser, isLoggedIn } = useAuth()
   const { toast } = useToast()
   const { t } = useTranslation()
   const [form, setForm] = useState({ kullaniciAdi: '', sifre: '' })
+  const [remember, setRemember] = useState(false)
   const [submitted, setSubmitted] = useState(false)
 
   const mutation = useMutation({
     mutationFn: login,
     onSuccess: (data) => {
-      saveUser({ ...data, token: data.token })
+      saveUser({ ...data, token: data.token }, remember)
       navigate('/dashboard', { replace: true })
     },
     onError: () => {
@@ -31,12 +32,16 @@ export function LoginPage() {
     },
   })
 
+  // Otomatik giriş: geçerli (hatırlanan ya da oturumluk) token varsa login
+  // ekranını hiç gösterme, doğrudan uygulamaya yönlendir.
+  if (isLoggedIn()) return <Navigate to="/dashboard" replace />
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     setSubmitted(true)
     // Boş alan varsa sessiz dönme — submitted=true ile alan altı hata mesajları görünür.
     if (!form.kullaniciAdi.trim() || !form.sifre.trim()) return
-    mutation.mutate(form)
+    mutation.mutate({ ...form, rememberMe: remember })
   }
 
   return (
@@ -75,6 +80,18 @@ export function LoginPage() {
                 onChange={(e) => setForm({ ...form, sifre: e.target.value })}
               />
               {submitted && !form.sifre.trim() && <FieldError message={t('validation.required')} />}
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                id="rememberMe"
+                type="checkbox"
+                className="h-4 w-4 rounded border-input accent-primary"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+              />
+              <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal">
+                {t('login.rememberMe')}
+              </Label>
             </div>
             <Button type="submit" className="w-full" disabled={mutation.isPending}>
               {mutation.isPending ? `${t('login.submit')}...` : t('login.submit')}

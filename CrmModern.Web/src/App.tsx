@@ -14,7 +14,6 @@ import { CarriersPage } from '@/pages/logistics/CarriersPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
 import { AccountingHistoryPage } from '@/pages/accounting/AccountingHistoryPage'
 import { CustomerBalancePage } from '@/pages/accounting/CustomerBalancePage'
-import { LogisticsApprovalsPage } from '@/pages/accounting/LogisticsApprovalsPage'
 import { AccountingApprovalPage } from '@/pages/accounting/AccountingApprovalPage'
 import { NewPurchaseRequestPage } from '@/pages/purchase/NewPurchaseRequestPage'
 import { MyPurchaseRequestsPage } from '@/pages/purchase/MyPurchaseRequestsPage'
@@ -61,7 +60,6 @@ export default function App() {
         <Route path="/accounting"          element={<RoleGuard roles={['Yonetici','Muhasebe']}><AccountingPage /></RoleGuard>} />
         {/* PROMPT-v6 §1 — Burcu onay ekranı YALNIZ burcu.karaman (rol değil; Yonetici dahil giremez). */}
         <Route path="/accounting/approval" element={<RoleGuard usernames={['burcu.karaman']}><AccountingApprovalPage /></RoleGuard>} />
-        <Route path="/accounting/logistics-approvals" element={<RoleGuard roles={['Yonetici','Muhasebe']} usernames={['elshan.rasulov']}><LogisticsApprovalsPage /></RoleGuard>} />
         <Route path="/accounting/history"  element={<RoleGuard roles={['Yonetici','Muhasebe','Gozlemci']}><AccountingHistoryPage /></RoleGuard>} />
         <Route path="/accounting/balance"  element={<RoleGuard roles={['Yonetici','Muhasebe']}><CustomerBalancePage /></RoleGuard>} />
         <Route path="/purchase"             element={<Navigate to="/purchase/mine" replace />} />

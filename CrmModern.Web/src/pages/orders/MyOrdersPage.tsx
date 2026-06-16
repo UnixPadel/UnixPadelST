@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -11,14 +11,23 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { OrderKontrolBadge } from '@/components/OrderKontrolBadge'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { describeApiError } from '@/lib/axios'
 import { formatDate } from '@/lib/utils'
+import { stageLabel, kontrolLabel, statusLabel } from '@/lib/status'
 import type { OrderListDto } from '@/types'
+
+// §17 — ana Siparişler ekranındaki filtrelerle aynı küme.
+const STAGE_OPTIONS = ['Teklif', 'Siparis', 'Planlama', 'Uretim', 'Hazir', 'Lojistik', 'TamamlanmaBekliyor', 'Tamamlandi', 'Iptal']
+const KONTROL_OPTIONS = ['Kontrol', 'Onay', 'Reddet']
+const ODEME_OPTIONS = ['Beklemede', 'Ödendi']
+const ALL = '__all__'
 
 /**
  * PROMPT.md #20: Siparişlerim ekranı — port of legacy Siparislerim.cs.
@@ -62,6 +71,41 @@ export function MyOrdersPage() {
     refetchOnWindowFocus: 'always',
     staleTime: 0,
   })
+
+  // ── §17 — filtreler (ana Siparişler ekranı davranışıyla aynı) ──────────
+  const [fTemsilci, setFTemsilci] = useState<string>(ALL)
+  const [fStage, setFStage] = useState<string>(ALL)
+  const [fKontrol, setFKontrol] = useState<string>(ALL)
+  const [fOdeme, setFOdeme] = useState<string>(ALL)
+  const [fMusteri, setFMusteri] = useState('')
+  const [fNo, setFNo] = useState('')
+  const [fFrom, setFFrom] = useState('')
+  const [fTo, setFTo] = useState('')
+
+  // Temsilci seçenekleri — yalnız global izleyici (elshan) görür; satırlardaki
+  // benzersiz temsilci adlarından türetilir.
+  const temsilciOptions = useMemo(
+    () => Array.from(new Set(orders.map((o) => o.kullaniciAdSoyad).filter(Boolean) as string[])).sort(
+      (a, b) => a.localeCompare(b, 'tr-TR', { sensitivity: 'base' })),
+    [orders],
+  )
+
+  const resetFilters = () => {
+    setFTemsilci(ALL); setFStage(ALL); setFKontrol(ALL); setFOdeme(ALL)
+    setFMusteri(''); setFNo(''); setFFrom(''); setFTo('')
+  }
+
+  const filtered = useMemo(() => orders.filter((o) => {
+    if (isGlobalViewer && fTemsilci !== ALL && (o.kullaniciAdSoyad ?? '') !== fTemsilci) return false
+    if (fStage !== ALL && o.siparisMiTeklifMi !== fStage) return false
+    if (fKontrol !== ALL && o.kontrol !== fKontrol) return false
+    if (fOdeme !== ALL && (o.odemeDurum ?? '') !== fOdeme) return false
+    if (fMusteri && !(o.musteriAd ?? '').toLowerCase().includes(fMusteri.toLowerCase())) return false
+    if (fNo && !rowNo(o).toLowerCase().includes(fNo.toLowerCase())) return false
+    if (fFrom && new Date(o.tarih) < new Date(fFrom)) return false
+    if (fTo && new Date(o.tarih) > new Date(`${fTo}T23:59:59`)) return false
+    return true
+  }), [orders, isGlobalViewer, fTemsilci, fStage, fKontrol, fOdeme, fMusteri, fNo, fFrom, fTo])
 
   // ── Form Göster modal target ───────────────────────────────────────────
   const [detailNo, setDetailNo] = useState<string | null>(null)
@@ -216,10 +260,77 @@ export function MyOrdersPage() {
         title={t('myOrders.title')}
         actions={<Button onClick={() => nav('/orders/new')}>{t('common.add')}</Button>}
       />
-      <div className="p-6">
+      <div className="p-6 space-y-4">
+        {/* §17 — filtre şeridi */}
+        <div className="rounded-md border bg-card p-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {isGlobalViewer && (
+              <div className="space-y-1">
+                <Label>{t('common.representative')}</Label>
+                <Select value={fTemsilci} onValueChange={setFTemsilci}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
+                    {temsilciOptions.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label>{t('myOrders.filter.stage')}</Label>
+              <Select value={fStage} onValueChange={setFStage}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
+                  {STAGE_OPTIONS.map((s) => <SelectItem key={s} value={s}>{stageLabel(t, s)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>{t('myOrders.filter.kontrol')}</Label>
+              <Select value={fKontrol} onValueChange={setFKontrol}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
+                  {KONTROL_OPTIONS.map((s) => <SelectItem key={s} value={s}>{kontrolLabel(t, s)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>{t('myOrders.filter.odeme')}</Label>
+              <Select value={fOdeme} onValueChange={setFOdeme}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
+                  {ODEME_OPTIONS.map((s) => <SelectItem key={s} value={s}>{statusLabel(t, s)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>{t('common.customer')}</Label>
+              <Input value={fMusteri} onChange={(e) => setFMusteri(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>{t('common.orderNo')}</Label>
+              <Input value={fNo} onChange={(e) => setFNo(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>{t('common.startDate')}</Label>
+              <Input type="date" value={fFrom} onChange={(e) => setFFrom(e.target.value)} />
+            </div>
+            <div className="space-y-1">
+              <Label>{t('common.endDate')}</Label>
+              <Input type="date" value={fTo} onChange={(e) => setFTo(e.target.value)} />
+            </div>
+            <div className="space-y-1 flex items-end">
+              <Button variant="outline" className="w-full" onClick={resetFilters}>{t('myOrders.filter.reset')}</Button>
+            </div>
+          </div>
+        </div>
+
         <DataTable
           columns={cols}
-          data={orders as (OrderListDto & Record<string, unknown>)[]}
+          data={filtered as (OrderListDto & Record<string, unknown>)[]}
           keyField="siparisAlID"
           loading={isLoading}
         />

@@ -1,33 +1,19 @@
 import { useCallback } from 'react'
 import type { AuthUser } from '@/types'
-
-const USER_KEY = 'user'
-const TOKEN_KEY = 'token'
+import { getToken, getStoredUser, saveAuth, refreshAuth, clearAuth } from '@/lib/authStore'
 
 export function useAuth() {
-  const getUser = useCallback((): AuthUser | null => {
-    const raw = localStorage.getItem(USER_KEY)
-    if (!raw) return null
-    try {
-      return JSON.parse(raw) as AuthUser
-    } catch {
-      return null
-    }
-  }, [])
+  const getUser = useCallback((): AuthUser | null => getStoredUser(), [])
 
-  const saveUser = useCallback((user: AuthUser) => {
-    localStorage.setItem(TOKEN_KEY, user.token)
-    localStorage.setItem(USER_KEY, JSON.stringify(user))
-  }, [])
+  // Giriş: remember=true → localStorage (kalıcı), false → sessionStorage (oturumluk).
+  const saveUser = useCallback((user: AuthUser, remember: boolean) => saveAuth(user, remember), [])
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    localStorage.removeItem(USER_KEY)
-  }, [])
+  // /me tazelemesi: mevcut depolama tercihini korur.
+  const refreshUser = useCallback((user: AuthUser) => refreshAuth(user), [])
 
-  const isLoggedIn = useCallback((): boolean => {
-    return !!localStorage.getItem(TOKEN_KEY)
-  }, [])
+  const logout = useCallback(() => clearAuth(), [])
 
-  return { getUser, saveUser, logout, isLoggedIn }
+  const isLoggedIn = useCallback((): boolean => !!getToken(), [])
+
+  return { getUser, saveUser, refreshUser, logout, isLoggedIn }
 }

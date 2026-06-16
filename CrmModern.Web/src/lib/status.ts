@@ -12,6 +12,7 @@ const STAGE: Record<string, string> = {
   Uretim: 'production',
   Hazir: 'ready',
   Lojistik: 'logistics',
+  TamamlanmaBekliyor: 'pendingCompletion',
   Tamamlandi: 'completed',
   Iptal: 'cancelled',
 }

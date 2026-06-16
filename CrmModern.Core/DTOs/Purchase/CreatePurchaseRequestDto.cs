@@ -18,4 +18,6 @@ public sealed record CreatePurchaseRequestDto(
     decimal? Maliyet,
     string?  MaliyetDetayi,
     decimal? Kar,
-    string?  SiparisNo);
+    string?  SiparisNo,
+    // Round-9 §9 — çok kalemli talep satırları (boş/null → tek satırlık legacy davranış)
+    IReadOnlyList<CreatePurchaseRequestLineDto>? Kalemler = null);

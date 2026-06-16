@@ -8,12 +8,13 @@ import { UpdatesModal } from './UpdatesModal'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { PageLoader } from './PageLoader'
 import { useAuth } from '@/hooks/useAuth'
+import { getToken } from '@/lib/authStore'
 import { me } from '@/api/auth'
 
 const SIDEBAR_KEY = 'sidebar:open'
 
 export function Layout() {
-  const { isLoggedIn, getUser, saveUser } = useAuth()
+  const { isLoggedIn, getUser, refreshUser } = useAuth()
   const { t } = useTranslation()
   const [bootstrapped, setBootstrapped] = useState(false)
 
@@ -33,7 +34,8 @@ export function Layout() {
   useEffect(() => {
     if (!isLoggedIn()) { setBootstrapped(true); return }
     me()
-      .then((u) => saveUser({ ...getUser()!, ...u, token: localStorage.getItem('token')! }))
+      // me() boş token döndürür → mevcut token korunur; depolama tercihi (remember) değişmez.
+      .then((u) => refreshUser({ ...getUser()!, ...u, token: getToken()! }))
       .catch(() => { /* axios interceptor 401'de zaten /login'e atar */ })
       .finally(() => setBootstrapped(true))
   }, [])

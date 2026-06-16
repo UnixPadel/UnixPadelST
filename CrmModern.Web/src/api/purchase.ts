@@ -38,7 +38,21 @@ export const getAllPurchaseRequests = async (filter: PurchaseFilter = {}): Promi
 
 // ── Detay ───────────────────────────────────────────────────────────────────
 
+// Round-9 §9 — çok kalemli talep satırı
+export interface PurchaseRequestLine {
+  kalemID: number
+  urunAdi: string
+  birim: string
+  miktar: number
+  birimFiyat?: number | null
+  toplam: number
+  indirim?: number | null
+  indirimTipi?: string | null
+  fiyatModu: string
+}
+
 export interface PurchaseRequestDetail extends PurchaseRequestListDto {
+  kalemler?: PurchaseRequestLine[]
   notlar?: string
   onIzlemeYapan?: string
   onIzlemeTarihi?: string

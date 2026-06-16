@@ -17,6 +17,9 @@ import type { AuthUser } from '@/types'
 
 const TOKEN_KEY = 'token'
 const USER_KEY = 'user'
+// Round-11 — "Beni Hatırla" giriş ön-doldurma anahtarı. Token/oturum
+// anahtarlarından AYRI tutulur ki logout/clearAuth bunu SİLMESİN.
+const REMEMBER_KEY = 'remember:login'
 
 /** Aktif oturumu hangi store tutuyor? Önce localStorage (kalıcı), sonra session. */
 function readStore(): Storage | null {
@@ -60,10 +63,51 @@ export function refreshAuth(user: AuthUser): void {
   target.setItem(USER_KEY, JSON.stringify(user))
 }
 
-/** Çıkış / 401: her iki store'dan da tüm auth verisini siler. */
+/**
+ * Çıkış / 401: her iki store'dan da tüm auth verisini siler.
+ * NOT: "Beni Hatırla" giriş ön-doldurma (REMEMBER_KEY) bilinçli olarak
+ * SİLİNMEZ — logout sonrası da kullanıcı adı/şifre formda dolu gelmelidir.
+ */
 export function clearAuth(): void {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
   sessionStorage.removeItem(TOKEN_KEY)
   sessionStorage.removeItem(USER_KEY)
+}
+
+// ── "Beni Hatırla" giriş ön-doldurma ──────────────────────────────────────
+//
+// Round-11 — Token/JWT/oturum davranışından TAMAMEN bağımsız: yalnız login
+// formunu otomatik doldurmak için son BAŞARILI kullanıcı adı + şifreyi
+// localStorage'da tutar. localStorage olduğu için tarayıcı/bilgisayar yeniden
+// başlasa ve logout yapılsa da kalır. Remember Me kapalıyken silinir.
+//
+// GÜVENLİK NOTU: şifre düz metin saklanır (ürün gereği, kullanıcının açık
+// isteği). XSS veya cihaza fiziksel erişim bu bilgiyi okuyabilir.
+
+export interface RememberedLogin {
+  kullaniciAdi: string
+  sifre: string
+}
+
+/** Remember Me işaretliyken başarılı giriş sonrası çağrılır. */
+export function saveRememberedLogin(kullaniciAdi: string, sifre: string): void {
+  localStorage.setItem(REMEMBER_KEY, JSON.stringify({ kullaniciAdi, sifre }))
+}
+
+/** Login formunu ön-doldurmak için saklanan kimlik bilgisi (yoksa null). */
+export function getRememberedLogin(): RememberedLogin | null {
+  const raw = localStorage.getItem(REMEMBER_KEY)
+  if (!raw) return null
+  try {
+    const v = JSON.parse(raw) as RememberedLogin
+    return typeof v?.kullaniciAdi === 'string' && typeof v?.sifre === 'string' ? v : null
+  } catch {
+    return null
+  }
+}
+
+/** Remember Me kapatıldığında / kapalı girişte saklanan kimlik bilgisini siler. */
+export function clearRememberedLogin(): void {
+  localStorage.removeItem(REMEMBER_KEY)
 }

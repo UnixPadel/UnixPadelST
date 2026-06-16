@@ -12,6 +12,9 @@ public sealed class PurchaseRequest
     public string    UrunAdi               { get; set; } = string.Empty;
     public string?   UrunTuru              { get; set; }
     public decimal   UrunMaliyeti          { get; set; }
+    // Round-11 §9 — talep para birimi (belge düzeyinde tek). Euro/Dolar/TL/Sterlin.
+    // Eski talepler NULL (UI '—' veya varsayılan gösterir).
+    public string?   ParaBirimi            { get; set; }
     public string?   AlinanYer             { get; set; }
     public string?   TalepEdenKullaniciAdi { get; set; }
     public string?   Departman             { get; set; }

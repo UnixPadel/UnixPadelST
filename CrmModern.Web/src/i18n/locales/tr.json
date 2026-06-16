@@ -315,7 +315,7 @@
       "siparisN": "Sipariş {{n}}",
       "anaUrun": "Ana Ürün",
       "anaUrunSec": "Ana ürün seç",
-      "tekilFiyatAdet": "Tekil Fiyat ve Adet",
+      "tekilFiyatAdet": "Tekil Fiyat",
       "setFiyati": "Set Fiyatı",
       "bilesenlerYukleniyor": "Bileşenler yükleniyor…",
       "anaUrunSecHint": "Ana ürün seçince bileşen listesi burada görünür.",
@@ -648,8 +648,10 @@
       "temsilci": "Temsilci",
       "paraTipi": "Para Tipi",
       "pesinat": "{{n}}. Peşinat",
-      "fark": "Fark (1→2)",
-      "diger": "Diğer"
+      "diger": "Diğer",
+      "maliyet": "Maliyet",
+      "fark": "Fark",
+      "toplamTahsilat": "Toplam Tahsilat"
     },
     "moreCount": "+{{count}} daha",
     "empty": "Kayıt yok.",
@@ -765,6 +767,8 @@
     "alinanYer": "Alınan Yer",
     "departman": "Departman",
     "departmanHint": "Rolünüzden otomatik atanır.",
+    "paraBirimi": "Para Birimi",
+    "paraBirimiHint": "Tüm kalemler bu para biriminde hesaplanır.",
     "notlar": "Notlar",
     "cancel": "Vazgeç",
     "create": "Talep Oluştur",
@@ -785,6 +789,7 @@
       "indirim": "İndirim",
       "indirimYuzde": "%",
       "indirimTutar": "Tutar",
+      "araToplam": "Ara Toplam",
       "satirToplam": "Satır Toplamı",
       "genelToplam": "Genel Toplam",
       "ekle": "Satır Ekle",
@@ -830,7 +835,7 @@
       "title": "Talebi Reddet — #{{id}}",
       "note": "Red Notu *"
     },
-    "pre": { "approved": "Ön onaylandı", "rejected": "Reddedildi" },
+    "pre": { "approved": "Ön onaylandı", "rejected": "Reddedildi", "reviewTitle": "Ön Onay İnceleme — #{{id}}" },
     "payment": {
       "pageTitle": "Ödeme Detayı (Muhasebe)",
       "dialogTitle": "Ödeme Detayı — Talep #{{id}}",

@@ -20,41 +20,45 @@ import type { CreatePurchaseRequestLine } from '@/types'
 const UNITS = ['Adet', 'Kg', 'Gram', 'Ton', 'Metre', 'm²', 'm³', 'Litre', 'Paket', 'Kutu', 'Koli', 'Rulo', 'Set'] as const
 const OTHER_UNIT = '__other__'
 
-type FiyatModu = 'miktar' | 'toplam'
-type IndirimTipi = 'yuzde' | 'tutar'
+// Round-11 §9 — belge düzeyinde para birimi. Değerler app paraTipi sözlüğüyle
+// uyumlu (formatCurrency simgeleri tanır); etiketler ISO koduyla gösterilir.
+const PARA_BIRIMLERI = [
+  { value: 'Euro',    label: 'EUR (€)' },
+  { value: 'Dolar',   label: 'USD ($)' },
+  { value: 'TL',      label: 'TRY (₺)' },
+  { value: 'Sterlin', label: 'GBP (£)' },
+] as const
 
+/**
+ * Round-11 §9 — temiz ERP satırı: Ürün / Miktar / Birim / Birim Fiyat / İndirim.
+ *   Ara Toplam   = Miktar × Birim Fiyat
+ *   Satır Toplamı = Ara Toplam − İndirim   (İndirim, talep para biriminde tutar)
+ * Eski fiyatModu (miktar/toplam) geçişi kaldırıldı; backend kalemleri her zaman
+ * fiyatModu='miktar', indirimTipi='tutar' olarak alır.
+ */
 interface LineRow {
   id: number
   urunAdi: string
   birimChoice: string   // UNITS değeri | OTHER_UNIT
   birimOther: string
   miktar: number | null
-  fiyatModu: FiyatModu
-  birimFiyat: number | null   // 'miktar' modu
-  brutToplam: number | null   // 'toplam' modu
-  indirim: number | null      // 'toplam' modu
-  indirimTipi: IndirimTipi    // 'toplam' modu
+  birimFiyat: number | null
+  indirim: number | null   // tutar (talep para biriminde)
 }
 
 let _seq = 1
 const blankRow = (): LineRow => ({
   id: _seq++,
   urunAdi: '', birimChoice: 'Adet', birimOther: '',
-  miktar: 1, fiyatModu: 'miktar', birimFiyat: null,
-  brutToplam: null, indirim: null, indirimTipi: 'yuzde',
+  miktar: 1, birimFiyat: null, indirim: null,
 })
 
 const resolveBirim = (r: LineRow) => (r.birimChoice === OTHER_UNIT ? r.birimOther.trim() : r.birimChoice)
-
-const lineTotal = (r: LineRow): number => {
-  if (r.fiyatModu === 'miktar') return (r.miktar ?? 0) * (r.birimFiyat ?? 0)
-  const gross = r.brutToplam ?? 0
-  const disc = r.indirimTipi === 'yuzde' ? gross * (r.indirim ?? 0) / 100 : (r.indirim ?? 0)
-  return Math.max(gross - disc, 0)
-}
+const araToplam = (r: LineRow): number => (r.miktar ?? 0) * (r.birimFiyat ?? 0)
+const lineTotal = (r: LineRow): number => Math.max(araToplam(r) - (r.indirim ?? 0), 0)
 
 const lineValid = (r: LineRow): boolean =>
-  !!(r.urunAdi.trim() && resolveBirim(r) && (r.miktar ?? 0) > 0 && lineTotal(r) > 0)
+  !!(r.urunAdi.trim() && resolveBirim(r) && (r.miktar ?? 0) > 0 && (r.birimFiyat ?? 0) > 0)
 
 export function NewPurchaseRequestPage() {
   const nav = useNavigate()
@@ -65,6 +69,7 @@ export function NewPurchaseRequestPage() {
   const user = getUser()
 
   const [rows, setRows] = useState<LineRow[]>([blankRow()])
+  const [paraBirimi, setParaBirimi] = useState<string>('Euro')
   const [alinanYer, setAlinanYer] = useState('')
   const [notlar, setNotlar] = useState('')
   const [submitted, setSubmitted] = useState(false)
@@ -76,7 +81,7 @@ export function NewPurchaseRequestPage() {
   const removeRow = (id: number) => setRows((rs) => (rs.length > 1 ? rs.filter((r) => r.id !== id) : rs))
 
   const grandTotal = rows.reduce((acc, r) => acc + lineTotal(r), 0)
-  const filledRows = rows.filter((r) => r.urunAdi.trim() || (r.miktar ?? 0) > 0 || (r.birimFiyat ?? 0) > 0 || (r.brutToplam ?? 0) > 0)
+  const filledRows = rows.filter((r) => r.urunAdi.trim() || (r.miktar ?? 0) > 0 || (r.birimFiyat ?? 0) > 0)
   const valid = !!(alinanYer.trim() && filledRows.length > 0 && filledRows.every(lineValid))
 
   const createMut = useMutation({
@@ -85,11 +90,11 @@ export function NewPurchaseRequestPage() {
         urunAdi: r.urunAdi.trim(),
         birim: resolveBirim(r),
         miktar: r.miktar ?? 0,
-        birimFiyat: r.fiyatModu === 'miktar' ? (r.birimFiyat ?? 0) : null,
+        birimFiyat: r.birimFiyat ?? 0,
         toplam: lineTotal(r),
-        indirim: r.fiyatModu === 'toplam' ? (r.indirim ?? 0) : null,
-        indirimTipi: r.fiyatModu === 'toplam' ? r.indirimTipi : null,
-        fiyatModu: r.fiyatModu,
+        indirim: r.indirim ?? null,
+        indirimTipi: 'tutar',
+        fiyatModu: 'miktar',
       }))
       // Parent UrunAdi: ilk kalem + (varsa) "+N kalem" özeti (NOT NULL, ≤500).
       const first = kalemler[0]?.urunAdi ?? ''
@@ -99,6 +104,7 @@ export function NewPurchaseRequestPage() {
       return createPurchaseRequest({
         urunAdi: summary.slice(0, 500),
         urunMaliyeti: grandTotal,
+        paraBirimi,
         alinanYer: alinanYer.trim() || undefined,
         notlar: notlar || undefined,
         talepEdenKullaniciAdi: user!.kullaniciAdi,
@@ -124,7 +130,21 @@ export function NewPurchaseRequestPage() {
   return (
     <div>
       <PageHeader title={t('purchase.newTitle')} />
-      <div className="p-6 max-w-5xl space-y-4">
+      <div className="p-4 lg:p-6 max-w-5xl space-y-4">
+
+        {/* Para birimi (belge düzeyinde, tek) */}
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="space-y-1 w-48">
+            <Label>{t('purchase.paraBirimi')} *</Label>
+            <Select value={paraBirimi} onValueChange={setParaBirimi}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {PARA_BIRIMLERI.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <p className="text-xs text-muted-foreground pb-2">{t('purchase.paraBirimiHint')}</p>
+        </div>
 
         {/* Kalemler tablosu */}
         <div className="rounded-md border bg-card">
@@ -139,8 +159,9 @@ export function NewPurchaseRequestPage() {
                   <th className="px-2 py-2 text-left min-w-44">{t('purchase.lines.urunAdi')} *</th>
                   <th className="px-2 py-2 text-left w-32">{t('purchase.lines.birim')} *</th>
                   <th className="px-2 py-2 text-right w-24">{t('purchase.lines.miktar')} *</th>
-                  <th className="px-2 py-2 text-left w-44">{t('purchase.lines.fiyatModu')}</th>
-                  <th className="px-2 py-2 text-left w-56">{t('purchase.lines.birimFiyat')} / {t('purchase.lines.indirim')}</th>
+                  <th className="px-2 py-2 text-right w-32">{t('purchase.lines.birimFiyat')} *</th>
+                  <th className="px-2 py-2 text-right w-28">{t('purchase.lines.indirim')}</th>
+                  <th className="px-2 py-2 text-right w-32">{t('purchase.lines.araToplam')}</th>
                   <th className="px-2 py-2 text-right w-32">{t('purchase.lines.satirToplam')}</th>
                   <th className="px-2 py-2 w-12"></th>
                 </tr>
@@ -152,6 +173,7 @@ export function NewPurchaseRequestPage() {
                     <tr key={r.id} className="border-t align-top">
                       <td className="px-2 py-1.5">
                         <Input value={r.urunAdi} onChange={(e) => patchRow(r.id, { urunAdi: e.target.value })} />
+                        {invalid && <FieldError message={t('validation.required')} />}
                       </td>
                       <td className="px-2 py-1.5">
                         <Select value={r.birimChoice} onValueChange={(v) => patchRow(r.id, { birimChoice: v })}>
@@ -172,42 +194,20 @@ export function NewPurchaseRequestPage() {
                           onValueChange={(v) => patchRow(r.id, { miktar: v === '' ? null : v })} />
                       </td>
                       <td className="px-2 py-1.5">
-                        <Select value={r.fiyatModu} onValueChange={(v) => patchRow(r.id, { fiyatModu: v as FiyatModu })}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="miktar">{t('purchase.lines.moduMiktar')}</SelectItem>
-                            <SelectItem value="toplam">{t('purchase.lines.moduToplam')}</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <DecimalInput className="text-right" value={r.birimFiyat ?? ''}
+                          onValueChange={(v) => patchRow(r.id, { birimFiyat: v === '' ? null : v })}
+                          placeholder={t('purchase.lines.birimFiyat')} />
                       </td>
                       <td className="px-2 py-1.5">
-                        {r.fiyatModu === 'miktar' ? (
-                          <DecimalInput value={r.birimFiyat ?? ''}
-                            onValueChange={(v) => patchRow(r.id, { birimFiyat: v === '' ? null : v })}
-                            placeholder={t('purchase.lines.birimFiyat')} />
-                        ) : (
-                          <div className="space-y-1">
-                            <DecimalInput value={r.brutToplam ?? ''}
-                              onValueChange={(v) => patchRow(r.id, { brutToplam: v === '' ? null : v })}
-                              placeholder={t('purchase.lines.brutToplam')} />
-                            <div className="flex gap-1">
-                              <DecimalInput className="flex-1" value={r.indirim ?? ''}
-                                onValueChange={(v) => patchRow(r.id, { indirim: v === '' ? null : v })}
-                                placeholder={t('purchase.lines.indirim')} />
-                              <Select value={r.indirimTipi} onValueChange={(v) => patchRow(r.id, { indirimTipi: v as IndirimTipi })}>
-                                <SelectTrigger className="h-9 w-20"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="yuzde">{t('purchase.lines.indirimYuzde')}</SelectItem>
-                                  <SelectItem value="tutar">{t('purchase.lines.indirimTutar')}</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        )}
-                        {invalid && <FieldError message={t('validation.required')} />}
+                        <DecimalInput className="text-right" value={r.indirim ?? ''}
+                          onValueChange={(v) => patchRow(r.id, { indirim: v === '' ? null : v })}
+                          placeholder="0" />
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums text-muted-foreground whitespace-nowrap">
+                        {formatCurrency(araToplam(r), paraBirimi)}
                       </td>
                       <td className="px-2 py-1.5 text-right tabular-nums font-medium whitespace-nowrap">
-                        {formatCurrency(lineTotal(r))}
+                        {formatCurrency(lineTotal(r), paraBirimi)}
                       </td>
                       <td className="px-2 py-1.5 text-center">
                         <Button size="sm" variant="ghost" className="text-destructive"
@@ -221,8 +221,8 @@ export function NewPurchaseRequestPage() {
               </tbody>
               <tfoot>
                 <tr className="border-t bg-muted/20">
-                  <td colSpan={5} className="px-2 py-2 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
-                  <td className="px-2 py-2 text-right tabular-nums font-bold">{formatCurrency(grandTotal)}</td>
+                  <td colSpan={6} className="px-2 py-2 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
+                  <td className="px-2 py-2 text-right tabular-nums font-bold whitespace-nowrap">{formatCurrency(grandTotal, paraBirimi)}</td>
                   <td></td>
                 </tr>
               </tfoot>

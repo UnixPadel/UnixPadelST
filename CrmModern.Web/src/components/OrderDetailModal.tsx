@@ -10,6 +10,7 @@ import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
 import { OrderStageTimeline } from '@/components/OrderStageTimeline'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
 
 interface Props {
   siparisNo: string | null
@@ -19,10 +20,11 @@ interface Props {
 export function OrderDetailModal({ siparisNo, onClose }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
-  // PROMPT-v2 §2: Fabrika rolü parasal değer görmez (Fiyatlandırma bloğu,
-  // bileşen Fiyat sütunu, proforma Excel butonu). Backend de aynı gate'lere sahip.
+  // PROMPT-v2 §2 + Round-11 §3: parasal değer gizleme (Fabrika rolü + omur.caliskan
+  // gibi ad-bazlı kullanıcılar). Fiyatlandırma bloğu, bileşen Fiyat/Toplam sütunları,
+  // proforma Excel butonu gizlenir. Backend de aynı gate'lere sahip.
   const { getUser } = useAuth()
-  const hideMoney = getUser()?.yetkiTuru === 'Fabrika'
+  const hideMoney = hideMoneyFor(getUser())
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order-detail', siparisNo],
@@ -119,7 +121,9 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
                       <th className="text-left px-2 py-1">{t('orderDetail.oznitelik')}</th>
                       <th className="text-right px-2 py-1">{t('orderDetail.adet')}</th>
                       {/* PROMPT-v2 §2: Fabrika Fiyat sütununu görmez. */}
+                      {/* Round-11 §4: Fiyat = tekil (birim) fiyat; Toplam = Tekil Fiyat × Adet. */}
                       {!hideMoney && <th className="text-right px-2 py-1">{t('orderDetail.fiyat')}</th>}
+                      {!hideMoney && <th className="text-right px-2 py-1">{t('orderDetail.toplam')}</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -130,6 +134,9 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
                         <td className="text-right px-2 py-1">{item.adet}</td>
                         {!hideMoney && (
                           <td className="text-right px-2 py-1">{formatCurrency(item.fiyat, order.paraTipi)}</td>
+                        )}
+                        {!hideMoney && (
+                          <td className="text-right px-2 py-1 tabular-nums">{formatCurrency((item.fiyat ?? 0) * item.adet, order.paraTipi)}</td>
                         )}
                       </tr>
                     ))}

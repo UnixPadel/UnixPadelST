@@ -16,6 +16,7 @@ internal sealed class PurchaseRequestConfiguration : IEntityTypeConfiguration<Pu
         builder.Property(p => p.UrunAdi)               .HasColumnName("UrunAdi")               .IsRequired().HasMaxLength(500);
         builder.Property(p => p.UrunTuru)               .HasColumnName("UrunTuru")               .HasMaxLength(500);
         builder.Property(p => p.UrunMaliyeti)           .HasColumnName("UrunMaliyeti")           .HasColumnType("decimal(18,2)");
+        builder.Property(p => p.ParaBirimi)             .HasColumnName("ParaBirimi")             .HasMaxLength(8);
         builder.Property(p => p.AlinanYer)              .HasColumnName("AlinanYer")              .HasMaxLength(500);
         builder.Property(p => p.TalepEdenKullaniciAdi)  .HasColumnName("TalepEdenKullaniciAdi")  .HasMaxLength(200);
         builder.Property(p => p.Departman)              .HasColumnName("Departman")              .HasMaxLength(100);

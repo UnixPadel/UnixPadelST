@@ -20,6 +20,7 @@ import { DecimalInput } from '@/components/DecimalInput'
 import { KPICard } from '@/components/KPICard'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { AccountingOrderListDto } from '@/types'
@@ -52,6 +53,8 @@ interface OrderRow {
   musteriAd?: string
   kullanici?: string
   paraTipi?: string
+  // Round-11 §10: siparişin nihai maliyeti (Maliyet Reçetesi ile aynı kaynak).
+  maliyet?: number | null
   installments: InstallmentCell[]
 }
 
@@ -60,6 +63,9 @@ export function AccountingHistoryPage() {
   const { toast } = useToast()
   const { getUser } = useAuth()
   const role = getUser()?.yetkiTuru ?? ''
+  // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez: para birimi
+  // toplamları, tahsilat tutar sütunu ve Excel (tutar içerir) gizlenir.
+  const hideMoney = hideMoneyFor(getUser())
   // PROMPT-v2 §10.3: Sadece Yonetici + Muhasebe peşinat sütunları + Maliyet
   // Reçetesi butonu görür. Gozlemci eski tek-Tutar görünümünde kalır.
   const showInstallments = role === 'Yonetici' || role === 'Muhasebe'
@@ -112,6 +118,8 @@ export function AccountingHistoryPage() {
           musteriAd: tx.musteriAd,
           kullanici: tx.kullanici,
           paraTipi:  tx.paraTipi,
+          // Round-11 §10: maliyet siparişin tüm satırlarında aynı; ilk satırdan al.
+          maliyet:   tx.maliyet,
           installments: [],
         }
         m.set(tx.siparisNo, g)
@@ -138,8 +146,10 @@ export function AccountingHistoryPage() {
     { key: 'musteriAd',    header: t('common.customer') },
     { key: 'kullanici',    header: t('common.representative') },
     { key: 'paraTipi',     header: t('common.currency') },
-    { key: 'odenenMiktar', header: t('common.amount'),
-      render: (r) => formatCurrency((r.odenenMiktar as number) ?? 0, r.paraTipi as string) },
+    ...(!hideMoney ? [
+      { key: 'odenenMiktar', header: t('common.amount'),
+        render: (r) => formatCurrency((r.odenenMiktar as number) ?? 0, r.paraTipi as string) },
+    ] satisfies Column<LegacyRow>[] : []),
   ]
 
   // ── Filter helpers ─────────────────────────────────────────────────────
@@ -153,7 +163,7 @@ export function AccountingHistoryPage() {
     <div>
       <PageHeader
         title={t('accounting.historyTitle')}
-        actions={<Button variant="outline" disabled={exporting} onClick={onExport}>{t('common.excel')}</Button>}
+        actions={hideMoney ? undefined : <Button variant="outline" disabled={exporting} onClick={onExport}>{t('common.excel')}</Button>}
       />
 
       <div className="p-6 space-y-4">
@@ -236,18 +246,20 @@ export function AccountingHistoryPage() {
           </div>
         </div>
 
-        {/* Currency totals strip */}
-        <div>
-          <p className="text-xs uppercase text-muted-foreground font-medium mb-2">
-            {t('accounting.filter.totalsLabel')}
-          </p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KPICard baslik="Euro"    deger={formatCurrency(totals['Euro']    ?? 0, 'Euro')} />
-            <KPICard baslik="Dolar"   deger={formatCurrency(totals['Dolar']   ?? 0, 'Dolar')} />
-            <KPICard baslik="TL"      deger={formatCurrency(totals['TL']      ?? 0, 'TL')} />
-            <KPICard baslik="Sterlin" deger={formatCurrency(totals['Sterlin'] ?? 0, 'Sterlin')} />
+        {/* Currency totals strip — Round-11 §3: omur.caliskan için gizli (para birimi toplamları). */}
+        {!hideMoney && (
+          <div>
+            <p className="text-xs uppercase text-muted-foreground font-medium mb-2">
+              {t('accounting.filter.totalsLabel')}
+            </p>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <KPICard baslik="Euro"    deger={formatCurrency(totals['Euro']    ?? 0, 'Euro')} />
+              <KPICard baslik="Dolar"   deger={formatCurrency(totals['Dolar']   ?? 0, 'Dolar')} />
+              <KPICard baslik="TL"      deger={formatCurrency(totals['TL']      ?? 0, 'TL')} />
+              <KPICard baslik="Sterlin" deger={formatCurrency(totals['Sterlin'] ?? 0, 'Sterlin')} />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Result count */}
         <div className="text-sm text-muted-foreground">
@@ -340,17 +352,26 @@ function InstallmentTable({
             {Array.from({ length: maxN }, (_, i) => (
               <th key={i} className="px-2 py-2 text-right">{t('accountingHistory.cols.pesinat', { n: i + 1 })}</th>
             ))}
-            <th className="px-2 py-2 text-right">{t('accountingHistory.cols.fark')}</th>
+            {/* Round-11 §10: sıra — peşinatlar → Diğer → Maliyet → Fark */}
             <th className="px-2 py-2 text-right">{t('accountingHistory.cols.diger')}</th>
+            <th className="px-2 py-2 text-right">{t('accountingHistory.cols.maliyet')}</th>
+            <th className="px-2 py-2 text-right">{t('accountingHistory.cols.fark')}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((r) => {
             const visible = r.installments.slice(0, maxN)
             const overflow = r.installments.slice(maxN)
-            const fark = r.installments.length >= 2
-              ? ((r.installments[1].miktar ?? 0) - (r.installments[0].miktar ?? 0))
-              : null
+            // Round-11 §10: Toplam Tahsilat = tüm peşinatlar + Diğer (taşanlar dahil).
+            const toplamTahsilat = r.installments.reduce((acc, i) => acc + (i.miktar ?? 0), 0)
+            const maliyet = r.maliyet ?? null
+            // Fark = Toplam Tahsilat − Maliyet (maliyet girilmemişse hesaplanamaz → —).
+            const fark = maliyet != null ? toplamTahsilat - maliyet : null
+            const farkClass = fark == null
+              ? 'text-muted-foreground'
+              : fark > 0 ? 'text-emerald-600 font-semibold'
+              : fark < 0 ? 'text-red-600 font-semibold'
+              : ''
             return (
               <tr key={r.siparisNo} className="border-t hover:bg-muted/20">
                 <td className="px-2 py-1">
@@ -372,11 +393,7 @@ function InstallmentTable({
                     </td>
                   )
                 })}
-                <td className="px-2 py-1 text-right tabular-nums">
-                  {fark === null
-                    ? <span className="text-muted-foreground">—</span>
-                    : <span className={fark < 0 ? 'text-red-600' : ''}>{formatCurrency(fark, r.paraTipi ?? '')}</span>}
-                </td>
+                {/* Diğer — maxN'i aşan peşinatlar (tooltip'te dökümü) */}
                 <td className="px-2 py-1 text-right">
                   {overflow.length === 0
                     ? <span className="text-muted-foreground">—</span>
@@ -388,6 +405,25 @@ function InstallmentTable({
                         className="underline cursor-help text-xs"
                       >
                         {t('accountingHistory.moreCount', { count: overflow.length })}
+                      </span>
+                    )}
+                </td>
+                {/* Round-11 §10: Maliyet — Tamamlanmayı Bekleyen'de girilen nihai maliyet */}
+                <td className="px-2 py-1 text-right tabular-nums">
+                  {maliyet != null
+                    ? formatCurrency(maliyet, r.paraTipi ?? '')
+                    : <span className="text-muted-foreground">—</span>}
+                </td>
+                {/* Round-11 §10: Fark = Toplam Tahsilat − Maliyet (yeşil/kırmızı/nötr) */}
+                <td className="px-2 py-1 text-right tabular-nums">
+                  {fark == null
+                    ? <span className="text-muted-foreground">—</span>
+                    : (
+                      <span
+                        className={farkClass}
+                        title={`${t('accountingHistory.cols.toplamTahsilat')}: ${formatCurrency(toplamTahsilat, r.paraTipi ?? '')} − ${t('accountingHistory.cols.maliyet')}: ${formatCurrency(maliyet ?? 0, r.paraTipi ?? '')}`}
+                      >
+                        {formatCurrency(fark, r.paraTipi ?? '')}
                       </span>
                     )}
                 </td>

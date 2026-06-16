@@ -40,6 +40,13 @@ public static class DatabaseSchemaMigrator
         // Additive: parent SatinAlmaTalep değişmez, eski talepler kalemsiz çalışır.
         await EnsureSatinAlmaTalepKalemTableAsync(ctx, logger);
 
+        // 3c) Round-11 §9: SatinAlmaTalep.ParaBirimi — belge düzeyinde para birimi.
+        // Additive + nullable: eski talepler NULL (UI varsayılan/'—' gösterir).
+        await EnsureColumnAsync(ctx, logger,
+            table: "SatinAlmaTalep",
+            column: "ParaBirimi",
+            ddl: "ALTER TABLE SatinAlmaTalep ADD COLUMN ParaBirimi VARCHAR(8) NULL");
+
         // 4) PROMPT-v2 §7: MusteriBilgileri.CreatedByKullaniciID + tek seferlik backfill.
         await EnsureMusteriCreatedByColumnAsync(ctx, logger);
 

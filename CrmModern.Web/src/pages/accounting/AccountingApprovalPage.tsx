@@ -4,8 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   getAccountingOrders, getTransactionsForOrder,
   approveMuhasebeAndMoveToPlanning, approveLogistics,
-  submitMaliyetTalep, uploadMuhasebeEk, finalizeCompletion,
-  type SubmitMaliyetRequest,
+  uploadMuhasebeEk, finalizeCompletion,
 } from '@/api/accounting'
 import { getOrderDetail, downloadAttachment, downloadExcel } from '@/api/orders'
 import { DataTable, type Column } from '@/components/DataTable'
@@ -116,10 +115,9 @@ export function AccountingApprovalPage() {
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
 
-  // Maliyet talebi formu (legacy odmeButton "Talep Gönder")
-  const [maliyetForm, setMaliyetForm] = useState<{ maliyet: number; maliyetDetayi: string }>({
-    maliyet: 0, maliyetDetayi: '',
-  })
+  // Round-11 §8 — Cari/Lojistik kuyruğundaki bağımsız "Talep Gönder" maliyet
+  // alanı kaldırıldı (maliyet yalnız "Tamamlanmayı Bekleyen" finalize'da girilir).
+  // Standalone maliyet talebi iş akışı ana Muhasebe ekranında yaşamaya devam eder.
 
   // Round-9 §19 — "Tamamlanmayı Bekleyen" finalize formu (3. Peşinat + Final Maliyet)
   const [finalizeForm, setFinalizeForm] = useState<{
@@ -162,10 +160,6 @@ export function AccountingApprovalPage() {
   // arka plan invalidation'ları kullanıcının yazdığını ezmesin diye yalnız
   // `selected` dep'i var (AccountingPage kalıbı).
   useEffect(() => {
-    setMaliyetForm({
-      maliyet:       selectedRow?.maliyet ?? 0,
-      maliyetDetayi: selectedRow?.maliyetDetayi ?? '',
-    })
     setFinalizeForm({
       pesinat:       null,
       pesinatTarihi: new Date().toISOString().slice(0, 10),
@@ -245,25 +239,6 @@ export function AccountingApprovalPage() {
     onSuccess: () => {
       refreshAll(); setSelected(null)
       toast({ title: t('accApproval.finalize.done') })
-    },
-    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
-  })
-
-  const maliyetMut = useMutation({
-    mutationFn: (no: string) => {
-      const body: SubmitMaliyetRequest = {
-        maliyet: maliyetForm.maliyet,
-        maliyetDetayi: maliyetForm.maliyetDetayi.trim() || undefined,
-        toplamSiparis: selectedRow?.toplamFiyat ?? undefined,
-        kaporaBakiyesi: selectedRow?.kaparoFiyat ?? undefined,
-        kalanBakiyeTalep: selectedRow?.kalanBakiye ?? undefined,
-        pesinYuzde: selectedRow?.pesinYuzde,
-      }
-      return submitMaliyetTalep(no, body)
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
-      toast({ title: t('accountingFull.toast.maliyetSent') })
     },
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
@@ -604,28 +579,6 @@ export function AccountingApprovalPage() {
                 </div>
               )}
 
-              {/* Maliyet Talebi — "Talep Gönder" (SubmitMaliyetTalep) davranışı değişmedi. */}
-              <CariRow label={t('accApproval.cariLabel.maliyet')}>
-                <DecimalInput className="h-7 text-xs" value={maliyetForm.maliyet}
-                  onValueChange={(v) => setMaliyetForm((f) => ({ ...f, maliyet: v === '' ? 0 : v }))} />
-              </CariRow>
-              <Textarea
-                className="min-h-[3rem] resize-none text-xs"
-                placeholder={t('accountingFull.maliyet.notu')}
-                value={maliyetForm.maliyetDetayi}
-                onChange={(e) => setMaliyetForm((f) => ({ ...f, maliyetDetayi: e.target.value }))}
-              />
-              <Button size="sm" variant="outline" className="h-7 text-xs"
-                disabled={maliyetMut.isPending || maliyetForm.maliyet < 0}
-                onClick={() => { const no = requireSelection(); if (no) maliyetMut.mutate(no) }}>
-                {t('accountingFull.actions.talepGonder')}
-              </Button>
-              {selectedRow?.muhasebeDurumu && (
-                <p className="text-[10px] text-muted-foreground">
-                  {t('accountingFull.maliyet.lastStatus')}: <strong>{selectedRow.muhasebeDurumu}</strong>
-                  {selectedRow.muhasebeRedNotu && <> — {selectedRow.muhasebeRedNotu}</>}
-                </p>
-              )}
             </>
           )}
           {/* Kuyruğa göre bağlamsal onay aksiyonu */}

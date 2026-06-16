@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { purchaseStatusLabel } from '@/lib/status'
@@ -36,6 +37,8 @@ export function AllPurchaseRequestsPage() {
 
   // PROMPT-v7 §2: override "Onayla" yalnız elshan.rasulov'a render edilir.
   const isOverrideUser = getUser()?.kullaniciAdi === 'elshan.rasulov'
+  // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez.
+  const hideMoney = hideMoneyFor(getUser())
 
   const { data: page, isLoading } = useQuery({
     queryKey: ['purchase-all', filter],
@@ -68,7 +71,10 @@ export function AllPurchaseRequestsPage() {
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
     { key: 'talepID',               header: t('purchase.cols.id') },
     { key: 'urunAdi',               header: t('purchase.cols.urun') },
-    { key: 'urunMaliyeti',          header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    ...(!hideMoney ? [
+      { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => (r.paraBirimi as string) ?? '—' },
+      { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
+    ] satisfies Column<PurchaseRequestListDto & Record<string, unknown>>[] : []),
     { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
     { key: 'departman',             header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
     { key: 'talepTipi',             header: t('purchase.cols.tip'), render: (r) => t(`purchase.tipLabel.${(r.talepTipi as string) ?? 'SatinAlma'}`, { defaultValue: (r.talepTipi as string) ?? 'SatinAlma' }) },

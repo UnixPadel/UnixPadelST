@@ -223,7 +223,9 @@ export function AccountingPage() {
         actions={<Button variant="outline" onClick={() => downloadAccountingExcel()}>{t('common.excel')}</Button>}
       />
 
-      <div className="p-6 space-y-4">
+      {/* Round-11 §7 — Tahsilat/Muhasebe yoğun grid: yatay alanı genişletmek için
+          sayfa dolgusu azaltıldı (p-6→p-4); grid fit-first DataTable ile sığar. */}
+      <div className="p-4 space-y-3">
 
         {/* ── TOP FORM (only when a row is selected) ──────────────────── */}
         {selectedNo && (

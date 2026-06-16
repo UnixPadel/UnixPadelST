@@ -180,6 +180,14 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 g => g.Key,
                 g => (g.First().MusteriAd, MUlke: g.First().MUlke, g.First().ParaTipi));
 
+        // Round-11 §10: SiparisNo → nihai Maliyet (Muhasebe SatinAlmaTalep —
+        // GetMuhasebeBySiparisNoAsync ile aynı satır). Tek sorgu, satır başına
+        // tekrar lookup yok. Frontend Fark = ΣTahsilat − Maliyet hesabında kullanır.
+        var maliyetBySiparis = (await uow.PurchaseRequests.GetAllAsync())
+            .Where(p => p.TalepTipi == "Muhasebe" && !string.IsNullOrEmpty(p.SiparisNo))
+            .GroupBy(p => p.SiparisNo!)
+            .ToDictionary(g => g.Key, g => g.First().Maliyet);
+
         // Row projection — joins user + order meta to the transaction.
         IEnumerable<TransactionListItemDto> projected = rows.Select(t =>
         {
@@ -192,7 +200,9 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 users.TryGetValue(t.KullaniciID, out var n) ? n : null,
                 ord.ParaTipi, t.OdenenMiktar, t.Tarih,
                 // PROMPT-v2 §10.1: SiparisNo'su boş satırlar 0; geri kalanlar lookup'tan.
-                installmentIndex.TryGetValue(t.ID, out var ix) ? ix : 0);
+                installmentIndex.TryGetValue(t.ID, out var ix) ? ix : 0,
+                // Round-11 §10: siparişin nihai maliyeti (yoksa null).
+                !string.IsNullOrEmpty(t.SiparisNo) && maliyetBySiparis.TryGetValue(t.SiparisNo, out var mlt) ? mlt : null);
         });
 
         if (!string.IsNullOrWhiteSpace(filter.MusteriAd))

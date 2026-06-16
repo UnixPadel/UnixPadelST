@@ -16,7 +16,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useToast } from '@/components/ToastProvider'
 import { formatDate } from '@/lib/utils'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
-import { downloadExcel } from '@/api/orders'
 import { useAuth } from '@/hooks/useAuth'
 import type { FactoryOrderListDto } from '@/types'
 
@@ -25,11 +24,9 @@ const FACTORY_ASAMALAR = ['Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi
 
 export function FactoryPage() {
   const qc = useQueryClient()
-  const { toast, dismiss } = useToast()
+  const { toast } = useToast()
   const { t } = useTranslation()
-  // PROMPT-v2 §2: Excel proforma fiyat içerir; Fabrika için gizli.
   const { getUser } = useAuth()
-  const isFabrika = getUser()?.yetkiTuru === 'Fabrika'
   // PROMPT-v6 §1.1 — Üretime Al / Hazır aşama geçişleri yalnız simge.cakir
   // (backend Forbid + buton render gate'i; diğer Fabrika kullanıcıları listeyi görür).
   const isFactoryUser = getUser()?.kullaniciAdi === 'simge.cakir'
@@ -89,25 +86,6 @@ export function FactoryPage() {
     onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
   })
 
-  // 2.6 — Excel akışı: önce persistent "İndiriliyor..." toast'u; promise
-  // resolve olunca onu kapatıp "İndirildi" toast'u (otomatik kapanır).
-  // Reddedilirse aynısı + destructive variant.
-  const handleExcel = async (siparisNo: string) => {
-    const loadingId = toast({
-      title: t('factory.excelDownloading'),
-      description: siparisNo,
-      persistent: true,
-    })
-    try {
-      await downloadExcel(siparisNo)
-      dismiss(loadingId)
-      toast({ title: t('factory.excelDownloaded'), description: siparisNo })
-    } catch {
-      dismiss(loadingId)
-      toast({ title: t('factory.excelFailed'), description: siparisNo, variant: 'destructive' })
-    }
-  }
-
   const columns: Column<FactoryOrderListDto & Record<string, unknown>>[] = [
     { key: 'siparisNo',         header: t('common.orderNo'),  sortable: true },
     { key: 'musteriAd',         header: t('common.customer'), sortable: true },
@@ -126,9 +104,6 @@ export function FactoryPage() {
       render: (r) => (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.form')}</Button>
-          {!isFabrika && (
-            <Button size="sm" variant="ghost" onClick={() => handleExcel(r.siparisNo as string)}>{t('common.excel')}</Button>
-          )}
           {isFactoryUser && (r.siparisMiTeklifMi as string) === 'Planlama' && (
             <Button size="sm" onClick={() => { setProductionTarget(r.siparisNo as string) }}>
               {t('factory.moveToProduction')}

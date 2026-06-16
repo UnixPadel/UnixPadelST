@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getLogisticsHistory, completeShipment, cancelShipment } from '@/api/logistics'
 import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { LogisticsStatusBadge } from '@/components/LogisticsStatusBadge'
@@ -19,6 +20,8 @@ export function LogisticsHistoryPage() {
   const { getUser } = useAuth()
   const role = getUser()?.yetkiTuru ?? ''
   const canMutate = role === 'Yonetici' || role === 'Lojistik'
+  // Round-11 §3 — omur.caliskan (Gozlemci) lojistik tutarını görmez.
+  const hideMoney = hideMoneyFor(getUser())
 
   const [filter, setFilter] = useState({ siparisNo: '', firmaAdi: '' })
 
@@ -48,7 +51,9 @@ export function LogisticsHistoryPage() {
     // PROMPT.md OBSERVER #18: operatör Ad Soyad kolonu.
     { key: 'kullaniciAdSoyad', header: t('logistics.history.operator'), sortable: true,
       render: (r) => (r.kullaniciAdSoyad as string) || '—' },
-    { key: 'fiyat',        header: t('common.amount'),    render: (r) => formatCurrency((r.fiyat as number) ?? 0) },
+    ...(!hideMoney ? [
+      { key: 'fiyat', header: t('common.amount'), render: (r) => formatCurrency((r.fiyat as number) ?? 0) },
+    ] satisfies Column<LogisticsHistoryDto & Record<string, unknown>>[] : []),
     { key: 'siparisMiTeklifMi', header: t('common.status'),
       render: (r) => <LogisticsStatusBadge value={(r.siparisMiTeklifMi as string) ?? ''} /> },
     { key: 'lNot',         header: t('common.note'),      render: (r) => <span className="text-sm text-muted-foreground">{(r.lNot as string) ?? '—'}</span> },

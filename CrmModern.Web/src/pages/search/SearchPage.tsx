@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import { statusLabel } from '@/lib/status'
 import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
 import type { SearchResultDto } from '@/types'
 
 const STAGES = ['all', 'Teklif', 'Siparis', 'Planlama', 'Uretim', 'Hazir', 'Lojistik', 'Tamamlandi']
@@ -32,10 +33,10 @@ const empty = (): Filters => ({ siparisNo: '', musteriAd: '', ulke: '', asama: '
 
 export function SearchPage() {
   const { t } = useTranslation()
-  // PROMPT-v5 §2: Fabrika sipariş parası görmez — para kolonları gizlenir
-  // (backend de aynı alanları null/0 dönerek karartır).
+  // PROMPT-v5 §2 + Round-11 §3: para kolonları gizleme (Fabrika rolü + omur.caliskan
+  // gibi ad-bazlı kullanıcılar). Backend de aynı alanları null/0 dönerek karartır.
   const { getUser } = useAuth()
-  const hideMoney = getUser()?.yetkiTuru === 'Fabrika'
+  const hideMoney = hideMoneyFor(getUser())
   const [filters, setFilters] = useState<Filters>(empty())
   const [submitted, setSubmitted] = useState<Filters | null>(null)
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -230,6 +230,9 @@ export function NewOrderPage() {
     () => Array.from({ length: SET_COUNT }, () => emptySetTab()),
   )
   const [ekFileName, setEkFileName] = useState<string>('')
+  // Round-11 §1 — Revize/Amend hidrasyonu kaynak başına bir kez çalışsın diye işaret
+  // (arka plan refetch'leri kullanıcının düzenlemesini ezmesin).
+  const hydratedNoRef = useRef<string | null>(null)
 
   // ── Revise mode ────────────────────────────────────────────────────────
   // PROMPT.md #20: when ?revise=NO is present we pre-load that order and
@@ -243,13 +246,8 @@ export function NewOrderPage() {
     queryFn: () => getOrderDetail(sourceNo!),
     enabled: isReviseMode || isAmendMode,
   })
-  useEffect(() => {
-    if (!reviseSource) return
-    setForm(detailToForm(reviseSource))
-    // PROMPT-v6 §5 — revize modunda seed YOK; Ödeme Şekli kontrolü kaynaktaki
-    // mevcut satırdan kurulur ki pesinYuzde değişiklikleri senkron kalsın.
-    setOdemeSekli(parseOdemeFromDetails(reviseSource.details ?? []))
-  }, [reviseSource])
+  // Round-11 §1 — Revize/Amend tam geri-yükleme aşağıda (hydrateFromDetail
+  // categories + toChecklist tanımlandıktan sonra çağrılabildiği için) yapılır.
 
   // ── Data sources ───────────────────────────────────────────────────────
   const { data: customers       = [] } = useQuery({ queryKey: ['customers'],            queryFn: getCustomers })
@@ -551,73 +549,80 @@ export function NewOrderPage() {
   })
 
   /**
-   * Seçilen siparişi forma YENİ kayıt olarak hidrate eder (revise pre-load'un
-   * aksine numaralar boş kalır, kaydet butonları taze Teklif/Sipariş üretir).
-   * OrderItem satırları kayıt sırasına göre gruplanır: kategori satırı yeni
-   * seti açar, ardından gelen bileşen satırları o sete bağlanır.
+   * OrderDetail.items → Sipariş 1..5 sekme state'i + payload set'leri. Kayıt
+   * sırasına göre gruplar: kategori satırı yeni set açar, ardından gelen bileşen
+   * satırları o sete bağlanır; her kategori için bileşen checklist'i tekrar
+   * yüklenir, kaydedilen öznitelik/adet/fiyat korunur. Round-11 §1: Revize/Amend
+   * ve Formu Getir aynı geri-yükleme makinesini paylaşır.
+   */
+  const hydrateFromDetail = async (d: OrderDetail) => {
+    interface Group { kategoriID: number; adet: number; fiyat: number; comps: typeof d.items }
+    const groups: Group[] = []
+    for (const it of d.items) {
+      if (it.kategoriID != null)
+        groups.push({ kategoriID: it.kategoriID, adet: it.adet, fiyat: it.fiyat ?? 0, comps: [] })
+      else if (it.bilesenID != null && groups.length > 0)
+        groups[groups.length - 1].comps.push(it)
+    }
+
+    const tabs = Array.from({ length: SET_COUNT }, () => emptySetTab())
+    const sets: OrderSetInput[] = []
+    for (let i = 0; i < Math.min(groups.length, SET_COUNT); i++) {
+      const g = groups[i]
+      const kategoriAdi = categories.find((c) => c.kategoriID === g.kategoriID)?.kategoriAdi ?? ''
+      const checklist = toChecklist(await getComponentsByCategory(g.kategoriID))
+      const savedIds = new Set(g.comps.map((c) => c.bilesenID!))
+      const meta = new Map(checklist.map((c) => [c.bilesenID, c]))
+
+      tabs[i] = {
+        kategoriID:    g.kategoriID,
+        kategoriAdi,
+        kategoriFiyat: g.fiyat,
+        adet:          g.adet,
+        checklist:     checklist.map((c) => ({ ...c, checked: savedIds.has(c.bilesenID) })),
+        components:    g.comps.map((sc) => {
+          const m = meta.get(sc.bilesenID!)
+          const opts = m?.attributes ?? []
+          const saved = sc.oznitelikAdi ?? ''
+          return {
+            bilesenID:           sc.bilesenID!,
+            bilesenAdi:          m?.bilesenAdi ?? `#${sc.bilesenID}`,
+            birim:               m?.birim ?? '',
+            oznitelikSecili:     saved,
+            oznitelikSecenekler: saved && !opts.includes(saved) ? [...opts, saved] : opts,
+            adet:                sc.adet,
+            birimFiyat:          sc.fiyat ?? 0,
+            defaultAdet:         m?.defaultAdet ?? 1,
+          }
+        }),
+      }
+      sets[i] = {
+        kategoriID:    g.kategoriID,
+        adet:          g.adet,
+        kategoriFiyat: g.fiyat,
+        components:    g.comps.map((c) => ({
+          bilesenID:    c.bilesenID!,
+          oznitelikAdi: c.oznitelikAdi || undefined,
+          adet:         c.adet,
+          fiyat:        c.fiyat ?? 0,
+        })),
+      }
+    }
+    return { tabs, sets, odemeSekli: parseOdemeFromDetails(d.details ?? []) }
+  }
+
+  /**
+   * Formu Getir (PROMPT-v3 §6): seçilen siparişi forma YENİ kayıt olarak hidrate
+   * eder — numaralar boş kalır, kaydet butonları taze Teklif/Sipariş üretir.
    */
   const loadFromOrder = async (no: string) => {
     setGetirLoading(true)
     try {
       const d = await getOrderDetail(no)
-
-      interface Group { kategoriID: number; adet: number; fiyat: number; comps: typeof d.items }
-      const groups: Group[] = []
-      for (const it of d.items) {
-        if (it.kategoriID != null)
-          groups.push({ kategoriID: it.kategoriID, adet: it.adet, fiyat: it.fiyat ?? 0, comps: [] })
-        else if (it.bilesenID != null && groups.length > 0)
-          groups[groups.length - 1].comps.push(it)
-      }
-
-      const tabs = Array.from({ length: SET_COUNT }, () => emptySetTab())
-      const sets: OrderSetInput[] = []
-      for (let i = 0; i < Math.min(groups.length, SET_COUNT); i++) {
-        const g = groups[i]
-        const kategoriAdi = categories.find((c) => c.kategoriID === g.kategoriID)?.kategoriAdi ?? ''
-        const checklist = toChecklist(await getComponentsByCategory(g.kategoriID))
-        const savedIds = new Set(g.comps.map((c) => c.bilesenID!))
-        const meta = new Map(checklist.map((c) => [c.bilesenID, c]))
-
-        tabs[i] = {
-          kategoriID:    g.kategoriID,
-          kategoriAdi,
-          kategoriFiyat: g.fiyat,
-          adet:          g.adet,
-          checklist:     checklist.map((c) => ({ ...c, checked: savedIds.has(c.bilesenID) })),
-          components:    g.comps.map((sc) => {
-            const m = meta.get(sc.bilesenID!)
-            const opts = m?.attributes ?? []
-            const saved = sc.oznitelikAdi ?? ''
-            return {
-              bilesenID:           sc.bilesenID!,
-              bilesenAdi:          m?.bilesenAdi ?? `#${sc.bilesenID}`,
-              birim:               m?.birim ?? '',
-              oznitelikSecili:     saved,
-              oznitelikSecenekler: saved && !opts.includes(saved) ? [...opts, saved] : opts,
-              adet:                sc.adet,
-              birimFiyat:          sc.fiyat ?? 0,
-              defaultAdet:         m?.defaultAdet ?? 1,
-            }
-          }),
-        }
-        sets[i] = {
-          kategoriID:    g.kategoriID,
-          adet:          g.adet,
-          kategoriFiyat: g.fiyat,
-          components:    g.comps.map((c) => ({
-            bilesenID:    c.bilesenID!,
-            oznitelikAdi: c.oznitelikAdi || undefined,
-            adet:         c.adet,
-            fiyat:        c.fiyat ?? 0,
-          })),
-        }
-      }
-
+      const { tabs, sets, odemeSekli } = await hydrateFromDetail(d)
       setSetTabs(tabs)
       setForm({ ...detailToForm(d), sets })
-      // PROMPT-v6 §5 — teklif-yükleme modunda seed YOK; kontrol satırdan kurulur.
-      setOdemeSekli(parseOdemeFromDetails(d.details ?? []))
+      setOdemeSekli(odemeSekli)
       setCreatedNo(null)
       setGetirOpen(false)
       toast({ title: t('orders.toast.formLoaded'), description: t('orders.toast.formLoadedDesc', { no }) })
@@ -627,6 +632,33 @@ export function NewOrderPage() {
       setGetirLoading(false)
     }
   }
+
+  // Round-11 §1 — Revize/Amend tam geri-yükleme. Eski davranış yalnız header'ı
+  // (detailToForm) dolduruyordu; Sipariş 1..5 sekmeleri boş kalıyordu (sets:[]),
+  // ürün/bileşen/kategori/adet/fiyat kayboluyordu. Artık Formu Getir ile aynı
+  // hydrateFromDetail kullanılır. createdNo'ya DOKUNULMAZ → kaydet reviseOrder/
+  // amendOrder'a gider. Hidrasyon kategori lookup + bileşen checklist gerektirir,
+  // bu yüzden categories yüklenene dek bekler; kaynak başına bir kez çalışır.
+  useEffect(() => {
+    if (!reviseSource || categories.length === 0) return
+    if (hydratedNoRef.current === sourceNo) return
+    hydratedNoRef.current = sourceNo ?? null
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { tabs, sets, odemeSekli } = await hydrateFromDetail(reviseSource)
+        if (cancelled) return
+        setSetTabs(tabs)
+        setForm({ ...detailToForm(reviseSource), sets })
+        setOdemeSekli(odemeSekli)
+      } catch {
+        hydratedNoRef.current = null // başarısızsa tekrar denenebilsin
+        if (!cancelled) toast({ title: t('orders.toast.formLoadFailed'), variant: 'destructive' })
+      }
+    })()
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reviseSource, categories, sourceNo])
 
   // ── Computed pricing (right column) ───────────────────────────────────
   // Per-tab fiyat = kategoriFiyat × adet (legacy "Sipariş N'in Fiyatı").
@@ -762,13 +794,6 @@ export function NewOrderPage() {
               <div className="p-3 space-y-2">
                 <Field label={t('orders.form.temsilciIsmi')}>
                   <Input value={temsilciAdSoyad} readOnly disabled />
-                </Field>
-                <Field label={t('common.note')}>
-                  <Textarea
-                    rows={4}
-                    value={form.siparisNotu ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, siparisNotu: e.target.value }))}
-                  />
                 </Field>
                 {/* PROMPT-v7 §6 — Ödeme Şekli (Cari Bilgi'den taşındı). Davranış
                     aynı: seçim Detaylar'a 'Ödeme Şekli: …' satırı upsert eder;

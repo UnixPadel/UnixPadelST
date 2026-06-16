@@ -12,6 +12,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
+import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
+import { PurchaseLinesTable } from '@/components/PurchaseLinesTable'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
@@ -19,6 +22,9 @@ export function FinalApprovalPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const { t } = useTranslation()
+  const { getUser } = useAuth()
+  // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez.
+  const hideMoney = hideMoneyFor(getUser())
   const [detailId, setDetailId] = useState<number | null>(null)
   const [rejectTarget, setRejectTarget] = useState<number | null>(null)
   const [redNotu, setRedNotu] = useState('')
@@ -67,7 +73,9 @@ export function FinalApprovalPage() {
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
     { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
     { key: 'urunAdi',       header: t('purchase.cols.urun') },
-    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    ...(!hideMoney ? [
+      { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
+    ] satisfies Column<PurchaseRequestListDto & Record<string, unknown>>[] : []),
     { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
     { key: 'talepTipi',     header: t('purchase.cols.tip'), render: (r) => t(`purchase.tipLabel.${(r.talepTipi as string) ?? 'SatinAlma'}`, { defaultValue: (r.talepTipi as string) ?? 'SatinAlma' }) },
     { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
@@ -104,7 +112,8 @@ export function FinalApprovalPage() {
                 <h3 className="font-semibold border-b pb-1">{t('purchase.final.talep')}</h3>
                 <Row label={t('purchase.final.fields.urun')}       value={detail.urunAdi} />
                 <Row label={t('purchase.final.fields.tur')}        value={detail.urunTuru} />
-                <Row label={t('purchase.final.fields.maliyet')}    value={formatCurrency(detail.urunMaliyeti ?? 0)} />
+                {!hideMoney && <Row label={t('purchase.final.fields.maliyet')} value={formatCurrency(detail.urunMaliyeti ?? 0, detail.paraBirimi ?? '')} />}
+                <Row label={t('purchase.paraBirimi')}              value={detail.paraBirimi ?? undefined} />
                 <Row label={t('purchase.final.fields.alinanYer')}  value={detail.alinanYer} />
                 <Row label={t('purchase.final.fields.departman')}  value={detail.departman ? t(`roles.${detail.departman}`, { defaultValue: detail.departman }) : null} />
                 <Row label={t('purchase.final.fields.talepEden')}  value={detail.talepEdenKullaniciAdi} />
@@ -120,10 +129,10 @@ export function FinalApprovalPage() {
                 {detail.odemeTuru
                   ? <>
                       <Row label={t('purchase.final.fields.odemeTuru')}    value={detail.odemeTuru} />
-                      <Row label={t('purchase.final.fields.odenenTutar')}  value={detail.odenenTutar != null ? formatCurrency(detail.odenenTutar) : null} />
-                      <Row label={t('purchase.final.fields.odemeTutari')}  value={detail.odemeTutari != null ? formatCurrency(detail.odemeTutari) : null} />
+                      <Row label={t('purchase.final.fields.odenenTutar')}  value={!hideMoney && detail.odenenTutar != null ? formatCurrency(detail.odenenTutar, detail.paraBirimi ?? '') : null} />
+                      <Row label={t('purchase.final.fields.odemeTutari')}  value={!hideMoney && detail.odemeTutari != null ? formatCurrency(detail.odemeTutari, detail.paraBirimi ?? '') : null} />
                       <Row label={t('purchase.final.fields.vadeSuresi')}   value={detail.odemeVadeSuresi} />
-                      <Row label={t('purchase.final.fields.vadeTutari')}   value={detail.odemeVadeTutari != null ? formatCurrency(detail.odemeVadeTutari) : null} />
+                      <Row label={t('purchase.final.fields.vadeTutari')}   value={!hideMoney && detail.odemeVadeTutari != null ? formatCurrency(detail.odemeVadeTutari, detail.paraBirimi ?? '') : null} />
                       <Row label={t('purchase.final.fields.vadeTarihi')}   value={detail.odemeVadeTarihi} />
                       <Row label={t('purchase.final.fields.belgeNo')}      value={detail.odemeBelgeNo} />
                       <Row label={t('purchase.final.fields.bankaAdi')}     value={detail.odemeBankaAdi} />
@@ -139,44 +148,16 @@ export function FinalApprovalPage() {
                     </p>}
               </div>
 
-              {/* Round-9 §9 — kalem satırları (varsa) */}
+              {/* Round-9 §9 + Round-11 §9 — kalem satırları (para birimi + omur gizleme). */}
               {detail.kalemler && detail.kalemler.length > 0 && (
                 <div className="md:col-span-2 rounded-md border bg-card p-3">
                   <h3 className="font-semibold border-b pb-1 mb-2 text-sm">{t('purchase.lines.title')}</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead className="bg-muted/30 uppercase">
-                        <tr>
-                          <th className="px-2 py-1 text-left">{t('purchase.lines.urunAdi')}</th>
-                          <th className="px-2 py-1 text-left">{t('purchase.lines.birim')}</th>
-                          <th className="px-2 py-1 text-right">{t('purchase.lines.miktar')}</th>
-                          <th className="px-2 py-1 text-right">{t('purchase.lines.birimFiyat')}</th>
-                          <th className="px-2 py-1 text-right">{t('purchase.lines.indirim')}</th>
-                          <th className="px-2 py-1 text-right">{t('purchase.lines.satirToplam')}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {detail.kalemler.map((k) => (
-                          <tr key={k.kalemID} className="border-t">
-                            <td className="px-2 py-1">{k.urunAdi}</td>
-                            <td className="px-2 py-1">{k.birim}</td>
-                            <td className="px-2 py-1 text-right tabular-nums">{k.miktar}</td>
-                            <td className="px-2 py-1 text-right tabular-nums">{k.birimFiyat != null ? formatCurrency(k.birimFiyat) : '—'}</td>
-                            <td className="px-2 py-1 text-right tabular-nums">
-                              {k.indirim != null ? `${k.indirim}${k.indirimTipi === 'yuzde' ? '%' : ''}` : '—'}
-                            </td>
-                            <td className="px-2 py-1 text-right tabular-nums font-medium">{formatCurrency(k.toplam)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                      <tfoot>
-                        <tr className="border-t bg-muted/20">
-                          <td colSpan={5} className="px-2 py-1 text-right font-semibold">{t('purchase.lines.genelToplam')}</td>
-                          <td className="px-2 py-1 text-right tabular-nums font-bold">{formatCurrency(detail.urunMaliyeti ?? 0)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                  <PurchaseLinesTable
+                    kalemler={detail.kalemler}
+                    paraBirimi={detail.paraBirimi}
+                    grandTotal={detail.urunMaliyeti ?? 0}
+                    hideMoney={hideMoney}
+                  />
                 </div>
               )}
             </div>

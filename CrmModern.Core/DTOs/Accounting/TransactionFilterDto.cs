@@ -25,8 +25,12 @@ public sealed record TransactionListItemDto(
     DateTime Tarih,
     // PROMPT-v2 §10.1: 1-based, per-SiparisNo, ordered by Tarih asc. Frontend
     // bu indeksi kullanarak peşinatları "1. Peşinat / 2. Peşinat / …" sütunlarına
-    // dağıtır ve Fark (1→2) hesaplar. Filtre uygulanmış set üzerinden hesaplanır.
-    int      InstallmentIndex);
+    // dağıtır. Filtre uygulanmış set üzerinden hesaplanır.
+    int      InstallmentIndex,
+    // Round-11 §10: siparişin nihai maliyeti (Muhasebe SatinAlmaTalep.Maliyet,
+    // "Tamamlanmayı Bekleyen"de girilen — Maliyet Reçetesi ile aynı). Siparişin
+    // tüm tahsilat satırlarında aynı değer; frontend Fark = ΣTahsilat − Maliyet.
+    decimal? Maliyet = null);
 
 // CurrencyTotals: PROMPT.md ACCOUNTING #15 — sum of OdenenMiktar per ParaTipi
 // across the FULL filtered result (not just the current page), so the UI

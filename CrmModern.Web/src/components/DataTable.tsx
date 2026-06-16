@@ -77,10 +77,11 @@ export function DataTable<T extends Record<string, unknown>>({
 
   return (
     <div className="rounded-md border overflow-hidden">
-      {/* Round-8 §1 — yatay kaydırma güvenli: tablo doğal genişliğine (min-w-max)
-          oturur; dar viewport'ta sütunlar ezilmek yerine kendi kabında kayar. */}
+      {/* Round-11 §2 — fit-first: tablo viewport'a sığsın diye w-full (min-w-max yok);
+          sütunlar daralır, başlıklar gerekirse sarar. Sığmayan aşırı geniş tablolar
+          için overflow-x-auto son çare olarak kalır (sayfa düzeyinde scroll çıkmaz). */}
       <div className="overflow-x-auto">
-        <table className={cn('w-full min-w-max', compact ? 'text-xs' : 'text-sm')}>
+        <table className={cn('w-full', compact ? 'text-xs' : 'text-sm')}>
           <thead className="bg-muted/50">
             <tr>
               {columns.map((col) => (
@@ -89,8 +90,8 @@ export function DataTable<T extends Record<string, unknown>>({
                   className={cn(
                     cellPad,
                     'text-left font-medium text-muted-foreground',
-                    // §6: kompakt modda başlıklar iki satıra sarabilir.
-                    !compact && 'whitespace-nowrap',
+                    // Round-11 §2 — fit-first: başlıklar her yoğunlukta sarabilir ki
+                    // sütunlar viewport'a sığsın (eski nowrap geniş min-width dayatıyordu).
                     col.sortable && 'cursor-pointer select-none hover:text-foreground',
                     col.className
                   )}

@@ -354,6 +354,7 @@ export interface PurchaseRequestListDto {
   urunAdi: string
   urunTuru?: string
   urunMaliyeti: number | null
+  paraBirimi?: string | null
   alinanYer?: string
   talepEdenKullaniciAdi?: string
   departman?: string
@@ -404,6 +405,8 @@ export interface CreatePurchaseRequestDto {
   maliyetDetayi?: string
   kar?: number
   siparisNo?: string
+  // Round-11 §9 — belge düzeyinde para birimi (Euro/Dolar/TL/Sterlin)
+  paraBirimi?: string
   // Round-9 §9 — çok kalemli talep satırları
   kalemler?: CreatePurchaseRequestLine[]
 }

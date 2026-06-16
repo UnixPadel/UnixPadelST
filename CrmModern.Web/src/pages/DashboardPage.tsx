@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
+import { hideMoneyFor } from '@/lib/visibility'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { KPICard } from '@/components/KPICard'
@@ -165,7 +166,12 @@ export function DashboardPage() {
   const { t } = useTranslation()
   const user = getUser()
   const role = user?.yetkiTuru ?? ''
-  const layout = ROLE_LAYOUT[role] ?? DEFAULT_LAYOUT
+  const baseLayout = ROLE_LAYOUT[role] ?? DEFAULT_LAYOUT
+  // Round-11 §3 — ad-bazlı ciro gizleme (omur.caliskan, rolü Gozlemci olsa da):
+  // gelir şeridi + "En Çok Ciro" grafiği kaldırılır; sayaç KPI'ları/işlem kartları kalır.
+  const layout = hideMoneyFor(user)
+    ? { ...baseLayout, revenue: false, charts: baseLayout.charts.filter((c) => c !== 'topCustomers') }
+    : baseLayout
 
   const needsTrend = layout.charts.includes('trend')
   const needsTop   = layout.charts.includes('topCustomers')

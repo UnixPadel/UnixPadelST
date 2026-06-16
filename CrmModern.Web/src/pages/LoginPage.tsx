@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { login } from '@/api/auth'
 import { useAuth } from '@/hooks/useAuth'
+import { getRememberedLogin, saveRememberedLogin, clearRememberedLogin } from '@/lib/authStore'
 import { useToast } from '@/components/ToastProvider'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Button } from '@/components/ui/button'
@@ -17,14 +18,25 @@ export function LoginPage() {
   const { saveUser, isLoggedIn } = useAuth()
   const { toast } = useToast()
   const { t } = useTranslation()
-  const [form, setForm] = useState({ kullaniciAdi: '', sifre: '' })
-  const [remember, setRemember] = useState(false)
+  // Round-11 — "Beni Hatırla" ön-doldurma: saklanan kimlik bilgisi varsa form
+  // (kullanıcı adı + şifre) ve checkbox onunla başlatılır (logout / tarayıcı /
+  // bilgisayar yeniden başlatmasından sonra da gelir).
+  const remembered = getRememberedLogin()
+  const [form, setForm] = useState({
+    kullaniciAdi: remembered?.kullaniciAdi ?? '',
+    sifre:        remembered?.sifre ?? '',
+  })
+  const [remember, setRemember] = useState(!!remembered)
   const [submitted, setSubmitted] = useState(false)
 
   const mutation = useMutation({
     mutationFn: login,
     onSuccess: (data) => {
       saveUser({ ...data, token: data.token }, remember)
+      // Round-11 — başarılı girişte Remember Me işaretliyse son kimlik bilgisini
+      // sakla, değilse temizle. Token/JWT/oturum davranışı DEĞİŞMEZ.
+      if (remember) saveRememberedLogin(form.kullaniciAdi, form.sifre)
+      else clearRememberedLogin()
       navigate('/dashboard', { replace: true })
     },
     onError: () => {
@@ -87,7 +99,11 @@ export function LoginPage() {
                 type="checkbox"
                 className="h-4 w-4 rounded border-input accent-primary"
                 checked={remember}
-                onChange={(e) => setRemember(e.target.checked)}
+                onChange={(e) => {
+                  setRemember(e.target.checked)
+                  // Round-11 — Remember Me kapatılınca saklanan kimlik bilgisi hemen silinir.
+                  if (!e.target.checked) clearRememberedLogin()
+                }}
               />
               <Label htmlFor="rememberMe" className="cursor-pointer text-sm font-normal">
                 {t('login.rememberMe')}

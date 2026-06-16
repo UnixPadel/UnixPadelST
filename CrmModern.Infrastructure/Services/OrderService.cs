@@ -324,10 +324,14 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         }
 
         // ── 4. Calculate prices ───────────────────────────────────────────
-        // BrutToplamFiyat = Σ setFiyatTextBox values + montaj + teslimat
-        // (KategoriFiyat is the total for the whole set, NOT per-unit)
+        // Round-11 §4: BrutToplamFiyat = Σ (Tekil Fiyat × Adet) + montaj + teslimat.
+        // KategoriFiyat is the per-unit "Tekil Fiyat" (the client sends unit price
+        // everywhere; "Çarp" only multiplies on screen). The set total is computed
+        // here as KategoriFiyat × Adet — the old "KategoriFiyat = whole-set total"
+        // assumption stored totals short by a factor of Adet, so Siparişlerim showed
+        // the un-multiplied unit price.
         decimal brutToplamFiyat =
-              dto.Sets.Sum(s => s.KategoriFiyat)
+              dto.Sets.Sum(s => s.KategoriFiyat * s.Adet)
             + (dto.MontajVar   ? dto.MontajFiyat   : 0m)
             + (dto.TeslimatVar ? dto.TeslimatFiyat : 0m);
 

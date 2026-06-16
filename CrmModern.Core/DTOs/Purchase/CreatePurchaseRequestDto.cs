@@ -20,4 +20,6 @@ public sealed record CreatePurchaseRequestDto(
     decimal? Kar,
     string?  SiparisNo,
     // Round-9 §9 — çok kalemli talep satırları (boş/null → tek satırlık legacy davranış)
-    IReadOnlyList<CreatePurchaseRequestLineDto>? Kalemler = null);
+    IReadOnlyList<CreatePurchaseRequestLineDto>? Kalemler = null,
+    // Round-11 §9 — belge düzeyinde para birimi (Euro/Dolar/TL/Sterlin)
+    string? ParaBirimi = null);

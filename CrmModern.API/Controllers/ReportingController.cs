@@ -27,9 +27,15 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     private string CurrentRole =>
         User.FindFirstValue(ClaimTypes.Role) ?? "Temsilci";
 
-    // PROMPT-v5 §2: ciro görünürlüğü olmayan roller — ReportingService
-    // .GetDashboardKpisAsync içindeki revenueHidden setiyle birebir aynı.
-    private bool RevenueHidden => CurrentRole is "Fabrika" or "Lojistik" or "Temsilci";
+    private string CurrentUserName =>
+        User.FindFirstValue(ClaimTypes.Name) ?? "";
+
+    // PROMPT-v5 §2 + Round-11 §3: ciro görünürlüğü olmayan roller + ad-bazlı
+    // kullanıcılar. omur.caliskan rolü Gozlemci'dir (ciro gören rol), bu yüzden
+    // gizleme KULLANICI ADI bazlı olmak zorunda — frontend lib/visibility.ts ile aynı.
+    private bool RevenueHidden =>
+        CurrentRole is "Fabrika" or "Lojistik" or "Temsilci"
+        || CurrentUserName == "omur.caliskan";
 
     /// <summary>
     /// Exports all approved accounting orders to Excel.
@@ -71,6 +77,18 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     public async Task<IActionResult> GetDashboardKpis()
     {
         var result = await reportingService.GetDashboardKpisAsync(CurrentUserId, CurrentRole);
+
+        // Round-11 §3: servis ciro karartmasını ROLE göre yapar; ad-bazlı gizleme
+        // (omur.caliskan — rolü Gozlemci) için ciroyu burada da sıfırla.
+        if (RevenueHidden)
+            result = result with
+            {
+                Son30GunCiroEuro    = 0m,
+                Son30GunCiroDolar   = 0m,
+                Son30GunCiroTL      = 0m,
+                Son30GunCiroSterlin = 0m,
+            };
+
         return Ok(ApiResponse<DashboardKpiDto>.Ok(result));
     }
 
@@ -108,6 +126,11 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     public async Task<IActionResult> GetTopCustomers([FromQuery] int days = 90, [FromQuery] int limit = 10)
     {
         var result = await reportingService.GetTopCustomersAsync(days, limit);
+
+        // Round-11 §3: ciro görmeyen kullanıcı (omur.caliskan / Gozlemci) tutar görmez.
+        if (RevenueHidden)
+            result = result.Select(c => c with { ToplamCiro = 0m }).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<TopCustomerDto>>.Ok(result));
     }
 

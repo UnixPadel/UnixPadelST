@@ -50,6 +50,9 @@ export interface TransactionListItem {
   tarih: string
   // PROMPT-v2 §10.1: SiparisNo başına 1-based; 0 = sahipsiz (SiparisNo boş).
   installmentIndex: number
+  // Round-11 §10: siparişin nihai maliyeti (Muhasebe SatinAlmaTalep.Maliyet).
+  // Aynı siparişin tüm tahsilat satırlarında aynıdır.
+  maliyet?: number | null
 }
 
 export interface TransactionPage {

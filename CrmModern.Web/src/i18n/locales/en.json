@@ -315,7 +315,7 @@
       "siparisN": "Order {{n}}",
       "anaUrun": "Main Product",
       "anaUrunSec": "Select main product",
-      "tekilFiyatAdet": "Unit Price & Qty",
+      "tekilFiyatAdet": "Unit Price",
       "setFiyati": "Set Price",
       "bilesenlerYukleniyor": "Loading components…",
       "anaUrunSecHint": "Select a main product to see its components here.",
@@ -648,8 +648,10 @@
       "temsilci": "Representative",
       "paraTipi": "Currency",
       "pesinat": "Installment {{n}}",
-      "fark": "Difference (1→2)",
-      "diger": "Other"
+      "diger": "Other",
+      "maliyet": "Cost",
+      "fark": "Difference",
+      "toplamTahsilat": "Total Collected"
     },
     "moreCount": "+{{count}} more",
     "empty": "No records.",
@@ -765,6 +767,8 @@
     "alinanYer": "Source",
     "departman": "Department",
     "departmanHint": "Auto-assigned from your role.",
+    "paraBirimi": "Currency",
+    "paraBirimiHint": "All line items are calculated in this currency.",
     "notlar": "Notes",
     "cancel": "Cancel",
     "create": "Create Request",
@@ -785,6 +789,7 @@
       "indirim": "Discount",
       "indirimYuzde": "%",
       "indirimTutar": "Amount",
+      "araToplam": "Subtotal",
       "satirToplam": "Line Total",
       "genelToplam": "Grand Total",
       "ekle": "Add Row",
@@ -829,7 +834,7 @@
       "title": "Reject Request — #{{id}}",
       "note": "Rejection Note *"
     },
-    "pre": { "approved": "Pre-approved", "rejected": "Rejected" },
+    "pre": { "approved": "Pre-approved", "rejected": "Rejected", "reviewTitle": "Pre-Approval Review — #{{id}}" },
     "payment": {
       "pageTitle": "Payment Details (Accounting)",
       "dialogTitle": "Payment Details — Request #{{id}}",

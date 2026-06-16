@@ -113,6 +113,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             UrunAdi               = dto.UrunAdi,
             UrunTuru              = dto.UrunTuru,
             UrunMaliyeti          = grandTotal,
+            ParaBirimi            = dto.ParaBirimi,
             AlinanYer             = dto.AlinanYer,
             TalepEdenKullaniciAdi = dto.TalepEdenKullaniciAdi,
             Departman             = dto.Departman,
@@ -402,7 +403,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             p.TalepEdenKullaniciAdi, p.Departman, p.TalepTarihi, p.Durum,
             p.RedNotu, p.IslemYapanKullanici, p.IslemTarihi, p.TalepTipi,
             p.MusteriAdi, p.ToplamSiparis, p.KaporaBakiyesi, p.KalanBakiyeTalep,
-            p.PesinYuzde, p.Maliyet, p.MaliyetDetayi, p.Kar, p.SiparisNo);
+            p.PesinYuzde, p.Maliyet, p.MaliyetDetayi, p.Kar, p.SiparisNo, p.ParaBirimi);
 
     private static PurchaseRequestDetailDto MapDetail(
         PurchaseRequest p, IReadOnlyList<PurchaseRequestLine>? kalemler = null) =>
@@ -420,5 +421,6 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
                 .Select(k => new PurchaseRequestLineDto(
                     k.KalemID, k.UrunAdi, k.Birim, k.Miktar, k.BirimFiyat,
                     k.Toplam, k.Indirim, k.IndirimTipi, k.FiyatModu))
-                .ToList());
+                .ToList(),
+            p.ParaBirimi);
 }

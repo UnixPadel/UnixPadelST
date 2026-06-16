@@ -23,4 +23,6 @@ public sealed record PurchaseRequestListDto(
     decimal? Maliyet,
     string?  MaliyetDetayi,
     decimal? Kar,
-    string?  SiparisNo);
+    string?  SiparisNo,
+    // Round-11 §9 — belge düzeyinde para birimi
+    string?  ParaBirimi = null);

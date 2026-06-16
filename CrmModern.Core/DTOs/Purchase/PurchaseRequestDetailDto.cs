@@ -48,4 +48,6 @@ public sealed record PurchaseRequestDetailDto(
     string?   IslemYapanKullanici,
     DateTime? IslemTarihi,
     // Round-9 §9 — kalem satırları (boşsa tek-satırlık legacy talep)
-    IReadOnlyList<PurchaseRequestLineDto> Kalemler);
+    IReadOnlyList<PurchaseRequestLineDto> Kalemler,
+    // Round-11 §9 — belge düzeyinde para birimi
+    string?   ParaBirimi = null);

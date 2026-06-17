@@ -676,6 +676,7 @@
     }
   },
   "logistics": {
+    "preparing": "Hazırlanıyor",
     "readyTitle": "Lojistik · Hazır",
     "historyTitle": "Lojistik · Geçmiş",
     "carriersTitle": "Lojistik · Taşıyıcılar",

@@ -281,6 +281,10 @@ export function NewOrderPage() {
     if (!hasLineItems) {
       toast({ title: t('validation.emptyOrder'), variant: 'destructive' }); return false
     }
+    // Peşinat zorunlu (Teklif + Sipariş) — boş veya 0 geçilemez.
+    if (form.pesinYuzde == null || form.pesinYuzde <= 0) {
+      toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return false
+    }
     return true
   }
 
@@ -1112,7 +1116,7 @@ export function NewOrderPage() {
                   <Field label={t('orders.form.toplamFiyatLabel')} prefix={sym}>
                     <Input readOnly disabled value={fmt(toplamFiyat)} />
                   </Field>
-                  <Field label={t('orders.form.pesin').replace(' %', '')} suffix="%">
+                  <Field label={t('orders.form.pesin').replace(' %', '')} suffix="%" required>
                     <DecimalInput value={form.pesinYuzde ?? ''} onValueChange={(v) => setForm((f) => {
                       const pesinYuzde = v === '' ? null : v
                       // PROMPT-v6 §5 — Vadeli seçiliyken Ödeme Şekli satırı
@@ -1122,6 +1126,9 @@ export function NewOrderPage() {
                         : f.details
                       return { ...f, pesinYuzde, details }
                     })} />
+                    {submitted && (form.pesinYuzde == null || form.pesinYuzde <= 0) && (
+                      <FieldError message={t('validation.required')} />
+                    )}
                   </Field>
 
                   <Field label={t('orders.form.kaporaMiktari')} prefix={sym}>
@@ -1321,6 +1328,15 @@ export function NewOrderPage() {
               onClick={submitOrder}
             >
               {t('orders.form.siparisiHazirla')}
+            </Button>
+          )}
+          {isReviseMode && (
+            <Button
+              variant="outline"
+              disabled={orderMut.isPending}
+              onClick={() => nav('/orders/mine')}
+            >
+              {t('common.cancel')}
             </Button>
           )}
           {isReviseMode && (

@@ -27,9 +27,20 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         // PROMPT-v6 §1.1 — Burcu lojistik onay gate'i: 'Bekliyor' satırlar
         // ready-listte görünmez. NULL = migration öncesi eski kayıt (gate
         // uygulanmaz — migrator backfill'i bunları zaten 'Onay' yapar).
-        return orders
+        var hazir = orders
             .Where(o => o.LojistikOnay is null or "Onay")
-            .Select(MapList).ToList().AsReadOnly();
+            .Select(MapList);
+
+        // Üretime alınan sipariş lojistikte de görünür ("Hazırlanıyor"); gerçek
+        // aşama 'Uretim' kalır, sevk yalnız 'Hazir' olunca yapılabilir (frontend
+        // 'Sevk Oluştur'u pasif tutar). Mevcut aşama mantığı korunur.
+        var uretim = (await uow.Orders.SearchAsync(
+                siparisNo: null, musteriAd: null, kullaniciID: null,
+                ulke: null, asama: "Uretim", kontrol: "Onay",
+                odemeDurum: null, baslangic: null, bitis: null))
+            .Select(MapList);
+
+        return hazir.Concat(uretim).ToList().AsReadOnly();
     }
 
     public async Task MoveToLogisticsAsync(string siparisNo, MoveToLogisticsDto dto)

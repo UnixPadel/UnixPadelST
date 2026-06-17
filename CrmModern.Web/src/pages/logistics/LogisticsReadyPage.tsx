@@ -6,6 +6,7 @@ import { INCOTERMS } from '@/lib/constants'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
@@ -77,18 +78,27 @@ export function LogisticsReadyPage() {
     { key: 'siparisNo',         header: t('common.orderNo'), sortable: true },
     { key: 'musteriAd',         header: t('common.customer'), sortable: true },
     { key: 'mUlke',             header: t('common.country') },
-    { key: 'siparisMiTeklifMi', header: t('common.stage'), render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} /> },
+    { key: 'siparisMiTeklifMi', header: t('common.stage'), render: (r) => (
+      // Üretimdeki sipariş lojistikte "Hazırlanıyor" olarak yansır (gerçek aşama 'Uretim').
+      r.siparisMiTeklifMi === 'Uretim'
+        ? <Badge variant="warning">{t('logistics.preparing')}</Badge>
+        : <StatusBadge value={r.siparisMiTeklifMi as string} />
+    ) },
     { key: 'tarih',             header: t('common.date'), render: (r) => formatDate((r.tarih as string) ?? '-') },
     {
       key: 'actions', header: t('common.actions'),
-      render: (r) => (
+      render: (r) => {
+        // Sevk yalnız 'Hazir' aşamasında yapılabilir; 'Hazırlanıyor' (Uretim) için pasif.
+        const canShip = r.siparisMiTeklifMi === 'Hazir'
+        return (
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.details')}</Button>
-          <Button size="sm" onClick={() => {
+          <Button size="sm" disabled={!canShip} title={canShip ? undefined : t('logistics.preparing')} onClick={() => {
             setTarget(r as LogisticsOrderListDto); setForm(blank()); setCarrierChoice(OTHER_CARRIER); setSubmitted(false)
           }}>{t('logistics.createShipment')}</Button>
         </div>
-      ),
+        )
+      },
     },
   ]
 

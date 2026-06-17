@@ -676,6 +676,7 @@
     }
   },
   "logistics": {
+    "preparing": "Preparing",
     "readyTitle": "Logistics · Ready",
     "historyTitle": "Logistics · History",
     "carriersTitle": "Logistics · Carriers",

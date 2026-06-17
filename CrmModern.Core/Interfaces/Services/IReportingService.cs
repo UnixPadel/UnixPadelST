@@ -33,6 +33,15 @@ public interface IReportingService
     /// <summary>Son N günde para birimi dağılımı.</summary>
     Task<IReadOnlyList<CurrencyDistributionDto>> GetCurrencyDistributionAsync(int days = 90);
 
-    /// <summary>Round-8 §13 — Tarih aralığında Temsilci-rolü kullanıcı başına performans.</summary>
+    /// <summary>Round-8 §13 — Tarih aralığında Temsilci-rolü kullanıcı başına performans.
+    /// §19 — Sipariş olmayan temsilciler de SIFIR satırla döner (tüm temsilciler görünür).</summary>
     Task<IReadOnlyList<RepPerformanceDto>> GetRepPerformanceAsync(DateTime start, DateTime end);
+
+    /// <summary>§19 — Tek temsilcinin tarih aralığındaki detaylı analizi
+    /// (ülke/ürün/aylık kırılım, AOV, dönüşüm). Dashboard ve Excel raporunu besler.</summary>
+    Task<RepDetailDto> GetRepDetailAsync(int kullaniciID, DateTime start, DateTime end);
+
+    /// <summary>§19 — Temsilci için 5-sayfalık markalı Excel raporu (Yönetici özeti,
+    /// Ülke analizi, Ürün analizi, Sipariş detayı, Aylık ciro trendi).</summary>
+    Task<byte[]> ExportRepReportAsync(int kullaniciID, DateTime start, DateTime end);
 }

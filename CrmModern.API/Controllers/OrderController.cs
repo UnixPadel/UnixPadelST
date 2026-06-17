@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Order;
@@ -31,7 +32,8 @@ public sealed class OrderController(
         User.FindFirstValue(ClaimTypes.Name)
             ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
 
-    private bool IsControlUser => CurrentUserName == ControlUser;
+    // §24 — Admin Kontrol ekranının tüm mutasyon/okumalarına erişir (tam erişim).
+    private bool IsControlUser => CurrentUserName == ControlUser || User.IsSuperAdmin();
 
     private bool CanCreateOrders =>
         User.IsInRole("Temsilci") || IsControlUser;

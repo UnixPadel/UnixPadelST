@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Accounting;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.Interfaces.Services;
@@ -30,7 +31,8 @@ public sealed class AccountingController(IAccountingService accountingService) :
     // PROMPT-v7 §1/§3 — elshan.rasulov merkezi bypass: o da onaylayabilir.
     private static readonly string[] AccountingApprovers = { "burcu.karaman", "elshan.rasulov" };
 
-    private bool IsAccountingApprover => AccountingApprovers.Contains(CurrentUserName);
+    // §24 — Admin de Burcu'nun cari/lojistik onay mutasyonlarını yapabilir.
+    private bool IsAccountingApprover => AccountingApprovers.Contains(CurrentUserName) || User.IsSuperAdmin();
 
     [HttpGet("orders")]
     [Authorize(Roles = "Yonetici,Muhasebe")]

@@ -78,6 +78,62 @@ public static class DatabaseSchemaMigrator
         await EnsureColumnAsync(ctx, logger,
             table: "SiparisAlTablo", column: "DegisiklikTarihi",
             ddl: "ALTER TABLE SiparisAlTablo ADD COLUMN DegisiklikTarihi DATETIME NULL");
+
+        // 8) §16 — SiparisAlTablo.SiparisMiTeklifMi aşama kolonunu genişlet.
+        await EnsureSiparisMiTeklifMiWidenedAsync(ctx, logger);
+    }
+
+    /// <summary>
+    /// §16 — Lojistik "Sevki Tamamla" 500 hatasının kök nedeni: SiparisMiTeklifMi
+    /// kolonu canlı DB'de ENUM('Teklif','Siparis','Planlama','Uretim','Hazir',
+    /// 'Lojistik','Tamamlandi','Iptal') olarak tanımlı; Round-9 §19'da eklenen
+    /// 'TamamlanmaBekliyor' (18 karakter) bu enum listesinde YOK. STRICT_TRANS_TABLES
+    /// altında geçersiz enum değeri yazmak hard error verir
+    /// ("Data truncated for column 'SiparisMiTeklifMi'") → CompleteShipment 500.
+    /// EF modeli kolonu zaten HasMaxLength(20) (varchar) sayıyor; kolonu VARCHAR(20)'ye
+    /// çevirerek (a) 500'ü gideriyoruz, (b) EF modeliyle DB'yi hizalıyoruz,
+    /// (c) gelecekteki aşama eklemelerinde aynı enum tuzağını ortadan kaldırıyoruz.
+    /// Idempotent: kolon zaten varchar(&gt;=20) ise dokunmaz. ENUM→VARCHAR dönüşümü
+    /// mevcut satır değerlerini etiketleriyle birebir korur (veri kaybı yok).
+    /// </summary>
+    private static async Task EnsureSiparisMiTeklifMiWidenedAsync(AppDbContext ctx, ILogger? logger)
+    {
+        var conn = ctx.Database.GetDbConnection();
+        string? dataType;
+        long maxLen;
+        await using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText =
+                @"SELECT DATA_TYPE, COALESCE(CHARACTER_MAXIMUM_LENGTH, 0)
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME   = 'SiparisAlTablo'
+                    AND COLUMN_NAME  = 'SiparisMiTeklifMi'
+                  LIMIT 1";
+            if (conn.State != System.Data.ConnectionState.Open)
+                await conn.OpenAsync();
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+            {
+                logger?.LogWarning("SiparisAlTablo.SiparisMiTeklifMi kolonu bulunamadı — şema migrator atlandı.");
+                return;
+            }
+            dataType = r.GetValue(0)?.ToString()?.ToLowerInvariant();
+            maxLen   = Convert.ToInt64(r.GetValue(1));
+        }
+
+        if (dataType == "varchar" && maxLen >= 20)
+        {
+            logger?.LogInformation("SiparisAlTablo.SiparisMiTeklifMi zaten varchar({Len}); ALTER atlandı.", maxLen);
+            return;
+        }
+
+        logger?.LogInformation(
+            "SiparisAlTablo.SiparisMiTeklifMi ({Type}) → VARCHAR(20) yapılıyor (§16 — 'TamamlanmaBekliyor' aşaması için).",
+            dataType);
+        await ctx.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE SiparisAlTablo MODIFY COLUMN SiparisMiTeklifMi VARCHAR(20) NULL");
+        logger?.LogInformation("SiparisAlTablo.SiparisMiTeklifMi VARCHAR(20) yapıldı (§16 fix).");
     }
 
     /// <summary>
@@ -177,8 +233,40 @@ public static class DatabaseSchemaMigrator
     private static async Task EnsureTalepOnaylariTableAsync(AppDbContext ctx, ILogger? logger)
     {
         // Faz 8.4 — Satın Alma talep aşama log'u.
-        // Tablo Faz 0 snapshot listesinde geçiyor, ancak yapısı bilinmiyor;
-        // bu DDL idempotent: CREATE TABLE IF NOT EXISTS → varsa dokunmaz.
+        //
+        // §20 KÖK NEDEN: Canlı DB'de TalepOnaylari LEGACY şemayla mevcuttu
+        // (OnayID, TalepID, OnaylayanID, OnayTarihi, Durum ENUM('Beklemede',
+        // 'Onaylandi','Reddedildi'), OnayMuhasebe, OnayAdmin). EF entity'sinin
+        // beklediği Asama/KullaniciAdi/Tarih/Not_ kolonları YOK ve Durum ENUM idi.
+        // Sonuç: (a) her audit INSERT'i "Unknown column 'Asama'" + ENUM truncation
+        // ile patlıyordu (PurchaseService.LogApprovalAsync try/catch ile yutuyordu →
+        // tablo 0 satır), (b) GET /api/purchase/{id}/history "Unknown column 'Asama'"
+        // → 500. Eski `CREATE TABLE IF NOT EXISTS` legacy tabloyu görünce no-op
+        // yaptığı için kolonlar hiç eklenmedi.
+        //
+        // Düzeltme: tablo legacy ise (Asama kolonu yoksa) DROP + doğru şemayla
+        // yeniden oluştur. Idempotent: Asama varsa hiçbir şey yapılmaz. Güvenlik:
+        // yalnız 0 satırlıysa DROP edilir (canlıda 0 satır — veri kaybı YOK).
+        bool tableExists = await TableExistsAsync(ctx, "TalepOnaylari");
+        if (tableExists && !await ColumnExistsAsync(ctx, "TalepOnaylari", "Asama"))
+        {
+            long rows = await ScalarLongAsync(ctx, "SELECT COUNT(*) FROM TalepOnaylari");
+            if (rows == 0)
+            {
+                await ctx.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS TalepOnaylari");
+                logger?.LogWarning("§20 — TalepOnaylari legacy şema (Asama yok, 0 satır) DROP edildi.");
+            }
+            else
+            {
+                logger?.LogError(
+                    "§20 — TalepOnaylari legacy şema ama {Rows} satır içeriyor; otomatik DROP atlandı (elle migrasyon gerekli).",
+                    rows);
+                return;
+            }
+        }
+
+        // Idempotent: CREATE TABLE IF NOT EXISTS → tablo (drop edildiyse veya hiç
+        // yoksa) doğru şemayla oluşur; doğru şemayla zaten varsa dokunmaz.
         await ctx.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS TalepOnaylari (
                 OnayID         INT NOT NULL AUTO_INCREMENT,
@@ -191,7 +279,7 @@ public static class DatabaseSchemaMigrator
                 PRIMARY KEY (OnayID),
                 INDEX IX_TalepOnaylari_TalepID (TalepID)
             )");
-        logger?.LogInformation("TalepOnaylari tablosu hazırlandı (CREATE IF NOT EXISTS).");
+        logger?.LogInformation("TalepOnaylari tablosu hazırlandı (doğru şema — §20).");
     }
 
     private static async Task EnsureSatinAlmaTalepKalemTableAsync(AppDbContext ctx, ILogger? logger)
@@ -271,6 +359,24 @@ public static class DatabaseSchemaMigrator
         var pC = cmd.CreateParameter(); pC.ParameterName = "@c"; pC.Value = column; cmd.Parameters.Add(pC);
         var n = Convert.ToInt32(await cmd.ExecuteScalarAsync() ?? 0);
         return n > 0;
+    }
+
+    private static async Task<bool> TableExistsAsync(AppDbContext ctx, string table)
+    {
+        var conn = ctx.Database.GetDbConnection();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+                            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t";
+        var pT = cmd.CreateParameter(); pT.ParameterName = "@t"; pT.Value = table; cmd.Parameters.Add(pT);
+        return Convert.ToInt32(await cmd.ExecuteScalarAsync() ?? 0) > 0;
+    }
+
+    private static async Task<long> ScalarLongAsync(AppDbContext ctx, string sql)
+    {
+        var conn = ctx.Database.GetDbConnection();
+        await using var cmd = conn.CreateCommand();
+        cmd.CommandText = sql;
+        return Convert.ToInt64(await cmd.ExecuteScalarAsync() ?? 0L);
     }
 
     private static async Task EnsureColumnAsync(AppDbContext ctx, ILogger? logger,

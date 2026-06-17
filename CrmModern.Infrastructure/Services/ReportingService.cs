@@ -684,25 +684,33 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
     {
         var orders = await uow.Orders.GetOrdersInRangeAsync(start, end);
 
-        // Yalnız Temsilci rolündeki kullanıcılar performans boyutunda görünür.
+        // §19 — TÜM Temsilci kullanıcıları listelenir. Eski kod sonucu siparişlerden
+        // türetip sözlüğü yalnız FİLTRE olarak kullandığı için, o dönemde siparişi
+        // olmayan temsilciler hiç görünmüyordu. Artık roster'dan sürülür: siparişi
+        // olmayan temsilci de SIFIR satırla görünür.
         var temsilciler = (await uow.Kullanicilar.GetAllAsync())
             .Where(u => u.YetkiTuru == "Temsilci")
-            .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
+            .ToList();
+        var ids = temsilciler.Select(u => u.KullaniciID).ToHashSet();
+
+        var byRep = orders
+            .Where(o => ids.Contains(o.KullaniciID))
+            .GroupBy(o => o.KullaniciID)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         static decimal CiroOf(IEnumerable<Order> rows, string para) =>
             rows.Where(o => o.ParaTipi == para).Sum(o => o.ToplamFiyat ?? 0m);
 
-        return orders
-            .Where(o => temsilciler.ContainsKey(o.KullaniciID))
-            .GroupBy(o => o.KullaniciID)
-            .Select(g =>
+        return temsilciler
+            .Select(u =>
             {
-                int olusturulan = g.Count();
+                var g = byRep.TryGetValue(u.KullaniciID, out var rows) ? rows : new List<Order>();
+                int olusturulan = g.Count;
                 int teklif      = g.Count(o => o.SiparisMiTeklifMi == "Teklif");
                 int siparis     = g.Count(o => o.SiparisMiTeklifMi != "Teklif" && o.SiparisMiTeklifMi != "Iptal");
                 return new RepPerformanceDto(
-                    KullaniciID:  g.Key,
-                    AdSoyad:      temsilciler[g.Key],
+                    KullaniciID:  u.KullaniciID,
+                    AdSoyad:      $"{u.Ad} {u.Soyad}".Trim(),
                     Olusturulan:  olusturulan,
                     Teklif:       teklif,
                     Siparis:      siparis,
@@ -717,6 +725,246 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     CiroSterlin:  CiroOf(g, "Sterlin"));
             })
             .OrderByDescending(r => r.Olusturulan)
+            .ThenBy(r => r.AdSoyad, StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
+    // §19 — Tek temsilci detay analizi + 5-sayfalık markalı Excel raporu
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    public async Task<RepDetailDto> GetRepDetailAsync(int kullaniciID, DateTime start, DateTime end)
+    {
+        var user   = (await uow.Kullanicilar.GetAllAsync()).FirstOrDefault(u => u.KullaniciID == kullaniciID);
+        var orders = await uow.Orders.GetRepReportOrdersAsync(kullaniciID, start, end);
+
+        // Satış = gerçek sipariş (Teklif/Iptal dışı). Ciro/ülke/ürün bunlardan türetilir.
+        var sales = orders
+            .Where(o => o.SiparisMiTeklifMi != "Teklif" && o.SiparisMiTeklifMi != "Iptal")
+            .ToList();
+
+        // Kalemler: satış siparişlerinin SiparisNo ∪ TeklifNo anahtarlarıyla toplu çek.
+        var keys = sales
+            .SelectMany(o => new[] { o.SiparisNo, o.TeklifNo })
+            .Where(s => !string.IsNullOrEmpty(s))
+            .Distinct()
+            .ToList();
+        var items     = await uow.Orders.GetItemsForOrdersAsync(keys!);
+        var catLookup = (await uow.ProductCategories.GetAllAsync()).ToDictionary(c => c.KategoriID, c => c.KategoriAdi);
+        var catItems  = items.Where(i => i.KategoriID != null).ToList();   // ürün = kategori/SET satırı
+
+        static decimal Ciro(IEnumerable<Order> rows, string p) =>
+            rows.Where(o => o.ParaTipi == p).Sum(o => o.ToplamFiyat ?? 0m);
+        decimal Aov(string p)
+        {
+            var rs = sales.Where(o => o.ParaTipi == p).ToList();
+            return rs.Count > 0 ? Math.Round(rs.Sum(o => o.ToplamFiyat ?? 0m) / rs.Count, 2) : 0m;
+        }
+
+        var urunler = catItems
+            .GroupBy(i => catLookup.TryGetValue(i.KategoriID!.Value, out var n) ? n : $"#{i.KategoriID}")
+            .Select(g => new RepProductStatDto(g.Key, g.Sum(i => i.Adet), g.Select(i => i.SiparisNo).Distinct().Count()))
+            .OrderByDescending(p => p.Adet).ThenBy(p => p.Urun, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var ulkeler = sales
+            .GroupBy(o => string.IsNullOrWhiteSpace(o.MUlke) ? "—" : o.MUlke!)
+            .Select(g =>
+            {
+                var snos = g.SelectMany(o => new[] { o.SiparisNo, o.TeklifNo }).Where(s => !string.IsNullOrEmpty(s)).ToHashSet();
+                int adet = catItems.Where(i => snos.Contains(i.SiparisNo)).Sum(i => i.Adet);
+                return new RepCountryStatDto(g.Key, g.Count(), adet,
+                    Ciro(g, "Euro"), Ciro(g, "Dolar"), Ciro(g, "TL"), Ciro(g, "Sterlin"));
+            })
+            .OrderByDescending(c => c.SiparisSayisi)
+            .ThenByDescending(c => c.CiroEuro + c.CiroDolar + c.CiroTL + c.CiroSterlin)
+            .ToList();
+
+        var aylik = sales
+            .GroupBy(o => new { o.Tarih.Year, o.Tarih.Month })
+            .Select(g => new RepMonthlyStatDto($"{g.Key.Year:D4}-{g.Key.Month:D2}", g.Count(),
+                Ciro(g, "Euro"), Ciro(g, "Dolar"), Ciro(g, "TL"), Ciro(g, "Sterlin")))
+            .OrderBy(m => m.Ay, StringComparer.Ordinal)
+            .ToList();
+
+        int olusturulan   = orders.Count;
+        int siparisSayisi = sales.Count;
+
+        return new RepDetailDto(
+            KullaniciID:   kullaniciID,
+            AdSoyad:       user != null ? $"{user.Ad} {user.Soyad}".Trim() : $"#{kullaniciID}",
+            KullaniciAdi:  user?.KullaniciAdi,
+            SiparisSayisi: siparisSayisi,
+            TeklifSayisi:  orders.Count(o => o.SiparisMiTeklifMi == "Teklif"),
+            ToplamAdet:    catItems.Sum(i => i.Adet),
+            UlkeSayisi:    sales.Select(o => o.MUlke).Where(s => !string.IsNullOrWhiteSpace(s)).Distinct().Count(),
+            DonusumOrani:  olusturulan > 0 ? Math.Round((decimal)siparisSayisi / olusturulan * 100m, 1) : 0m,
+            CiroEuro:      Ciro(sales, "Euro"),  CiroDolar:   Ciro(sales, "Dolar"),
+            CiroTL:        Ciro(sales, "TL"),    CiroSterlin: Ciro(sales, "Sterlin"),
+            AovEuro:       Aov("Euro"),  AovDolar: Aov("Dolar"),  AovTL: Aov("TL"),  AovSterlin: Aov("Sterlin"),
+            Ulkeler:       ulkeler,
+            Urunler:       urunler,
+            AylikCiro:     aylik);
+    }
+
+    public async Task<byte[]> ExportRepReportAsync(int kullaniciID, DateTime start, DateTime end)
+    {
+        var d      = await GetRepDetailAsync(kullaniciID, start, end);
+        var orders = await uow.Orders.GetRepReportOrdersAsync(kullaniciID, start, end);
+
+        var brand     = XLColor.FromArgb(68, 114, 196);
+        var brandDark = XLColor.FromArgb(31, 56, 100);
+        string period = $"{start:dd.MM.yyyy} – {end:dd.MM.yyyy}";
+
+        static void HeaderRow(IXLWorksheet ws, int row, XLColor brand, params string[] headers)
+        {
+            for (int c = 0; c < headers.Length; c++)
+            {
+                var cell = ws.Cell(row, c + 1);
+                cell.Value = headers[c];
+                cell.Style.Font.Bold = true;
+                cell.Style.Fill.BackgroundColor = brand;
+                cell.Style.Font.FontColor = XLColor.White;
+                cell.Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            }
+        }
+        void BrandTitle(IXLWorksheet ws, string subtitle, int cols)
+        {
+            // Logo alanı + marka başlığı (kurumsal görünüm).
+            ws.Cell(1, 1).Value = "UNIXPADEL";
+            ws.Range(1, 1, 1, cols).Merge();
+            ws.Cell(1, 1).Style.Font.Bold = true;
+            ws.Cell(1, 1).Style.Font.FontSize = 18;
+            ws.Cell(1, 1).Style.Font.FontColor = XLColor.White;
+            ws.Cell(1, 1).Style.Fill.BackgroundColor = brandDark;
+            ws.Cell(1, 1).Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
+            ws.Row(1).Height = 30;
+            ws.Cell(2, 1).Value = subtitle;
+            ws.Range(2, 1, 2, cols).Merge();
+            ws.Cell(2, 1).Style.Font.Italic = true;
+            ws.Cell(2, 1).Style.Font.FontColor = XLColor.FromArgb(90, 90, 90);
+        }
+        static void Currency(IXLWorksheet ws, params int[] cols)
+        {
+            foreach (var c in cols) ws.Column(c).Style.NumberFormat.Format = "#,##0.00";
+        }
+
+        using var wb = new XLWorkbook();
+
+        // ── Sheet 1: Executive Summary ───────────────────────────────────────────
+        var s1 = wb.AddWorksheet("Executive Summary");
+        BrandTitle(s1, $"Temsilci Performans Raporu · {d.AdSoyad} · {period}", 4);
+        int r = 4;
+        void Kv(string k, XLCellValue v)
+        {
+            s1.Cell(r, 1).Value = k; s1.Cell(r, 1).Style.Font.Bold = true;
+            s1.Cell(r, 2).Value = v; r++;
+        }
+        Kv("Temsilci",        d.AdSoyad);
+        Kv("Kullanıcı Adı",   d.KullaniciAdi ?? "—");
+        Kv("Dönem",           period);
+        r++;
+        Kv("Sipariş Sayısı",  d.SiparisSayisi);
+        Kv("Teklif Sayısı",   d.TeklifSayisi);
+        Kv("Dönüşüm Oranı",   $"%{d.DonusumOrani}");
+        Kv("Satılan Ürün Adedi", d.ToplamAdet);
+        Kv("Satış Yapılan Ülke", d.UlkeSayisi);
+        r++;
+        s1.Cell(r, 1).Value = "Ciro (Para Birimi Bazında)"; s1.Cell(r, 1).Style.Font.Bold = true; r++;
+        HeaderRow(s1, r, brand, "Para Birimi", "Ciro", "Ort. Sipariş Değeri (AOV)"); r++;
+        void Cur(string name, decimal ciro, decimal aov)
+        {
+            if (ciro == 0m && aov == 0m) return;
+            s1.Cell(r, 1).Value = name;
+            s1.Cell(r, 2).Value = (double)ciro;
+            s1.Cell(r, 3).Value = (double)aov;
+            r++;
+        }
+        Cur("Euro", d.CiroEuro, d.AovEuro);
+        Cur("Dolar", d.CiroDolar, d.AovDolar);
+        Cur("TL", d.CiroTL, d.AovTL);
+        Cur("Sterlin", d.CiroSterlin, d.AovSterlin);
+        Currency(s1, 2, 3);
+        s1.Columns().AdjustToContents();
+        s1.Column(1).Width = Math.Max(s1.Column(1).Width, 24);
+
+        // ── Sheet 2: Country Analysis ────────────────────────────────────────────
+        var s2 = wb.AddWorksheet("Country Analysis");
+        BrandTitle(s2, $"Ülke Analizi · {d.AdSoyad} · {period}", 7);
+        HeaderRow(s2, 4, brand, "Ülke", "Sipariş", "Adet", "Ciro €", "Ciro $", "Ciro ₺", "Ciro £");
+        int row2 = 5;
+        foreach (var u in d.Ulkeler)
+        {
+            s2.Cell(row2, 1).Value = u.Ulke;
+            s2.Cell(row2, 2).Value = u.SiparisSayisi;
+            s2.Cell(row2, 3).Value = u.Adet;
+            s2.Cell(row2, 4).Value = (double)u.CiroEuro;
+            s2.Cell(row2, 5).Value = (double)u.CiroDolar;
+            s2.Cell(row2, 6).Value = (double)u.CiroTL;
+            s2.Cell(row2, 7).Value = (double)u.CiroSterlin;
+            row2++;
+        }
+        Currency(s2, 4, 5, 6, 7);
+        s2.Columns().AdjustToContents();
+        s2.SheetView.FreezeRows(4);
+
+        // ── Sheet 3: Product Analysis ────────────────────────────────────────────
+        var s3 = wb.AddWorksheet("Product Analysis");
+        BrandTitle(s3, $"Ürün Analizi · {d.AdSoyad} · {period}", 3);
+        HeaderRow(s3, 4, brand, "Ürün (Kategori)", "Satılan Adet", "Sipariş Sayısı");
+        int row3 = 5;
+        foreach (var p in d.Urunler)
+        {
+            s3.Cell(row3, 1).Value = p.Urun;
+            s3.Cell(row3, 2).Value = p.Adet;
+            s3.Cell(row3, 3).Value = p.SiparisSayisi;
+            row3++;
+        }
+        s3.Columns().AdjustToContents();
+        s3.SheetView.FreezeRows(4);
+
+        // ── Sheet 4: Order Details ───────────────────────────────────────────────
+        var s4 = wb.AddWorksheet("Order Details");
+        BrandTitle(s4, $"Sipariş Detayı · {d.AdSoyad} · {period}", 8);
+        HeaderRow(s4, 4, brand, "No", "Müşteri", "Ülke", "Aşama", "Kontrol", "Para Birimi", "Toplam", "Tarih");
+        int row4 = 5;
+        foreach (var o in orders)
+        {
+            s4.Cell(row4, 1).Value = string.IsNullOrEmpty(o.SiparisNo) ? o.TeklifNo : o.SiparisNo;
+            s4.Cell(row4, 2).Value = o.MusteriAd;
+            s4.Cell(row4, 3).Value = o.MUlke ?? "";
+            s4.Cell(row4, 4).Value = o.SiparisMiTeklifMi;
+            s4.Cell(row4, 5).Value = o.Kontrol ?? "";
+            s4.Cell(row4, 6).Value = o.ParaTipi;
+            s4.Cell(row4, 7).Value = (double)(o.ToplamFiyat ?? 0m);
+            s4.Cell(row4, 8).Value = o.Tarih.ToString("dd.MM.yyyy");
+            row4++;
+        }
+        Currency(s4, 7);
+        s4.Columns().AdjustToContents();
+        s4.SheetView.FreezeRows(4);
+
+        // ── Sheet 5: Monthly Revenue Trend ───────────────────────────────────────
+        var s5 = wb.AddWorksheet("Monthly Revenue Trend");
+        BrandTitle(s5, $"Aylık Ciro Trendi · {d.AdSoyad} · {period}", 6);
+        HeaderRow(s5, 4, brand, "Ay", "Sipariş", "Ciro €", "Ciro $", "Ciro ₺", "Ciro £");
+        int row5 = 5;
+        foreach (var m in d.AylikCiro)
+        {
+            s5.Cell(row5, 1).Value = m.Ay;
+            s5.Cell(row5, 2).Value = m.SiparisSayisi;
+            s5.Cell(row5, 3).Value = (double)m.CiroEuro;
+            s5.Cell(row5, 4).Value = (double)m.CiroDolar;
+            s5.Cell(row5, 5).Value = (double)m.CiroTL;
+            s5.Cell(row5, 6).Value = (double)m.CiroSterlin;
+            row5++;
+        }
+        Currency(s5, 3, 4, 5, 6);
+        s5.Columns().AdjustToContents();
+        s5.SheetView.FreezeRows(4);
+
+        using var ms = new MemoryStream();
+        wb.SaveAs(ms);
+        return ms.ToArray();
     }
 }

@@ -29,6 +29,16 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
     private static readonly HashSet<string> PurchaseRequestRoles =
         new(StringComparer.OrdinalIgnoreCase) { "Lojistik", "Fabrika", "Gozlemci", "Temsilci" };
 
+    /// <summary>
+    /// §24 — Süper-admin (Admin) kullanıcı adları. Bu kullanıcılara login JWT'sinde
+    /// `is_super_admin=true` claim'i basılır; API tarafında merkezi authorization
+    /// handler + controller kapıları bu claim'i okuyup TÜM rol/kullanıcı
+    /// kontrollerini bypass eder. Claim type literal'i CrmModern.API
+    /// ClaimsPrincipalExtensions.SuperAdminClaim ile aynı olmalıdır.
+    /// </summary>
+    private static readonly HashSet<string> SuperAdminUsers =
+        new(StringComparer.OrdinalIgnoreCase) { "admin" };
+
     // ─────────────────────────────────────────────────────────────────────────
 
     public async Task<LoginResponseDto> LoginAsync(LoginRequestDto request)
@@ -112,6 +122,10 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
 
             new("can_view_purchase_requests",
                 PurchaseRequestRoles.Contains(kullanici.YetkiTuru).ToString().ToLower()),
+
+            // §24 — Admin süper-kullanıcı bayrağı (tüm yetki kontrollerini bypass eder).
+            new("is_super_admin",
+                SuperAdminUsers.Contains(kullanici.KullaniciAdi).ToString().ToLower()),
         };
 
         var tokenDescriptor = new SecurityTokenDescriptor

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -8,15 +8,18 @@ const { autoUpdater } = require('electron-updater');
 
 let mainWindow;
 
-// ── Auto-update ──────────────────────────────────────────────────────────
-// Akış (sessiz indir, restart'ta uygula):
+// ── Auto-update (TAM OTOMATİK — §15) ──────────────────────────────────────
+// Akış (tamamen sessiz, kullanıcı hiç onay vermez, hiç popup görmez):
 //   1. App açılır → 5 sn sonra GitHub Releases kontrol edilir
-//   2. Yeni sürüm varsa arka planda indirilir (kullanıcı çalışmaya devam eder)
-//   3. İndirme bitince küçük bir dialog: "Şimdi yeniden başlat / Sonra"
-//   4. "Sonra" derse → uygulama bir sonraki kapanışta otomatik yükler
+//   2. Yeni sürüm varsa arka planda otomatik indirilir (autoDownload)
+//   3. İndirme bittiğinde HİÇBİR dialog gösterilmez — kullanıcı çalışmaya devam eder
+//   4. Uygulama kapanırken güncelleme otomatik kurulur (autoInstallOnAppQuit)
+//   5. Bir sonraki açılışta yeni sürüm zaten yüklüdür
+// ERP kullanıcıları güncellemeyi asla elle kurmaz; süreç GitHub Release
+// dağıtım sistemiyle (latest.yml + NSIS installer) tam uyumludur.
 function setupAutoUpdater() {
-  autoUpdater.autoDownload = true;          // sessiz indir
-  autoUpdater.autoInstallOnAppQuit = true;  // kapanışta otomatik kur
+  autoUpdater.autoDownload = true;          // yeni sürümü arka planda sessizce indir
+  autoUpdater.autoInstallOnAppQuit = true;  // kapanışta sessizce kur (restart prompt yok)
 
   autoUpdater.on('error', (err) => {
     console.error('[auto-update] error:', err?.message || err);
@@ -24,27 +27,17 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-available', (info) => {
-    console.log('[auto-update] yeni sürüm bulundu:', info?.version);
+    console.log('[auto-update] yeni sürüm bulundu, arka planda indiriliyor:', info?.version);
   });
 
   autoUpdater.on('update-not-available', () => {
     console.log('[auto-update] güncel sürüm kullanılıyor');
   });
 
-  autoUpdater.on('update-downloaded', async (info) => {
-    console.log('[auto-update] indirildi:', info?.version);
-    const { response } = await dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      buttons: ['Şimdi Yeniden Başlat', 'Sonra'],
-      defaultId: 0,
-      cancelId: 1,
-      title: 'UnixPadelST güncellendi',
-      message: `Yeni sürüm hazır: ${info?.version || ''}`,
-      detail: 'Şimdi yeniden başlatırsan güncelleme uygulanır. "Sonra" dersen bir sonraki açılışta otomatik yüklenir.',
-    });
-    if (response === 0) {
-      autoUpdater.quitAndInstall();
-    }
+  autoUpdater.on('update-downloaded', (info) => {
+    // Sessiz akış: dialog YOK, quitAndInstall YOK. autoInstallOnAppQuit=true
+    // olduğu için güncelleme uygulama kapanışında otomatik uygulanır.
+    console.log('[auto-update] indirildi, sonraki kapanışta otomatik kurulacak:', info?.version);
   });
 
   // İlk kontrol: pencere yüklendikten 5 sn sonra (yavaş ağda bloke etmesin).

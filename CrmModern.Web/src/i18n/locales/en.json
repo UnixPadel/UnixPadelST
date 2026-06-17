@@ -926,7 +926,30 @@
       "donusum": "Conversion %",
       "ciro": "Revenue"
     },
-    "empty": "No data for this period."
+    "empty": "No data for this period.",
+    "detail": {
+      "analytics": "Analytics Dashboard",
+      "selectRep": "Select a representative…",
+      "selectHint": "Select a representative above to view detailed analytics.",
+      "orders": "Orders",
+      "quotations": "Quotations",
+      "quantity": "Quantity Sold",
+      "countries": "Countries",
+      "conversion": "Conversion",
+      "aov": "Avg. Order Value",
+      "totalRevenue": "Total Revenue",
+      "monthlyRevenue": "Monthly Revenue Trend",
+      "topCountries": "Top Countries",
+      "topProducts": "Top Products",
+      "country": "Country",
+      "product": "Product",
+      "qty": "Qty",
+      "ordersShort": "Orders",
+      "revenue": "Revenue",
+      "export": "Export Excel",
+      "exporting": "Exporting…",
+      "loadError": "Could not load analytics."
+    }
   },
   "orderDetail": {
     "title": "Order Detail — {{no}}",
@@ -949,6 +972,7 @@
     "kdv": "VAT",
     "toplam": "Total",
     "pesinYuzde": "Down Payment %",
+    "pesinatTutar": "Down Payment Amount",
     "montaj": "Assembly",
     "teslimat": "Delivery",
     "tur": "Type",

@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getReadyForShipment, createShipment, getCarriers } from '@/api/logistics'
 import { INCOTERMS } from '@/lib/constants'
+import { stageLabel } from '@/lib/status'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -51,10 +52,28 @@ export function LogisticsReadyPage() {
     createMut.mutate()
   }
 
+  // §25 — filtreler
+  const [fNo, setFNo] = useState('')
+  const [fMusteri, setFMusteri] = useState('')
+  const [fAsama, setFAsama] = useState('__all__')
+
   const { data: ready = [], isLoading } = useQuery({
     queryKey: ['logistics-ready'], queryFn: getReadyForShipment,
   })
   const { data: carriers = [] } = useQuery({ queryKey: ['carriers'], queryFn: getCarriers })
+
+  // Unique stages from loaded data
+  const stageOptions = useMemo(
+    () => Array.from(new Set(ready.map((r) => r.siparisMiTeklifMi).filter(Boolean))).sort(),
+    [ready],
+  )
+
+  const filtered = useMemo(() => ready.filter((r) => {
+    if (fNo && !r.siparisNo.toLowerCase().includes(fNo.toLowerCase())) return false
+    if (fMusteri && !(r.musteriAd ?? '').toLowerCase().includes(fMusteri.toLowerCase())) return false
+    if (fAsama !== '__all__' && r.siparisMiTeklifMi !== fAsama) return false
+    return true
+  }), [ready, fNo, fMusteri, fAsama])
 
   const createMut = useMutation({
     mutationFn: () => createShipment({ siparisNo: target!.siparisNo, ...form, firmaAdi }),
@@ -105,8 +124,38 @@ export function LogisticsReadyPage() {
   return (
     <div>
       <PageHeader title={t('logistics.readyTitle')} />
-      <div className="p-6">
-        <DataTable columns={cols} data={ready as (LogisticsOrderListDto & Record<string, unknown>)[]} keyField="siparisNo" loading={isLoading} density="compact" />
+      <div className="p-6 space-y-4">
+        {/* §25 — filtre şeridi */}
+        <div className="rounded-md border bg-card p-3">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="space-y-1">
+              <Label>{t('common.orderNo')}</Label>
+              <Input value={fNo} onChange={(e) => setFNo(e.target.value)} placeholder="…" />
+            </div>
+            <div className="space-y-1">
+              <Label>{t('common.customer')}</Label>
+              <Input value={fMusteri} onChange={(e) => setFMusteri(e.target.value)} placeholder="…" />
+            </div>
+            <div className="space-y-1">
+              <Label>{t('common.stage')}</Label>
+              <Select value={fAsama} onValueChange={setFAsama}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">{t('myOrders.filter.all')}</SelectItem>
+                  {stageOptions.map((s) => (
+                    <SelectItem key={s} value={s}>{stageLabel(t, s)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 flex items-end">
+              <Button variant="outline" className="w-full" onClick={() => { setFNo(''); setFMusteri(''); setFAsama('__all__') }}>
+                {t('myOrders.filter.reset')}
+              </Button>
+            </div>
+          </div>
+        </div>
+        <DataTable columns={cols} data={filtered as (LogisticsOrderListDto & Record<string, unknown>)[]} keyField="siparisNo" loading={isLoading} density="compact" />
       </div>
 
       <Dialog open={!!target} onOpenChange={() => setTarget(null)}>

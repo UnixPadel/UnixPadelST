@@ -161,4 +161,30 @@ public sealed class ReportingController(IReportingService reportingService) : Co
         var result = await reportingService.GetRepPerformanceAsync(start, end);
         return Ok(ApiResponse<IReadOnlyList<RepPerformanceDto>>.Ok(result));
     }
+
+    /// <summary>§19 — Tek temsilcinin detaylı analizi (ülke/ürün/aylık kırılım, AOV).</summary>
+    [HttpGet("rep-performance/{kullaniciID:int}/detail")]
+    [Authorize(Roles = "Yonetici")]
+    [ProducesResponseType(typeof(ApiResponse<RepDetailDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetRepDetail(int kullaniciID,
+        [FromQuery] DateTime? baslangic = null, [FromQuery] DateTime? bitis = null)
+    {
+        var end   = bitis ?? DateTime.Now;
+        var start = baslangic ?? end.AddDays(-30);
+        var result = await reportingService.GetRepDetailAsync(kullaniciID, start, end);
+        return Ok(ApiResponse<RepDetailDto>.Ok(result));
+    }
+
+    /// <summary>§19 — Temsilci için 5-sayfalık markalı Excel raporu (doğrudan indirilebilir).</summary>
+    [HttpGet("rep-performance/{kullaniciID:int}/export")]
+    [Authorize(Roles = "Yonetici")]
+    public async Task<IActionResult> ExportRepReport(int kullaniciID,
+        [FromQuery] DateTime? baslangic = null, [FromQuery] DateTime? bitis = null)
+    {
+        var end   = bitis ?? DateTime.Now;
+        var start = baslangic ?? end.AddDays(-30);
+        var bytes = await reportingService.ExportRepReportAsync(kullaniciID, start, end);
+        var filename = $"temsilci_raporu_{kullaniciID}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
+        return File(bytes, ContentType, filename);
+    }
 }

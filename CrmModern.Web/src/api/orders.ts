@@ -1,4 +1,5 @@
 import api from '@/lib/axios'
+import i18n from '@/i18n/i18n'
 import type {
   ApiResponse, OrderListDto, OrderDetail, CreateOrderDto,
 } from '@/types'
@@ -167,9 +168,14 @@ export const downloadAttachment = async (no: string, type: 'ek' | 'muhasebeek') 
 // ── Excel ───────────────────────────────────────────────────────────────────
 
 // Round-8 §4 — proforma standart şartları aktif UI diline göre üretilsin diye
-// `lang` query'si geçilir (i18next localStorage anahtarı: 'i18nextLng').
+// `lang` query'si geçilir.
+// §18 — Kaynak olarak CANLI i18next dili (`i18n.language`) kullanılır; doğrudan
+// localStorage['i18nextLng'] okumak, paketlenmiş Electron'da anahtarın yazılmaması
+// / bölgesel kod (en-US) / zamanlama nedeniyle görünen UI dilinden SAPABİLİR ve
+// İngilizce arayüzde Türkçe proforma üretirdi. `i18n.language` arayüz dilinin tek
+// otoritesidir (LanguageSwitcher de bunu kullanır); böylece export = görünen dil.
 const currentLang = (): 'tr' | 'en' =>
-  (localStorage.getItem('i18nextLng') || 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr'
+  (i18n.language || localStorage.getItem('i18nextLng') || 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr'
 
 export const excelUrl = (no: string) => `/api/orders/${no}/excel?lang=${currentLang()}`
 

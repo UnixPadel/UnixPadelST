@@ -158,6 +158,12 @@ public interface IOrderRepository : IBaseRepository<Order>
     /// Temsilci performans raporu servis tarafında bunları gruplar.</summary>
     Task<IReadOnlyList<Order>> GetOrdersInRangeAsync(DateTime start, DateTime end);
 
+    /// <summary>§19 — Tek temsilcinin tarih aralığındaki (silinmemiş) siparişleri (detay rapor).</summary>
+    Task<IReadOnlyList<Order>> GetRepReportOrdersAsync(int kullaniciID, DateTime start, DateTime end);
+
+    /// <summary>§19 — Verilen sipariş numaralarına ait SiparisIslemTablo kalemleri (toplu yükleme).</summary>
+    Task<IReadOnlyList<OrderItem>> GetItemsForOrdersAsync(IReadOnlyCollection<string> siparisNolar);
+
     /// <summary>Round-8 §10 — müşterinin (id veya ad eşleşmesiyle) herhangi bir
     /// siparişi/teklifi var mı? Müşteri silmeden önce güvenlik kontrolü.</summary>
     Task<bool> AnyByCustomerAsync(int musteriId, string musteriAd);

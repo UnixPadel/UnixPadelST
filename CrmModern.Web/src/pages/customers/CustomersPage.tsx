@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getCustomers, deleteCustomer } from '@/api/customers'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { Button } from '@/components/ui/button'
@@ -39,7 +40,7 @@ export function CustomersPage() {
   const canAdd  = ADD_ROLES.has(role)
   const canEdit = EDIT_ROLES.has(role)
   // Round-8 §10 — müşteri silme YALNIZ elshan.rasulov (kullanıcı adı bazlı).
-  const canDelete = getUser()?.kullaniciAdi === 'elshan.rasulov'
+  const canDelete = getUser()?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(getUser())
 
   const [q, setQ] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Musteri | null>(null)

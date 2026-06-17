@@ -36,6 +36,12 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+// §24 — Admin tüm [Authorize] politikalarını (rol gereksinimleri dahil) karşılar.
+// Rol claim'i enjekte etmeden (Fabrika rolü para gizlemesini tetiklerdi) merkezi
+// olarak yetkilendirmeyi geçirir.
+builder.Services.AddSingleton<Microsoft.AspNetCore.Authorization.IAuthorizationHandler,
+    CrmModern.API.Authorization.SuperAdminAuthorizationHandler>();
+
 // ── Controllers ────────────────────────────────────────────────────────────
 builder.Services.AddControllers();
 

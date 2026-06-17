@@ -927,7 +927,30 @@
       "donusum": "Dönüşüm %",
       "ciro": "Ciro"
     },
-    "empty": "Bu dönem için veri yok."
+    "empty": "Bu dönem için veri yok.",
+    "detail": {
+      "analytics": "Analiz Panosu",
+      "selectRep": "Temsilci seçin…",
+      "selectHint": "Detaylı analiz için yukarıdan bir temsilci seçin.",
+      "orders": "Siparişler",
+      "quotations": "Teklifler",
+      "quantity": "Satılan Adet",
+      "countries": "Ülke Sayısı",
+      "conversion": "Dönüşüm",
+      "aov": "Ort. Sipariş Değeri",
+      "totalRevenue": "Toplam Ciro",
+      "monthlyRevenue": "Aylık Ciro Trendi",
+      "topCountries": "En Çok Satış Yapılan Ülkeler",
+      "topProducts": "En Çok Satan Ürünler",
+      "country": "Ülke",
+      "product": "Ürün",
+      "qty": "Adet",
+      "ordersShort": "Sipariş",
+      "revenue": "Ciro",
+      "export": "Excel'e Aktar",
+      "exporting": "Aktarılıyor…",
+      "loadError": "Analiz yüklenemedi."
+    }
   },
   "orderDetail": {
     "title": "Sipariş Detayı — {{no}}",
@@ -950,6 +973,7 @@
     "kdv": "KDV",
     "toplam": "Toplam",
     "pesinYuzde": "Peşin Yüzde",
+    "pesinatTutar": "Peşinat Tutarı",
     "montaj": "Montaj",
     "teslimat": "Teslimat",
     "tur": "Tür",

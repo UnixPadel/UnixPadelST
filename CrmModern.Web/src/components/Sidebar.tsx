@@ -6,6 +6,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import { logout as apiLogout } from '@/api/auth'
 
 interface SidebarProps {
@@ -64,7 +65,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     if (!item.roles && !item.usernames) return true
     if (!user) return false
     // PROMPT-v7 §1 — merkezi bypass: elshan.rasulov TÜM nav kayıtlarını görür.
-    if (user.kullaniciAdi === 'elshan.rasulov') return true
+    // §24 — Admin (süper-admin) da tüm menüleri (gizli dahil) görür.
+    if (user.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user)) return true
     const roleOk = item.roles?.includes(user.yetkiTuru) ?? false
     const userOk = item.usernames?.includes(user.kullaniciAdi) ?? false
     return roleOk || userOk

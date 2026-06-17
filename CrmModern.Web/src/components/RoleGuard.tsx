@@ -1,5 +1,6 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 
 interface Props {
   // Faz 6 / Paket 3: rol VEYA kullanıcı adı. Listede biri eşleşirse geçer.
@@ -19,7 +20,8 @@ export function RoleGuard({ roles, usernames, children }: Props) {
 
   if (!user) return <Navigate to="/login" replace />
   // PROMPT-v7 §1 — elshan tüm rol/kullanıcı kontrollerinden muaf.
-  if (user.kullaniciAdi === SUPERUSER) return <>{children}</>
+  // §24 — Admin (süper-admin) de tüm sayfa/rol kontrollerinden muaf.
+  if (user.kullaniciAdi === SUPERUSER || isSuperAdmin(user)) return <>{children}</>
   const roleOk = roles?.includes(user.yetkiTuru) ?? false
   const userOk = usernames?.includes(user.kullaniciAdi) ?? false
   if (!roleOk && !userOk) return <Navigate to="/dashboard" replace />

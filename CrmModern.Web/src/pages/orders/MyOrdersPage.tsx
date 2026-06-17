@@ -18,6 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import { describeApiError } from '@/lib/axios'
 import { formatDate } from '@/lib/utils'
 import { stageLabel, kontrolLabel, statusLabel } from '@/lib/status'
@@ -58,7 +59,7 @@ export function MyOrdersPage() {
   const { getUser } = useAuth()
   // PROMPT-v4 §6.2 — elshan.rasulov tüm sistemi izler; sahip (Temsilci) kolonu
   // yalnız ona görünür (backend /my zaten tüm satırları döner).
-  const isGlobalViewer = getUser()?.kullaniciAdi === 'elshan.rasulov'
+  const isGlobalViewer = getUser()?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(getUser())
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['my-orders'],
@@ -336,8 +337,8 @@ export function MyOrdersPage() {
         />
       </div>
 
-      {/* Form Göster — reuse the shared OrderDetailModal */}
-      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} />
+      {/* Form Göster — reuse the shared OrderDetailModal. §22: Notlar bölümü gizli. */}
+      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} hideNotes />
 
       {/* Red Notu — inline dialog (legacy MessageBox replacement) */}
       <Dialog open={!!redTarget} onOpenChange={(o) => { if (!o) setRedTarget(null) }}>

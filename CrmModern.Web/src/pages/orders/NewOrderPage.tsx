@@ -571,10 +571,23 @@ export function NewOrderPage() {
 
     const tabs = Array.from({ length: SET_COUNT }, () => emptySetTab())
     const sets: OrderSetInput[] = []
-    for (let i = 0; i < Math.min(groups.length, SET_COUNT); i++) {
+    const count = Math.min(groups.length, SET_COUNT)
+
+    // §23 — Revize performansı: kategori bileşenleri ARTIK PARALEL çekilir.
+    // Eski kod her grup için `await getComponentsByCategory(...)`'ı SIRAYLA
+    // bekliyordu (N kategori → N ardışık tur, her biri tüm katalog ~77 bileşen).
+    // Aynı kategori tekrarını da tekilleştirip tek turda (Promise.all) çekiyoruz;
+    // ürünler tıklamadan sonra ~1×RTT'de (N×RTT yerine) görünür.
+    const uniqueCatIds = [...new Set(groups.slice(0, count).map((g) => g.kategoriID))]
+    const fetched = await Promise.all(
+      uniqueCatIds.map((id) => getComponentsByCategory(id).then(toChecklist)),
+    )
+    const checklistByCat = new Map(uniqueCatIds.map((id, idx) => [id, fetched[idx]]))
+
+    for (let i = 0; i < count; i++) {
       const g = groups[i]
       const kategoriAdi = categories.find((c) => c.kategoriID === g.kategoriID)?.kategoriAdi ?? ''
-      const checklist = toChecklist(await getComponentsByCategory(g.kategoriID))
+      const checklist = checklistByCat.get(g.kategoriID) ?? []
       const savedIds = new Set(g.comps.map((c) => c.bilesenID!))
       const meta = new Map(checklist.map((c) => [c.bilesenID, c]))
 

@@ -559,6 +559,24 @@ export interface RepPerformance {
   ciroSterlin: number
 }
 
+// §19 — temsilci detay analizi
+export interface RepCountryStat {
+  ulke: string; siparisSayisi: number; adet: number
+  ciroEuro: number; ciroDolar: number; ciroTL: number; ciroSterlin: number
+}
+export interface RepProductStat { urun: string; adet: number; siparisSayisi: number }
+export interface RepMonthlyStat {
+  ay: string; siparisSayisi: number
+  ciroEuro: number; ciroDolar: number; ciroTL: number; ciroSterlin: number
+}
+export interface RepDetail {
+  kullaniciID: number; adSoyad: string; kullaniciAdi?: string | null
+  siparisSayisi: number; teklifSayisi: number; toplamAdet: number; ulkeSayisi: number; donusumOrani: number
+  ciroEuro: number; ciroDolar: number; ciroTL: number; ciroSterlin: number
+  aovEuro: number; aovDolar: number; aovTL: number; aovSterlin: number
+  ulkeler: RepCountryStat[]; urunler: RepProductStat[]; aylikCiro: RepMonthlyStat[]
+}
+
 // ── Global Search (Faz 7) ─────────────────────────────────────────────────────
 
 export interface UnifiedSearchHit {

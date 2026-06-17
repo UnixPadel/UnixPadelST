@@ -56,6 +56,24 @@ internal sealed class OrderRepository(AppDbContext context)
             .Where(o => !o.Silindi && o.Tarih >= start && o.Tarih <= end)
             .ToListAsync();
 
+    // §19 — Tek temsilcinin tarih aralığındaki silinmemiş siparişleri (detay rapor).
+    public async Task<IReadOnlyList<Order>> GetRepReportOrdersAsync(int kullaniciID, DateTime start, DateTime end) =>
+        await _context.SiparisAlTablo
+            .AsNoTracking()
+            .Where(o => !o.Silindi && o.KullaniciID == kullaniciID && o.Tarih >= start && o.Tarih <= end)
+            .OrderByDescending(o => o.SiparisAlID)
+            .ToListAsync();
+
+    // §19 — Verilen sipariş numaralarına ait kalemler (SiparisIslemTablo) — toplu, N+1 yok.
+    public async Task<IReadOnlyList<OrderItem>> GetItemsForOrdersAsync(IReadOnlyCollection<string> siparisNolar)
+    {
+        if (siparisNolar.Count == 0) return Array.Empty<OrderItem>();
+        return await _context.SiparisIslemTablo
+            .AsNoTracking()
+            .Where(i => siparisNolar.Contains(i.SiparisNo))
+            .ToListAsync();
+    }
+
     // Round-8 §10 — müşteri silmeden önce sipariş/teklif var mı kontrolü.
     public async Task<bool> AnyByCustomerAsync(int musteriId, string musteriAd) =>
         await _context.SiparisAlTablo

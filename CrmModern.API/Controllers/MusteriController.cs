@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Musteri;
 using CrmModern.Core.Interfaces.Services;
@@ -28,8 +29,9 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
     // elshan.rasulov rolünden bağımsız Temsilci sahiplenme filtresinden muaf.
     private const string ControlUser = "elshan.rasulov";
 
+    // §24 — Admin de Kontrol istisnalarından yararlanır (tam erişim).
     private bool IsControlUser =>
-        User.FindFirstValue(ClaimTypes.Name) == ControlUser;
+        User.FindFirstValue(ClaimTypes.Name) == ControlUser || User.IsSuperAdmin();
 
     // ── Müşteri endpoints ────────────────────────────────────────────────────
 

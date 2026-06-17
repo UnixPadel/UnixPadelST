@@ -15,9 +15,12 @@ import { hideMoneyFor } from '@/lib/visibility'
 interface Props {
   siparisNo: string | null
   onClose: () => void
+  // §22 — "Siparişlerim" (My Orders) ekranında Notlar bölümü tamamen kaldırılır.
+  // Diğer ekranlar (Muhasebe/Fabrika/Lojistik/Kontrol) davranışı değişmez.
+  hideNotes?: boolean
 }
 
-export function OrderDetailModal({ siparisNo, onClose }: Props) {
+export function OrderDetailModal({ siparisNo, onClose, hideNotes = false }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
   // PROMPT-v2 §2 + Round-11 §3: parasal değer gizleme (Fabrika rolü + omur.caliskan
@@ -104,6 +107,12 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
                   {(order.kdv ?? 0) > 0 && <PriceBox label={t('orderDetail.kdv')} value={`%${order.kdv}`} />}
                   <PriceBox label={t('orderDetail.toplam')} value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
                   <PriceBox label={t('orderDetail.pesinYuzde')} value={`%${order.pesinYuzde}`} />
+                  {(order.pesinYuzde ?? 0) > 0 && (
+                    <PriceBox
+                      label={t('orderDetail.pesinatTutar')}
+                      value={formatCurrency(((order.toplamFiyat ?? 0) * (order.pesinYuzde ?? 0)) / 100, order.paraTipi)}
+                    />
+                  )}
                   {order.montajVar && <PriceBox label={t('orderDetail.montaj')} value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
                   {order.teslimatVar && <PriceBox label={t('orderDetail.teslimat')} value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
                 </div>
@@ -145,8 +154,8 @@ export function OrderDetailModal({ siparisNo, onClose }: Props) {
               </div>
             )}
 
-            {/* Details / Notes */}
-            {order.details && order.details.length > 0 && (
+            {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes). */}
+            {!hideNotes && order.details && order.details.length > 0 && (
               <div className="border rounded-md p-3">
                 <h3 className="font-semibold mb-2">{t('orderDetail.notes')}</h3>
                 <ul className="space-y-1 text-muted-foreground">

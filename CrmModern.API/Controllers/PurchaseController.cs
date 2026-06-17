@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Purchase;
 using CrmModern.Core.Interfaces.Services;
@@ -191,7 +192,8 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     [HttpPost("{talepId:int}/override-approve")]
     public async Task<IActionResult> OverrideApprove(int talepId, [FromBody] ApprovalActionDto? dto)
     {
-        if (CurrentUserName != FinalApproverUser)
+        // §24 — Admin de override onayı yapabilir (elshan kalıbına ek).
+        if (CurrentUserName != FinalApproverUser && !User.IsSuperAdmin())
             return Forbid();
         await purchaseService.OverrideApproveAsync(talepId, CurrentUserName, dto?.Aciklama);
         return Ok(ApiResponse<object>.Ok(null!, "Talep onaylandı (override)."));

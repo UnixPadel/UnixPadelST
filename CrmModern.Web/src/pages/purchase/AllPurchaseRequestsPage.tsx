@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -36,7 +37,8 @@ export function AllPurchaseRequestsPage() {
   const [filter, setFilter] = useState<PurchaseFilter>({ page: 1, pageSize: 50 })
 
   // PROMPT-v7 §2: override "Onayla" yalnız elshan.rasulov'a render edilir.
-  const isOverrideUser = getUser()?.kullaniciAdi === 'elshan.rasulov'
+  // §24 — Admin de override "Onayla" butonunu görür/kullanır.
+  const isOverrideUser = getUser()?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(getUser())
   // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez.
   const hideMoney = hideMoneyFor(getUser())
 

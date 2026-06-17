@@ -17,6 +17,7 @@ import { useToast } from '@/components/ToastProvider'
 import { formatDate } from '@/lib/utils'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import type { FactoryOrderListDto } from '@/types'
 
 // FactoryService.GetProductionStagesAsync 5 aşama dönüyor.
@@ -29,7 +30,8 @@ export function FactoryPage() {
   const { getUser } = useAuth()
   // PROMPT-v6 §1.1 — Üretime Al / Hazır aşama geçişleri yalnız simge.cakir
   // (backend Forbid + buton render gate'i; diğer Fabrika kullanıcıları listeyi görür).
-  const isFactoryUser = getUser()?.kullaniciAdi === 'simge.cakir'
+  // §24 — Admin de Üretime Al / Hazır aşama geçişlerini yapabilir.
+  const isFactoryUser = getUser()?.kullaniciAdi === 'simge.cakir' || isSuperAdmin(getUser())
   const [productionTarget, setProductionTarget] = useState<string | null>(null)
   const [fabrikaNot, setFabrikaNot] = useState('')
   const [sTarih, setSTarih] = useState(() => new Date().toISOString().slice(0, 16))

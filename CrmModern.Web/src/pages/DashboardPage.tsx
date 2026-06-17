@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -217,10 +218,11 @@ export function DashboardPage() {
   }, [needsTrend, needsTop])
 
   // PROMPT-v4 §1: Kontrol kartı yalnız elshan.rasulov'a görünür (rol bağımsız).
-  const isControlUser = user?.kullaniciAdi === 'elshan.rasulov'
+  // §24 — Admin (süper-admin) Kontrol ve Cari Onay kartlarını da görür.
+  const isControlUser = user?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user)
   // PROMPT-v6 §1: Muhasebe Onay kartı burcu.karaman'a görünür (rol bağımsız).
   // PROMPT-v7 §1: elshan.rasulov da Cari Onay kartını görür (merkezi bypass).
-  const isAccountingApprover = user?.kullaniciAdi === 'burcu.karaman' || user?.kullaniciAdi === 'elshan.rasulov'
+  const isAccountingApprover = user?.kullaniciAdi === 'burcu.karaman' || user?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user)
   const tiles = useMemo(() => {
     let paths = layout.tiles
     if (isControlUser) paths = ['/quality-control', ...paths]

@@ -65,7 +65,10 @@ public static class ClauseText
         var s = NormalizeToCode(line).Trim();
         if (!s.StartsWith(Prefix, StringComparison.Ordinal)) return line; // gerçek serbest metin
 
-        bool en = string.Equals(lang, "en", StringComparison.OrdinalIgnoreCase);
+        // §18 — bölgesel kodlara toleranslı: "en", "en-US", "EN" hepsi İngilizce.
+        // Frontend zaten 'en'/'tr' normalize eder; bu, doğrudan API çağrıları ve
+        // eski entegrasyonlar için savunma amaçlı ek koruma.
+        bool en = lang is not null && lang.StartsWith("en", StringComparison.OrdinalIgnoreCase);
 
         if (s.StartsWith("@@TESLIMAT:", StringComparison.Ordinal))
         {

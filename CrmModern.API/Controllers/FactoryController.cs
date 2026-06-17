@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Factory;
 using CrmModern.Core.DTOs.Order;
@@ -21,8 +22,9 @@ public sealed class FactoryController(
     // Diğer Fabrika kullanıcıları listeyi görmeye devam eder.
     private const string FactoryUser = "simge.cakir";
 
+    // §24 — Admin de fabrika aşama geçişlerini (Üretime Al / Hazır) yapabilir.
     private bool IsFactoryUser =>
-        User.FindFirstValue(ClaimTypes.Name) == FactoryUser;
+        User.FindFirstValue(ClaimTypes.Name) == FactoryUser || User.IsSuperAdmin();
 
     /// <summary>
     /// Returns orders in production stages (Planlama/Uretim/Hazir/Lojistik/Tamamlandi).

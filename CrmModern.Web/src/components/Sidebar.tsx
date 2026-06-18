@@ -46,7 +46,7 @@ const navItems: NavItem[] = [
   { path: '/approval/pre',     i18nKey: 'nav.approvalPre',     icon: <FileText className="h-4 w-4" />, usernames: ['omur.caliskan'] },
   { path: '/approval/payment', i18nKey: 'nav.approvalPayment', icon: <FileText className="h-4 w-4" />, roles: ['Muhasebe'] },
   { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
-  { path: '/customers',       i18nKey: 'nav.customers',       icon: <UserPlus className="h-4 w-4" />,roles: ['Yonetici','Temsilci','Gozlemci','Muhasebe'] },
+  { path: '/customers',       i18nKey: 'nav.customers',       icon: <UserPlus className="h-4 w-4" />,roles: ['Yonetici','Temsilci','Gozlemci','Muhasebe','Lojistik'] },
   { path: '/users',           i18nKey: 'nav.users',           icon: <Users className="h-4 w-4" />,   roles: ['Yonetici'] },
   // Round-8 §13 — Temsilci performans raporu yalnız Yonetici.
   { path: '/reporting/representatives', i18nKey: 'nav.reporting', icon: <BarChart3 className="h-4 w-4" />, roles: ['Yonetici'] },

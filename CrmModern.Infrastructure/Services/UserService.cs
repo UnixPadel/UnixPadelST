@@ -29,9 +29,12 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
 
     // Slim lookup — Fabrika filter "Temsilci" dropdown'u için.
     // Tüm authenticated kullanıcılara açık (no role restriction in controller).
+    // §26 — yalnız AKTİF kullanıcılar döner: pasif (ayrılan) personel hiçbir
+    // dropdown/filtre/autocomplete'te görünmez. Tarihsel ad gösterimi ayrı
+    // çözümleme map'leriyle (GetAllAsync) korunur.
     public async Task<IReadOnlyList<UserLookupDto>> GetLookupAsync()
     {
-        var users = await uow.Kullanicilar.GetAllAsync();
+        var users = await uow.Kullanicilar.GetActiveAsync();
         return users
             .OrderBy(u => u.Ad).ThenBy(u => u.Soyad)
             .Select(u => new UserLookupDto(u.KullaniciID, u.Ad, u.Soyad, u.YetkiTuru))

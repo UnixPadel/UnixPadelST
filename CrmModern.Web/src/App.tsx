@@ -44,10 +44,11 @@ export default function App() {
         {/* Round-8 §13 — Temsilci performans raporu YALNIZ Yonetici. */}
         <Route path="/reporting/representatives" element={<RoleGuard roles={['Yonetici']}><RepPerformancePage /></RoleGuard>} />
         {/* PROMPT.md #16 + #19 — Müşteri CRUD. Per-row matrix:
-              list   — Yonetici, Temsilci, Gozlemci, Muhasebe (read-only)
+              list   — Yonetici, Temsilci, Gozlemci, Muhasebe, Lojistik (read-only)
               new    — Yonetici, Temsilci, Gozlemci
-              edit   — Yonetici, Gozlemci  (Temsilci can add but not edit) */}
-        <Route path="/customers"            element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci','Muhasebe']}><CustomersPage /></RoleGuard>} />
+              edit   — Yonetici, Gozlemci  (Temsilci can add but not edit)
+              Lojistik: yalnız listeyi GÖRÜR (ekleme/düzenleme/silme YOK). */}
+        <Route path="/customers"            element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci','Muhasebe','Lojistik']}><CustomersPage /></RoleGuard>} />
         <Route path="/customers/new"        element={<RoleGuard roles={['Yonetici','Temsilci','Gozlemci']}><CustomerFormPage /></RoleGuard>} />
         <Route path="/customers/:id/edit"   element={<RoleGuard roles={['Yonetici','Gozlemci']}><CustomerFormPage /></RoleGuard>} />
         {/* PROMPT-v4 §1 — Kontrol ekranı YALNIZ elshan.rasulov (rol değil; Yonetici dahil giremez). */}

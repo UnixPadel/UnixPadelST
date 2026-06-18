@@ -158,22 +158,12 @@ export function RepPerformancePage() {
           </div>
         </div>
 
-        {/* Tüm temsilciler tablosu */}
-        <DataTable
-          columns={cols}
-          data={reps as (RepPerformance & Record<string, unknown>)[]}
-          keyField="kullaniciID"
-          loading={isLoading}
-          density="compact"
-          emptyMessage={t('reporting.empty')}
-        />
-
-        {/* Seçili temsilci analiz panosu */}
-        {selectedId == null ? (
-          <Card><CardContent className="py-10 text-center text-muted-foreground text-sm">
-            {t('reporting.detail.selectHint')}
-          </CardContent></Card>
-        ) : detailLoading ? (
+        {/* §28 — Seçili temsilci "Analiz Panosu" açıldığında EN ÜSTTE (tüm-temsilciler
+            tablosunun ÜSTÜNDE) belirgin gösterilir. Önceden tablonun altında kalıp göze
+            çarpmıyordu. Hiç temsilci seçilmemişken bu bölüm render edilmez; yönlendirme
+            ipucu tablonun altında durur. */}
+        {selectedId != null && (
+          detailLoading ? (
           <Card><CardContent className="py-10 flex items-center justify-center text-muted-foreground">
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('common.loading')}
           </CardContent></Card>
@@ -277,6 +267,24 @@ export function RepPerformancePage() {
               </Card>
             </div>
           </div>
+          )
+        )}
+
+        {/* Tüm temsilciler tablosu — analiz panosunun altında. */}
+        <DataTable
+          columns={cols}
+          data={reps as (RepPerformance & Record<string, unknown>)[]}
+          keyField="kullaniciID"
+          loading={isLoading}
+          density="compact"
+          emptyMessage={t('reporting.empty')}
+        />
+
+        {/* Hiç temsilci seçilmemişken yönlendirme ipucu — tablonun altında. */}
+        {selectedId == null && (
+          <Card><CardContent className="py-6 text-center text-muted-foreground text-sm">
+            {t('reporting.detail.selectHint')}
+          </CardContent></Card>
         )}
       </div>
     </div>

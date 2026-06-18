@@ -303,6 +303,7 @@
       "ek": "Attachment",
       "ekHint": "Attach only in ZIP or RAR format",
       "standardTerms": "Standard Terms",
+      "autoTerms": "Automatic terms (delivery / payment / installation)",
       "freeNotes": "Notes (one per line)",
       "toplamFiyatLabel": "Total Price",
       "kaporaMiktari": "Deposit Amount",
@@ -503,6 +504,7 @@
     "deleteSuccess": "User deleted",
     "passwordChanged": "Password changed",
     "deleteConfirm": "Are you sure you want to delete this user?",
+    "showPassive": "Show passive",
     "yetkiTuru": "Role",
     "columns": {
       "kullaniciAdi": "Username",

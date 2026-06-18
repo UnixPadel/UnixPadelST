@@ -29,14 +29,15 @@ import { INCOTERMS } from '@/lib/constants'
 // Round-8 §4/§5 — standart şartlar artık yapılandırılmış KOD olarak saklanır
 // (dil-duyarlı proforma/ekran). Yardımcılar src/lib/clauses.ts'te.
 import {
-  STANDART_SART_KODLARI, CLAUSE, ODEME_PREFIX, TESLIMAT_PREFIX,
+  STANDART_DETAY_SARTLARI, CLAUSE, ODEME_PREFIX, TESLIMAT_PREFIX,
   teslimatCode, odemeCode, upsertClause, parseOdemeFromDetails,
-  resolveClause, normalizeToCode, isClauseCode,
+  normalizeToCode, isFreeNote,
 } from '@/lib/clauses'
 import type { CreateOrderDto, OrderDetail, OrderSetInput } from '@/types'
 
-const PARA_TIPLERI_RADIO = ['Euro', 'Dolar', 'TL'] as const
-const PARA_TIPLERI_DIGER = ['Sterlin'] as const
+// §30 — Cari Bilgi para birimleri: "Diğer" dropdown'u kaldırıldı; Sterlin doğrudan
+// 4. radyo olarak eklendi. Sistemin yerel para birimleri: Euro / Dolar / TL / Sterlin.
+const PARA_TIPLERI_RADIO = ['Euro', 'Dolar', 'TL', 'Sterlin'] as const
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk'] as const
 
 /** Currency symbol for any selected paraTipi (Euro/Dolar/TL/Sterlin). */
@@ -52,6 +53,12 @@ function currencySymbol(paraTipi: string): string {
 
 const SET_COUNT = 5 // Legacy Sipariş 1..5
 
+// §31 — Detaylar sekmesi YALNIZ eski CRM'in 17 İngilizce standart şartını gösterir
+// (+ kullanıcı serbest notları). Ticari/otomatik @@kodlar (FIYAT/KDV/KARGO/HAKLAR ve
+// kontrol-güdümlü TESLIMAT/ODEME/MONTAJ) ARTIK Detaylar listesinde GÖSTERİLMEZ ve
+// proforma #DETAY'da görünmez (backend bunları #DETAY'dan eler). Teslimat/ödeme/montaj
+// zaten proformanın kendi satırlarında render edilir → tekrar olmaz.
+
 const blank = (): CreateOrderDto => ({
   musteriAd: '', siparisNotu: '',
   sTelefon: '', sFax: '', sWeb: '', sE_Mail: '', sVatNumarasi: '', sUlke: '', sAdres: '',
@@ -63,9 +70,10 @@ const blank = (): CreateOrderDto => ({
   // PROMPT-v2 §3: İndirim/KDV/Peşin başlangıçta boş — "henüz karar vermedi"
   // semantiği. Backend null → 0 coercion'ını total hesaplamada uygular.
   paraTipi: 'Euro', indirim: null, kdv: null, pesinYuzde: null,
-  // PROMPT-v6 §5 — yeni boş form standart şartlarla seed'li gelir.
-  // Revize/Formu Getir modunda detailToForm() bunları kaynağın içeriğiyle ezer.
-  sets: [], details: [...STANDART_SART_KODLARI], sirket: 'Unixpadel',
+  // §31 — yeni boş form, eski CRM'deki gibi YALNIZ 17 İngilizce standart şartla
+  // (hepsi işaretli) seed'li gelir. Ticari/otomatik @@kod seed'lenmez. Revize/Formu
+  // Getir modunda detailToForm() bunları kaynağın içeriğiyle ezer.
+  sets: [], details: [...STANDART_DETAY_SARTLARI], sirket: 'Unixpadel',
 })
 
 /**
@@ -270,6 +278,17 @@ export function NewOrderPage() {
       mAdres:       c.adres,
     }))
   }
+
+  // OFFER-DETAILS — checklist toggle: işaretlenen şartı (literal metin veya
+  // @@kod) form.details'e ekler/çıkarır. Diğer satırlara (otomatik kodlar,
+  // serbest notlar) dokunmaz → teslimat/ödeme/montaj wiring'i bozulmaz.
+  const toggleClause = (clause: string, checked: boolean) =>
+    setForm((f) => ({
+      ...f,
+      details: checked
+        ? (f.details.includes(clause) ? f.details : [...f.details, clause])
+        : f.details.filter((d) => d !== clause),
+    }))
 
   // ── Validation ────────────────────────────────────────────────────────
   const hasLineItems = (form.details?.length ?? 0) > 0 || (form.sets?.length ?? 0) > 0
@@ -702,8 +721,6 @@ export function NewOrderPage() {
   const sym = currencySymbol(form.paraTipi)
   const fmt = (n: number) => n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
-  // Para tipi: 3 radyo + "Diğer" dropdown (legacy düzeni birebir).
-  const isInRadio = (PARA_TIPLERI_RADIO as readonly string[]).includes(form.paraTipi)
 
   return (
     <div>
@@ -879,7 +896,6 @@ export function NewOrderPage() {
                       {t('orders.form.siparisN', { n: i + 1 })}
                     </TabsTrigger>
                   ))}
-                  <TabsTrigger value="detay" className="px-3 py-1 text-xs">{t('orders.form.details')}</TabsTrigger>
                 </TabsList>
               </div>
 
@@ -1038,41 +1054,8 @@ export function NewOrderPage() {
                 </TabsContent>
               ))}
 
-              {/* Detay sekmesi — §5: standart şartlar ayrı liste (kod, dil-duyarlı)
-                  + serbest notlar ayrı textarea (verbatim). */}
-              <TabsContent value="detay" className="m-0 p-4 space-y-3">
-                <h4 className="text-center text-base font-semibold">{t('orders.form.details')}</h4>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">{t('orders.form.standardTerms')}</Label>
-                  {(form.details ?? []).filter(isClauseCode).length === 0 ? (
-                    <p className="text-xs text-muted-foreground">—</p>
-                  ) : (
-                    <ul className="list-disc space-y-0.5 pl-5 text-sm">
-                      {(form.details ?? []).filter(isClauseCode).map((c, i) => (
-                        <li key={i}>{resolveClause(t, c)}</li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-
-                <div className="space-y-1">
-                  <Label className="text-xs">{t('orders.form.freeNotes')}</Label>
-                  <Textarea
-                    rows={10}
-                    value={(form.details ?? []).filter((s) => !isClauseCode(s)).join('\n')}
-                    onChange={(e) => {
-                      const free = e.target.value.split('\n').filter((s) => s.length > 0)
-                      setForm((f) => ({
-                        ...f,
-                        // Kodları koru, serbest metni değiştir (kodlar başta kalır).
-                        details: [...f.details.filter(isClauseCode), ...free],
-                      }))
-                    }}
-                    placeholder={'Not 1\nNot 2\n...'}
-                  />
-                </div>
-              </TabsContent>
+              {/* §31 — "DETAYLAR" sekmesi kaldırıldı; ürün tablosunun ALTINA, Kaydet'in
+                  üstüne tam-genişlik bölüm olarak taşındı (grid'in altına bakın). */}
             </Tabs>
           </section>
 
@@ -1092,7 +1075,7 @@ export function NewOrderPage() {
             <section className="rounded-md border bg-card">
               <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.sections.cariBilgi')}</h3>
               <div className="p-3 space-y-3">
-                {/* Para Tipi radyolar + Diğer dropdown */}
+                {/* §30 — Para Tipi radyoları: Euro / Dolar / TL / Sterlin (Diğer kaldırıldı) */}
                 <div className="flex items-center gap-3 flex-wrap text-sm">
                   {PARA_TIPLERI_RADIO.map((p) => (
                     <label key={p} className="flex items-center gap-1 cursor-pointer">
@@ -1106,15 +1089,6 @@ export function NewOrderPage() {
                       <span>{p}</span>
                     </label>
                   ))}
-                  <Select
-                    value={isInRadio ? '' : form.paraTipi}
-                    onValueChange={(v) => setForm((f) => ({ ...f, paraTipi: v }))}
-                  >
-                    <SelectTrigger className="w-28 h-8"><SelectValue placeholder={t('orders.form.diger')} /></SelectTrigger>
-                    <SelectContent>
-                      {PARA_TIPLERI_DIGER.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
@@ -1319,6 +1293,45 @@ export function NewOrderPage() {
             </section>
           </div>
         </div>
+
+        {/* §31 — DETAYLAR: ürün tablosunun ALTINDA, Kaydet'in ÜSTÜNDE tam-genişlik
+            bölüm. YALNIZ eski CRM'in 17 İngilizce standart şartı (checkbox) + kullanıcı
+            serbest notları. Otomatik/ticari @@kodlar burada gösterilmez ve proforma
+            #DETAY'da görünmez (backend eler). */}
+        <section className="mt-4 rounded-md border bg-card">
+          <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.form.details')}</h3>
+          <div className="p-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-xs">{t('orders.form.standardTerms')}</Label>
+              <div className="grid gap-x-6 gap-y-1 sm:grid-cols-2 rounded-md border p-3">
+                {STANDART_DETAY_SARTLARI.map((clause) => (
+                  <label key={clause} className="flex items-start gap-2 text-sm cursor-pointer select-none">
+                    <input type="checkbox" className="mt-1 h-3.5 w-3.5 shrink-0"
+                      checked={(form.details ?? []).includes(clause)}
+                      onChange={(e) => toggleClause(clause, e.target.checked)} />
+                    <span>{clause}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">{t('orders.form.freeNotes')}</Label>
+              <Textarea
+                rows={4}
+                value={(form.details ?? []).filter(isFreeNote).join('\n')}
+                onChange={(e) => {
+                  const free = e.target.value.split('\n').filter((s) => s.trim().length > 0)
+                  setForm((f) => ({
+                    ...f,
+                    // İşaretli standart şartları + (görünmez) kodları koru, yalnız serbest notları değiştir.
+                    details: [...f.details.filter((s) => !isFreeNote(s)), ...free],
+                  }))
+                }}
+                placeholder={'Not 1\nNot 2\n...'}
+              />
+            </div>
+          </div>
+        </section>
 
         {/* ╔══════════ FOOTER: AKSIYON BUTONLARI ═════════════════════════ */}
         <div className="mt-4 flex flex-wrap justify-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t">

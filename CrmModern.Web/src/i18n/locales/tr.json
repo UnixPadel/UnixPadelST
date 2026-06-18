@@ -303,6 +303,7 @@
       "ek": "Ek",
       "ekHint": "Ek'i yalnızca ZIP veya RAR formatında ekleyiniz",
       "standardTerms": "Standart Şartlar",
+      "autoTerms": "Otomatik şartlar (teslimat / ödeme / montaj)",
       "freeNotes": "Notlar (her satır bir not)",
       "toplamFiyatLabel": "Toplam Fiyat",
       "kaporaMiktari": "Kapora Miktarı",
@@ -503,6 +504,7 @@
     "deleteSuccess": "Kullanıcı silindi",
     "passwordChanged": "Şifre değiştirildi",
     "deleteConfirm": "Bu kullanıcıyı silmek istediğinize emin misiniz?",
+    "showPassive": "Pasif Kullanıcıları Göster",
     "yetkiTuru": "Yetki Türü",
     "columns": {
       "kullaniciAdi": "Kullanıcı Adı",

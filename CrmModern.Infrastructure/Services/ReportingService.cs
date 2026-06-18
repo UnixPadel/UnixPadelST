@@ -541,12 +541,13 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
                 case "#KDV":
+                    // §29 — WinForms (Muhasebe.cs excelYazOzet_Click #KDV) BIREBIR: `Kdv`
+                    // kolonu MUTLAK bir tutardır (ör. 6000 = €6.000,00), YÜZDE DEĞİL.
+                    // Diverjans: önceki kod onu yüzde sanıp `ToplamFiyat * Kdv/100`
+                    // hesaplıyordu → 6000 değeri için "+ 4.920.000,00 % 6000" gibi saçma
+                    // satır üretiyordu. Orijinal çıktı: "+<sembol> <tutar>".
                     if (kdv > 0)
-                    {
-                        decimal toplam   = order.ToplamFiyat ?? 0m;
-                        decimal kdvTutar = toplam * (kdv / 100m);
-                        cell.Value = "+ " + kdvTutar.ToString("N2", TrTR) + " % " + ((int)kdv).ToString(TrTR);
-                    }
+                        cell.Value = "+" + paraBirimi + kdv.ToString("N2", TrTR);
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
 
@@ -562,6 +563,14 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     foreach (var d in order.Details)
                     {
                         if (string.IsNullOrWhiteSpace(d.Text)) continue;
+                        // §31 — Otomatik/kodlu şartları #DETAY'dan ELE: @@TESLIMAT/@@ODEME/@@MONTAJ
+                        // ve diğer @@kodlar (+ bunlara normalize olan legacy "Teslimat Şekli:" /
+                        // "Ödeme Şekli:" / TR ticari literalleri). Teslimat/ödeme/montaj zaten
+                        // proformanın KENDİ satırlarında (#TESLIMATCESITI/#ODEMEORANI/#MONTAJ)
+                        // render edilir → #DETAY'da tekrar etmesin. Yalnız literal metin
+                        // (eski CRM 17 İngilizce standart şart + kullanıcı serbest notları) yazılır.
+                        if (ClauseText.NormalizeToCode(d.Text).StartsWith(ClauseText.Prefix, StringComparison.Ordinal))
+                            continue;
                         var text = ClauseText.Resolve(d.Text, lang);
                         ws.Cell(baseR + rowIdx, baseC + colIdx).Value = $"{count}. {text}";
                         rowIdx++;
@@ -688,7 +697,8 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         // türetip sözlüğü yalnız FİLTRE olarak kullandığı için, o dönemde siparişi
         // olmayan temsilciler hiç görünmüyordu. Artık roster'dan sürülür: siparişi
         // olmayan temsilci de SIFIR satırla görünür.
-        var temsilciler = (await uow.Kullanicilar.GetAllAsync())
+        // §26 — pasif (ayrılan) temsilciler performans rosterında görünmez.
+        var temsilciler = (await uow.Kullanicilar.GetActiveAsync())
             .Where(u => u.YetkiTuru == "Temsilci")
             .ToList();
         var ids = temsilciler.Select(u => u.KullaniciID).ToHashSet();

@@ -111,10 +111,18 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         var entity = new PurchaseRequest
         {
             UrunAdi               = dto.UrunAdi,
-            UrunTuru              = dto.UrunTuru,
+            // §27 — SatinAlmaTalep.UrunTuru kolonu varchar(500) NOT NULL (default yok).
+            // Round-9 çok-kalemli yeni form ayrı "Ürün Türü" alanı göndermez → dto.UrunTuru
+            // null gelir → EF INSERT NULL yazar → MySqlException 1048 "Column 'UrunTuru'
+            // cannot be null" → POST /api/purchase 500. Non-null bir değere düş: istemci
+            // tür verdiyse onu, vermediyse ürün özetini (UrunAdi) kullan (legacy semantiğe
+            // en yakın, her zaman non-null).
+            UrunTuru              = string.IsNullOrWhiteSpace(dto.UrunTuru) ? dto.UrunAdi : dto.UrunTuru,
             UrunMaliyeti          = grandTotal,
             ParaBirimi            = dto.ParaBirimi,
-            AlinanYer             = dto.AlinanYer,
+            // AlinanYer da NOT NULL — istemci doğrulaması boş bırakmaz ama DTO nullable;
+            // aynı 1048 sınıfı hataya düşmemek için non-null garanti.
+            AlinanYer             = dto.AlinanYer ?? string.Empty,
             TalepEdenKullaniciAdi = dto.TalepEdenKullaniciAdi,
             Departman             = dto.Departman,
             TalepTarihi           = DateTime.Now,

@@ -30,8 +30,12 @@ export function UsersPage() {
   const [editForm, setEditForm] = useState<UpdateUserDto>({ ad: '', soyad: '', email: '', telefon: '', yetkiTuru: '', durum: '' })
   const [pwUser, setPwUser] = useState<UserListDto | null>(null)
   const [pwValue, setPwValue] = useState('')
+  // §26 — Pasif kullanıcılar varsayılan olarak gizli (uygulamanın geri kalanında
+  // hiç görünmezler). Yönetici bu anahtarla yeniden etkinleştirmek için görebilir.
+  const [showPassive, setShowPassive] = useState(false)
 
   const { data = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: getUsers })
+  const visibleData = showPassive ? data : data.filter((u) => u.durum !== 'Pasif')
 
   const createMut = useMutation({
     mutationFn: () => createUser(createForm),
@@ -107,10 +111,23 @@ export function UsersPage() {
       <PageHeader
         title={t('users.title')}
         description={t('users.subtitle')}
-        actions={<Button onClick={() => setShowCreate(true)}>{t('users.newUser')}</Button>}
+        actions={
+          <div className="flex items-center gap-4">
+            <label className="flex items-center gap-2 text-sm text-muted-foreground cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="h-4 w-4 cursor-pointer"
+                checked={showPassive}
+                onChange={(e) => setShowPassive(e.target.checked)}
+              />
+              {t('users.showPassive')}
+            </label>
+            <Button onClick={() => setShowCreate(true)}>{t('users.newUser')}</Button>
+          </div>
+        }
       />
       <div className="p-6">
-        <DataTable columns={columns} data={data as (UserListDto & Record<string, unknown>)[]} keyField="kullaniciID" loading={isLoading} />
+        <DataTable columns={columns} data={visibleData as (UserListDto & Record<string, unknown>)[]} keyField="kullaniciID" loading={isLoading} />
       </div>
 
       {/* Create */}

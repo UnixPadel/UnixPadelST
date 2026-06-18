@@ -14,6 +14,16 @@ public interface IKullaniciRepository : IBaseRepository<Kullanici>
 
     Task<bool> KullaniciAdiExistsAsync(string kullaniciAdi);
 
+    /// <summary>
+    /// §26 — Yalnız AKTİF kullanıcılar (Durum != 'Pasif'). Seçim bağlamlarının
+    /// (dropdown/lookup/temsilci roster/arama) merkezî kaynağı. Pasif kullanıcılar
+    /// (ayrılan personel) uygulamada hiçbir seçilebilir listede görünmez. NULL/boş/
+    /// bilinmeyen durum 'aktif' sayılır (yalnız açıkça 'Pasif' gizlenir).
+    /// Tarihsel ad çözümlemesi (sipariş sahibi vb.) GetAllAsync ile yapılır — onlar
+    /// pasif kullanıcıyı KORUR ki eski kayıtlar adı göstermeye devam etsin.
+    /// </summary>
+    Task<IReadOnlyList<Kullanici>> GetActiveAsync();
+
     /// <summary>Faz 7 — Topbar global arama. KullaniciAdi/Ad/Soyad/Email üzerinde LIKE (yalnız Yonetici çağırır).</summary>
     Task<IReadOnlyList<Kullanici>> QuickFindAsync(string query, int limit);
 

@@ -21,6 +21,15 @@ internal sealed class KullaniciRepository(AppDbContext context)
     public async Task<bool> KullaniciAdiExistsAsync(string kullaniciAdi) =>
         await _dbSet.AnyAsync(k => k.KullaniciAdi == kullaniciAdi);
 
+    // §26 — Aktif kullanıcılar (Durum != 'Pasif'). Seçim/lookup/roster/arama
+    // bağlamlarının merkezî kaynağı; pasif kullanıcılar hiçbir seçilebilir
+    // listede görünmez. Tarihsel kayıtlar GetAllAsync ile çözülmeye devam eder.
+    public async Task<IReadOnlyList<Kullanici>> GetActiveAsync() =>
+        await _dbSet
+            .AsNoTracking()
+            .Where(k => k.Durum != "Pasif")
+            .ToListAsync();
+
     public async Task<int> UpdateSifreAsync(int kullaniciID, string newSifre) =>
         await _context.KullaniciBilgileri
             .Where(k => k.KullaniciID == kullaniciID)
@@ -31,10 +40,12 @@ internal sealed class KullaniciRepository(AppDbContext context)
         var q = $"%{query}%";
         return await _context.KullaniciBilgileri
             .AsNoTracking()
-            .Where(k => EF.Functions.Like(k.KullaniciAdi, q)
+            // §26 — pasif kullanıcılar global aramada da görünmez.
+            .Where(k => k.Durum != "Pasif"
+                     && (EF.Functions.Like(k.KullaniciAdi, q)
                      || EF.Functions.Like(k.Ad, q)
                      || EF.Functions.Like(k.Soyad, q)
-                     || EF.Functions.Like(k.Email, q))
+                     || EF.Functions.Like(k.Email, q)))
             .OrderBy(k => k.KullaniciAdi)
             .Take(limit)
             .ToListAsync();

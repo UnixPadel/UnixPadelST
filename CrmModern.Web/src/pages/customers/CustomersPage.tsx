@@ -23,8 +23,10 @@ import type { Musteri } from '@/types'
  *   Temsilci  — list / add               (add but not edit)
  *   Gozlemci  — list / add / edit
  *   Muhasebe  — list (read-only)
+ *   Lojistik  — list (read-only)   // sadece görüntüleme; ekleme/düzenleme/silme YOK
  *
  * Row click → /customers/:id/edit, but only for roles that can edit.
+ * Lojistik ADD_ROLES/EDIT_ROLES'te olmadığı için otomatik salt-okunur olur.
  */
 
 const ADD_ROLES  = new Set(['Yonetici', 'Temsilci', 'Gozlemci'])

@@ -20,6 +20,42 @@ export const STANDART_SART_KODLARI: readonly string[] = [
   CLAUSE.FIYAT, CLAUSE.KDV, CLAUSE.KARGO, CLAUSE.MONTAJ, CLAUSE.HAKLAR,
 ]
 
+// "OFFER INCLUDE BELOW DETAILS" — eski CRM (WindowsFormsApp1 / SiparisForm.cs,
+// satır 598-614) standart şart listesi: 17 önceden tanımlı İngilizce şart.
+// Eski sistemde yeni siparişte hepsi İŞARETLİ (checkbox) gelir; kullanıcı
+// istemediğini kaldırır, yalnız işaretliler DetayTablo'ya yazılır ve proformada
+// #DETAY altında listelenir. Metinler ORİJİNALE BİREBİR korunur (yazım dahil) —
+// çeviri YOK: literal metin ClauseText.Resolve'dan olduğu gibi geçer, böylece TR
+// ve EN proformada aynı İngilizce çıkar (eski CRM davranışı). Yeni şart EKLENMEZ.
+export const STANDART_DETAY_SARTLARI: readonly string[] = [
+  'Include all necessary Standard padel structure',
+  '80x60x3mm electro static powder paint structure',
+  'Galvanized 50x50x4mm fence with powder paint',
+  'FIP approved 9000dtex blue padel grass',
+  '10mm temperred padel glass with EN and CE certificate',
+  'Glass waranty againts Temperred broken by producer',
+  'Transport delivered to ...',
+  'Metallic structure under unixpadel warranty 10 years',
+  'Padel grass under unixpadel 5 years warranty',
+  'Led light 200 w 2 years warranty under producer',
+  'Proffesional padel net and pole with standard',
+  'Instllation will make by Unixpadel team and buyer',
+  'Unixpadel responsiable untill loading from Factory',
+  'Loading the goods under unixpadel responsiable',
+  'Unloading the goods under Buyer responsiable',
+  'Buyer will provide all necessary machinery',
+  'Buyer will provide installation helper on side in ...',
+]
+
+const STANDART_DETAY_SET = new Set<string>(STANDART_DETAY_SARTLARI)
+
+/** Satır eski CRM'in 17 önceden tanımlı standart şartından biri mi? */
+export const isStandardDetay = (line: string): boolean => STANDART_DETAY_SET.has(line.trim())
+
+/** Ne @@kod ne de önceden tanımlı 17 şart → kullanıcının serbest (custom) notu. */
+export const isFreeNote = (line: string): boolean =>
+  !isClauseCode(line) && !isStandardDetay(line)
+
 export const teslimatCode = (incoterm: string) => `${TESLIMAT_PREFIX}${incoterm}`
 export const odemeCode = (sekli: 'Pesin' | 'Vadeli', pesinYuzde: number | null): string => {
   if (sekli === 'Pesin') return `${ODEME_PREFIX}Pesin`

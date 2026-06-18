@@ -762,7 +762,9 @@ export function NewOrderPage() {
             verildi, böylece grid çocukları kendi içerikleriyle taşmaz —
             yatay scroll yalnız ortadaki bileşen tablosunda lazım olur.
         */}
-        <div className="grid grid-cols-1 lg:grid-cols-[300px_minmax(0,1fr)_380px] gap-4">
+        {/* §32 — 3 kolonlu yerleşim yalnız xl (≥1280) altında; daha dar/ölçeklenmiş
+            ekranlarda (1024-1279) orta kolon ~72px'e sıkışmasın diye tek kolona yığılır. */}
+        <div className="grid grid-cols-1 xl:grid-cols-[300px_minmax(0,1fr)_380px] gap-4">
 
           {/* ╔══════════ LEFT: MÜŞTERİ + TEMSİLCİ ══════════════════════ */}
           <div className="space-y-4 min-w-0">

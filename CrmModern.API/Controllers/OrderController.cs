@@ -431,8 +431,23 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Excel(string no, [FromQuery] string lang = "tr")
     {
-        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe")  && !User.IsInRole("Lojistik") && !IsControlUser)
-            return Forbid();
+        // §32 — Proforma indirme yetkisi:
+        //   Yonetici / Muhasebe / Lojistik / Kontrol kullanıcısı → her sipariş.
+        //   Temsilci → YALNIZ kendi oluşturduğu sipariş (own-only) — eski kod
+        //     Temsilci'yi tamamen reddediyordu → kendi siparişlerinde de 403.
+        //   Fabrika (parasal değer göremez) + diğer roller → erişemez.
+        bool privileged = User.IsInRole("Yonetici") || User.IsInRole("Muhasebe")
+                       || User.IsInRole("Lojistik") || IsControlUser;
+        if (!privileged)
+        {
+            if (!User.IsInRole("Temsilci"))
+                return Forbid();
+            // Temsilci sahiplik kontrolü: `no` (SiparisNo veya TeklifNo) kullanıcının
+            // KENDİ siparişlerinden biri olmalı; başkasının siparişi → Forbid.
+            var mine = await orderService.GetMyOrdersAsync(CurrentUserId);
+            if (!mine.Any(o => o.SiparisNo == no || o.TeklifNo == no))
+                return Forbid();
+        }
         var bytes = await reportingService.ExportOrderProformaAsync(no, lang);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes,

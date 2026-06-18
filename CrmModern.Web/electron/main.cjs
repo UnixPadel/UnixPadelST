@@ -55,9 +55,13 @@ async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
-    // PROMPT-v6 §6 — layout'un altına inilemesin (tablolar kaymasın).
-    minWidth: 1280,
-    minHeight: 720,
+    // §32 — minWidth 1280/minHeight 720 idi; DPI ölçeklemeli (125%/150%) veya küçük
+    // dizüstü/harici monitörlerde MANTIKSAL çözünürlük bunun altına düşünce pencere
+    // ekrana SIĞMIYOR → içerik taşıyor/kesiliyor. Layout zaten responsive (içerik
+    // <lg'de dikey yığılır, tablolar kendi sarmalayıcılarında kayar), bu yüzden min'i
+    // düşürdük: pencere küçük ekrana sığsın, layout uyum sağlasın.
+    minWidth: 1024,
+    minHeight: 640,
     title: 'UnixPadelST',
     autoHideMenuBar: true,
     webPreferences: {

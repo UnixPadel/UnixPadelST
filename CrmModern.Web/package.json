@@ -1,7 +1,7 @@
 {
   "name": "unixpadelst",
   "private": true,
-  "version": "0.2.22",
+  "version": "0.2.23",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -28,9 +28,8 @@
       "artifactName": "UnixPadelST-Setup-${version}.${ext}"
     },
     "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true,
+      "oneClick": true,
+      "perMachine": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "UnixPadelST"

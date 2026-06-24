@@ -42,10 +42,19 @@ export function getStoredUser(): AuthUser | null {
   }
 }
 
+// Masaüstü (Electron) istemcisi: oturum, otomatik güncelleme uygulamayı yeniden
+// başlatınca KAYBOLMASIN diye her zaman localStorage'da tutulur. sessionStorage
+// uygulama kapanışında silinir → güncelleme sonrası kullanıcı oturumdan düşerdi.
+// Güvenlik sınırı JWT "exp" ile korunur (remember=false için ~8 saat). Tarayıcıda
+// (web) eski "Beni Hatırla" davranışı aynen korunur.
+const isDesktop = typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent)
+
 /** Giriş anında çağrılır: remember'a göre hedef store seçilir, diğeri temizlenir. */
 export function saveAuth(user: AuthUser, remember: boolean): void {
-  const target = remember ? localStorage : sessionStorage
-  const other = remember ? sessionStorage : localStorage
+  // Masaüstünde her zaman kalıcı store (güncelleme oturumu düşürmesin).
+  const persist = remember || isDesktop
+  const target = persist ? localStorage : sessionStorage
+  const other = persist ? sessionStorage : localStorage
   // Eski oturum kalıntısını diğer store'dan temizle (çift kayıt / kafa karışıklığı önlenir).
   other.removeItem(TOKEN_KEY)
   other.removeItem(USER_KEY)

@@ -125,7 +125,72 @@ public sealed class LogisticsController(ILogisticsService logisticsService) : Co
         var result = await logisticsService.GetCesitlerAsync();
         return Ok(ApiResponse<IReadOnlyList<string>>.Ok(result));
     }
+
+    // ── Lojistik Teklif (offers) ────────────────────────────────────────────────
+    // Yalnız Lojistik + Yönetici. Onay/iptal yalnız Yönetici (SuperAdmin handler ile geçer).
+
+    /// <summary>Üretim→tamamlanma aralığındaki siparişler + teklif sayısı + onaylı özet.</summary>
+    [HttpGet("offers/queue")]
+    [Authorize(Roles = "Yonetici,Lojistik")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<LogisticsOfferQueueItemDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOfferQueue()
+    {
+        var result = await logisticsService.GetOfferQueueAsync();
+        return Ok(ApiResponse<IReadOnlyList<LogisticsOfferQueueItemDto>>.Ok(result));
+    }
+
+    /// <summary>Bir siparişin tüm lojistik teklifleri.</summary>
+    [HttpGet("offers/{siparisNo}")]
+    [Authorize(Roles = "Yonetici,Lojistik")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<LogisticsOfferDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetOffers(string siparisNo)
+    {
+        var result = await logisticsService.GetOffersAsync(siparisNo);
+        return Ok(ApiResponse<IReadOnlyList<LogisticsOfferDto>>.Ok(result));
+    }
+
+    /// <summary>Yeni lojistik teklif gir (yalnız Lojistik). Yönetici teklif oluşturmaz.</summary>
+    [HttpPost("offers/{siparisNo}")]
+    [Authorize(Roles = "Lojistik")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> SubmitOffer(string siparisNo, [FromBody] SubmitLogisticsOfferRequest req)
+    {
+        await logisticsService.SubmitOfferAsync(siparisNo, CurrentUserId, req);
+        return Ok(ApiResponse<object>.Ok(null!, "Lojistik teklif kaydedildi."));
+    }
+
+    /// <summary>Teklifi onayla (yalnız Yönetici). Tek onaylı kalır.</summary>
+    [HttpPost("offers/{teklifId:int}/approve")]
+    [Authorize(Roles = "Yonetici")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ApproveOffer(int teklifId)
+    {
+        await logisticsService.ApproveOfferAsync(teklifId, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Lojistik teklif onaylandı."));
+    }
+
+    /// <summary>Teklif onayını iptal et (yalnız Yönetici).</summary>
+    [HttpPost("offers/{teklifId:int}/revoke")]
+    [Authorize(Roles = "Yonetici")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RevokeOffer(int teklifId)
+    {
+        await logisticsService.RevokeOfferAsync(teklifId, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Lojistik teklif onayı iptal edildi."));
+    }
+
+    /// <summary>Teklifi reddet — red açıklaması zorunlu (yalnız Yönetici).</summary>
+    [HttpPost("offers/{teklifId:int}/reject")]
+    [Authorize(Roles = "Yonetici")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RejectOffer(int teklifId, [FromBody] RejectOfferRequest req)
+    {
+        await logisticsService.RejectOfferAsync(teklifId, CurrentUserId, req.RedNotu);
+        return Ok(ApiResponse<object>.Ok(null!, "Lojistik teklif reddedildi."));
+    }
 }
+
+public sealed record RejectOfferRequest(string RedNotu);
 
 public sealed record CreateShipmentRequest(
     string   SiparisNo,

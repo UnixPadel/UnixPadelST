@@ -107,8 +107,48 @@ export const getPurchaseHistory = async (page = 1, pageSize = 50): Promise<Purch
 
 // ── Mutations ───────────────────────────────────────────────────────────────
 
-export const createPurchaseRequest = async (dto: CreatePurchaseRequestDto): Promise<void> => {
-  await api.post('/api/purchase', dto)
+// Yeni TalepID döner — oluşturduktan sonra ek dosya yüklemek için kullanılır.
+export const createPurchaseRequest = async (dto: CreatePurchaseRequestDto): Promise<number> => {
+  const res = await api.post<ApiResponse<number>>('/api/purchase', dto)
+  return res.data.data
+}
+
+// ── Ek dosya (SatinAlmaTalepEk) ───────────────────────────────────────────────
+
+export interface PurchaseAttachmentInfo {
+  talepID: number
+  ad: string
+  tip: string
+  tarih: string
+  yukleyen?: string | null
+}
+
+export const getPurchaseAttachmentInfo = async (talepId: number): Promise<PurchaseAttachmentInfo | null> => {
+  const res = await api.get<ApiResponse<PurchaseAttachmentInfo | null>>(`/api/purchase/${talepId}/attachment/info`)
+  return res.data.data
+}
+
+export const uploadPurchaseAttachment = async (talepId: number, file: File): Promise<void> => {
+  const fd = new FormData()
+  fd.append('file', file)
+  await api.post(`/api/purchase/${talepId}/attachment`, fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+export const downloadPurchaseAttachment = async (talepId: number, fileName?: string) => {
+  const res = await api.get(`/api/purchase/${talepId}/attachment`, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = fileName || `talep_${talepId}`
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 0)
+}
+
+export const deletePurchaseAttachment = async (talepId: number): Promise<void> => {
+  await api.delete(`/api/purchase/${talepId}/attachment`)
 }
 
 export const preApprovePurchase = (talepId: number, aciklama?: string) =>

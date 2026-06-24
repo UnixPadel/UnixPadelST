@@ -81,6 +81,66 @@ public static class DatabaseSchemaMigrator
 
         // 8) §16 — SiparisAlTablo.SiparisMiTeklifMi aşama kolonunu genişlet.
         await EnsureSiparisMiTeklifMiWidenedAsync(ctx, logger);
+
+        // 9) Lojistik teklif akışı — LojistikTeklifTablo (yoksa CREATE).
+        await EnsureLojistikTeklifTableAsync(ctx, logger);
+
+        // 10) Satın alma ek dosyaları — SatinAlmaTalepEk (yoksa CREATE).
+        await EnsureSatinAlmaTalepEkTableAsync(ctx, logger);
+    }
+
+    /// <summary>
+    /// Satın alma talebine eklenen dosyalar. Blob ayrı tabloda; ana SatinAlmaTalep
+    /// sorguları (liste/aşama) blob yüklemez. CREATE IF NOT EXISTS → idempotent.
+    /// </summary>
+    private static async Task EnsureSatinAlmaTalepEkTableAsync(AppDbContext ctx, ILogger? logger)
+    {
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS SatinAlmaTalepEk (
+                EkID                 INT            NOT NULL AUTO_INCREMENT,
+                TalepID              INT            NOT NULL,
+                Ad                   VARCHAR(255)   NOT NULL,
+                Tip                  VARCHAR(150)   NOT NULL,
+                Veri                 LONGBLOB       NOT NULL,
+                Tarih                DATETIME       NOT NULL,
+                YukleyenKullaniciAdi VARCHAR(200)   NULL,
+                PRIMARY KEY (EkID),
+                INDEX IX_SatinAlmaTalepEk_TalepID (TalepID)
+            )");
+        logger?.LogInformation("SatinAlmaTalepEk tablosu hazırlandı (CREATE IF NOT EXISTS).");
+    }
+
+    /// <summary>
+    /// Lojistik teklif akışı — sipariş üretimdeyken lojistik firmalardan teklif
+    /// toplanır, Yönetici birini onaylar. Mevcut LojistikTablo (sevk) ile karışmaz.
+    /// CREATE IF NOT EXISTS → idempotent; tablo varsa dokunmaz.
+    /// </summary>
+    private static async Task EnsureLojistikTeklifTableAsync(AppDbContext ctx, ILogger? logger)
+    {
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS LojistikTeklifTablo (
+                TeklifID        INT            NOT NULL AUTO_INCREMENT,
+                SiparisNo       VARCHAR(50)    NOT NULL,
+                KullaniciID     INT            NOT NULL,
+                FirmaAdi        VARCHAR(255)   NOT NULL,
+                LojistikCesit   VARCHAR(64)    NOT NULL,
+                Fiyat           DECIMAL(18,2)  NOT NULL,
+                Aciklama        TEXT           NULL,
+                Durum           VARCHAR(16)    NOT NULL DEFAULT 'Beklemede',
+                OlusturmaTarihi DATETIME       NOT NULL,
+                OnayKullaniciID INT            NULL,
+                OnayTarihi      DATETIME       NULL,
+                RedNotu         TEXT           NULL,
+                PRIMARY KEY (TeklifID),
+                INDEX IX_LojistikTeklif_SiparisNo (SiparisNo)
+            )");
+        logger?.LogInformation("LojistikTeklifTablo tablosu hazırlandı (CREATE IF NOT EXISTS).");
+
+        // RedNotu kolonu — bu kolondan önce oluşturulmuş tablolar için additive ALTER
+        // (CREATE IF NOT EXISTS mevcut tabloya kolon eklemez). Yönetici red açıklaması.
+        await EnsureColumnAsync(ctx, logger,
+            table: "LojistikTeklifTablo", column: "RedNotu",
+            ddl: "ALTER TABLE LojistikTeklifTablo ADD COLUMN RedNotu TEXT NULL");
     }
 
     /// <summary>

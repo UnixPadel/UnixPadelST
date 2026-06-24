@@ -431,27 +431,42 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Excel(string no, [FromQuery] string lang = "tr")
     {
-        // §32 — Proforma indirme yetkisi:
-        //   Yonetici / Muhasebe / Lojistik / Kontrol kullanıcısı → her sipariş.
-        //   Temsilci → YALNIZ kendi oluşturduğu sipariş (own-only) — eski kod
-        //     Temsilci'yi tamamen reddediyordu → kendi siparişlerinde de 403.
-        //   Fabrika (parasal değer göremez) + diğer roller → erişemez.
-        bool privileged = User.IsInRole("Yonetici") || User.IsInRole("Muhasebe")
-                       || User.IsInRole("Lojistik") || IsControlUser;
-        if (!privileged)
-        {
-            if (!User.IsInRole("Temsilci"))
-                return Forbid();
-            // Temsilci sahiplik kontrolü: `no` (SiparisNo veya TeklifNo) kullanıcının
-            // KENDİ siparişlerinden biri olmalı; başkasının siparişi → Forbid.
-            var mine = await orderService.GetMyOrdersAsync(CurrentUserId);
-            if (!mine.Any(o => o.SiparisNo == no || o.TeklifNo == no))
-                return Forbid();
-        }
+        if (!await CanDownloadProformaAsync(no)) return Forbid();
         var bytes = await reportingService.ExportOrderProformaAsync(no, lang);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             fileName);
+    }
+
+    /// <summary>
+    /// Aynı proformanın PDF çıktısı (LibreOffice ile xlsx→PDF, birebir görünüm).
+    /// Yetki kuralı Excel ile AYNI: Temsilci yalnız kendi siparişini indirir.
+    /// GET /api/orders/{no}/pdf
+    /// </summary>
+    [HttpGet("{no}/pdf")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Pdf(string no, [FromQuery] string lang = "tr")
+    {
+        if (!await CanDownloadProformaAsync(no)) return Forbid();
+        var bytes = await reportingService.ExportOrderProformaPdfAsync(no, lang);
+        var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.pdf";
+        return File(bytes, "application/pdf", fileName);
+    }
+
+    // §32 — Proforma indirme yetkisi (Excel + PDF ortak):
+    //   Yonetici / Muhasebe / Lojistik / Kontrol kullanıcısı → her sipariş.
+    //   Temsilci → YALNIZ kendi oluşturduğu sipariş (own-only).
+    //   Fabrika (parasal değer göremez) + diğer roller → erişemez.
+    private async Task<bool> CanDownloadProformaAsync(string no)
+    {
+        if (User.IsInRole("Yonetici") || User.IsInRole("Muhasebe")
+            || User.IsInRole("Lojistik") || IsControlUser)
+            return true;
+        if (!User.IsInRole("Temsilci"))
+            return false;
+        // Temsilci sahiplik kontrolü: `no` (SiparisNo veya TeklifNo) kendi siparişi olmalı.
+        var mine = await orderService.GetMyOrdersAsync(CurrentUserId);
+        return mine.Any(o => o.SiparisNo == no || o.TeklifNo == no);
     }
 }

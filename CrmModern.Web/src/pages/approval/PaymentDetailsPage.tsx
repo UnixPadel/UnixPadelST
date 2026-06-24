@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { FieldError } from '@/components/FieldError'
+import { PurchaseAttachment } from '@/components/PurchaseAttachment'
 import { ODEME_TURLERI } from '@/components/DynamicPaymentForm'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
@@ -145,6 +146,12 @@ export function PaymentDetailsPage() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {detail && (
+            <div className="mb-3">
+              <PurchaseAttachment talepId={detail.talepID} />
             </div>
           )}
 

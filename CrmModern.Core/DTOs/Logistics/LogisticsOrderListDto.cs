@@ -12,4 +12,9 @@ public sealed record LogisticsOrderListDto(
     DateTime? STarih,
     DateTime Tarih,
     int     PesinYuzde = 0,
-    string? OdemeDurum = null);
+    string? OdemeDurum = null,
+    // Lojistik teklif akışı — onaylı teklif (yalnız 'ready' listesinde dolu).
+    // Sevk "Sevk Oluştur" formunu ön-doldurmak için kullanılır.
+    string?  OnayliFirma = null,
+    string?  OnayliCesit = null,
+    decimal? OnayliFiyat = null);

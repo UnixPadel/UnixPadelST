@@ -39,4 +39,30 @@ public interface ILogisticsService
 
     /// <summary>SELECT DISTINCT LojistikCesit (taşıma türü dropdown).</summary>
     Task<IReadOnlyList<string>> GetCesitlerAsync();
+
+    // ── Lojistik Teklif akışı (LojistikTeklifTablo) ───────────────────────────
+
+    /// <summary>
+    /// "Lojistik Teklif" ekranı kuyruğu: üretim→tamamlanma aralığındaki siparişler
+    /// (Uretim/Hazir/Lojistik/TamamlanmaBekliyor) + teklif sayısı + onaylı teklif özeti.
+    /// </summary>
+    Task<IReadOnlyList<LogisticsOfferQueueItemDto>> GetOfferQueueAsync();
+
+    /// <summary>Bir siparişin tüm lojistik teklifleri (kullanıcı adları çözümlenmiş).</summary>
+    Task<IReadOnlyList<LogisticsOfferDto>> GetOffersAsync(string siparisNo);
+
+    /// <summary>Yeni lojistik teklif girişi (Lojistik/Yönetici). Durum='Beklemede'.</summary>
+    Task SubmitOfferAsync(string siparisNo, int kullaniciId, SubmitLogisticsOfferRequest req);
+
+    /// <summary>
+    /// Yönetici teklifi onaylar: Durum='Onaylandi'; aynı siparişteki diğer onaylı
+    /// teklif 'Beklemede'ye döner (tek onaylı kalır). SiparisOnaylari audit yazılır.
+    /// </summary>
+    Task ApproveOfferAsync(int teklifId, int yoneticiId);
+
+    /// <summary>Yönetici onayı iptal eder: onaylı teklif 'Beklemede'ye döner.</summary>
+    Task RevokeOfferAsync(int teklifId, int yoneticiId);
+
+    /// <summary>Yönetici teklifi reddeder: Durum='Reddedildi' + red açıklaması (zorunlu).</summary>
+    Task RejectOfferAsync(int teklifId, int yoneticiId, string redNotu);
 }

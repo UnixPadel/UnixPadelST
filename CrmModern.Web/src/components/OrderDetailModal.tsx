@@ -1,6 +1,7 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getOrderDetail, downloadExcel } from '@/api/orders'
+import { getOrderDetail, downloadExcel, downloadPdf } from '@/api/orders'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { resolveClause } from '@/lib/clauses'
@@ -8,8 +9,10 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
 import { OrderStageTimeline } from '@/components/OrderStageTimeline'
+import { LogisticsOfferForm } from '@/components/LogisticsOfferForm'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { isSuperAdmin } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
 
 interface Props {
@@ -18,16 +21,26 @@ interface Props {
   // §22 — "Siparişlerim" (My Orders) ekranında Notlar bölümü tamamen kaldırılır.
   // Diğer ekranlar (Muhasebe/Fabrika/Lojistik/Kontrol) davranışı değişmez.
   hideNotes?: boolean
+  // Lojistik görünümü: fabrika notu + aşama geçmişi + "Teklif Gönder" fiyatlandırmanın
+  // ÜSTÜNDE gösterilir. Yalnız Lojistik Hazır + Lojistik Teklif ekranları geçer;
+  // diğer ekranlar etkilenmez.
+  logisticsView?: boolean
 }
 
-export function OrderDetailModal({ siparisNo, onClose, hideNotes = false }: Props) {
+export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logisticsView = false }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
   // PROMPT-v2 §2 + Round-11 §3: parasal değer gizleme (Fabrika rolü + omur.caliskan
   // gibi ad-bazlı kullanıcılar). Fiyatlandırma bloğu, bileşen Fiyat/Toplam sütunları,
   // proforma Excel butonu gizlenir. Backend de aynı gate'lere sahip.
   const { getUser } = useAuth()
-  const hideMoney = hideMoneyFor(getUser())
+  const user = getUser()
+  const hideMoney = hideMoneyFor(user)
+  // Teklif gönderme yalnız Lojistik (+ süper-admin). Yönetici teklif oluşturmaz.
+  // Sadece logisticsView'da görünür.
+  const canOffer = logisticsView && !!user &&
+    (user.yetkiTuru === 'Lojistik' || isSuperAdmin(user))
+  const [showOfferForm, setShowOfferForm] = useState(false)
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order-detail', siparisNo],
@@ -45,6 +58,17 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false }: Prop
     }
   }
 
+  // Aynı proformanın PDF'i (sunucuda LibreOffice ile birebir dönüşüm).
+  const handlePdf = async () => {
+    if (!siparisNo) return
+    try {
+      await downloadPdf(siparisNo)
+      toast({ title: 'PDF indirildi' })
+    } catch {
+      toast({ title: 'Hata', variant: 'destructive' })
+    }
+  }
+
   return (
     <Dialog open={!!siparisNo} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -52,7 +76,10 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false }: Prop
           <DialogTitle className="flex items-center justify-between">
             <span>{t('orderDetail.title', { no: siparisNo })}</span>
             {!hideMoney && (
-              <Button size="sm" variant="outline" onClick={handleExcel}>📥 {t('common.excel')}</Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" onClick={handleExcel}>📥 {t('common.excel')}</Button>
+                <Button size="sm" variant="outline" onClick={handlePdf}>📄 PDF</Button>
+              </div>
             )}
           </DialogTitle>
         </DialogHeader>
@@ -95,6 +122,31 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false }: Prop
                 </div>
               )}
             </div>
+
+            {/* Lojistik görünümü — Fiyatlandırmanın ÜSTÜNDE: fabrika notu →
+                aşama geçmişi → Teklif Gönder. Diğer ekranlar (logisticsView yok)
+                değişmez; aynı bloklar aşağıda tekrar gösterilmez. */}
+            {logisticsView && (
+              <div className="space-y-4">
+                {order.fabrikaNot && (
+                  <div className="border rounded-md p-3">
+                    <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>
+                  </div>
+                )}
+                <div className="border rounded-md p-3">
+                  <OrderStageTimeline
+                    tarih={order.tarih}
+                    sTarih={order.sTarih}
+                    currentStage={order.siparisMiTeklifMi}
+                  />
+                </div>
+                {canOffer && (
+                  showOfferForm
+                    ? <LogisticsOfferForm siparisNo={order.siparisNo} onSubmitted={() => setShowOfferForm(false)} />
+                    : <Button onClick={() => setShowOfferForm(true)}>{t('logisticsOffer.sendOffer')}</Button>
+                )}
+              </div>
+            )}
 
             {/* Pricing — PROMPT-v2 §2: Fabrika için tamamen gizli. */}
             {!hideMoney && (
@@ -172,22 +224,26 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false }: Prop
               </div>
             )}
 
-            {/* Factory / Logistics notes */}
-            {(order.fabrikaNot || order.lojistikNot) && (
+            {/* Factory / Logistics notes — logisticsView'da fabrika notu yukarı
+                taşındığı için burada yalnız lojistik notu kalır. */}
+            {((order.fabrikaNot && !logisticsView) || order.lojistikNot) && (
               <div className="border rounded-md p-3 space-y-1">
-                {order.fabrikaNot && <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>}
+                {order.fabrikaNot && !logisticsView && <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>}
                 {order.lojistikNot && <p><span className="font-semibold">{t('orderDetail.lojistikNot')}:</span> {order.lojistikNot}</p>}
               </div>
             )}
 
-            {/* 2.5 — Aşama Geçmişi: Tarih + STarih + currentStage'den türetildi */}
-            <div className="border rounded-md p-3">
-              <OrderStageTimeline
-                tarih={order.tarih}
-                sTarih={order.sTarih}
-                currentStage={order.siparisMiTeklifMi}
-              />
-            </div>
+            {/* 2.5 — Aşama Geçmişi: Tarih + STarih + currentStage'den türetildi.
+                logisticsView'da yukarı taşındı; burada tekrar gösterilmez. */}
+            {!logisticsView && (
+              <div className="border rounded-md p-3">
+                <OrderStageTimeline
+                  tarih={order.tarih}
+                  sTarih={order.sTarih}
+                  currentStage={order.siparisMiTeklifMi}
+                />
+              </div>
+            )}
 
             {/* Approval timeline (Faz 3) */}
             <div className="border rounded-md p-3">

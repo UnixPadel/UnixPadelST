@@ -92,6 +92,7 @@
     "qualityControl": "Kalite Kontrol",
     "factory": "Fabrika / Üretim",
     "logisticsReady": "Lojistik · Hazır",
+    "logisticsOffers": "Lojistik · Teklif",
     "logisticsHistory": "Lojistik · Geçmiş",
     "logisticsCarriers": "Lojistik · Taşıyıcılar",
     "accounting": "Muhasebe · Tahsilat",
@@ -726,6 +727,37 @@
       "firmaPlaceholder": "Firma Adı"
     }
   },
+  "logisticsOffer": {
+    "title": "Lojistik · Teklif",
+    "queueEmpty": "Teklif bekleyen sipariş yok.",
+    "noApproved": "Onaylı teklif yok",
+    "count": "{{n}} teklif",
+    "addTitle": "Yeni Teklif",
+    "approvedTitle": "Onaylı Lojistik Teklif",
+    "sendOffer": "Teklif Gönder",
+    "firma": "Firma",
+    "cesit": "Taşıma Türü",
+    "fiyat": "Fiyat",
+    "not": "Not",
+    "submit": "Gönder",
+    "approve": "Onayla",
+    "revoke": "Onayı İptal Et",
+    "reject": "Reddet",
+    "rejected": "Reddedildi",
+    "rejectTitle": "Teklifi Reddet",
+    "rejectReason": "Red Açıklaması",
+    "rejectedReason": "Red açıklaması",
+    "approved": "Onaylı",
+    "pending": "Bekliyor",
+    "empty": "Henüz teklif girilmedi.",
+    "toast": {
+      "submitted": "Teklif kaydedildi.",
+      "approved": "Teklif onaylandı.",
+      "revoked": "Onay iptal edildi.",
+      "rejected": "Teklif reddedildi.",
+      "error": "İşlem başarısız."
+    }
+  },
   "logApprovals": {
     "sevkId": "Sevk #",
     "tasiyici": "Taşıyıcı",
@@ -778,6 +810,21 @@
     "creating": "Gönderiliyor...",
     "createSuccess": "Talep oluşturuldu",
     "createError": "Hata",
+    "attachment": {
+      "title": "Ek Dosya",
+      "none": "Ek dosya yok",
+      "download": "İndir",
+      "upload": "Dosya Ekle",
+      "uploading": "Yükleniyor...",
+      "replace": "Değiştir",
+      "remove": "Kaldır",
+      "uploaded": "Dosya eklendi.",
+      "removed": "Dosya kaldırıldı.",
+      "error": "İşlem başarısız.",
+      "notFound": "Dosya bulunamadı.",
+      "hint": "İzin verilen: png, jpg, jpeg, pdf, word, txt, excel, zip… (≤25 MB)",
+      "done": "Listeye Dön"
+    },
     "lines": {
       "title": "Kalemler",
       "urunAdi": "Ürün Adı",

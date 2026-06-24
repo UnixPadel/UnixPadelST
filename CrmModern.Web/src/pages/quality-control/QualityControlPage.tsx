@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getPendingQC, getQCById, approveQC, rejectQC } from '@/api/qualityControl'
 import {
-  getOrders, updatePaidAmount, downloadAttachment, downloadExcel,
+  getOrders, updatePaidAmount, downloadAttachment, downloadExcel, downloadPdf,
   type OrderFilter,
 } from '@/api/orders'
 import { getCustomers, getUlkeler } from '@/api/customers'
@@ -356,6 +356,16 @@ export function QualityControlPage() {
     }
   }
 
+  const handlePdf = async () => {
+    const no = requireSelection()
+    if (!no) return
+    try {
+      await downloadPdf(no)
+    } catch (e) {
+      toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' })
+    }
+  }
+
   // ── Master grid kolonları (legacy başlıklar birebir) ────────────────────
   const columns: Column<KontrolRow>[] = [
     { key: 'siparisNo', header: t('qc.grid.siparisNo'), sortable: true,
@@ -605,6 +615,9 @@ export function QualityControlPage() {
             </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExcel}>
               {t('qc.actions.excelYaz')}
+            </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handlePdf}>
+              PDF
             </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleFormGetir}>
               {t('qc.actions.formGetir')}

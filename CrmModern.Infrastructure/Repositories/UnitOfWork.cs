@@ -24,8 +24,10 @@ internal sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
 
     // ── Logistics / Accounting / Purchase ────────────────────────────────
     private ILogisticsEntryRepository?  _logisticsEntries;
+    private ILogisticsOfferRepository?  _logisticsOffers;
     private IAccountingRepository?      _accounting;
     private IPurchaseRepository?        _purchaseRequests;
+    private IPurchaseAttachmentRepository? _purchaseAttachments;
 
     // ── Order lifecycle (Faz 3) ──────────────────────────────────────────
     private IOrderApprovalRepository?   _orderApprovals;
@@ -66,11 +68,17 @@ internal sealed class UnitOfWork(AppDbContext context) : IUnitOfWork
     public ILogisticsEntryRepository LogisticsEntries =>
         _logisticsEntries ??= new LogisticsEntryRepository(context);
 
+    public ILogisticsOfferRepository LogisticsOffers =>
+        _logisticsOffers ??= new LogisticsOfferRepository(context);
+
     public IAccountingRepository Accounting =>
         _accounting ??= new AccountingRepository(context);
 
     public IPurchaseRepository PurchaseRequests =>
         _purchaseRequests ??= new PurchaseRepository(context);
+
+    public IPurchaseAttachmentRepository PurchaseAttachments =>
+        _purchaseAttachments ??= new PurchaseAttachmentRepository(context);
 
     public IOrderApprovalRepository OrderApprovals =>
         _orderApprovals ??= new OrderApprovalRepository(context);

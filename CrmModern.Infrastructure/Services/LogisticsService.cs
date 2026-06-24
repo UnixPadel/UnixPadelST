@@ -11,25 +11,29 @@ namespace CrmModern.Infrastructure.Services;
 /// </summary>
 internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
 {
+    // Lojistik teklif kuyruğu aşamaları — sipariş üretime alınınca düşer,
+    // tamamlanana (Tamamlandi) kadar kalır.
+    private static readonly string[] OfferQueueStages =
+        { "Uretim", "Hazir", "Lojistik", "TamamlanmaBekliyor" };
+
     public async Task<IReadOnlyList<LogisticsOrderListDto>> GetLogisticsOrdersAsync()
     {
         var orders = await uow.Orders.GetLogisticsStagesAsync();
-        return orders.Select(MapList).ToList().AsReadOnly();
+        return orders.Select(o => MapList(o)).ToList().AsReadOnly();
     }
 
     public async Task<IReadOnlyList<LogisticsOrderListDto>> GetReadyForShipmentAsync()
     {
         // Faz 4: Hazir + Kontrol=Onay
-        var orders = await uow.Orders.SearchAsync(
-            siparisNo: null, musteriAd: null, kullaniciID: null,
-            ulke: null, asama: "Hazir", kontrol: "Onay",
-            odemeDurum: null, baslangic: null, bitis: null);
         // PROMPT-v6 §1.1 — Burcu lojistik onay gate'i: 'Bekliyor' satırlar
         // ready-listte görünmez. NULL = migration öncesi eski kayıt (gate
         // uygulanmaz — migrator backfill'i bunları zaten 'Onay' yapar).
-        var hazir = orders
+        var hazir = (await uow.Orders.SearchAsync(
+                siparisNo: null, musteriAd: null, kullaniciID: null,
+                ulke: null, asama: "Hazir", kontrol: "Onay",
+                odemeDurum: null, baslangic: null, bitis: null))
             .Where(o => o.LojistikOnay is null or "Onay")
-            .Select(MapList);
+            .ToList();
 
         // Üretime alınan sipariş lojistikte de görünür ("Hazırlanıyor"); gerçek
         // aşama 'Uretim' kalır, sevk yalnız 'Hazir' olunca yapılabilir (frontend
@@ -38,9 +42,19 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
                 siparisNo: null, musteriAd: null, kullaniciID: null,
                 ulke: null, asama: "Uretim", kontrol: "Onay",
                 odemeDurum: null, baslangic: null, bitis: null))
-            .Select(MapList);
+            .ToList();
 
-        return hazir.Concat(uretim).ToList().AsReadOnly();
+        var all = hazir.Concat(uretim).ToList();
+
+        // "Her ikisi de" — onaylı lojistik teklifini sevk formuna taşımak için
+        // onaylı firma/tür/fiyat'ı satıra iliştir (yoksa null kalır).
+        var approved = await uow.LogisticsOffers.GetApprovedForOrdersAsync(
+            all.Select(o => o.SiparisNo).Distinct().ToList());
+
+        return all
+            .Select(o => MapList(o, approved.TryGetValue(o.SiparisNo, out var a) ? a : null))
+            .ToList()
+            .AsReadOnly();
     }
 
     public async Task MoveToLogisticsAsync(string siparisNo, MoveToLogisticsDto dto)
@@ -161,9 +175,169 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
     public Task<IReadOnlyList<string>> GetCarriersAsync() => uow.LogisticsEntries.GetDistinctCarriersAsync();
     public Task<IReadOnlyList<string>> GetCesitlerAsync() => uow.LogisticsEntries.GetDistinctCesitlerAsync();
 
-    private static LogisticsOrderListDto MapList(Order o) => new(
+    private static LogisticsOrderListDto MapList(Order o, LogisticsOffer? approved = null) => new(
         o.SiparisNo, o.MusteriAd, o.MUlke,
         o.SiparisMiTeklifMi, o.LojistikNot, o.STarih, o.Tarih,
         // PROMPT-v6 §4 — ödeme türü bilgisi (tutar yok; v5 §2 karartması korunur).
-        o.PesinYüzde, o.OdemeDurum);
+        o.PesinYüzde, o.OdemeDurum,
+        // Onaylı lojistik teklif (yalnız ready listesinde dolu) — sevk ön-doldurma.
+        approved?.FirmaAdi, approved?.LojistikCesit, approved?.Fiyat);
+
+    // ── Lojistik Teklif akışı ─────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<LogisticsOfferQueueItemDto>> GetOfferQueueAsync()
+    {
+        // Üretim→tamamlanma aralığındaki siparişler. Bu aşamalara yalnız QC+cari
+        // onaydan geçmiş siparişler ulaşır; ayrı kontrol filtresine gerek yok.
+        var orders = new List<Order>();
+        foreach (var stage in OfferQueueStages)
+        {
+            orders.AddRange(await uow.Orders.SearchAsync(
+                siparisNo: null, musteriAd: null, kullaniciID: null,
+                ulke: null, asama: stage, kontrol: null,
+                odemeDurum: null, baslangic: null, bitis: null));
+        }
+
+        var siparisNolar = orders.Select(o => o.SiparisNo).Distinct().ToList();
+        var counts   = await uow.LogisticsOffers.GetOfferCountsAsync(siparisNolar);
+        var approved = await uow.LogisticsOffers.GetApprovedForOrdersAsync(siparisNolar);
+
+        return orders
+            .OrderByDescending(o => o.Tarih)
+            .Select(o => new LogisticsOfferQueueItemDto(
+                o.SiparisNo, o.MusteriAd, o.MUlke, o.SiparisMiTeklifMi, o.Tarih, o.STarih,
+                counts.TryGetValue(o.SiparisNo, out var c) ? c : 0,
+                approved.TryGetValue(o.SiparisNo, out var a) ? a.FirmaAdi : null,
+                approved.TryGetValue(o.SiparisNo, out var a2) ? a2.Fiyat : null))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public async Task<IReadOnlyList<LogisticsOfferDto>> GetOffersAsync(string siparisNo)
+    {
+        var offers = await uow.LogisticsOffers.GetByOrderAsync(siparisNo);
+        if (offers.Count == 0) return Array.Empty<LogisticsOfferDto>();
+
+        var userIds = offers.Select(o => o.KullaniciID)
+            .Concat(offers.Where(o => o.OnayKullaniciID.HasValue).Select(o => o.OnayKullaniciID!.Value))
+            .Distinct().ToList();
+        var users = (await uow.Kullanicilar.GetAllAsync())
+            .Where(u => userIds.Contains(u.KullaniciID))
+            .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
+
+        return offers.Select(o => new LogisticsOfferDto(
+                o.TeklifID, o.SiparisNo, o.KullaniciID,
+                users.TryGetValue(o.KullaniciID, out var n) ? n : null,
+                o.FirmaAdi, o.LojistikCesit, o.Fiyat, o.Aciklama, o.Durum, o.OlusturmaTarihi,
+                o.OnayKullaniciID,
+                o.OnayKullaniciID.HasValue && users.TryGetValue(o.OnayKullaniciID.Value, out var on) ? on : null,
+                o.OnayTarihi, o.RedNotu))
+            .ToList()
+            .AsReadOnly();
+    }
+
+    public async Task SubmitOfferAsync(string siparisNo, int kullaniciId, SubmitLogisticsOfferRequest req)
+    {
+        if (string.IsNullOrWhiteSpace(req.FirmaAdi))
+            throw new BusinessException("Firma adı zorunlu.");
+        if (string.IsNullOrWhiteSpace(req.LojistikCesit))
+            throw new BusinessException("Taşıma türü zorunlu.");
+
+        var order = await uow.Orders.GetByNoAsync(siparisNo)
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        if (!OfferQueueStages.Contains(order.SiparisMiTeklifMi))
+            throw new BusinessException(
+                $"'{siparisNo}' lojistik teklif aşamasında değil (aşama: {order.SiparisMiTeklifMi}).");
+
+        await uow.LogisticsOffers.AddAsync(new LogisticsOffer
+        {
+            SiparisNo       = siparisNo,
+            KullaniciID     = kullaniciId,
+            FirmaAdi        = req.FirmaAdi.Trim(),
+            LojistikCesit   = req.LojistikCesit.Trim(),
+            Fiyat           = req.Fiyat,
+            Aciklama        = string.IsNullOrWhiteSpace(req.Aciklama) ? null : req.Aciklama.Trim(),
+            Durum           = "Beklemede",
+            OlusturmaTarihi = DateTime.Now,
+        });
+        await uow.SaveChangesAsync();
+    }
+
+    public async Task ApproveOfferAsync(int teklifId, int yoneticiId)
+    {
+        var offer = await uow.LogisticsOffers.GetByIdAsync(teklifId)
+            ?? throw new NotFoundException("LogisticsOffer", teklifId);
+
+        // Tracked çek — aynı siparişteki tüm teklifler (chosen EF identity map ile aynı instance).
+        var siblings = await uow.LogisticsOffers.GetTrackedByOrderAsync(offer.SiparisNo);
+        LogisticsOffer? chosen = null;
+        foreach (var s in siblings)
+        {
+            if (s.TeklifID == teklifId)
+            {
+                s.Durum           = "Onaylandi";
+                s.OnayKullaniciID = yoneticiId;
+                s.OnayTarihi      = DateTime.Now;
+                s.RedNotu         = null;   // önceden reddedildiyse red notunu temizle
+                chosen = s;
+            }
+            else if (s.Durum == "Onaylandi")
+            {
+                // Tek onaylı kalsın — önceki onayı geri al.
+                s.Durum           = "Beklemede";
+                s.OnayKullaniciID = null;
+                s.OnayTarihi      = null;
+            }
+            uow.LogisticsOffers.Update(s);
+        }
+
+        chosen ??= offer;
+        await uow.OrderApprovals.UpsertAsync(
+            offer.SiparisNo, yoneticiId, "LojistikTeklifOnaylandi",
+            $"Lojistik teklif onaylandı: {chosen.FirmaAdi} — {chosen.Fiyat:N2} ({chosen.LojistikCesit}).");
+
+        await uow.SaveChangesAsync();
+    }
+
+    public async Task RevokeOfferAsync(int teklifId, int yoneticiId)
+    {
+        var offer = await uow.LogisticsOffers.GetByIdAsync(teklifId)
+            ?? throw new NotFoundException("LogisticsOffer", teklifId);
+
+        if (offer.Durum != "Onaylandi")
+            throw new BusinessException("Teklif onaylı değil — iptal edilecek onay yok.");
+
+        offer.Durum           = "Beklemede";
+        offer.OnayKullaniciID = null;
+        offer.OnayTarihi      = null;
+        uow.LogisticsOffers.Update(offer);
+
+        await uow.OrderApprovals.UpsertAsync(
+            offer.SiparisNo, yoneticiId, "LojistikTeklifIptal",
+            $"Lojistik teklif onayı iptal edildi: {offer.FirmaAdi}.");
+
+        await uow.SaveChangesAsync();
+    }
+
+    public async Task RejectOfferAsync(int teklifId, int yoneticiId, string redNotu)
+    {
+        if (string.IsNullOrWhiteSpace(redNotu))
+            throw new BusinessException("Red açıklaması zorunlu.");
+
+        var offer = await uow.LogisticsOffers.GetByIdAsync(teklifId)
+            ?? throw new NotFoundException("LogisticsOffer", teklifId);
+
+        offer.Durum           = "Reddedildi";
+        offer.RedNotu         = redNotu.Trim();
+        offer.OnayKullaniciID = yoneticiId;   // kararı veren yönetici
+        offer.OnayTarihi      = DateTime.Now;
+        uow.LogisticsOffers.Update(offer);
+
+        await uow.OrderApprovals.UpsertAsync(
+            offer.SiparisNo, yoneticiId, "LojistikTeklifReddedildi",
+            $"Lojistik teklif reddedildi: {offer.FirmaAdi} — {redNotu.Trim()}");
+
+        await uow.SaveChangesAsync();
+    }
 }

@@ -33,6 +33,7 @@ const navItems: NavItem[] = [
   { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, usernames: ['elshan.rasulov'] },
   { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },
   { path: '/logistics/ready',     i18nKey: 'nav.logisticsReady',     icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
+  { path: '/logistics/offers',    i18nKey: 'nav.logisticsOffers',    icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
   { path: '/logistics/history',   i18nKey: 'nav.logisticsHistory',   icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
   { path: '/logistics/carriers',  i18nKey: 'nav.logisticsCarriers',  icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
   { path: '/accounting',         i18nKey: 'nav.accounting',                       icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },

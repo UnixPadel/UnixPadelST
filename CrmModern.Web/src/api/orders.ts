@@ -190,6 +190,18 @@ export const downloadExcel = async (no: string) => {
   URL.revokeObjectURL(url)
 }
 
+// Aynı proformanın PDF'i (sunucuda LibreOffice ile xlsx→PDF). Yetki Excel ile aynı.
+export const downloadPdf = async (no: string) => {
+  const res = await api.get(`/api/orders/${no}/pdf`, {
+    params: { lang: currentLang() },
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(res.data as Blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = `Proforma_${no}.pdf`; a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Catalog helpers ─────────────────────────────────────────────────────────
 
 export const getCategories = () =>

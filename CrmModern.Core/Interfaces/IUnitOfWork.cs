@@ -22,8 +22,10 @@ public interface IUnitOfWork : IDisposable
 
     // ── Logistics / Accounting / Purchase ────────────────────────────────
     ILogisticsEntryRepository  LogisticsEntries  { get; }
+    ILogisticsOfferRepository  LogisticsOffers   { get; }
     IAccountingRepository      Accounting        { get; }
     IPurchaseRepository        PurchaseRequests  { get; }
+    IPurchaseAttachmentRepository PurchaseAttachments { get; }
 
     // ── Order lifecycle (Faz 3) ──────────────────────────────────────────
     IOrderApprovalRepository   OrderApprovals    { get; }

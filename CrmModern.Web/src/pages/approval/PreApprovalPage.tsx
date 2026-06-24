@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { PurchaseLinesTable } from '@/components/PurchaseLinesTable'
+import { PurchaseAttachment } from '@/components/PurchaseAttachment'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -108,6 +109,9 @@ export function PreApprovalPage() {
                   />
                 </div>
               )}
+
+              {/* Talep sahibinin eklediği dosya — ön onay basamağı da görür. */}
+              <PurchaseAttachment talepId={detail.talepID} />
             </div>
           )}
           <DialogFooter className="flex flex-wrap justify-end gap-2">

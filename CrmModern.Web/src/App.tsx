@@ -9,6 +9,7 @@ import { CustomerFormPage } from '@/pages/customers/CustomerFormPage'
 import { QualityControlPage } from '@/pages/quality-control/QualityControlPage'
 import { FactoryPage } from '@/pages/factory/FactoryPage'
 import { LogisticsReadyPage } from '@/pages/logistics/LogisticsReadyPage'
+import { LogisticsOffersPage } from '@/pages/logistics/LogisticsOffersPage'
 import { LogisticsHistoryPage } from '@/pages/logistics/LogisticsHistoryPage'
 import { CarriersPage } from '@/pages/logistics/CarriersPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
@@ -56,6 +57,8 @@ export default function App() {
         <Route path="/factory"         element={<FactoryPage />} />
         <Route path="/logistics"           element={<Navigate to="/logistics/ready" replace />} />
         <Route path="/logistics/ready"     element={<RoleGuard roles={['Yonetici','Lojistik']}><LogisticsReadyPage /></RoleGuard>} />
+        {/* Lojistik Teklif — yalnız Lojistik + Yönetici. Onay yalnız Yönetici (sayfa içi). */}
+        <Route path="/logistics/offers"    element={<RoleGuard roles={['Yonetici','Lojistik']}><LogisticsOffersPage /></RoleGuard>} />
         <Route path="/logistics/history"   element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci','Muhasebe']} usernames={['elshan.rasulov']}><LogisticsHistoryPage /></RoleGuard>} />
         <Route path="/logistics/carriers"  element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci']} usernames={['elshan.rasulov']}><CarriersPage /></RoleGuard>} />
         <Route path="/accounting"          element={<RoleGuard roles={['Yonetici','Muhasebe']}><AccountingPage /></RoleGuard>} />

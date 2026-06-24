@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FieldError } from '@/components/FieldError'
+import { PurchaseAttachment } from '@/components/PurchaseAttachment'
 import { useToast } from '@/components/ToastProvider'
 import { formatCurrency } from '@/lib/utils'
 import type { CreatePurchaseRequestLine } from '@/types'
@@ -81,6 +82,8 @@ export function NewPurchaseRequestPage() {
   const [alinanYer, setAlinanYer] = useState('')
   const [notlar, setNotlar] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  // Oluşturma sonrası ek dosya adımı için yeni TalepID.
+  const [createdId, setCreatedId] = useState<number | null>(null)
   const departman = user?.yetkiTuru ?? ''
 
   const patchRow = (id: number, patch: Partial<LineRow>) =>
@@ -121,10 +124,11 @@ export function NewPurchaseRequestPage() {
         kalemler,
       })
     },
-    onSuccess: () => {
+    onSuccess: (id: number) => {
       qc.invalidateQueries({ queryKey: ['purchase-mine'] })
+      // Hemen yönlendirme YOK — ek dosya eklenebilsin diye TalepID'yi tut.
+      setCreatedId(id)
       toast({ title: t('purchase.createSuccess') })
-      nav('/purchase/mine')
     },
     onError: () => toast({ title: t('purchase.createError'), variant: 'destructive' }),
   })
@@ -275,12 +279,23 @@ export function NewPurchaseRequestPage() {
           </div>
         </div>
 
-        <div className="pt-2 flex gap-2">
-          <Button variant="outline" onClick={() => nav(-1)}>{t('purchase.cancel')}</Button>
-          <Button disabled={createMut.isPending} onClick={onSubmit}>
-            {createMut.isPending ? t('purchase.creating') : t('purchase.create')}
-          </Button>
-        </div>
+        {createdId == null ? (
+          <div className="pt-2 flex gap-2">
+            <Button variant="outline" onClick={() => nav(-1)}>{t('purchase.cancel')}</Button>
+            <Button disabled={createMut.isPending} onClick={onSubmit}>
+              {createMut.isPending ? t('purchase.creating') : t('purchase.create')}
+            </Button>
+          </div>
+        ) : (
+          // Talep oluşturuldu — opsiyonel ek dosya adımı (onay basamakları görür).
+          <div className="pt-2 space-y-3 max-w-xl">
+            <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">
+              {t('purchase.createSuccess')} — #{createdId}
+            </div>
+            <PurchaseAttachment talepId={createdId} canManage />
+            <Button onClick={() => nav('/purchase/mine')}>{t('purchase.attachment.done')}</Button>
+          </div>
+        )}
       </div>
     </div>
   )

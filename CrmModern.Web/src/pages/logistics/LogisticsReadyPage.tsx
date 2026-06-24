@@ -68,12 +68,18 @@ export function LogisticsReadyPage() {
     [ready],
   )
 
-  const filtered = useMemo(() => ready.filter((r) => {
-    if (fNo && !r.siparisNo.toLowerCase().includes(fNo.toLowerCase())) return false
-    if (fMusteri && !(r.musteriAd ?? '').toLowerCase().includes(fMusteri.toLowerCase())) return false
-    if (fAsama !== '__all__' && r.siparisMiTeklifMi !== fAsama) return false
-    return true
-  }), [ready, fNo, fMusteri, fAsama])
+  const filtered = useMemo(() => {
+    const list = ready.filter((r) => {
+      if (fNo && !r.siparisNo.toLowerCase().includes(fNo.toLowerCase())) return false
+      if (fMusteri && !(r.musteriAd ?? '').toLowerCase().includes(fMusteri.toLowerCase())) return false
+      if (fAsama !== '__all__' && r.siparisMiTeklifMi !== fAsama) return false
+      return true
+    })
+    // Aşamalarda en üstte üretimde olanlar gözüksün (kararlı sıralama; kullanıcı
+    // başlığa tıklayınca DataTable kendi sıralamasını uygular).
+    return [...list].sort((a, b) =>
+      (a.siparisMiTeklifMi === 'Uretim' ? 0 : 1) - (b.siparisMiTeklifMi === 'Uretim' ? 0 : 1))
+  }, [ready, fNo, fMusteri, fAsama])
 
   const createMut = useMutation({
     mutationFn: () => createShipment({ siparisNo: target!.siparisNo, ...form, firmaAdi }),
@@ -113,7 +119,12 @@ export function LogisticsReadyPage() {
         <div className="flex flex-wrap gap-2">
           <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.details')}</Button>
           <Button size="sm" disabled={!canShip} title={canShip ? undefined : t('logistics.preparing')} onClick={() => {
-            setTarget(r as LogisticsOrderListDto); setForm(blank()); setCarrierChoice(OTHER_CARRIER); setSubmitted(false)
+            const o = r as LogisticsOrderListDto
+            setTarget(o)
+            // "Her ikisi de" — onaylı lojistik teklifi varsa sevk formunu ön-doldur.
+            setForm({ ...blank(), firmaAdi: o.onayliFirma ?? '', lojistikCesit: o.onayliCesit ?? '', fiyat: o.onayliFiyat ?? 0 })
+            setCarrierChoice(o.onayliFirma && carriers.includes(o.onayliFirma) ? o.onayliFirma : OTHER_CARRIER)
+            setSubmitted(false)
           }}>{t('logistics.createShipment')}</Button>
         </div>
         )
@@ -214,7 +225,7 @@ export function LogisticsReadyPage() {
         </DialogContent>
       </Dialog>
 
-      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} />
+      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} logisticsView />
     </div>
   )
 }

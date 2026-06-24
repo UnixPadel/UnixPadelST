@@ -23,7 +23,18 @@ public interface IPurchaseService
     Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingFinalApprovalAsync();
 
     // ── Talep oluştur ─────────────────────────────────────────────────────
-    Task CreateAsync(CreatePurchaseRequestDto dto);
+    /// <summary>Talebi oluşturur ve yeni TalepID'yi döndürür (ek dosya yüklemesi için).</summary>
+    Task<int> CreateAsync(CreatePurchaseRequestDto dto);
+
+    // ── Ek dosya (SatinAlmaTalepEk) ───────────────────────────────────────
+    /// <summary>Talebe dosya ekle (talep başına tek ek — öncekini değiştirir).</summary>
+    Task UploadAttachmentAsync(int talepId, string ad, string tip, byte[] veri, string? yukleyen);
+    /// <summary>Ek meta verisi (blob YOK) — yoksa null.</summary>
+    Task<PurchaseAttachmentInfoDto?> GetAttachmentInfoAsync(int talepId);
+    /// <summary>Ek indirme verisi (bayt + ad + tip) — yoksa null.</summary>
+    Task<PurchaseAttachmentDataDto?> GetAttachmentAsync(int talepId);
+    /// <summary>Talebin ek dosyasını kaldır.</summary>
+    Task DeleteAttachmentAsync(int talepId);
 
     // ── Aşama 1: ön onay (omur.caliskan) ──────────────────────────────────
     Task PreApproveAsync(int talepId, string currentUserName, string? aciklama);

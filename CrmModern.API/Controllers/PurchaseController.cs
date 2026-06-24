@@ -1,3 +1,4 @@
+using System.IO;
 using System.Security.Claims;
 using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Common;
@@ -16,6 +17,14 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     // WinForms birebir özel kullanıcı adları (rol değil)
     private const string PreApproverUser  = "omur.caliskan";
     private const string FinalApproverUser = "elshan.rasulov";
+
+    // Ek dosya kuralları — izin verilen uzantılar + boyut sınırı.
+    private static readonly HashSet<string> AllowedEkUzantilar = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf",
+        ".doc", ".docx", ".txt", ".xls", ".xlsx", ".csv", ".rtf", ".odt", ".zip", ".rar",
+    };
+    private const long MaxEkBytes = 25L * 1024 * 1024;   // 25 MB
 
     private string CurrentUserName =>
         User.FindFirstValue(ClaimTypes.Name)
@@ -123,9 +132,67 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status201Created)]
     public async Task<IActionResult> Create([FromBody] CreatePurchaseRequestDto dto)
     {
-        await purchaseService.CreateAsync(dto);
+        int talepId = await purchaseService.CreateAsync(dto);
         return StatusCode(StatusCodes.Status201Created,
-            ApiResponse<object>.Ok(null!, "Talep oluşturuldu."));
+            ApiResponse<int>.Ok(talepId, "Talep oluşturuldu."));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Ek dosya (SatinAlmaTalepEk) — talep başına tek ek.
+    // Yükleme: talep oluşturabilen roller (+Muhasebe). İndirme/meta: tüm onay
+    // basamakları görebilsin diye [Authorize] (her kimliği doğrulanmış kullanıcı).
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>Ek meta verisi (blob YOK) — indirme düğmesini göstermek için.</summary>
+    [HttpGet("{talepId:int}/attachment/info")]
+    public async Task<IActionResult> GetAttachmentInfo(int talepId)
+    {
+        var info = await purchaseService.GetAttachmentInfoAsync(talepId);
+        return Ok(ApiResponse<PurchaseAttachmentInfoDto?>.Ok(info));
+    }
+
+    /// <summary>Ek dosyayı indir (orijinal ad + içerik tipi korunur).</summary>
+    [HttpGet("{talepId:int}/attachment")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DownloadAttachment(int talepId)
+    {
+        var data = await purchaseService.GetAttachmentAsync(talepId);
+        if (data is null || data.Veri.Length == 0)
+            return NotFound(ApiResponse<object>.Fail("Ek bulunamadı."));
+        var tip = string.IsNullOrWhiteSpace(data.Tip) ? "application/octet-stream" : data.Tip;
+        return File(data.Veri, tip, data.Ad);
+    }
+
+    /// <summary>Talebe dosya ekle (png/jpg/jpeg/pdf/word/txt/excel… ≤25 MB). Talep başına tek ek.</summary>
+    [HttpPost("{talepId:int}/attachment")]
+    [Authorize(Roles = "Yonetici,Lojistik,Fabrika,Gozlemci,Temsilci,Muhasebe")]
+    public async Task<IActionResult> UploadAttachment(int talepId, IFormFile file)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.Fail("Dosya boş."));
+        if (file.Length > MaxEkBytes)
+            return BadRequest(ApiResponse<object>.Fail("Dosya 25 MB sınırını aşıyor."));
+
+        var ext = Path.GetExtension(file.FileName);
+        if (string.IsNullOrWhiteSpace(ext) || !AllowedEkUzantilar.Contains(ext))
+            return BadRequest(ApiResponse<object>.Fail("Desteklenmeyen dosya türü."));
+
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var ad  = Path.GetFileName(file.FileName);
+        var tip = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
+        await purchaseService.UploadAttachmentAsync(talepId, ad, tip, ms.ToArray(), CurrentUserName);
+        return Ok(ApiResponse<object>.Ok(null!, "Ek yüklendi."));
+    }
+
+    /// <summary>Talebin ek dosyasını kaldır.</summary>
+    [HttpDelete("{talepId:int}/attachment")]
+    [Authorize(Roles = "Yonetici,Lojistik,Fabrika,Gozlemci,Temsilci,Muhasebe")]
+    public async Task<IActionResult> DeleteAttachment(int talepId)
+    {
+        await purchaseService.DeleteAttachmentAsync(talepId);
+        return Ok(ApiResponse<object>.Ok(null!, "Ek silindi."));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

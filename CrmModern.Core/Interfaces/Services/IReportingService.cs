@@ -16,6 +16,13 @@ public interface IReportingService
     /// </summary>
     Task<byte[]> ExportOrderProformaAsync(string siparisNo, string lang = "tr");
 
+    /// <summary>
+    /// Aynı proformanın PDF çıktısı: ExportOrderProformaAsync ile üretilen xlsx
+    /// (şablon + görseller + #DETAY) sunucuda LibreOffice headless ile PDF'e
+    /// dönüştürülür → Excel ile birebir aynı görünüm. `lang` aynı anlama gelir.
+    /// </summary>
+    Task<byte[]> ExportOrderProformaPdfAsync(string siparisNo, string lang = "tr");
+
     // ── Faz 7 Dashboard ───────────────────────────────────────────────────────
 
     /// <summary>Rol bazlı KPI sayıları (kart widget'ları için).</summary>

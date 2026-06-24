@@ -15,6 +15,7 @@ import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
 import { PurchaseLinesTable } from '@/components/PurchaseLinesTable'
+import { PurchaseAttachment } from '@/components/PurchaseAttachment'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
@@ -160,6 +161,11 @@ export function FinalApprovalPage() {
                   />
                 </div>
               )}
+
+              {/* Talep sahibinin eklediği dosya — nihai onay basamağı da görür. */}
+              <div className="md:col-span-2">
+                <PurchaseAttachment talepId={detail.talepID} />
+              </div>
             </div>
           )}
 

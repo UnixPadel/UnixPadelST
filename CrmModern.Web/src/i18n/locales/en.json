@@ -92,6 +92,7 @@
     "qualityControl": "Quality Control",
     "factory": "Factory / Production",
     "logisticsReady": "Logistics · Ready",
+    "logisticsOffers": "Logistics · Offers",
     "logisticsHistory": "Logistics · History",
     "logisticsCarriers": "Logistics · Carriers",
     "accounting": "Accounting · Collections",
@@ -726,6 +727,37 @@
       "firmaPlaceholder": "Carrier name"
     }
   },
+  "logisticsOffer": {
+    "title": "Logistics · Offers",
+    "queueEmpty": "No orders awaiting offers.",
+    "noApproved": "No approved offer",
+    "count": "{{n}} offers",
+    "addTitle": "New Offer",
+    "approvedTitle": "Approved Logistics Offer",
+    "sendOffer": "Send Offer",
+    "firma": "Carrier",
+    "cesit": "Transport Type",
+    "fiyat": "Price",
+    "not": "Note",
+    "submit": "Send",
+    "approve": "Approve",
+    "revoke": "Revoke Approval",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "rejectTitle": "Reject Offer",
+    "rejectReason": "Rejection Reason",
+    "rejectedReason": "Rejection reason",
+    "approved": "Approved",
+    "pending": "Pending",
+    "empty": "No offers entered yet.",
+    "toast": {
+      "submitted": "Offer saved.",
+      "approved": "Offer approved.",
+      "revoked": "Approval revoked.",
+      "rejected": "Offer rejected.",
+      "error": "Operation failed."
+    }
+  },
   "logApprovals": {
     "sevkId": "Shipment #",
     "tasiyici": "Carrier",
@@ -778,6 +810,21 @@
     "creating": "Submitting...",
     "createSuccess": "Request created",
     "createError": "Error",
+    "attachment": {
+      "title": "Attachment",
+      "none": "No attachment",
+      "download": "Download",
+      "upload": "Add File",
+      "uploading": "Uploading...",
+      "replace": "Replace",
+      "remove": "Remove",
+      "uploaded": "File attached.",
+      "removed": "File removed.",
+      "error": "Operation failed.",
+      "notFound": "File not found.",
+      "hint": "Allowed: png, jpg, jpeg, pdf, word, txt, excel, zip… (≤25 MB)",
+      "done": "Back to List"
+    },
     "lines": {
       "title": "Line Items",
       "urunAdi": "Product Name",

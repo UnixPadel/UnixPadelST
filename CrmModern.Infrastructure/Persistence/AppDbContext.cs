@@ -31,10 +31,12 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
     public DbSet<EntityAttribute>   OznitelikTablo     => Set<EntityAttribute>();
 
     // ── Logistics / Accounting / Purchase ────────────────────────────────
-    public DbSet<LogisticsEntry>        LojistikTablo      => Set<LogisticsEntry>();
+    public DbSet<LogisticsEntry>        LojistikTablo       => Set<LogisticsEntry>();
+    public DbSet<LogisticsOffer>        LojistikTeklifTablo => Set<LogisticsOffer>();
     public DbSet<AccountingTransaction> MuhasebeIslemTablo => Set<AccountingTransaction>();
     public DbSet<PurchaseRequest>       SatinAlmaTalep     => Set<PurchaseRequest>();
     public DbSet<PurchaseRequestLine>   SatinAlmaTalepKalem => Set<PurchaseRequestLine>();
+    public DbSet<PurchaseAttachment>    SatinAlmaTalepEk    => Set<PurchaseAttachment>();
 
     // ── Order lifecycle (Faz 3) ──────────────────────────────────────────
     public DbSet<OrderApproval>  SiparisOnaylari      => Set<OrderApproval>();

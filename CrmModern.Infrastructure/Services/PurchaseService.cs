@@ -101,7 +101,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
 
     // ── Create ───────────────────────────────────────────────────────────────
 
-    public async Task CreateAsync(CreatePurchaseRequestDto dto)
+    public async Task<int> CreateAsync(CreatePurchaseRequestDto dto)
     {
         // Round-9 §9 — kalem varsa genel toplam kalemlerden türetilir
         // (parent.UrunMaliyeti otorite olarak kalemlerin Toplam toplamı olur).
@@ -159,6 +159,45 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             await uow.PurchaseRequests.AddLinesAsync(lines);
             await uow.SaveChangesAsync();
         }
+
+        return entity.TalepID;
+    }
+
+    // ── Ek dosya (SatinAlmaTalepEk) ──────────────────────────────────────────
+
+    public async Task UploadAttachmentAsync(int talepId, string ad, string tip, byte[] veri, string? yukleyen)
+    {
+        // Talep var mı? (yetkisiz/yanlış id'ye yazma engeli)
+        _ = await uow.PurchaseRequests.GetByIdAsync(talepId)
+            ?? throw new NotFoundException("PurchaseRequest", talepId);
+
+        // Talep başına tek ek: öncekini sil, yenisini ekle.
+        await uow.PurchaseAttachments.DeleteByTalepAsync(talepId);
+        await uow.PurchaseAttachments.AddAsync(new PurchaseAttachment
+        {
+            TalepID              = talepId,
+            Ad                   = ad,
+            Tip                  = tip,
+            Veri                 = veri,
+            Tarih                = DateTime.Now,
+            YukleyenKullaniciAdi = yukleyen,
+        });
+        await uow.SaveChangesAsync();
+    }
+
+    public Task<PurchaseAttachmentInfoDto?> GetAttachmentInfoAsync(int talepId) =>
+        uow.PurchaseAttachments.GetInfoByTalepAsync(talepId);
+
+    public async Task<PurchaseAttachmentDataDto?> GetAttachmentAsync(int talepId)
+    {
+        var e = await uow.PurchaseAttachments.GetByTalepAsync(talepId);
+        return e is null ? null : new PurchaseAttachmentDataDto(e.Veri, e.Ad, e.Tip);
+    }
+
+    public async Task DeleteAttachmentAsync(int talepId)
+    {
+        await uow.PurchaseAttachments.DeleteByTalepAsync(talepId);
+        await uow.SaveChangesAsync();
     }
 
     // ── Aşama 1: Ön Onay ─────────────────────────────────────────────────────

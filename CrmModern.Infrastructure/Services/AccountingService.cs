@@ -17,6 +17,11 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
         var orders = await uow.Orders.GetAccountingOrdersAsync();
         var result = new List<AccountingOrderListDto>(orders.Count);
 
+        // Lojistik teklif akışı — onaylı teklif özetini Burcu lojistik onay
+        // kartında göstermek için toplu çek (SiparisNo → onaylı teklif).
+        var approvedOffers = await uow.LogisticsOffers.GetApprovedForOrdersAsync(
+            orders.Select(o => o.SiparisNo).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList());
+
         foreach (var o in orders)
         {
             decimal odenen      = o.OdenenMiktar ?? 0m;
@@ -55,7 +60,10 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 Indirim:          o.Indirim,
                 Kdv:              o.Kdv,
                 // PROMPT-v6 §1 — Burcu kuyruk seçicisi.
-                LojistikOnay:     o.LojistikOnay));
+                LojistikOnay:     o.LojistikOnay,
+                // Lojistik teklif akışı — onaylı teklif özeti (varsa).
+                OnayliLojistikFirma: approvedOffers.TryGetValue(o.SiparisNo, out var off)  ? off.FirmaAdi : null,
+                OnayliLojistikFiyat: approvedOffers.TryGetValue(o.SiparisNo, out var off2) ? off2.Fiyat   : null));
         }
 
         return result.AsReadOnly();

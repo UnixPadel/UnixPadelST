@@ -264,6 +264,49 @@ export interface LogisticsOrderListDto {
   // PROMPT-v6 §4 — yalnız ödeme TÜRÜ bilgisi; tutar alanı bilinçli yok (v5 §2).
   pesinYuzde: number
   odemeDurum?: string | null
+  // Lojistik teklif akışı — onaylı teklif (yalnız ready listesinde dolu);
+  // "Sevk Oluştur" formunu ön-doldurmak için.
+  onayliFirma?: string | null
+  onayliCesit?: string | null
+  onayliFiyat?: number | null
+}
+
+// ── Lojistik Teklif akışı ───────────────────────────────────────────────────
+
+export interface LogisticsOffer {
+  teklifID: number
+  siparisNo: string
+  kullaniciID: number
+  kullaniciAdSoyad?: string | null
+  firmaAdi: string
+  lojistikCesit: string
+  fiyat: number
+  aciklama?: string | null
+  durum: string  // 'Beklemede' | 'Onaylandi' | 'Reddedildi'
+  olusturmaTarihi: string
+  onayKullaniciID?: number | null
+  onayKullaniciAdSoyad?: string | null
+  onayTarihi?: string | null
+  redNotu?: string | null
+}
+
+export interface LogisticsOfferQueueItem {
+  siparisNo: string
+  musteriAd: string
+  mUlke?: string
+  siparisMiTeklifMi: string
+  tarih: string
+  sTarih?: string | null
+  teklifSayisi: number
+  onayliFirma?: string | null
+  onayliFiyat?: number | null
+}
+
+export interface SubmitLogisticsOfferRequest {
+  firmaAdi: string
+  lojistikCesit: string
+  fiyat: number
+  aciklama?: string
 }
 
 export interface MoveToLogisticsDto {
@@ -336,6 +379,9 @@ export interface AccountingOrderListDto {
   kdv?: number | null
   // PROMPT-v6 §1 — Burcu "Lojistik Onay Bekleyen" kuyruğu: null | 'Bekliyor' | 'Onay'
   lojistikOnay?: string | null
+  // Lojistik teklif akışı — yöneticinin onayladığı lojistik teklif özeti.
+  onayliLojistikFirma?: string | null
+  onayliLojistikFiyat?: number | null
 }
 
 export interface AccountingTransactionDto {

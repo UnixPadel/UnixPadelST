@@ -318,6 +318,73 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
+    // PDF proforma — aynı xlsx'i LibreOffice headless ile PDF'e çevirir (birebir görünüm)
+    // ─────────────────────────────────────────────────────────────────────────────
+
+    public async Task<byte[]> ExportOrderProformaPdfAsync(string siparisNo, string lang = "tr")
+    {
+        var xlsx = await ExportOrderProformaAsync(siparisNo, lang);
+        return XlsxToPdf(xlsx);
+    }
+
+    // soffice (LibreOffice) binary; Docker imajında PATH'te. Override için env var.
+    private static readonly string SofficePath =
+        Environment.GetEnvironmentVariable("LIBREOFFICE_PATH") ?? "soffice";
+
+    /// <summary>
+    /// xlsx baytlarını LibreOffice headless ile PDF'e çevirir. Her çağrı için BENZERSİZ
+    /// UserInstallation profili kullanılır → eşzamanlı çağrılarda tek-örnek kilidi
+    /// (single-instance lock) çakışması olmaz. Geçici dosyalar finally'de temizlenir.
+    /// </summary>
+    private static byte[] XlsxToPdf(byte[] xlsx)
+    {
+        var work = Path.Combine(Path.GetTempPath(), "proforma_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(work);
+        try
+        {
+            var xlsxPath = Path.Combine(work, "proforma.xlsx");
+            File.WriteAllBytes(xlsxPath, xlsx);
+            var profileUri = new Uri(Path.Combine(work, "louser")).AbsoluteUri; // file:///...
+
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName               = SofficePath,
+                RedirectStandardError  = true,
+                RedirectStandardOutput = true,
+                UseShellExecute        = false,
+                CreateNoWindow         = true,
+            };
+            foreach (var a in new[]
+            {
+                "--headless", "--norestore", "--nologo", "--nolockcheck",
+                $"-env:UserInstallation={profileUri}",
+                "--convert-to", "pdf:calc_pdf_Export",
+                "--outdir", work, xlsxPath,
+            }) psi.ArgumentList.Add(a);
+
+            using var p = System.Diagnostics.Process.Start(psi)
+                ?? throw new InvalidOperationException("LibreOffice (soffice) başlatılamadı.");
+            // Render free-tier'da ilk (soğuk) dönüşüm yavaş olabilir → 120 sn tolerans.
+            if (!p.WaitForExit(120_000))
+            {
+                try { p.Kill(entireProcessTree: true); } catch { /* ignore */ }
+                throw new InvalidOperationException("PDF dönüşümü zaman aşımına uğradı.");
+            }
+
+            var pdfPath = Path.Combine(work, "proforma.pdf");
+            if (!File.Exists(pdfPath))
+                throw new InvalidOperationException(
+                    "PDF dönüşümü başarısız (LibreOffice kurulu mu?). stderr: " + p.StandardError.ReadToEnd());
+
+            return File.ReadAllBytes(pdfPath);
+        }
+        finally
+        {
+            try { Directory.Delete(work, recursive: true); } catch { /* best-effort temizlik */ }
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────────
     // Hotfix Proforma — ExcelIndir BLOB template substitution (WinForms BIREBIR)
     //
     // Kaynak: SiparisForm.cs previewButton_Click (3408+) ve Form3.cs excelYaz_Click (2810+).

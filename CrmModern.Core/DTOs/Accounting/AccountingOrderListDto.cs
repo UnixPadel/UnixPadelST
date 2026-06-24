@@ -33,4 +33,8 @@ public sealed record AccountingOrderListDto(
     decimal? Kdv     = null,
     // PROMPT-v6 §1 — Burcu ekranı "Lojistik Onay Bekleyen" kuyruğu için:
     // NULL | 'Bekliyor' | 'Onay'.
-    string?  LojistikOnay = null);
+    string?  LojistikOnay = null,
+    // Lojistik teklif akışı — yöneticinin onayladığı lojistik teklif özeti
+    // (Burcu lojistik onay kartında görünür). Onaylı teklif yoksa null.
+    string?  OnayliLojistikFirma = null,
+    decimal? OnayliLojistikFiyat = null);

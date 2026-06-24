@@ -6,7 +6,7 @@ import {
   approveMuhasebeAndMoveToPlanning, approveLogistics,
   uploadMuhasebeEk, finalizeCompletion,
 } from '@/api/accounting'
-import { getOrderDetail, downloadAttachment, downloadExcel } from '@/api/orders'
+import { getOrderDetail, downloadAttachment, downloadExcel, downloadPdf } from '@/api/orders'
 import { DataTable, type Column } from '@/components/DataTable'
 import { DecimalInput } from '@/components/DecimalInput'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
@@ -269,6 +269,15 @@ export function AccountingApprovalPage() {
       toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }) }
   }
 
+  const handlePdf = async () => {
+    const no = requireSelection()
+    if (!no) return
+    try {
+      await downloadPdf(no)
+    } catch (e) {
+      toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }) }
+  }
+
   // Seçili satırın kuyruğuna göre tek bağlamsal onay aksiyonu.
   const canCari = !!selectedRow && matchesView(selectedRow, 'cariQueue')
   const canLoj  = !!selectedRow && matchesView(selectedRow, 'lojistikQueue')
@@ -504,6 +513,9 @@ export function AccountingApprovalPage() {
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExcel}>
               {t('qc.actions.excelYaz')}
             </Button>
+            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handlePdf}>
+              PDF
+            </Button>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('ek')}>
               {t('qc.actions.saticiEk')}
             </Button>
@@ -562,6 +574,22 @@ export function AccountingApprovalPage() {
             </div>
           ) : (
             <>
+              {/* Lojistik teklif akışı — yöneticinin onayladığı lojistik teklif
+                  (firma + fiyat) Burcu'ya salt-okunur gösterilir. */}
+              {canLoj && selectedRow?.onayliLojistikFirma && (
+                <div className="space-y-1.5 rounded border border-emerald-300 bg-emerald-50 p-2">
+                  <p className="text-[11px] font-semibold text-emerald-700">{t('logisticsOffer.approvedTitle')}</p>
+                  <CariRow label={t('logisticsOffer.firma')}>
+                    <span className="text-xs font-medium">{selectedRow.onayliLojistikFirma}</span>
+                  </CariRow>
+                  <CariRow label={t('logisticsOffer.fiyat')}>
+                    <span className="text-xs font-medium tabular-nums">
+                      {selectedRow.onayliLojistikFiyat != null ? formatCurrency(selectedRow.onayliLojistikFiyat) : '—'}
+                    </span>
+                  </CariRow>
+                </div>
+              )}
+
               {/* Round-10 — Peşinat alanı (yalnız Cari/Lojistik kuyruğu): onayla
                   birlikte MuhasebeIslemTablo'ya tahsilat olarak kaydedilir.
                   Maliyet talebinden TAMAMEN bağımsız — Maliyet'e yazmaz. */}

@@ -1,7 +1,7 @@
 {
   "name": "unixpadelst",
   "private": true,
-  "version": "0.2.20",
+  "version": "0.2.22",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {

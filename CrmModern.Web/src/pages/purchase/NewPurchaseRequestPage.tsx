@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { createPurchaseRequest } from '@/api/purchase'
+import { createPurchaseRequest, uploadPurchaseAttachment } from '@/api/purchase'
 import { useAuth } from '@/hooks/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FieldError } from '@/components/FieldError'
-import { PurchaseAttachment } from '@/components/PurchaseAttachment'
 import { useToast } from '@/components/ToastProvider'
 import { formatCurrency } from '@/lib/utils'
 import type { CreatePurchaseRequestLine } from '@/types'
@@ -29,6 +28,10 @@ const PARA_BIRIMLERI = [
   { value: 'TL',      label: 'TRY (₺)' },
   { value: 'Sterlin', label: 'GBP (£)' },
 ] as const
+
+// Ek dosya — backend ile aynı izinli uzantı listesi + 25 MB sınırı.
+const EK_ACCEPT = '.png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.rtf,.odt,.zip,.rar'
+const EK_MAX_BYTES = 25 * 1024 * 1024
 
 type IndirimTipi = 'yuzde' | 'tutar'
 
@@ -82,8 +85,9 @@ export function NewPurchaseRequestPage() {
   const [alinanYer, setAlinanYer] = useState('')
   const [notlar, setNotlar] = useState('')
   const [submitted, setSubmitted] = useState(false)
-  // Oluşturma sonrası ek dosya adımı için yeni TalepID.
-  const [createdId, setCreatedId] = useState<number | null>(null)
+  // Talep oluşturulurken seçilen ek dosya — "Talep Oluştur"da otomatik yüklenir.
+  const [ekFile, setEkFile] = useState<File | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
   const departman = user?.yetkiTuru ?? ''
 
   const patchRow = (id: number, patch: Partial<LineRow>) =>
@@ -96,7 +100,7 @@ export function NewPurchaseRequestPage() {
   const valid = !!(alinanYer.trim() && filledRows.length > 0 && filledRows.every(lineValid))
 
   const createMut = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const kalemler: CreatePurchaseRequestLine[] = filledRows.map((r) => ({
         urunAdi: r.urunAdi.trim(),
         birim: resolveBirim(r),
@@ -112,7 +116,7 @@ export function NewPurchaseRequestPage() {
       const summary = kalemler.length > 1
         ? `${first} (${t('purchase.summarySuffix', { count: kalemler.length - 1 })})`
         : first
-      return createPurchaseRequest({
+      const id = await createPurchaseRequest({
         urunAdi: summary.slice(0, 500),
         urunMaliyeti: grandTotal,
         paraBirimi,
@@ -123,12 +127,20 @@ export function NewPurchaseRequestPage() {
         talepTipi: 'SatinAlma',
         kalemler,
       })
+      // Talep oluştu; seçilen dosyayı yeni TalepID'ye yükle. Yükleme başarısız
+      // olsa bile talep kaybolmaz — kullanıcıya ayrı uyarı verilir.
+      let ekUploaded = true
+      if (ekFile) {
+        try { await uploadPurchaseAttachment(id, ekFile) } catch { ekUploaded = false }
+      }
+      return { ekUploaded }
     },
-    onSuccess: (id: number) => {
+    onSuccess: ({ ekUploaded }) => {
       qc.invalidateQueries({ queryKey: ['purchase-mine'] })
-      // Hemen yönlendirme YOK — ek dosya eklenebilsin diye TalepID'yi tut.
-      setCreatedId(id)
-      toast({ title: t('purchase.createSuccess') })
+      toast(ekUploaded
+        ? { title: t('purchase.createSuccess') }
+        : { title: t('purchase.attachment.createButUploadFailed'), variant: 'destructive' })
+      nav('/purchase/mine')
     },
     onError: () => toast({ title: t('purchase.createError'), variant: 'destructive' }),
   })
@@ -137,6 +149,15 @@ export function NewPurchaseRequestPage() {
     setSubmitted(true)
     if (!valid) return
     createMut.mutate()
+  }
+
+  // Dosya seçimi — boyut + uzantı doğrula, sonra state'e al (henüz yükleme yok).
+  const pickFile = (f: File | null) => {
+    if (!f) return
+    if (f.size > EK_MAX_BYTES) { toast({ title: t('purchase.attachment.tooBig'), variant: 'destructive' }); return }
+    const ext = '.' + (f.name.split('.').pop() ?? '').toLowerCase()
+    if (!EK_ACCEPT.split(',').includes(ext)) { toast({ title: t('purchase.attachment.badType'), variant: 'destructive' }); return }
+    setEkFile(f)
   }
 
   return (
@@ -277,25 +298,33 @@ export function NewPurchaseRequestPage() {
             <Label>{t('purchase.notlar')}</Label>
             <Textarea rows={3} value={notlar} onChange={(e) => setNotlar(e.target.value)} />
           </div>
+          {/* Ek dosya — talep oluşturulurken seçilir, "Talep Oluştur"da otomatik yüklenir. */}
+          <div className="space-y-1 md:col-span-2">
+            <Label>{t('purchase.attachment.title')}</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <input ref={fileRef} type="file" accept={EK_ACCEPT} className="sr-only"
+                onChange={(e) => { pickFile(e.target.files?.[0] ?? null); e.target.value = '' }} />
+              <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                {ekFile ? t('purchase.attachment.replace') : t('purchase.attachment.upload')}
+              </Button>
+              {ekFile && (
+                <span className="flex items-center gap-1 text-sm break-all">
+                  {ekFile.name}
+                  <button type="button" className="px-1 text-destructive" aria-label={t('purchase.attachment.remove')}
+                    onClick={() => setEkFile(null)}>×</button>
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-muted-foreground">{t('purchase.attachment.hint')}</p>
+          </div>
         </div>
 
-        {createdId == null ? (
-          <div className="pt-2 flex gap-2">
-            <Button variant="outline" onClick={() => nav(-1)}>{t('purchase.cancel')}</Button>
-            <Button disabled={createMut.isPending} onClick={onSubmit}>
-              {createMut.isPending ? t('purchase.creating') : t('purchase.create')}
-            </Button>
-          </div>
-        ) : (
-          // Talep oluşturuldu — opsiyonel ek dosya adımı (onay basamakları görür).
-          <div className="pt-2 space-y-3 max-w-xl">
-            <div className="rounded-md border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-700">
-              {t('purchase.createSuccess')} — #{createdId}
-            </div>
-            <PurchaseAttachment talepId={createdId} canManage />
-            <Button onClick={() => nav('/purchase/mine')}>{t('purchase.attachment.done')}</Button>
-          </div>
-        )}
+        <div className="pt-2 flex gap-2">
+          <Button variant="outline" onClick={() => nav(-1)}>{t('purchase.cancel')}</Button>
+          <Button disabled={createMut.isPending} onClick={onSubmit}>
+            {createMut.isPending ? t('purchase.creating') : t('purchase.create')}
+          </Button>
+        </div>
       </div>
     </div>
   )

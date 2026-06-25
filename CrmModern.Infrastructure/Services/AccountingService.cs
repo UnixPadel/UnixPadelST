@@ -62,8 +62,9 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
                 // PROMPT-v6 §1 — Burcu kuyruk seçicisi.
                 LojistikOnay:     o.LojistikOnay,
                 // Lojistik teklif akışı — onaylı teklif özeti (varsa).
-                OnayliLojistikFirma: approvedOffers.TryGetValue(o.SiparisNo, out var off)  ? off.FirmaAdi : null,
-                OnayliLojistikFiyat: approvedOffers.TryGetValue(o.SiparisNo, out var off2) ? off2.Fiyat   : null));
+                OnayliLojistikFirma: approvedOffers.TryGetValue(o.SiparisNo, out var off)  ? off.FirmaAdi   : null,
+                OnayliLojistikFiyat: approvedOffers.TryGetValue(o.SiparisNo, out var off2) ? off2.Fiyat     : null,
+                OnayliLojistikParaBirimi: approvedOffers.TryGetValue(o.SiparisNo, out var off3) ? off3.ParaBirimi : null));
         }
 
         return result.AsReadOnly();

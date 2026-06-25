@@ -5,4 +5,5 @@ public sealed record SubmitLogisticsOfferRequest(
     string  FirmaAdi,
     string  LojistikCesit,
     decimal Fiyat,
+    string? ParaBirimi,
     string? Aciklama);

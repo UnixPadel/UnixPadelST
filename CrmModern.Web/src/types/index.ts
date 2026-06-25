@@ -281,6 +281,7 @@ export interface LogisticsOffer {
   firmaAdi: string
   lojistikCesit: string
   fiyat: number
+  paraBirimi?: string | null
   aciklama?: string | null
   durum: string  // 'Beklemede' | 'Onaylandi' | 'Reddedildi'
   olusturmaTarihi: string
@@ -300,12 +301,14 @@ export interface LogisticsOfferQueueItem {
   teklifSayisi: number
   onayliFirma?: string | null
   onayliFiyat?: number | null
+  onayliParaBirimi?: string | null
 }
 
 export interface SubmitLogisticsOfferRequest {
   firmaAdi: string
   lojistikCesit: string
   fiyat: number
+  paraBirimi?: string
   aciklama?: string
 }
 
@@ -382,6 +385,7 @@ export interface AccountingOrderListDto {
   // Lojistik teklif akışı — yöneticinin onayladığı lojistik teklif özeti.
   onayliLojistikFirma?: string | null
   onayliLojistikFiyat?: number | null
+  onayliLojistikParaBirimi?: string | null
 }
 
 export interface AccountingTransactionDto {

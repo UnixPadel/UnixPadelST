@@ -91,7 +91,7 @@ export function LogisticsOffersPage() {
                       : <StatusBadge value={r.siparisMiTeklifMi} />}
                     <span className="ml-auto flex items-center gap-2">
                       {r.onayliFirma
-                        ? <Badge variant="success">{r.onayliFirma}{r.onayliFiyat != null ? ` · ${formatCurrency(r.onayliFiyat)}` : ''}</Badge>
+                        ? <Badge variant="success">{r.onayliFirma}{r.onayliFiyat != null ? ` · ${formatCurrency(r.onayliFiyat, r.onayliParaBirimi ?? undefined)}` : ''}</Badge>
                         : <span className="text-xs text-muted-foreground">{t('logisticsOffer.noApproved')}</span>}
                       <Badge variant="secondary">{t('logisticsOffer.count', { n: r.teklifSayisi })}</Badge>
                     </span>

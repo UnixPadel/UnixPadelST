@@ -13,4 +13,5 @@ public sealed record LogisticsOfferQueueItemDto(
     DateTime? STarih,
     int       TeklifSayisi,
     string?   OnayliFirma,
-    decimal?  OnayliFiyat);
+    decimal?  OnayliFiyat,
+    string?   OnayliParaBirimi);

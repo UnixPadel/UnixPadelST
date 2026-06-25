@@ -84,7 +84,7 @@ export function LogisticsOffersList({ siparisNo, canApprove }: Props) {
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <span className="font-medium">{o.firmaAdi}</span>
               <span className="text-muted-foreground">{o.lojistikCesit}</span>
-              <span className="font-semibold tabular-nums">{formatCurrency(o.fiyat)}</span>
+              <span className="font-semibold tabular-nums">{formatCurrency(o.fiyat, o.paraBirimi ?? undefined)}</span>
               {o.aciklama && <span className="text-xs text-muted-foreground">{o.aciklama}</span>}
               <span className="text-xs text-muted-foreground">{o.kullaniciAdSoyad ?? '—'}</span>
               <span className="text-xs text-muted-foreground">{formatDate(o.olusturmaTarihi)}</span>

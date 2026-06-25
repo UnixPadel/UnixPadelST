@@ -131,10 +131,14 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
         var tokenDescriptor = new SecurityTokenDescriptor
         {
             Subject            = new ClaimsIdentity(claims),
-            // "Beni Hatırla": uzun ömürlü token (gün). Aksi halde normal oturum (saat).
-            Expires            = rememberMe
-                ? DateTime.UtcNow.AddDays(int.Parse(jwtSettings["RememberMeExpiryDays"] ?? "30"))
-                : DateTime.UtcNow.AddHours(int.Parse(jwtSettings["ExpiryHours"] ?? "8")),
+            // Talep ("hiç çıkış yapmasın"): token ÇOK uzun ömürlü. Masaüstü istemci
+            // oturumu localStorage'da sakladığı için kullanıcı pratikte hiç oturum
+            // düşmez — ne güncelleme/yeniden başlatmada ne de 8 saat sonra.
+            // rememberMe artık SÜREYİ ETKİLEMEZ (yalnız frontend giriş ön-doldurması).
+            // GÜVENLİK: uzun ömürlü token sızarsa süre boyunca geçerlidir; TÜM
+            // oturumları anında düşürmek gerekirse JwtSettings:SecretKey döndürülür.
+            Expires            = DateTime.UtcNow.AddDays(
+                                     int.Parse(jwtSettings["RememberMeExpiryDays"] ?? "3650")),
             Issuer             = jwtSettings["Issuer"],
             Audience           = jwtSettings["Audience"],
             SigningCredentials = new SigningCredentials(

@@ -37,4 +37,5 @@ public sealed record AccountingOrderListDto(
     // Lojistik teklif akışı — yöneticinin onayladığı lojistik teklif özeti
     // (Burcu lojistik onay kartında görünür). Onaylı teklif yoksa null.
     string?  OnayliLojistikFirma = null,
-    decimal? OnayliLojistikFiyat = null);
+    decimal? OnayliLojistikFiyat = null,
+    string?  OnayliLojistikParaBirimi = null);

@@ -208,7 +208,8 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
                 o.SiparisNo, o.MusteriAd, o.MUlke, o.SiparisMiTeklifMi, o.Tarih, o.STarih,
                 counts.TryGetValue(o.SiparisNo, out var c) ? c : 0,
                 approved.TryGetValue(o.SiparisNo, out var a) ? a.FirmaAdi : null,
-                approved.TryGetValue(o.SiparisNo, out var a2) ? a2.Fiyat : null))
+                approved.TryGetValue(o.SiparisNo, out var a2) ? a2.Fiyat : null,
+                approved.TryGetValue(o.SiparisNo, out var a3) ? a3.ParaBirimi : null))
             .ToList()
             .AsReadOnly();
     }
@@ -228,7 +229,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         return offers.Select(o => new LogisticsOfferDto(
                 o.TeklifID, o.SiparisNo, o.KullaniciID,
                 users.TryGetValue(o.KullaniciID, out var n) ? n : null,
-                o.FirmaAdi, o.LojistikCesit, o.Fiyat, o.Aciklama, o.Durum, o.OlusturmaTarihi,
+                o.FirmaAdi, o.LojistikCesit, o.Fiyat, o.ParaBirimi, o.Aciklama, o.Durum, o.OlusturmaTarihi,
                 o.OnayKullaniciID,
                 o.OnayKullaniciID.HasValue && users.TryGetValue(o.OnayKullaniciID.Value, out var on) ? on : null,
                 o.OnayTarihi, o.RedNotu))
@@ -257,6 +258,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             FirmaAdi        = req.FirmaAdi.Trim(),
             LojistikCesit   = req.LojistikCesit.Trim(),
             Fiyat           = req.Fiyat,
+            ParaBirimi      = string.IsNullOrWhiteSpace(req.ParaBirimi) ? null : req.ParaBirimi.Trim(),
             Aciklama        = string.IsNullOrWhiteSpace(req.Aciklama) ? null : req.Aciklama.Trim(),
             Durum           = "Beklemede",
             OlusturmaTarihi = DateTime.Now,

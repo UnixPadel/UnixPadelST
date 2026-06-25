@@ -19,6 +19,7 @@ internal sealed class LogisticsOfferConfiguration : IEntityTypeConfiguration<Log
         builder.Property(o => o.FirmaAdi)       .HasColumnName("FirmaAdi")       .HasMaxLength(255);
         builder.Property(o => o.LojistikCesit)  .HasColumnName("LojistikCesit")  .HasMaxLength(64);
         builder.Property(o => o.Fiyat)          .HasColumnName("Fiyat")          .HasColumnType("decimal(18,2)");
+        builder.Property(o => o.ParaBirimi)     .HasColumnName("ParaBirimi")     .HasMaxLength(16);
         builder.Property(o => o.Aciklama)       .HasColumnName("Aciklama")       .HasColumnType("text");
         builder.Property(o => o.Durum)          .HasColumnName("Durum")          .HasMaxLength(16);
         builder.Property(o => o.OlusturmaTarihi).HasColumnName("OlusturmaTarihi");

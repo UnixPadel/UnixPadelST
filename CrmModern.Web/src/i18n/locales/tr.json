@@ -738,6 +738,7 @@
     "firma": "Firma",
     "cesit": "Taşıma Türü",
     "fiyat": "Fiyat",
+    "paraBirimi": "Para Birimi",
     "not": "Not",
     "submit": "Gönder",
     "approve": "Onayla",
@@ -822,6 +823,9 @@
       "removed": "Dosya kaldırıldı.",
       "error": "İşlem başarısız.",
       "notFound": "Dosya bulunamadı.",
+      "tooBig": "Dosya 25 MB sınırını aşıyor.",
+      "badType": "Desteklenmeyen dosya türü.",
+      "createButUploadFailed": "Talep oluşturuldu ama dosya yüklenemedi.",
       "hint": "İzin verilen: png, jpg, jpeg, pdf, word, txt, excel, zip… (≤25 MB)",
       "done": "Listeye Dön"
     },

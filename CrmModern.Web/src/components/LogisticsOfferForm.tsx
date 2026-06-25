@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getCarriers } from '@/api/logistics'
 import { submitOffer } from '@/api/logisticsOffers'
-import { INCOTERMS } from '@/lib/constants'
+import { INCOTERMS, PARA_BIRIMLERI } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -37,6 +37,7 @@ export function LogisticsOfferForm({ siparisNo, onSubmitted }: Props) {
   const [firmaText, setFirmaText] = useState('')
   const [lojistikCesit, setLojistikCesit] = useState('')
   const [fiyat, setFiyat] = useState<number>(0)
+  const [paraBirimi, setParaBirimi] = useState('Euro')
   const [aciklama, setAciklama] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
@@ -45,14 +46,14 @@ export function LogisticsOfferForm({ siparisNo, onSubmitted }: Props) {
 
   const mut = useMutation({
     mutationFn: () => submitOffer(siparisNo, {
-      firmaAdi, lojistikCesit, fiyat, aciklama: aciklama.trim() || undefined,
+      firmaAdi, lojistikCesit, fiyat, paraBirimi, aciklama: aciklama.trim() || undefined,
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['logistics-offers', siparisNo] })
       qc.invalidateQueries({ queryKey: ['logistics-offer-queue'] })
       qc.invalidateQueries({ queryKey: ['carriers'] })
       setCarrierChoice(OTHER_CARRIER); setFirmaText(''); setLojistikCesit('')
-      setFiyat(0); setAciklama(''); setSubmitted(false)
+      setFiyat(0); setParaBirimi('Euro'); setAciklama(''); setSubmitted(false)
       toast({ title: t('logisticsOffer.toast.submitted') })
       onSubmitted?.()
     },
@@ -98,6 +99,15 @@ export function LogisticsOfferForm({ siparisNo, onSubmitted }: Props) {
           <Label>{t('logisticsOffer.fiyat')}</Label>
           <DecimalInput value={fiyat} onValueChange={(v) => setFiyat(v === '' ? 0 : v)} />
           {submitted && !(fiyat > 0) && <FieldError message={t('validation.required')} />}
+        </div>
+        <div className="space-y-1">
+          <Label>{t('logisticsOffer.paraBirimi')}</Label>
+          <Select value={paraBirimi} onValueChange={setParaBirimi}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {PARA_BIRIMLERI.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1">
           <Label>{t('logisticsOffer.not')}</Label>

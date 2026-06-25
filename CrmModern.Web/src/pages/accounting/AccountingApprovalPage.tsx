@@ -584,7 +584,7 @@ export function AccountingApprovalPage() {
                   </CariRow>
                   <CariRow label={t('logisticsOffer.fiyat')}>
                     <span className="text-xs font-medium tabular-nums">
-                      {selectedRow.onayliLojistikFiyat != null ? formatCurrency(selectedRow.onayliLojistikFiyat) : '—'}
+                      {selectedRow.onayliLojistikFiyat != null ? formatCurrency(selectedRow.onayliLojistikFiyat, selectedRow.onayliLojistikParaBirimi ?? undefined) : '—'}
                     </span>
                   </CariRow>
                 </div>

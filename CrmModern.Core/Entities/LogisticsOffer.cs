@@ -15,6 +15,7 @@ public sealed class LogisticsOffer
     public string    FirmaAdi        { get; set; } = string.Empty;
     public string    LojistikCesit   { get; set; } = string.Empty; // Incoterm / taşıma türü
     public decimal   Fiyat           { get; set; }
+    public string?   ParaBirimi      { get; set; }                 // Euro | Dolar | TL | Sterlin
     public string?   Aciklama        { get; set; }                 // Not
     public string    Durum           { get; set; } = "Beklemede";  // Beklemede | Onaylandi | Reddedildi
     public DateTime  OlusturmaTarihi { get; set; }

@@ -125,6 +125,7 @@ public static class DatabaseSchemaMigrator
                 FirmaAdi        VARCHAR(255)   NOT NULL,
                 LojistikCesit   VARCHAR(64)    NOT NULL,
                 Fiyat           DECIMAL(18,2)  NOT NULL,
+                ParaBirimi      VARCHAR(16)    NULL,
                 Aciklama        TEXT           NULL,
                 Durum           VARCHAR(16)    NOT NULL DEFAULT 'Beklemede',
                 OlusturmaTarihi DATETIME       NOT NULL,
@@ -141,6 +142,10 @@ public static class DatabaseSchemaMigrator
         await EnsureColumnAsync(ctx, logger,
             table: "LojistikTeklifTablo", column: "RedNotu",
             ddl: "ALTER TABLE LojistikTeklifTablo ADD COLUMN RedNotu TEXT NULL");
+
+        await EnsureColumnAsync(ctx, logger,
+            table: "LojistikTeklifTablo", column: "ParaBirimi",
+            ddl: "ALTER TABLE LojistikTeklifTablo ADD COLUMN ParaBirimi VARCHAR(16) NULL");
     }
 
     /// <summary>

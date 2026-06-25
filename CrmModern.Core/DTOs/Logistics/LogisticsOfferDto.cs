@@ -9,6 +9,7 @@ public sealed record LogisticsOfferDto(
     string    FirmaAdi,
     string    LojistikCesit,
     decimal   Fiyat,
+    string?   ParaBirimi,
     string?   Aciklama,
     string    Durum,
     DateTime  OlusturmaTarihi,

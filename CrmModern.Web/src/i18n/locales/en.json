@@ -338,7 +338,17 @@
       "siparisiHazirla": "Prepare Order",
       "revizeEt": "Revise",
       "getirSearch": "Search quote no / order no / customer…",
-      "formYukleniyor": "Loading form…"
+      "formYukleniyor": "Loading form…",
+      "onizleme": "Preview",
+      "onizlemeBaslik": "Order Summary",
+      "onizlemeAciklama": "Review how the order looks before saving.",
+      "previewMusteri": "Customer Info",
+      "previewUrunler": "Products",
+      "previewBosUrun": "No products added yet.",
+      "previewMontajTeslimat": "Assembly / Delivery",
+      "previewSartlar": "Terms",
+      "previewFiyat": "Pricing",
+      "previewBrut": "Gross Total"
     },
     "subtitle": "Order Form — 3 columns (Customer / Sets / Account)",
     "sections": {

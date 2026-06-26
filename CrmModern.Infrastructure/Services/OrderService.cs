@@ -499,14 +499,16 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         TE_Mail           = dto.TE_Mail,
         TVATNumarasi      = dto.TVATNumarasi,
         TZipKod           = dto.TZipKod,
-        TUlke             = dto.TUlke,
+        // SiparisAlTablo.TUlke + tüm M* sütunları DB'de NOT NULL (varsayılan yok);
+        // form bunları boş bırakırsa null → MySQL 1048 → 500. Boş string'e indirgenir.
+        TUlke             = dto.TUlke         ?? string.Empty,
         TAdres            = dto.TAdres,
-        MTelefon          = dto.MTelefon,
-        MMail             = dto.MMail,
-        MUlke             = dto.MUlke,
-        MVATNumarasi      = dto.MVATNumarasi,
+        MTelefon          = dto.MTelefon      ?? string.Empty,
+        MMail             = dto.MMail         ?? string.Empty,
+        MUlke             = dto.MUlke         ?? string.Empty,
+        MVATNumarasi      = dto.MVATNumarasi  ?? string.Empty,
         MZipKod           = dto.MZipKod,
-        MAdres            = dto.MAdres,
+        MAdres            = dto.MAdres         ?? string.Empty,
         ParaTipi          = dto.ParaTipi,
         // PROMPT-v2 §3: null → DB NULL korunur (Order.Indirim/Kdv zaten nullable);
         // PesinYüzde non-nullable int olduğu için null → 0.
@@ -553,14 +555,15 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         existing.TE_Mail           = dto.TE_Mail;
         existing.TVATNumarasi      = dto.TVATNumarasi;
         existing.TZipKod           = dto.TZipKod;
-        existing.TUlke             = dto.TUlke;
+        // NOT NULL sütunlar (bkz. BuildOrderEntity) — null → boş string.
+        existing.TUlke             = dto.TUlke         ?? string.Empty;
         existing.TAdres            = dto.TAdres;
-        existing.MTelefon          = dto.MTelefon;
-        existing.MMail             = dto.MMail;
-        existing.MUlke             = dto.MUlke;
-        existing.MVATNumarasi      = dto.MVATNumarasi;
+        existing.MTelefon          = dto.MTelefon      ?? string.Empty;
+        existing.MMail             = dto.MMail         ?? string.Empty;
+        existing.MUlke             = dto.MUlke         ?? string.Empty;
+        existing.MVATNumarasi      = dto.MVATNumarasi  ?? string.Empty;
         existing.MZipKod           = dto.MZipKod;
-        existing.MAdres            = dto.MAdres;
+        existing.MAdres            = dto.MAdres         ?? string.Empty;
         existing.ParaTipi          = dto.ParaTipi;
         // PROMPT-v2 §3: nullable DTO → entity (PesinYüzde non-nullable: null → 0).
         existing.Indirim           = dto.Indirim;

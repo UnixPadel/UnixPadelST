@@ -338,7 +338,17 @@
       "siparisiHazirla": "Siparişi Hazırla",
       "revizeEt": "Revize Et",
       "getirSearch": "Teklif No / Sipariş No / Müşteri adı ara…",
-      "formYukleniyor": "Form yükleniyor…"
+      "formYukleniyor": "Form yükleniyor…",
+      "onizleme": "Önizleme",
+      "onizlemeBaslik": "Sipariş Özeti",
+      "onizlemeAciklama": "Kaydetmeden önce siparişin nasıl oluştuğunu kontrol edin.",
+      "previewMusteri": "Müşteri Bilgileri",
+      "previewUrunler": "Ürünler",
+      "previewBosUrun": "Henüz ürün eklenmedi.",
+      "previewMontajTeslimat": "Montaj / Teslimat",
+      "previewSartlar": "Şartlar",
+      "previewFiyat": "Fiyatlandırma",
+      "previewBrut": "Brüt Toplam"
     },
     "subtitle": "Sipariş Formu — 3 kolon (Müşteri / Setler / Cari)",
     "sections": {

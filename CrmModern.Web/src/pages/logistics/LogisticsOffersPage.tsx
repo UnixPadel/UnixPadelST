@@ -93,7 +93,8 @@ export function LogisticsOffersPage() {
                       {r.onayliFirma
                         ? <Badge variant="success">{r.onayliFirma}{r.onayliFiyat != null ? ` · ${formatCurrency(r.onayliFiyat, r.onayliParaBirimi ?? undefined)}` : ''}</Badge>
                         : <span className="text-xs text-muted-foreground">{t('logisticsOffer.noApproved')}</span>}
-                      <Badge variant="secondary">{t('logisticsOffer.count', { n: r.teklifSayisi })}</Badge>
+                      {/* Yeni teklif geldiyse (sayı > 0) rozet yeşile döner; boşsa nötr. */}
+                      <Badge variant={r.teklifSayisi > 0 ? 'success' : 'secondary'}>{t('logisticsOffer.count', { n: r.teklifSayisi })}</Badge>
                     </span>
                   </button>
 

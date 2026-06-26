@@ -554,6 +554,9 @@ export function NewOrderPage() {
     setForm((f) => ({ ...f, teslimatFiyat: fiyat * miktar, mTeslimat: 1 }))
   }
 
+  // ── Sipariş özeti önizlemesi (kaydetmeden önce) ───────────────────────
+  const [previewOpen, setPreviewOpen] = useState(false)
+
   // ── Formu Getir (PROMPT-v3 §6 — legacy FormGetir) ─────────────────────
   const [getirOpen, setGetirOpen]   = useState(false)
   const [getirQuery, setGetirQuery] = useState('')
@@ -1337,6 +1340,8 @@ export function NewOrderPage() {
 
         {/* ╔══════════ FOOTER: AKSIYON BUTONLARI ═════════════════════════ */}
         <div className="mt-4 flex flex-wrap justify-end gap-2 sticky bottom-0 bg-background/95 backdrop-blur py-3 border-t">
+          {/* Sipariş özeti önizlemesi — kaydetmeden önce nasıl oluştuğunu gösterir. */}
+          <Button variant="outline" onClick={() => setPreviewOpen(true)}>{t('orders.form.onizleme')}</Button>
           {/* PROMPT-v3 §6: legacy FormGetir — mevcut sipariş seçip forma yükler. */}
           {!isAmendMode && (
             <Button variant="outline" onClick={() => setGetirOpen(true)}>{t('orders.form.formuGetir')}</Button>
@@ -1420,6 +1425,152 @@ export function NewOrderPage() {
                 ))}
             </div>
             {getirLoading && <p className="text-xs text-muted-foreground">{t('orders.form.formYukleniyor')}</p>}
+          </DialogContent>
+        </Dialog>
+
+        {/* ╔══════════ SİPARİŞ ÖZETİ ÖNİZLEME ════════════════════════════ */}
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t('orders.form.onizlemeBaslik')}</DialogTitle>
+            </DialogHeader>
+            <p className="text-xs text-muted-foreground -mt-1">{t('orders.form.onizlemeAciklama')}</p>
+
+            {/* Müşteri / şirket / para birimi */}
+            <section className="rounded-md border p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{t('orders.form.musteri')}</span>
+                <span className="font-medium text-right">{form.musteriAd || '—'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{t('orders.form.sirket')}</span>
+                <span className="text-right">{form.sirket || '—'}</span>
+              </div>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{t('orders.form.paraTipi')}</span>
+                <span className="text-right">{form.paraTipi} ({sym})</span>
+              </div>
+              {[
+                [t('orders.form.telefon'), form.mTelefon],
+                [t('orders.form.email'), form.mMail],
+                [t('orders.form.ulke'), form.mUlke],
+                [t('orders.form.vat'), form.mVATNumarasi],
+                [t('orders.form.adres'), form.mAdres],
+              ].filter(([, v]) => (v ?? '').toString().trim().length > 0).map(([label, v]) => (
+                <div key={label} className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{label}</span>
+                  <span className="text-right">{v}</span>
+                </div>
+              ))}
+            </section>
+
+            {/* Ürünler (canlı sekmeler — totals ile birebir) */}
+            <section className="space-y-2">
+              <h4 className="text-sm font-semibold">{t('orders.form.previewUrunler')}</h4>
+              {setTabs.filter((tb) => tb.kategoriID).length === 0 ? (
+                <p className="text-sm text-muted-foreground">{t('orders.form.previewBosUrun')}</p>
+              ) : (
+                setTabs.filter((tb) => tb.kategoriID).map((tb, i) => (
+                  <div key={i} className="rounded-md border p-3 text-sm space-y-1">
+                    <div className="flex justify-between gap-4 font-medium">
+                      <span>{tb.kategoriAdi || t('orders.form.anaUrun')}</span>
+                      <span>{tb.adet} × {sym}{fmt(tb.kategoriFiyat)} = {sym}{fmt(tb.kategoriFiyat * tb.adet)}</span>
+                    </div>
+                    {tb.components.length > 0 && (
+                      <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                        {tb.components.map((c, j) => (
+                          <li key={j} className="flex justify-between gap-4">
+                            <span>
+                              • {c.bilesenAdi}
+                              {c.oznitelikSecili ? ` (${c.oznitelikSecili})` : ''}
+                            </span>
+                            <span className="shrink-0">{c.adet} {c.birim} × {sym}{fmt(c.birimFiyat)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ))
+              )}
+            </section>
+
+            {/* Montaj / Teslimat */}
+            {(form.montajVar || form.teslimatVar) && (
+              <section className="rounded-md border p-3 space-y-1.5 text-sm">
+                <h4 className="text-sm font-semibold">{t('orders.form.previewMontajTeslimat')}</h4>
+                {form.montajVar && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">{t('orders.form.montaj')}</span>
+                    <span>{form.mAdet} × {sym}{fmt(form.montajFiyat)} = {sym}{fmt(form.montajFiyat * form.mAdet)}</span>
+                  </div>
+                )}
+                {form.teslimatVar && (
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {t('orders.form.teslimat')}{form.teslimatCesiti ? ` (${form.teslimatCesiti})` : ''}
+                    </span>
+                    <span>{form.mTeslimat} × {sym}{fmt(form.teslimatFiyat)} = {sym}{fmt(form.teslimatFiyat * form.mTeslimat)}</span>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Fiyatlandırma */}
+            <section className="rounded-md border p-3 space-y-1.5 text-sm">
+              <h4 className="text-sm font-semibold">{t('orders.form.previewFiyat')}</h4>
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">{t('orders.form.previewBrut')}</span>
+                <span>{sym}{fmt(brutToplam)}</span>
+              </div>
+              {(form.indirim ?? 0) > 0 && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t('orders.form.indirim')}</span>
+                  <span>%{fmt(form.indirim ?? 0)}</span>
+                </div>
+              )}
+              {(form.kdv ?? 0) > 0 && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t('orders.form.kdv')}</span>
+                  <span>%{fmt(form.kdv ?? 0)}</span>
+                </div>
+              )}
+              <div className="flex justify-between gap-4 font-semibold border-t pt-1.5">
+                <span>{t('orders.form.toplamFiyatLabel')}</span>
+                <span>{sym}{fmt(toplamFiyat)}</span>
+              </div>
+              {(form.pesinYuzde ?? 0) > 0 && (
+                <div className="flex justify-between gap-4">
+                  <span className="text-muted-foreground">{t('orders.form.kaporaMiktari')} (%{form.pesinYuzde})</span>
+                  <span>{sym}{fmt(kaporaMiktari)}</span>
+                </div>
+              )}
+            </section>
+
+            {/* Şartlar / notlar */}
+            {(() => {
+              const sartlar = (form.details ?? []).filter(
+                (d) => STANDART_DETAY_SARTLARI.includes(d) || isFreeNote(d),
+              )
+              return sartlar.length > 0 ? (
+                <section className="space-y-1">
+                  <h4 className="text-sm font-semibold">{t('orders.form.previewSartlar')}</h4>
+                  <ul className="text-xs text-muted-foreground space-y-0.5 list-disc pl-4">
+                    {sartlar.map((d, i) => <li key={i}>{d}</li>)}
+                  </ul>
+                </section>
+              ) : null
+            })()}
+
+            {form.siparisNotu?.trim() && (
+              <section className="space-y-1">
+                <h4 className="text-sm font-semibold">{t('orders.form.siparisNotu')}</h4>
+                <p className="text-sm whitespace-pre-wrap">{form.siparisNotu}</p>
+              </section>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <Button variant="outline" onClick={() => setPreviewOpen(false)}>{t('common.close')}</Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

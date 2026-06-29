@@ -220,7 +220,7 @@ export function FactoryPage() {
         </DialogContent>
       </Dialog>
 
-      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} />
+      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} factoryView />
     </div>
   )
 }

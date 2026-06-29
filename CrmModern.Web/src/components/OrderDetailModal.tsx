@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { getOrderDetail, downloadExcel, downloadPdf } from '@/api/orders'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { formatCurrency, formatDate } from '@/lib/utils'
-import { resolveClause } from '@/lib/clauses'
+import { resolveClause, isFreeNote } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
@@ -25,9 +25,14 @@ interface Props {
   // ÜSTÜNDE gösterilir. Yalnız Lojistik Hazır + Lojistik Teklif ekranları geçer;
   // diğer ekranlar etkilenmez.
   logisticsView?: boolean
+  // Fabrika görünümü: Notlar bölümünde yalnız teklifi oluşturanın/sonradan
+  // eklenen SERBEST notlar gösterilir; default @@ standart şartlar (Fiyatlar 2
+  // hafta, KDV/nakliye dahil değildir, haklar saklıdır) ve 17 önceden tanımlı
+  // standart detay şartı fabrikaya gizlenir.
+  factoryView?: boolean
 }
 
-export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logisticsView = false }: Props) {
+export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logisticsView = false, factoryView = false }: Props) {
   const { t } = useTranslation()
   const { toast } = useToast()
   // PROMPT-v2 §2 + Round-11 §3: parasal değer gizleme (Fabrika rolü + omur.caliskan
@@ -188,9 +193,17 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
                     </tr>
                   </thead>
                   <tbody>
-                    {order.items.map((item, i) => (
-                      <tr key={i} className={`border-b ${item.kategoriID && !item.bilesenID ? 'font-semibold bg-muted/20' : ''}`}>
-                        <td className="px-2 py-1">{item.kategoriID && !item.bilesenID ? t('orderDetail.set', { id: item.kategoriID }) : t('orderDetail.bilesen', { id: item.bilesenID })}</td>
+                    {order.items.map((item, i) => {
+                      const isCategory = !!item.kategoriID && !item.bilesenID
+                      // Fabrikanın "Bileşen 1" yerine gerçek malzeme adını görmesi için
+                      // backend'in join'le çözdüğü kategoriAdi/bilesenAdi gösterilir;
+                      // eski/silinmiş kayıtta isim yoksa ID-bazlı etikete düşülür.
+                      const ad = isCategory
+                        ? (item.kategoriAdi ?? t('orderDetail.set', { id: item.kategoriID }))
+                        : (item.bilesenAdi ?? t('orderDetail.bilesen', { id: item.bilesenID }))
+                      return (
+                      <tr key={i} className={`border-b ${isCategory ? 'font-semibold bg-muted/20' : ''}`}>
+                        <td className="px-2 py-1">{ad}</td>
                         <td className="px-2 py-1">{item.oznitelikAdi ?? '—'}</td>
                         <td className="text-right px-2 py-1">{item.adet}</td>
                         {!hideMoney && (
@@ -200,21 +213,29 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
                           <td className="text-right px-2 py-1 tabular-nums">{formatCurrency((item.fiyat ?? 0) * item.adet, order.paraTipi)}</td>
                         )}
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
 
-            {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes). */}
-            {!hideNotes && order.details && order.details.length > 0 && (
-              <div className="border rounded-md p-3">
-                <h3 className="font-semibold mb-2">{t('orderDetail.notes')}</h3>
-                <ul className="space-y-1 text-muted-foreground">
-                  {order.details.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
-                </ul>
-              </div>
-            )}
+            {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes).
+                Fabrika görünümünde yalnız serbest (custom) notlar gösterilir;
+                default @@ standart şartlar ve 17 önceden tanımlı detay şartı
+                ayıklanır (isFreeNote). Serbest not yoksa bölüm hiç çıkmaz. */}
+            {!hideNotes && (() => {
+              const notes = factoryView ? (order.details ?? []).filter(isFreeNote) : order.details
+              if (!notes || notes.length === 0) return null
+              return (
+                <div className="border rounded-md p-3">
+                  <h3 className="font-semibold mb-2">{t('orderDetail.notes')}</h3>
+                  <ul className="space-y-1 text-muted-foreground">
+                    {notes.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
+                  </ul>
+                </div>
+              )
+            })()}
 
             {/* Rejection note */}
             {order.kontrol === 'Reddet' && order.red && (

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, dialog } = require('electron');
 const path = require('path');
 const { autoUpdater } = require('electron-updater');
 
@@ -9,17 +9,23 @@ const { autoUpdater } = require('electron-updater');
 let mainWindow;
 
 // ── Auto-update (TAM OTOMATİK — §15) ──────────────────────────────────────
-// Akış (tamamen sessiz, kullanıcı hiç onay vermez, hiç popup görmez):
-//   1. App açılır → 5 sn sonra GitHub Releases kontrol edilir
-//   2. Yeni sürüm varsa arka planda otomatik indirilir (autoDownload)
-//   3. İndirme bittiğinde HİÇBİR dialog gösterilmez — kullanıcı çalışmaya devam eder
-//   4. Uygulama kapanırken güncelleme otomatik kurulur (autoInstallOnAppQuit)
-//   5. Bir sonraki açılışta yeni sürüm zaten yüklüdür
-// ERP kullanıcıları güncellemeyi asla elle kurmaz; süreç GitHub Release
+// Akış:
+//   1. App açılır → 5 sn sonra GitHub Releases kontrol edilir; ayrıca açık kalan
+//      uygulama için PERİYODİK olarak (30 dk) tekrar kontrol edilir — böylece
+//      çalışan istemci yeni sürümü elle yeniden başlatmaya gerek kalmadan görür.
+//   2. Yeni sürüm varsa arka planda otomatik indirilir (autoDownload).
+//   3. İndirme bittiğinde kullanıcıya zorlamayan bir "şimdi yeniden başlat?"
+//      seçeneği sunulur. Hayır derse iş akışı bozulmaz: autoInstallOnAppQuit ile
+//      güncelleme bir sonraki kapanışta zaten kurulur.
+//   4. Bir sonraki açılışta yeni sürüm zaten yüklüdür.
+// ERP kullanıcıları güncellemeyi asla elle indirmez; süreç GitHub Release
 // dağıtım sistemiyle (latest.yml + NSIS installer) tam uyumludur.
+const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 dk
+let updatePromptShown = false; // aynı indirme için tekrar tekrar sormayalım
+
 function setupAutoUpdater() {
   autoUpdater.autoDownload = true;          // yeni sürümü arka planda sessizce indir
-  autoUpdater.autoInstallOnAppQuit = true;  // kapanışta sessizce kur (restart prompt yok)
+  autoUpdater.autoInstallOnAppQuit = true;  // kullanıcı "daha sonra" derse kapanışta kur
 
   autoUpdater.on('error', (err) => {
     console.error('[auto-update] error:', err?.message || err);
@@ -35,9 +41,26 @@ function setupAutoUpdater() {
   });
 
   autoUpdater.on('update-downloaded', (info) => {
-    // Sessiz akış: dialog YOK, quitAndInstall YOK. autoInstallOnAppQuit=true
-    // olduğu için güncelleme uygulama kapanışında otomatik uygulanır.
-    console.log('[auto-update] indirildi, sonraki kapanışta otomatik kurulacak:', info?.version);
+    console.log('[auto-update] indirildi:', info?.version);
+    if (updatePromptShown) return;
+    updatePromptShown = true;
+    // Zorlamayan teklif: "Şimdi yeniden başlat" → hemen kur; "Daha sonra" →
+    // autoInstallOnAppQuit kapanışta halleder. Pencere yoksa sessizce beklet.
+    const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+    dialog.showMessageBox(win, {
+      type: 'info',
+      buttons: ['Şimdi yeniden başlat', 'Daha sonra'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Güncelleme hazır',
+      message: `Yeni sürüm (${info?.version ?? ''}) indirildi.`,
+      detail: 'Şimdi yeniden başlatarak güncellemeyi tamamlayabilir veya daha sonra (uygulamayı kapattığınızda otomatik kurulur) devam edebilirsiniz.',
+    }).then(({ response }) => {
+      if (response === 0) {
+        // isSilent=true (sessiz kur), isForceRunAfter=true (kurunca yeniden aç)
+        autoUpdater.quitAndInstall(true, true);
+      }
+    }).catch((err) => console.error('[auto-update] prompt hatası:', err?.message || err));
   });
 
   // İlk kontrol: pencere yüklendikten 5 sn sonra (yavaş ağda bloke etmesin).
@@ -46,6 +69,13 @@ function setupAutoUpdater() {
       console.error('[auto-update] checkForUpdates başarısız:', err?.message || err);
     });
   }, 5000);
+
+  // Periyodik kontrol: uzun süre açık kalan istemci de güncellemeyi yakalasın.
+  setInterval(() => {
+    autoUpdater.checkForUpdates().catch((err) => {
+      console.error('[auto-update] periyodik kontrol başarısız:', err?.message || err);
+    });
+  }, UPDATE_CHECK_INTERVAL_MS);
 }
 
 async function createWindow() {

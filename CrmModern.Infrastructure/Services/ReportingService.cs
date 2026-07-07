@@ -134,187 +134,19 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
 
         // ── Faz 8 / Hotfix Proforma: ExcelIndir BLOB template varsa onu kullan ─
         var templateBytes = await uow.ExcelTemplates.GetLatestBytesAsync();
-        if (templateBytes is { Length: > 0 })
+        if (templateBytes is not { Length: > 0 })
         {
-            // Categories + Components için bir kerelik in-memory lookup —
-            // ProForma satır şablonu kategori adı / bileşen adı + birim gerektirir.
-            var allCategories = await uow.ProductCategories.GetAllAsync();
-            var allComponents = await uow.Components.GetAllAsync();
-            var catLookup = allCategories.ToDictionary(c => c.KategoriID, c => c.KategoriAdi);
-            var compLookup = allComponents.ToDictionary(c => c.BilesenID, c => c);
-
-            try
-            {
-                return GenerateProformaFromTemplate(templateBytes, order, catLookup, compLookup, lang);
-            }
-            catch
-            {
-                // Template uygulanamazsa ClosedXML fallback'e düş — kullanıcı asla "boş Excel" görmesin.
-            }
+            throw new InvalidOperationException("Proforma şablonu (ExcelIndir) bulunamadı.");
         }
 
-        using var wb = new XLWorkbook();
-        var ws = wb.AddWorksheet("Proforma");
+        // Categories + Components için bir kerelik in-memory lookup —
+        // ProForma satır şablonu kategori adı / bileşen adı + birim gerektirir.
+        var allCategories = await uow.ProductCategories.GetAllAsync();
+        var allComponents = await uow.Components.GetAllAsync();
+        var catLookup = allCategories.ToDictionary(c => c.KategoriID, c => c.KategoriAdi);
+        var compLookup = allComponents.ToDictionary(c => c.BilesenID, c => c);
 
-        string sym = CurrencySymbol(order.ParaTipi);
-
-        // ── Header block ───────────────────────────────────────────────────────
-        ws.Cell("A1").Value = "UNIX PADEL - PROFORMA";
-        ws.Cell("A1").Style.Font.Bold = true;
-        ws.Cell("A1").Style.Font.FontSize = 16;
-        ws.Range("A1:G1").Merge();
-
-        ws.Cell("A2").Value = $"Sipariş No: {order.SiparisNo}";
-        ws.Cell("D2").Value = $"Tarih: {order.Tarih:dd.MM.yyyy}";
-
-        // ── Customer block ─────────────────────────────────────────────────────
-        ws.Cell("A4").Value  = "MÜŞTERİ BİLGİLERİ"; ws.Cell("A4").Style.Font.Bold = true;
-        ws.Cell("A5").Value  = "Müşteri Adı:";    ws.Cell("B5").Value = order.MusteriAd;
-        ws.Cell("A6").Value  = "Ülke:";           ws.Cell("B6").Value = order.MUlke ?? "";
-        ws.Cell("A7").Value  = "Telefon:";        ws.Cell("B7").Value = order.MTelefon ?? "";
-        ws.Cell("A8").Value  = "E-Mail:";         ws.Cell("B8").Value = order.MMail ?? "";
-        ws.Cell("A9").Value  = "VAT No:";         ws.Cell("B9").Value = order.MVATNumarasi ?? "";
-        ws.Cell("A10").Value = "Adres:";          ws.Cell("B10").Value = order.MAdres ?? "";
-
-        // ── Delivery block ─────────────────────────────────────────────────────
-        if (order.Teslimat == "Var")
-        {
-            ws.Cell("D4").Value  = "TESLİMAT BİLGİLERİ"; ws.Cell("D4").Style.Font.Bold = true;
-            ws.Cell("D5").Value  = "Teslim Alan:";    ws.Cell("E5").Value = order.TTeslimAlanAdi ?? "";
-            ws.Cell("D6").Value  = "İlgili Kişi:";   ws.Cell("E6").Value = order.TIlgiliKisi ?? "";
-            ws.Cell("D7").Value  = "Ülke:";           ws.Cell("E7").Value = order.TUlke ?? "";
-            ws.Cell("D8").Value  = "Telefon:";        ws.Cell("E8").Value = order.TTelefon ?? "";
-            ws.Cell("D9").Value  = "E-Mail:";         ws.Cell("E9").Value = order.TE_Mail ?? "";
-            ws.Cell("D10").Value = "Adres:";          ws.Cell("E10").Value = order.TAdres ?? "";
-        }
-
-        // ── Product / Component table header ───────────────────────────────────
-        int tableStart = 13;
-        ws.Cell(tableStart, 1).Value = "Ürün / Bileşen";
-        ws.Cell(tableStart, 2).Value = "Birim";
-        ws.Cell(tableStart, 3).Value = "Adet";
-        ws.Cell(tableStart, 4).Value = $"Birim Fiyat ({sym})";
-        ws.Cell(tableStart, 5).Value = $"Toplam Fiyat ({sym})";
-        var headerRow = ws.Range(tableStart, 1, tableStart, 5);
-        headerRow.Style.Font.Bold = true;
-        headerRow.Style.Fill.BackgroundColor = XLColor.FromArgb(68, 114, 196);
-        headerRow.Style.Font.FontColor = XLColor.White;
-
-        int r = tableStart + 1;
-
-        foreach (var item in order.Items)
-        {
-            if (item.KategoriID.HasValue && !item.BilesenID.HasValue)
-            {
-                // Category row
-                decimal setFiyat = item.Fiyat ?? 0m;
-                decimal birimFiyat = item.Adet > 0 ? setFiyat / item.Adet : setFiyat;
-
-                ws.Cell(r, 1).Value = $"SET {item.KategoriID}";
-                ws.Cell(r, 2).Value = "SET";
-                ws.Cell(r, 3).Value = item.Adet;
-                ws.Cell(r, 4).Value = (double)birimFiyat;
-                ws.Cell(r, 5).Value = (double)setFiyat;
-                ws.Cell(r, 1).Style.Font.Bold = true;
-                r++;
-            }
-            else if (item.BilesenID.HasValue)
-            {
-                // Component row
-                string display = string.IsNullOrEmpty(item.OznitelikAdi)
-                    ? $"  Bileşen {item.BilesenID}"
-                    : $"  {item.OznitelikAdi}";
-
-                decimal compFiyat = item.Fiyat ?? 0m;
-                decimal birimFiyat = item.Adet > 0 && compFiyat > 0
-                    ? compFiyat / item.Adet : compFiyat;
-
-                ws.Cell(r, 1).Value = display;
-                ws.Cell(r, 3).Value = item.Adet;
-                ws.Cell(r, 4).Value = (double)birimFiyat;
-                ws.Cell(r, 5).Value = (double)compFiyat;
-                r++;
-            }
-        }
-
-        // ── Transport / Installation rows ──────────────────────────────────────
-        if (order.Teslimat == "Var" && order.TeslimatFiyat > 0)
-        {
-            decimal tp = order.TeslimatFiyat ?? 0m;
-            decimal tUnit = order.MTeslimat > 0 ? tp / order.MTeslimat : tp;
-            ws.Cell(r, 1).Value = "Nakliye";
-            ws.Cell(r, 3).Value = order.MTeslimat;
-            ws.Cell(r, 4).Value = (double)tUnit;
-            ws.Cell(r, 5).Value = (double)tp;
-            ws.Cell(r, 1).Style.Font.Italic = true;
-            r++;
-        }
-        if (order.Montaj == "Var" && order.MontajFiyat > 0)
-        {
-            decimal mp = order.MontajFiyat ?? 0m;
-            decimal mUnit = order.MAdet > 0 ? mp / order.MAdet : mp;
-            ws.Cell(r, 1).Value = "Montaj";
-            ws.Cell(r, 3).Value = order.MAdet;
-            ws.Cell(r, 4).Value = (double)mUnit;
-            ws.Cell(r, 5).Value = (double)mp;
-            ws.Cell(r, 1).Style.Font.Italic = true;
-            r++;
-        }
-
-        r++; // blank row
-
-        // ── Pricing summary ────────────────────────────────────────────────────
-        decimal brut  = order.BrutToplamFiyat ?? 0m;
-        decimal indir = order.Indirim ?? 0m;
-        decimal kdv   = order.Kdv    ?? 0m;
-        decimal total = order.ToplamFiyat ?? 0m;
-
-        ws.Cell(r, 4).Value = $"Brüt Toplam ({sym}):";    ws.Cell(r, 4).Style.Font.Bold = true;
-        ws.Cell(r, 5).Value = (double)brut;               r++;
-        if (indir > 0)
-        {
-            ws.Cell(r, 4).Value = $"İndirim ({sym}):";    ws.Cell(r, 4).Style.Font.Bold = true;
-            ws.Cell(r, 5).Value = -(double)indir;         r++;
-        }
-        if (kdv > 0)
-        {
-            ws.Cell(r, 4).Value = $"KDV (%{kdv}):";      ws.Cell(r, 4).Style.Font.Bold = true;
-            ws.Cell(r, 5).Value = (double)((brut - indir) * kdv / 100m); r++;
-        }
-        ws.Cell(r, 4).Value = $"TOPLAM ({sym}):";
-        ws.Cell(r, 5).Value = (double)total;
-        ws.Range(r, 4, r, 5).Style.Font.Bold = true;
-        ws.Range(r, 4, r, 5).Style.Fill.BackgroundColor = XLColor.FromArgb(68, 114, 196);
-        ws.Range(r, 4, r, 5).Style.Font.FontColor = XLColor.White;
-        r++;
-
-        // Payment terms
-        r++;
-        ws.Cell(r, 1).Value = $"Ödeme: %{order.PesinYüzde} peşin, %{100 - order.PesinYüzde} yükleme öncesi";
-        ws.Cell(r, 1).Style.Font.Italic = true;
-
-        // Details — Round-8 §4/§8: standart şart kodları hedef dile çevrilir.
-        if (order.Details.Any())
-        {
-            r += 2;
-            ws.Cell(r, 1).Value = lang == "en" ? "Notes:" : "Notlar:";
-            ws.Cell(r, 1).Style.Font.Bold = true;
-            foreach (var detail in order.Details)
-            {
-                r++;
-                ws.Cell(r, 1).Value = $"• {ClauseText.Resolve(detail.Text, lang)}";
-            }
-        }
-
-        // ── Format numeric columns ─────────────────────────────────────────────
-        ws.Column(4).Style.NumberFormat.Format = "#,##0.00";
-        ws.Column(5).Style.NumberFormat.Format = "#,##0.00";
-        ws.Columns().AdjustToContents();
-        ws.Column(1).Width = Math.Max(ws.Column(1).Width, 35);
-
-        using var ms = new MemoryStream();
-        wb.SaveAs(ms);
-        return ms.ToArray();
+        return GenerateProformaFromTemplate(templateBytes, order, catLookup, compLookup, lang);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────

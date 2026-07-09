@@ -23,6 +23,7 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
     public DbSet<OrderItem>       SiparisIslemTablo   => Set<OrderItem>();
     public DbSet<OrderDetail>     DetayTablo          => Set<OrderDetail>();
     public DbSet<DeliveryAddress> TeslimatBilgisiTablo => Set<DeliveryAddress>();
+    public DbSet<OrderExtraCost>  SiparisEkMaliyet    => Set<OrderExtraCost>();
 
     // ── Product catalog ───────────────────────────────────────────────────
     public DbSet<ProductCategory>   UrunKategorileri   => Set<ProductCategory>();

@@ -96,6 +96,7 @@
     "logisticsHistory": "Logistics · History",
     "logisticsCarriers": "Logistics · Carriers",
     "accounting": "Accounting · Collections",
+    "accountingOrders": "Accounting · Quotes/Orders",
     "accountingApproval": "Accounting · Approval",
     "accountingHistory": "Accounting · Transactions",
     "accountingBalance": "Accounting · Balance",
@@ -177,6 +178,7 @@
       "logistics": "Shipment and delivery tracking",
       "logisticsHistory": "Shipment history",
       "accounting": "Payments and account operations",
+      "accountingOrders": "View quotes and orders, open proforma (read-only)",
       "accountingApproval": "Cari and logistics approval queues",
       "accountingHistory": "Collection and transaction history",
       "purchase": "Purchase requests",
@@ -539,7 +541,16 @@
       "musteri": "Customer",
       "teslimat": "Delivery",
       "temsilci": "Sales Rep",
-      "maliyet": "Cost"
+      "maliyet": "Cost",
+      "ekstra": "Extra Cost"
+    },
+    "ekstra": {
+      "hint": "Each item added appears as a separate line on the proforma and is added to the order total.",
+      "aciklama": "Description",
+      "aciklamaPlaceholder": "e.g. Extra freight, customs, installation difference…",
+      "tutar": "Amount",
+      "none": "No extra cost items.",
+      "locked": "Extra costs can't be edited at this stage (only within the accounting/logistics approval window)."
     },
     "cols": {
       "sirket": "Company",

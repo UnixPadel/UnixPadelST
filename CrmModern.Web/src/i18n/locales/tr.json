@@ -96,6 +96,7 @@
     "logisticsHistory": "Lojistik · Geçmiş",
     "logisticsCarriers": "Lojistik · Taşıyıcılar",
     "accounting": "Muhasebe · Tahsilat",
+    "accountingOrders": "Muhasebe · Teklif/Sipariş",
     "accountingApproval": "Muhasebe · Onay",
     "accountingHistory": "Muhasebe · İşlem",
     "accountingBalance": "Muhasebe · Bakiye",
@@ -177,6 +178,7 @@
       "logistics": "Sevkiyat ve teslimat takibi",
       "logisticsHistory": "Sevkiyat geçmişi",
       "accounting": "Ödeme ve hesap işlemleri",
+      "accountingOrders": "Teklif ve siparişleri görüntüle, proforma aç (salt-okunur)",
       "accountingApproval": "Cari ve lojistik onay kuyrukları",
       "accountingHistory": "Tahsilat ve işlem geçmişi",
       "purchase": "Satın alma talepleri",
@@ -539,7 +541,16 @@
       "musteri": "Müşteri",
       "teslimat": "Teslimat",
       "temsilci": "Satış Temsilcisi",
-      "maliyet": "Maliyet"
+      "maliyet": "Maliyet",
+      "ekstra": "Ekstra Maliyet"
+    },
+    "ekstra": {
+      "hint": "Eklenen her kalem proformaya ayrı satır olarak yansır ve sipariş toplamına eklenir.",
+      "aciklama": "Açıklama",
+      "aciklamaPlaceholder": "Örn. Ek nakliye, gümrük, montaj farkı…",
+      "tutar": "Tutar",
+      "none": "Ekstra maliyet kalemi yok.",
+      "locked": "Bu aşamada ekstra maliyet düzenlenemez (yalnız cari/lojistik onay penceresinde)."
     },
     "cols": {
       "sirket": "Şirket",

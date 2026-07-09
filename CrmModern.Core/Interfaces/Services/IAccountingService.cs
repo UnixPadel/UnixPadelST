@@ -77,4 +77,19 @@ public interface IAccountingService
     /// </summary>
     Task FinalizeCompletionAsync(string siparisNo, FinalizeCompletionDto dto,
         int currentUserId, string currentUserName);
+
+    // ── Ekstra maliyet kalemleri ───────────────────────────────────────────────
+
+    /// <summary>Siparişin ekstra maliyet kalemleri (açıklama + tutar), eklenme sırasına göre.</summary>
+    Task<IReadOnlyList<OrderExtraCostDto>> GetExtraCostsAsync(string siparisNo);
+
+    /// <summary>
+    /// Yeni ekstra maliyet kalemi ekler. Tutarı ToplamFiyat/BrutToplamFiyat'a eklenir
+    /// ve proformada ayrı satır olarak görünür. Yalnız cari/lojistik onay penceresinde
+    /// (SiparisMiTeklifMi ∈ Siparis/Planlama/Hazir) izinlidir.
+    /// </summary>
+    Task<OrderExtraCostDto> AddExtraCostAsync(string siparisNo, CreateExtraCostDto dto, int currentUserId);
+
+    /// <summary>Ekstra maliyet kalemini siler; tutarını sipariş toplamından düşer.</summary>
+    Task DeleteExtraCostAsync(int ekMaliyetId, int currentUserId);
 }

@@ -183,6 +183,46 @@ public sealed class AccountingController(IAccountingService accountingService) :
         return Ok(ApiResponse<object>.Ok(null!, "Sipariş tamamlandı."));
     }
 
+    // ── Ekstra maliyet kalemleri ────────────────────────────────────────────
+
+    /// <summary>Siparişin ekstra maliyet kalemleri (açıklama + tutar).</summary>
+    [HttpGet("orders/{siparisNo}/extra-costs")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderExtraCostDto>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetExtraCosts(string siparisNo)
+    {
+        var result = await accountingService.GetExtraCostsAsync(siparisNo);
+        return Ok(ApiResponse<IReadOnlyList<OrderExtraCostDto>>.Ok(result));
+    }
+
+    /// <summary>
+    /// Ekstra maliyet kalemi ekle (açıklama + tutar). Tutar sipariş toplamına eklenir
+    /// ve proformada ayrı satır olarak görünür. Yalnız cari/lojistik onay penceresinde.
+    /// </summary>
+    [HttpPost("orders/{siparisNo}/extra-costs")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<OrderExtraCostDto>), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> AddExtraCost(string siparisNo, [FromBody] CreateExtraCostDto dto)
+    {
+        var created = await accountingService.AddExtraCostAsync(siparisNo, dto, CurrentUserId);
+        return StatusCode(StatusCodes.Status201Created,
+            ApiResponse<OrderExtraCostDto>.Ok(created, "Ekstra maliyet eklendi."));
+    }
+
+    /// <summary>Ekstra maliyet kalemini sil; tutarını sipariş toplamından düş.</summary>
+    [HttpDelete("extra-costs/{ekMaliyetId:int}")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> DeleteExtraCost(int ekMaliyetId)
+    {
+        await accountingService.DeleteExtraCostAsync(ekMaliyetId, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Ekstra maliyet silindi."));
+    }
+
     /// <summary>MuhasebeEk yükle (Faz 3 blok kaldırıldı, yetki: Yonetici, Muhasebe).</summary>
     [HttpPost("orders/{siparisNo}/muhasebe-ek")]
     [Authorize(Roles = "Yonetici,Muhasebe")]

@@ -18,6 +18,30 @@ export const getTransactionsForOrder = async (no: string): Promise<AccountingTra
   return res.data.data
 }
 
+// ── Ekstra maliyet kalemleri ─────────────────────────────────────────────────
+
+export interface OrderExtraCostDto {
+  ekMaliyetID: number
+  aciklama: string
+  tutar: number
+  eklenmeTarihi: string
+  kullaniciID?: number | null
+}
+
+export const getExtraCosts = async (no: string): Promise<OrderExtraCostDto[]> => {
+  const res = await api.get<ApiResponse<OrderExtraCostDto[]>>(`/api/accounting/orders/${no}/extra-costs`)
+  return res.data.data
+}
+
+export const addExtraCost = async (no: string, aciklama: string, tutar: number): Promise<OrderExtraCostDto> => {
+  const res = await api.post<ApiResponse<OrderExtraCostDto>>(`/api/accounting/orders/${no}/extra-costs`, { aciklama, tutar })
+  return res.data.data
+}
+
+export const deleteExtraCost = async (ekMaliyetId: number): Promise<void> => {
+  await api.delete(`/api/accounting/extra-costs/${ekMaliyetId}`)
+}
+
 export const getTransactions = async (): Promise<AccountingTransactionDto[]> => {
   const res = await api.get<ApiResponse<AccountingTransactionDto[]>>('/api/accounting/transactions')
   return res.data.data

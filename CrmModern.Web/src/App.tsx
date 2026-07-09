@@ -13,6 +13,7 @@ import { LogisticsOffersPage } from '@/pages/logistics/LogisticsOffersPage'
 import { LogisticsHistoryPage } from '@/pages/logistics/LogisticsHistoryPage'
 import { CarriersPage } from '@/pages/logistics/CarriersPage'
 import { AccountingPage } from '@/pages/accounting/AccountingPage'
+import { AccountingOrdersViewPage } from '@/pages/accounting/AccountingOrdersViewPage'
 import { AccountingHistoryPage } from '@/pages/accounting/AccountingHistoryPage'
 import { CustomerBalancePage } from '@/pages/accounting/CustomerBalancePage'
 import { AccountingApprovalPage } from '@/pages/accounting/AccountingApprovalPage'
@@ -61,6 +62,8 @@ export default function App() {
         <Route path="/logistics/history"   element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci','Muhasebe']} usernames={['elshan.rasulov']}><LogisticsHistoryPage /></RoleGuard>} />
         <Route path="/logistics/carriers"  element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci']} usernames={['elshan.rasulov']}><CarriersPage /></RoleGuard>} />
         <Route path="/accounting"          element={<RoleGuard roles={['Yonetici','Muhasebe']}><AccountingPage /></RoleGuard>} />
+        {/* Muhasebe — Teklif/Sipariş görüntüleme (salt-okunur; proforma açılır, revize yok). */}
+        <Route path="/accounting/orders"   element={<RoleGuard roles={['Yonetici','Muhasebe']}><AccountingOrdersViewPage /></RoleGuard>} />
         {/* PROMPT-v6 §1 — Burcu onay ekranı YALNIZ burcu.karaman (rol değil; Yonetici dahil giremez). */}
         <Route path="/accounting/approval" element={<RoleGuard usernames={['burcu.karaman']}><AccountingApprovalPage /></RoleGuard>} />
         <Route path="/accounting/history"  element={<RoleGuard roles={['Yonetici','Muhasebe','Gozlemci']}><AccountingHistoryPage /></RoleGuard>} />

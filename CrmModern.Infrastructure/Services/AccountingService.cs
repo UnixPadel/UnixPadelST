@@ -594,4 +594,82 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
 
     private static string NormalizeNo(string no) =>
         no.StartsWith('T') ? "S" + no[1..] : no;
+
+    // ── Ekstra maliyet kalemleri ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Ekstra maliyet + ödeme düzenleme penceresi: cari onay bekleyen (Siparis) ve
+    /// cari onaydan sonra Fabrika bir sonraki adımı almadan önce (Planlama), ayrıca
+    /// lojistik onay bekleyen/onaylı pencerede (Hazir). Silinmiş sipariş kilitli.
+    /// </summary>
+    private static bool CanEditExtras(Order order) =>
+        !order.Silindi &&
+        order.SiparisMiTeklifMi is "Siparis" or "Planlama" or "Hazir";
+
+    public async Task<IReadOnlyList<OrderExtraCostDto>> GetExtraCostsAsync(string siparisNo)
+    {
+        var order = await uow.Orders.GetByNoAsync(NormalizeNo(siparisNo))
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        var costs = await uow.Orders.GetExtraCostsByOrderIdAsync(order.SiparisAlID);
+        return costs
+            .Select(c => new OrderExtraCostDto(c.EkMaliyetID, c.Aciklama, c.Tutar, c.EklenmeTarihi, c.KullaniciID))
+            .ToList();
+    }
+
+    public async Task<OrderExtraCostDto> AddExtraCostAsync(string siparisNo, CreateExtraCostDto dto, int currentUserId)
+    {
+        var order = await uow.Orders.GetByNoAsync(NormalizeNo(siparisNo))
+            ?? throw new NotFoundException("Order", siparisNo);
+
+        if (!CanEditExtras(order))
+            throw new BusinessException("Bu aşamada ekstra maliyet eklenemez (yalnız cari/lojistik onay penceresinde).");
+
+        var aciklama = (dto.Aciklama ?? string.Empty).Trim();
+        if (aciklama.Length == 0)
+            throw new BusinessException("Açıklama zorunludur.");
+        if (dto.Tutar <= 0)
+            throw new BusinessException("Tutar 0'dan büyük olmalı.");
+
+        var cost = new OrderExtraCost
+        {
+            SiparisAlID   = order.SiparisAlID,
+            Aciklama      = aciklama,
+            Tutar         = dto.Tutar,
+            EklenmeTarihi = DateTime.Now,
+            KullaniciID   = currentUserId,
+        };
+        await uow.Orders.AddExtraCostAsync(cost);
+
+        // Tutarı sipariş toplamına yansıt — proforma #TOPLAMFIYAT ve muhasebe
+        // kalan bakiyesi tek kaynaktan (ToplamFiyat) okunduğu için tutarlı kalır.
+        order.ToplamFiyat     = (order.ToplamFiyat     ?? 0m) + dto.Tutar;
+        order.BrutToplamFiyat = (order.BrutToplamFiyat ?? 0m) + dto.Tutar;
+        uow.Orders.Update(order);
+
+        // Insert + toplam güncellemesi tek SaveChanges → atomik.
+        await uow.SaveChangesAsync();
+
+        return new OrderExtraCostDto(cost.EkMaliyetID, cost.Aciklama, cost.Tutar, cost.EklenmeTarihi, cost.KullaniciID);
+    }
+
+    public async Task DeleteExtraCostAsync(int ekMaliyetId, int currentUserId)
+    {
+        var cost = await uow.Orders.GetExtraCostByIdAsync(ekMaliyetId)
+            ?? throw new NotFoundException("EkMaliyet", ekMaliyetId);
+
+        var order = await uow.Orders.GetByIdAsync(cost.SiparisAlID)
+            ?? throw new NotFoundException("Order", cost.SiparisAlID);
+
+        if (!CanEditExtras(order))
+            throw new BusinessException("Bu aşamada ekstra maliyet silinemez (yalnız cari/lojistik onay penceresinde).");
+
+        uow.Orders.RemoveExtraCost(cost);
+
+        order.ToplamFiyat     = (order.ToplamFiyat     ?? 0m) - cost.Tutar;
+        order.BrutToplamFiyat = (order.BrutToplamFiyat ?? 0m) - cost.Tutar;
+        uow.Orders.Update(order);
+
+        await uow.SaveChangesAsync();
+    }
 }

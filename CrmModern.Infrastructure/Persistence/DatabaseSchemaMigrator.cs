@@ -87,6 +87,31 @@ public static class DatabaseSchemaMigrator
 
         // 10) Satın alma ek dosyaları — SatinAlmaTalepEk (yoksa CREATE).
         await EnsureSatinAlmaTalepEkTableAsync(ctx, logger);
+
+        // 11) Muhasebe ekstra maliyet kalemleri — SiparisEkMaliyet (yoksa CREATE).
+        // Additive: sipariş çekirdek kalemleri (SiparisIslemTablo) değişmez.
+        await EnsureSiparisEkMaliyetTableAsync(ctx, logger);
+    }
+
+    /// <summary>
+    /// Muhasebe tarafından sipariş/teklife eklenen ekstra maliyet kalemleri
+    /// (açıklama + tutar). Her kalem proformada ayrı satır olur ve tutarı sipariş
+    /// toplamına eklenir. CREATE IF NOT EXISTS → idempotent.
+    /// </summary>
+    private static async Task EnsureSiparisEkMaliyetTableAsync(AppDbContext ctx, ILogger? logger)
+    {
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS SiparisEkMaliyet (
+                EkMaliyetID   INT           NOT NULL AUTO_INCREMENT,
+                SiparisAlID   INT           NOT NULL,
+                Aciklama      VARCHAR(500)  NOT NULL,
+                Tutar         DECIMAL(10,2) NOT NULL,
+                EklenmeTarihi DATETIME      NOT NULL,
+                KullaniciID   INT           NULL,
+                PRIMARY KEY (EkMaliyetID),
+                INDEX IX_SiparisEkMaliyet_SiparisAlID (SiparisAlID)
+            )");
+        logger?.LogInformation("SiparisEkMaliyet tablosu hazırlandı (CREATE IF NOT EXISTS).");
     }
 
     /// <summary>

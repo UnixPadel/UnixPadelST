@@ -104,6 +104,24 @@ internal sealed class OrderRepository(AppDbContext context)
     public async Task AddDetailsAsync(IEnumerable<OrderDetail> details) =>
         await _context.DetayTablo.AddRangeAsync(details);
 
+    // ── Ekstra maliyet (SiparisEkMaliyet) ──────────────────────────────────────
+
+    public async Task<IReadOnlyList<OrderExtraCost>> GetExtraCostsByOrderIdAsync(int siparisAlID) =>
+        await _context.SiparisEkMaliyet
+            .AsNoTracking()
+            .Where(c => c.SiparisAlID == siparisAlID)
+            .OrderBy(c => c.EkMaliyetID)
+            .ToListAsync();
+
+    public async Task<OrderExtraCost?> GetExtraCostByIdAsync(int ekMaliyetID) =>
+        await _context.SiparisEkMaliyet.FirstOrDefaultAsync(c => c.EkMaliyetID == ekMaliyetID);
+
+    public async Task AddExtraCostAsync(OrderExtraCost cost) =>
+        await _context.SiparisEkMaliyet.AddAsync(cost);
+
+    public void RemoveExtraCost(OrderExtraCost cost) =>
+        _context.SiparisEkMaliyet.Remove(cost);
+
     // ── Factory ───────────────────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<Order>> GetProductionStagesAsync() =>

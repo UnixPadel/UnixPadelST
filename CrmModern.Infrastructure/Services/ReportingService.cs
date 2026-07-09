@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.IO.Compression;
+using System.Xml.Linq;
 using ClosedXML.Excel;
 using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
@@ -146,7 +148,11 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         var catLookup = allCategories.ToDictionary(c => c.KategoriID, c => c.KategoriAdi);
         var compLookup = allComponents.ToDictionary(c => c.BilesenID, c => c);
 
-        return GenerateProformaFromTemplate(templateBytes, order, catLookup, compLookup, lang);
+        // Muhasebe ekstra maliyet kalemleri — her biri proformada ayrı satır olur.
+        // Tutarları zaten ToplamFiyat'a eklendiği için #TOPLAMFIYAT tekrar toplamaz.
+        var extras = await uow.Orders.GetExtraCostsByOrderIdAsync(order.SiparisAlID);
+
+        return GenerateProformaFromTemplate(templateBytes, order, catLookup, compLookup, extras, lang);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -246,13 +252,82 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         _         => "TOTAL " + paraTipi,
     };
 
+    /// <summary>
+    /// Aynı medyaya aynı from-hücresinden işaret eden mükerrer resim anchor'larını
+    /// (drawing XML) şablon byte'larından ayıklar — ClosedXML'e YÜKLEMEDEN önce.
+    /// ClosedXML.Pictures üzerinden silmek işe yaramaz: SaveAs eski anchor'ları
+    /// XML'de bırakıp yenilerini ekliyor (23 anchor'a çıkıyor).
+    /// </summary>
+    private static byte[] RemoveDuplicatePictureAnchors(byte[] templateBytes)
+    {
+        using var ms = new MemoryStream();
+        ms.Write(templateBytes, 0, templateBytes.Length);
+        using (var zip = new ZipArchive(ms, ZipArchiveMode.Update, leaveOpen: true))
+        {
+            XNamespace xdr = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
+            XNamespace a   = "http://schemas.openxmlformats.org/drawingml/2006/main";
+            XNamespace rNs = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+            XNamespace pr  = "http://schemas.openxmlformats.org/package/2006/relationships";
+
+            foreach (var entry in zip.Entries
+                         .Where(e => e.FullName.StartsWith("xl/drawings/", StringComparison.Ordinal)
+                                  && e.FullName.EndsWith(".xml", StringComparison.Ordinal))
+                         .ToList())
+            {
+                XDocument doc;
+                using (var s = entry.Open()) doc = XDocument.Load(s);
+
+                // rId -> media hedefi (mükerrerler aynı medyaya farklı rId ile işaret edebilir)
+                var relTargets = new Dictionary<string, string>();
+                var relsEntry = zip.GetEntry("xl/drawings/_rels/" + Path.GetFileName(entry.FullName) + ".rels");
+                if (relsEntry is not null)
+                {
+                    XDocument relsDoc;
+                    using (var rs = relsEntry.Open()) relsDoc = XDocument.Load(rs);
+                    foreach (var rel in relsDoc.Root!.Elements(pr + "Relationship"))
+                        relTargets[(string)rel.Attribute("Id")!] = (string?)rel.Attribute("Target") ?? "";
+                }
+
+                var seen  = new HashSet<string>();
+                var dupes = new List<XElement>();
+                foreach (var anchor in doc.Root!.Elements()
+                             .Where(e => e.Name == xdr + "oneCellAnchor" || e.Name == xdr + "twoCellAnchor"))
+                {
+                    var embed = anchor.Descendants(a + "blip").FirstOrDefault()?.Attribute(rNs + "embed")?.Value;
+                    if (embed is null) continue; // resim değil (textbox vb.) — dokunma
+                    var media = relTargets.TryGetValue(embed, out var t) ? t : embed;
+                    var from  = anchor.Element(xdr + "from");
+                    var key   = media + "|" + string.Concat(from?.Elements().Select(x => x.Value + ",") ?? Enumerable.Empty<string>());
+                    if (!seen.Add(key)) dupes.Add(anchor);
+                }
+
+                if (dupes.Count == 0) continue;
+                foreach (var d in dupes) d.Remove();
+
+                entry.Delete();
+                var rewritten = zip.CreateEntry(entry.FullName);
+                using var os = rewritten.Open();
+                doc.Save(os);
+            }
+        }
+        return ms.ToArray();
+    }
+
     private static byte[] GenerateProformaFromTemplate(
         byte[] templateBytes,
         Core.Entities.Order order,
         IReadOnlyDictionary<int, string> catLookup,
         IReadOnlyDictionary<int, Component> compLookup,
+        IReadOnlyList<Core.Entities.OrderExtraCost> extras,
         string lang = "tr")
     {
+        // Şablon blob'unda 5 sertifika logosu MÜKERRER (aynı medya + aynı hücre,
+        // üst üste iki kopya). ClosedXML 0.102 SaveAs'i mükerrer resimlerde eski
+        // anchor'ları drawing XML'inde bırakıyor → satır insert'ten sonra logolar
+        // ürün tablosunun ORTASINDA kalıyordu (Excel + PDF bozuk görünüm).
+        // Interop (WinForms) tüm anchor'ları Excel'e kaydırttığı için fark edilmiyordu.
+        templateBytes = RemoveDuplicatePictureAnchors(templateBytes);
+
         using var inMs = new MemoryStream(templateBytes, writable: false);
         using var wb   = new XLWorkbook(inMs);
         var ws = wb.Worksheets.First();
@@ -278,20 +353,12 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             var items = order.Items.OrderBy(i => i.SiparisIslemID).ToList();
             int firstRow = urunCell.Address.RowNumber;
 
-            // İlk şablon satırı zaten yerinde — items.Count satır gerekiyor (1 zaten var, n-1 ekle)
-            // Aşağıya doğru çoğalt; orijinal şablon satırı en sonda kalır ve silinir.
-            for (int i = 0; i < items.Count; i++)
-            {
-                ws.Row(firstRow + i).InsertRowsBelow(1);
-                ws.Row(firstRow).CopyTo(ws.Row(firstRow + i + 1));
-            }
+            // Render satır haritaları: önce gerçek sipariş kalemleri, sonra muhasebe
+            // ekstra maliyet kalemleri (açıklama + tutar; tek adet, birim fiyat = tutar).
+            var rowMaps = new List<Dictionary<string, string>>(items.Count + extras.Count);
 
-            // Şablondan ürettiğimiz satırların ilk N tanesini doldur
-            for (int i = 0; i < items.Count; i++)
+            foreach (var item in items)
             {
-                int row = firstRow + i;
-                var item = items[i];
-
                 bool isCategory = item.KategoriID.HasValue && !item.BilesenID.HasValue;
                 decimal fiyat = item.Fiyat ?? 0m;
 
@@ -318,15 +385,42 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     fiyatText      = string.Empty;
                 }
 
-                var rowMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                rowMaps.Add(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["#URUN"]       = urunText,
                     ["#MIKTAR"]     = item.Adet.ToString(TrTR),
                     ["#BIRIM"]      = birimText,
                     ["#BIRIMFIYAT"] = birimFiyatText,
                     ["#FIYAT"]      = fiyatText,
-                };
+                });
+            }
 
+            // Ekstra maliyet kalemleri — kategori satırı gibi fiyatlı tek-adet satırlar.
+            foreach (var ex in extras)
+            {
+                string tutarText = paraBirimi + ex.Tutar.ToString("N2", TrTR);
+                rowMaps.Add(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["#URUN"]       = ex.Aciklama,
+                    ["#MIKTAR"]     = "1",
+                    ["#BIRIM"]      = string.Empty,
+                    ["#BIRIMFIYAT"] = tutarText,
+                    ["#FIYAT"]      = tutarText,
+                });
+            }
+
+            // İlk şablon satırı zaten yerinde — rowMaps.Count satır gerekiyor; aşağıya
+            // doğru çoğalt; orijinal şablon satırı en sonda kalır ve #URUN case'inde silinir.
+            for (int i = 0; i < rowMaps.Count; i++)
+            {
+                ws.Row(firstRow + i).InsertRowsBelow(1);
+                ws.Row(firstRow).CopyTo(ws.Row(firstRow + i + 1));
+            }
+
+            for (int i = 0; i < rowMaps.Count; i++)
+            {
+                int row = firstRow + i;
+                var rowMap = rowMaps[i];
                 foreach (var cell in ws.Row(row).CellsUsed().ToList())
                 {
                     var v = cell.GetString().Trim();

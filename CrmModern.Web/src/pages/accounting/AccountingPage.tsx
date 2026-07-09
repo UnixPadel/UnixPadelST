@@ -5,6 +5,7 @@ import {
   getAccountingOrders, addTransaction, uploadMuhasebeEk, downloadAccountingExcel,
   getTransactionsForOrder,
   submitMaliyetTalep,
+  getExtraCosts, addExtraCost, deleteExtraCost,
   type SubmitMaliyetRequest,
 } from '@/api/accounting'
 import { getOrderDetail } from '@/api/orders'
@@ -13,7 +14,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { statusLabel } from '@/lib/status'
-import { Eye, Plus, Upload } from 'lucide-react'
+import { Eye, Plus, Upload, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
@@ -158,6 +159,44 @@ export function AccountingPage() {
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
 
+  // ── Ekstra maliyet kalemleri (açıklama + tutar → proformaya yansır) ───
+  // Düzenleme penceresi: cari/lojistik onay akışı (Siparis/Planlama/Hazir).
+  const canEditExtras = !!selectedRow &&
+    ['Siparis', 'Planlama', 'Hazir'].includes(selectedRow.siparisMiTeklifMi ?? '')
+
+  const { data: extraCosts = [] } = useQuery({
+    queryKey: ['order-extra-costs', selectedNo],
+    queryFn: () => getExtraCosts(selectedNo!),
+    enabled: !!selectedNo,
+  })
+
+  const [exAciklama, setExAciklama] = useState('')
+  const [exTutar, setExTutar] = useState<number>(0)
+
+  const addExtraMut = useMutation({
+    mutationFn: () => addExtraCost(selectedNo!, exAciklama.trim(), exTutar),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order-extra-costs', selectedNo] })
+      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
+      qc.invalidateQueries({ queryKey: ['order-detail', selectedNo] })
+      setExAciklama('')
+      setExTutar(0)
+      toast({ title: t('common.success') })
+    },
+    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+  })
+
+  const delExtraMut = useMutation({
+    mutationFn: (id: number) => deleteExtraCost(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['order-extra-costs', selectedNo] })
+      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
+      qc.invalidateQueries({ queryKey: ['order-detail', selectedNo] })
+      toast({ title: t('common.success') })
+    },
+    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+  })
+
   // PROMPT-v6 §1 — "Muhasebe Onayla" butonu kaldırıldı: Cari onay gate'i artık
   // Burcu ekranında (/accounting/approval, yalnız burcu.karaman) yaşıyor.
 
@@ -255,6 +294,7 @@ export function AccountingPage() {
                 <TabsTrigger value="teslimat">{t('accountingFull.tabs.teslimat')}</TabsTrigger>
                 <TabsTrigger value="temsilci">{t('accountingFull.tabs.temsilci')}</TabsTrigger>
                 <TabsTrigger value="maliyet">{t('accountingFull.tabs.maliyet')}</TabsTrigger>
+                <TabsTrigger value="ekstra">{t('accountingFull.tabs.ekstra')}</TabsTrigger>
               </TabsList>
 
               {/* Sipariş Detayı */}
@@ -349,6 +389,70 @@ export function AccountingPage() {
                     {t('accountingFull.maliyet.lastStatus')}: <strong>{selectedRow.muhasebeDurumu}</strong>
                     {selectedRow.muhasebeRedNotu && <> — {selectedRow.muhasebeRedNotu}</>}
                   </p>
+                )}
+              </TabsContent>
+
+              {/* Ekstra Maliyet — açıklama + tutar; proformaya ek satır olarak yansır,
+                  tutarı sipariş toplamına eklenir. Yalnız cari/lojistik onay penceresinde. */}
+              <TabsContent value="ekstra" className="mt-4 space-y-3 max-w-2xl">
+                <p className="text-xs text-muted-foreground">
+                  {t('accountingFull.ekstra.hint')}
+                </p>
+
+                {/* Mevcut kalemler */}
+                <div className="rounded-md border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/30">
+                      <tr>
+                        <th className="text-left px-3 py-1.5">{t('accountingFull.ekstra.aciklama')}</th>
+                        <th className="text-right px-3 py-1.5 w-40">{t('accountingFull.ekstra.tutar')}</th>
+                        <th className="w-12"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {extraCosts.length === 0 ? (
+                        <tr><td colSpan={3} className="px-3 py-3 text-center text-xs text-muted-foreground">{t('accountingFull.ekstra.none')}</td></tr>
+                      ) : extraCosts.map((ex) => (
+                        <tr key={ex.ekMaliyetID} className="border-t">
+                          <td className="px-3 py-1.5 break-words">{ex.aciklama}</td>
+                          <td className="px-3 py-1.5 text-right">{formatCurrency(ex.tutar, selectedRow?.paraTipi)}</td>
+                          <td className="px-1 py-1.5 text-center">
+                            {canEditExtras && (
+                              <Button
+                                size="sm" variant="ghost" className="h-7 w-7 p-0 text-destructive"
+                                title={t('common.delete')}
+                                disabled={delExtraMut.isPending}
+                                onClick={() => delExtraMut.mutate(ex.ekMaliyetID)}
+                              ><Trash2 className="h-3.5 w-3.5" /></Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Yeni kalem ekle — yalnız düzenleme penceresinde */}
+                {canEditExtras ? (
+                  <div className="grid grid-cols-[1fr_160px_auto] gap-2 items-end">
+                    <div className="space-y-1">
+                      <Label>{t('accountingFull.ekstra.aciklama')}</Label>
+                      <Input value={exAciklama} onChange={(e) => setExAciklama(e.target.value)}
+                        placeholder={t('accountingFull.ekstra.aciklamaPlaceholder')} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t('accountingFull.ekstra.tutar')} ({selectedRow?.paraTipi ?? ''})</Label>
+                      <DecimalInput value={exTutar} onValueChange={(v) => setExTutar(v === '' ? 0 : v)} />
+                    </div>
+                    <Button
+                      disabled={addExtraMut.isPending || !exAciklama.trim() || exTutar <= 0}
+                      onClick={() => addExtraMut.mutate()}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />{t('common.add')}
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">{t('accountingFull.ekstra.locked')}</p>
                 )}
               </TabsContent>
             </Tabs>

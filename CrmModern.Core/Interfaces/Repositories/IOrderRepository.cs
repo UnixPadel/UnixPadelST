@@ -34,6 +34,20 @@ public interface IOrderRepository : IBaseRepository<Order>
     /// <summary>Inserts a batch of OrderDetail rows (DetayTablo).</summary>
     Task AddDetailsAsync(IEnumerable<OrderDetail> details);
 
+    // ── Ekstra maliyet (SiparisEkMaliyet) ──────────────────────────────────────
+
+    /// <summary>Bir siparişin ekstra maliyet kalemleri (EkMaliyetID artan).</summary>
+    Task<IReadOnlyList<OrderExtraCost>> GetExtraCostsByOrderIdAsync(int siparisAlID);
+
+    /// <summary>Tek ekstra maliyet kalemi (silme için; bulunamazsa null).</summary>
+    Task<OrderExtraCost?> GetExtraCostByIdAsync(int ekMaliyetID);
+
+    /// <summary>Ekstra maliyet kalemi ekler (SaveChanges çağrısı servise bırakılır).</summary>
+    Task AddExtraCostAsync(OrderExtraCost cost);
+
+    /// <summary>Ekstra maliyet kalemini siler (SaveChanges çağrısı servise bırakılır).</summary>
+    void RemoveExtraCost(OrderExtraCost cost);
+
     // ── Quality Control ───────────────────────────────────────────────────────
 
     // ── Factory ───────────────────────────────────────────────────────────────

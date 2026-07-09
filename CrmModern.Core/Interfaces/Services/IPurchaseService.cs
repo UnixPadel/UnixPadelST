@@ -18,7 +18,6 @@ public interface IPurchaseService
     Task<IReadOnlyList<PurchaseRequestListDto>> GetHistoryAsync(int page, int pageSize);
 
     // ── Aşama bazlı listeler ──────────────────────────────────────────────
-    Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingPreApprovalAsync();
     Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingPaymentAsync();
     Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingFinalApprovalAsync();
 
@@ -35,10 +34,6 @@ public interface IPurchaseService
     Task<PurchaseAttachmentDataDto?> GetAttachmentAsync(int talepId);
     /// <summary>Talebin ek dosyasını kaldır.</summary>
     Task DeleteAttachmentAsync(int talepId);
-
-    // ── Aşama 1: ön onay (omur.caliskan) ──────────────────────────────────
-    Task PreApproveAsync(int talepId, string currentUserName, string? aciklama);
-    Task PreRejectAsync (int talepId, string currentUserName, string redNotu);
 
     // ── Aşama 2: muhasebe ödeme detayı ────────────────────────────────────
     Task SetPaymentDetailsAsync(int talepId, SetPaymentDetailsDto dto, string currentUserName);

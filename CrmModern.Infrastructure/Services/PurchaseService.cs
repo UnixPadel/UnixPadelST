@@ -72,19 +72,13 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
 
     // ── Aşama bazlı listeler ─────────────────────────────────────────────────
 
-    public async Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingPreApprovalAsync()
-    {
-        // SatinAlimOnIzlemeForm WHERE: Durum IN ('Bekliyor','Onay Bekliyor') AND SatinAlma tipi
-        var list = await uow.PurchaseRequests
-            .GetByStatusesAsync(new[] { "Bekliyor", "Onay Bekliyor" }, "SatinAlma");
-        return list.Select(MapList).ToList().AsReadOnly();
-    }
-
     public async Task<IReadOnlyList<PurchaseRequestListDto>> GetPendingPaymentAsync()
     {
-        // SatinAlmaTakipForm bekleyen: SatinAlma + Durum IN ('Ön Onaylandı','Onay Bekliyor') + OdemeTuru IS NULL
+        // Ön onay aşaması kaldırıldı → yeni talepler doğrudan muhasebeye düşer.
+        // SatinAlma + Durum IN ('Bekliyor','Ön Onaylandı','Onay Bekliyor') + OdemeTuru IS NULL.
+        // ('Ön Onaylandı' geriye uyum için: kaldırma anında o durumda bekleyen in-flight kayıtlar.)
         var list = await uow.PurchaseRequests
-            .GetByStatusesAsync(new[] { "Ön Onaylandı", "Onay Bekliyor" }, "SatinAlma");
+            .GetByStatusesAsync(new[] { "Bekliyor", "Ön Onaylandı", "Onay Bekliyor" }, "SatinAlma");
         var filtered = list.Where(p => string.IsNullOrEmpty(p.OdemeTuru)).ToList();
         return filtered.Select(MapList).ToList().AsReadOnly();
     }
@@ -200,43 +194,12 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         await uow.SaveChangesAsync();
     }
 
-    // ── Aşama 1: Ön Onay ─────────────────────────────────────────────────────
-
-    public async Task PreApproveAsync(int talepId, string currentUserName, string? aciklama)
-    {
-        var entity = await GetForStage(talepId, new[] { "Bekliyor", "Onay Bekliyor" });
-
-        entity.Durum            = "Ön Onaylandı";
-        entity.OnIzlemeYapan    = currentUserName;
-        entity.OnIzlemeTarihi   = DateTime.Now;
-        uow.PurchaseRequests.Update(entity);
-        await uow.SaveChangesAsync();
-        await LogApprovalAsync(talepId, "OnOnay", "Onaylandı", currentUserName, aciklama);
-    }
-
-    public async Task PreRejectAsync(int talepId, string currentUserName, string redNotu)
-    {
-        if (string.IsNullOrWhiteSpace(redNotu))
-            throw new BusinessException("Red gerekçesi zorunlu.");
-
-        var entity = await GetForStage(talepId, new[] { "Bekliyor", "Onay Bekliyor" });
-
-        entity.Durum               = "Reddedildi";
-        entity.RedNotu             = redNotu;
-        entity.OnIzlemeYapan       = currentUserName;
-        entity.OnIzlemeTarihi      = DateTime.Now;
-        entity.IslemYapanKullanici = currentUserName;
-        entity.IslemTarihi         = DateTime.Now;
-        uow.PurchaseRequests.Update(entity);
-        await uow.SaveChangesAsync();
-        await LogApprovalAsync(talepId, "OnOnay", "Reddedildi", currentUserName, redNotu);
-    }
-
     // ── Aşama 2: Muhasebe ödeme detayı ───────────────────────────────────────
 
     public async Task SetPaymentDetailsAsync(int talepId, SetPaymentDetailsDto dto, string currentUserName)
     {
-        var entity = await GetForStage(talepId, new[] { "Ön Onaylandı", "Onay Bekliyor" });
+        // Ön onay aşaması kaldırıldı → yeni talepler 'Bekliyor' durumundan doğrudan işlenir.
+        var entity = await GetForStage(talepId, new[] { "Bekliyor", "Ön Onaylandı", "Onay Bekliyor" });
 
         if (!string.IsNullOrEmpty(entity.OdemeTuru))
             throw new BusinessException($"Talep #{talepId} için ödeme detayı zaten girilmiş.");
@@ -249,7 +212,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         if (tutarlar.Any(t => t < 0))
             throw new BusinessException("Negatif tutar girilemez.");
 
-        ValidateDynamicPaymentFields(dto);
+        // Tür-bazlı alt-alanlar artık zorunlu değil; girilen değerler olduğu gibi kaydedilir.
 
         entity.OdemeTuru              = dto.OdemeTuru;
         entity.OdenenTutar            = dto.OdenenTutar;
@@ -409,40 +372,6 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
                 $"beklenen: {string.Join('/', allowedStatuses)}).");
 
         return entity;
-    }
-
-    private static void ValidateDynamicPaymentFields(SetPaymentDetailsDto dto)
-    {
-        switch (dto.OdemeTuru)
-        {
-            case "Peşin":
-                if (dto.OdenenTutar      is null) throw new BusinessException("Peşin: OdenenTutar zorunlu.");
-                if (dto.OdemeIslemTarihi is null) throw new BusinessException("Peşin: OdemeIslemTarihi zorunlu.");
-                break;
-            case "Vadeli":
-                if (dto.OdenenTutar       is null) throw new BusinessException("Vadeli: OdenenTutar zorunlu.");
-                if (string.IsNullOrWhiteSpace(dto.OdemeVadeSuresi)) throw new BusinessException("Vadeli: OdemeVadeSuresi zorunlu.");
-                if (dto.OdemeVadeTutari   is null) throw new BusinessException("Vadeli: OdemeVadeTutari zorunlu.");
-                break;
-            case "Mal Mukabili":
-                if (dto.OdenenTutar is null) throw new BusinessException("Mal Mukabili: OdenenTutar zorunlu.");
-                if (string.IsNullOrWhiteSpace(dto.OdemeAciklama)) throw new BusinessException("Mal Mukabili: OdemeAciklama zorunlu.");
-                break;
-            case "Çek / Senet":
-                if (dto.OdemeTutari is null) throw new BusinessException("Çek/Senet: OdemeTutari zorunlu.");
-                if (string.IsNullOrWhiteSpace(dto.OdemeBelgeNo)) throw new BusinessException("Çek/Senet: OdemeBelgeNo zorunlu.");
-                if (dto.OdemeVadeTarihi is null) throw new BusinessException("Çek/Senet: OdemeVadeTarihi zorunlu.");
-                break;
-            case "Havale / EFT":
-                if (dto.OdemeTutari is null) throw new BusinessException("Havale/EFT: OdemeTutari zorunlu.");
-                if (string.IsNullOrWhiteSpace(dto.OdemeBankaAdi)) throw new BusinessException("Havale/EFT: OdemeBankaAdi zorunlu.");
-                if (dto.OdemeIslemTarihi is null) throw new BusinessException("Havale/EFT: OdemeIslemTarihi zorunlu.");
-                break;
-            case "Kredi Kartı / Banka Kartı":
-                if (dto.OdemeTutari is null) throw new BusinessException("Kart: OdemeTutari zorunlu.");
-                if (string.IsNullOrWhiteSpace(dto.OdemeKartTipi)) throw new BusinessException("Kart: OdemeKartTipi zorunlu.");
-                break;
-        }
     }
 
     private static PurchaseRequestListDto MapList(PurchaseRequest p) =>

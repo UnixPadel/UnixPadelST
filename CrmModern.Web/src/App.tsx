@@ -19,7 +19,6 @@ import { AccountingApprovalPage } from '@/pages/accounting/AccountingApprovalPag
 import { NewPurchaseRequestPage } from '@/pages/purchase/NewPurchaseRequestPage'
 import { MyPurchaseRequestsPage } from '@/pages/purchase/MyPurchaseRequestsPage'
 import { AllPurchaseRequestsPage } from '@/pages/purchase/AllPurchaseRequestsPage'
-import { PreApprovalPage } from '@/pages/approval/PreApprovalPage'
 import { PaymentDetailsPage } from '@/pages/approval/PaymentDetailsPage'
 import { FinalApprovalPage } from '@/pages/approval/FinalApprovalPage'
 import { UsersPage } from '@/pages/users/UsersPage'
@@ -70,7 +69,6 @@ export default function App() {
         <Route path="/purchase/new"         element={<RoleGuard roles={['Yonetici','Lojistik','Fabrika','Gozlemci','Temsilci']}><NewPurchaseRequestPage /></RoleGuard>} />
         <Route path="/purchase/mine"        element={<MyPurchaseRequestsPage />} />
         <Route path="/purchase/all"         element={<AllPurchaseRequestsPage />} />
-        <Route path="/approval/pre"         element={<PreApprovalPage />} />
         <Route path="/approval/payment"     element={<RoleGuard roles={['Yonetici','Muhasebe']}><PaymentDetailsPage /></RoleGuard>} />
         <Route path="/approval/final"       element={<FinalApprovalPage />} />
         <Route path="/users"           element={<RoleGuard roles={['Yonetici']}><UsersPage /></RoleGuard>} />

@@ -44,7 +44,6 @@ const navItems: NavItem[] = [
   { path: '/purchase/new',     i18nKey: 'nav.purchaseNew',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Lojistik','Fabrika','Gozlemci','Temsilci'] },
   { path: '/purchase/mine',    i18nKey: 'nav.purchaseMine',  icon: <FileText className="h-4 w-4" /> },
   { path: '/purchase/all',     i18nKey: 'nav.purchaseAll',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Gozlemci','Muhasebe'], usernames: ['elshan.rasulov'] },
-  { path: '/approval/pre',     i18nKey: 'nav.approvalPre',     icon: <FileText className="h-4 w-4" />, usernames: ['omur.caliskan'] },
   { path: '/approval/payment', i18nKey: 'nav.approvalPayment', icon: <FileText className="h-4 w-4" />, roles: ['Muhasebe'] },
   { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
   { path: '/customers',       i18nKey: 'nav.customers',       icon: <UserPlus className="h-4 w-4" />,roles: ['Yonetici','Temsilci','Gozlemci','Muhasebe','Lojistik'] },

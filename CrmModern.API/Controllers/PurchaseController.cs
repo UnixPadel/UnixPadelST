@@ -15,7 +15,6 @@ namespace CrmModern.API.Controllers;
 public sealed class PurchaseController(IPurchaseService purchaseService) : ControllerBase
 {
     // WinForms birebir özel kullanıcı adları (rol değil)
-    private const string PreApproverUser  = "omur.caliskan";
     private const string FinalApproverUser = "elshan.rasulov";
 
     // Ek dosya kuralları — izin verilen uzantılar + boyut sınırı.
@@ -79,17 +78,7 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
         return Ok(ApiResponse<IReadOnlyList<PurchaseApprovalDto>>.Ok(result));
     }
 
-    /// <summary>Aşama 1 bekleyenleri (Bekliyor/Onay Bekliyor + SatinAlma).</summary>
-    [HttpGet("pending-preapproval")]
-    public async Task<IActionResult> GetPendingPreApproval()
-    {
-        if (CurrentUserName != PreApproverUser && !IsRole("Yonetici"))
-            return Forbid();
-        var result = await purchaseService.GetPendingPreApprovalAsync();
-        return Ok(ApiResponse<IReadOnlyList<PurchaseRequestListDto>>.Ok(result));
-    }
-
-    /// <summary>Aşama 2 bekleyenleri (Ön Onaylandı + OdemeTuru IS NULL).</summary>
+    /// <summary>Aşama 2 bekleyenleri (Bekliyor/Ön Onaylandı + OdemeTuru IS NULL).</summary>
     [HttpGet("pending-payment")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
     public async Task<IActionResult> GetPendingPayment()
@@ -193,28 +182,6 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     {
         await purchaseService.DeleteAttachmentAsync(talepId);
         return Ok(ApiResponse<object>.Ok(null!, "Ek silindi."));
-    }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Aşama 1: ön onay (omur.caliskan VEYA Yonetici)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    [HttpPost("{talepId:int}/preapprove")]
-    public async Task<IActionResult> PreApprove(int talepId, [FromBody] ApprovalActionDto? dto)
-    {
-        if (CurrentUserName != PreApproverUser && !IsRole("Yonetici"))
-            return Forbid();
-        await purchaseService.PreApproveAsync(talepId, CurrentUserName, dto?.Aciklama);
-        return Ok(ApiResponse<object>.Ok(null!, "Ön onaylandı."));
-    }
-
-    [HttpPost("{talepId:int}/prereject")]
-    public async Task<IActionResult> PreReject(int talepId, [FromBody] RejectPurchaseDto dto)
-    {
-        if (CurrentUserName != PreApproverUser && !IsRole("Yonetici"))
-            return Forbid();
-        await purchaseService.PreRejectAsync(talepId, CurrentUserName, dto.RedNotu);
-        return Ok(ApiResponse<object>.Ok(null!, "Reddedildi."));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

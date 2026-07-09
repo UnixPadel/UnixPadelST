@@ -9,26 +9,16 @@ import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
-import { FieldError } from '@/components/FieldError'
 import { PurchaseAttachment } from '@/components/PurchaseAttachment'
-import { ODEME_TURLERI } from '@/components/DynamicPaymentForm'
+import { DynamicPaymentForm } from '@/components/DynamicPaymentForm'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
-// PROMPT.md ACCOUNTING #10 (revised): "keep only the text `Ödeme Detayı`" +
-// user follow-up: "keep odemeTuru as a single dropdown visible, no hardcoded
-// default. Just drop the dynamic sub-fields underneath it."
-//
-// So this dialog now shows:
-//   • Heading            "Ödeme Detayı"
-//   • Ödeme Türü         dropdown (required)
-//   • İşlem Tarihi       defaulted to DateTime.Now on open (task #11)
-// No more amount / vade / kart-tipi sub-fields conditional on the type.
+// Ödeme Detayı diyaloğu: seçilen ödeme türüne göre DynamicPaymentForm türe-özel
+// kırılım alanlarını gösterir. Alt-alanlar zorunlu DEĞİLDİR — yalnız ödeme türü
+// seçilmiş olmalı; alanlar boş bırakılsa da kayıt geçer (backend de gevşetildi).
 
 // `yyyy-MM-ddTHH:mm` in the user's local time, suitable for <input type="datetime-local" />.
 function nowForDatetimeLocal(): string {
@@ -48,11 +38,10 @@ export function PaymentDetailsPage() {
   const { toast } = useToast()
   const [target, setTarget] = useState<number | null>(null)
   const [form, setForm] = useState<SetPaymentDetailsRequest>(buildEmpty())
-  const [submitted, setSubmitted] = useState(false)
 
+  // Yalnız ödeme türü zorunlu; alt-alanlar opsiyonel.
   const valid = !!form.odemeTuru
   const onSubmit = () => {
-    setSubmitted(true)
     if (!valid) return
     saveMut.mutate()
   }
@@ -70,9 +59,8 @@ export function PaymentDetailsPage() {
     mutationFn: () => setPaymentDetails(target!, form),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['payment-pending'] })
-      qc.invalidateQueries({ queryKey: ['preapproval'] })
       qc.invalidateQueries({ queryKey: ['final-pending'] })
-      setTarget(null); setForm(buildEmpty()); setSubmitted(false)
+      setTarget(null); setForm(buildEmpty())
       toast({ title: t('purchase.payment.saved') })
     },
     onError: (e: unknown) => toast({ title: t('common.failed'), description: (e as Error).message, variant: 'destructive' }),
@@ -89,7 +77,7 @@ export function PaymentDetailsPage() {
     {
       key: 'actions', header: t('purchase.cols.islem'),
       render: (r) => (
-        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()); setSubmitted(false) }}>
+        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()) }}>
           {t('purchase.payment.enter')}
         </Button>
       ),
@@ -155,38 +143,15 @@ export function PaymentDetailsPage() {
             </div>
           )}
 
-          {/* PROMPT.md ACCOUNTING #10 (revised): heading + Ödeme Türü dropdown +
-              İşlem Tarihi (defaults to DateTime.Now — task #11). No sub-fields. */}
+          {/* Türe göre kırılım alanları — hiçbiri zorunlu değil (yalnız ödeme türü). */}
           <div className="space-y-3">
             <h3 className="text-sm font-medium">{t('purchase.payment.heading')}</h3>
-            <div className="space-y-1">
-              <Label>{t('purchase.payment.odemeTuru')}</Label>
-              <Select
-                value={form.odemeTuru}
-                onValueChange={(s) => setForm((f) => ({ ...f, odemeTuru: s }))}
-                disabled={saveMut.isPending}
-              >
-                <SelectTrigger><SelectValue placeholder={t('purchase.payment.selectPlaceholder')} /></SelectTrigger>
-                <SelectContent>
-                  {ODEME_TURLERI.map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
-                </SelectContent>
-              </Select>
-              {submitted && !form.odemeTuru && <FieldError message={t('validation.required')} />}
-            </div>
-            <div className="space-y-1">
-              <Label>{t('purchase.payment.islemTarihi')}</Label>
-              <Input
-                type="datetime-local"
-                value={form.odemeIslemTarihi ?? ''}
-                onChange={(e) => setForm((f) => ({ ...f, odemeIslemTarihi: e.target.value || undefined }))}
-                disabled={saveMut.isPending}
-              />
-            </div>
+            <DynamicPaymentForm value={form} onChange={setForm} disabled={saveMut.isPending} />
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
-            <Button disabled={saveMut.isPending} onClick={onSubmit}>
+            <Button disabled={saveMut.isPending || !valid} onClick={onSubmit}>
               {saveMut.isPending ? t('common.saving') : t('common.save')}
             </Button>
           </DialogFooter>

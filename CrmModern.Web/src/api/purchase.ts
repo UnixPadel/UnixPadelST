@@ -79,11 +79,6 @@ export const getPurchaseById = async (talepId: number): Promise<PurchaseRequestD
 
 // ── Aşama listeleri ─────────────────────────────────────────────────────────
 
-export const getPendingPreApproval = async (): Promise<PurchaseRequestListDto[]> => {
-  const res = await api.get<ApiResponse<PurchaseRequestListDto[]>>('/api/purchase/pending-preapproval')
-  return res.data.data
-}
-
 export const getPendingPayment = async (): Promise<PurchaseRequestListDto[]> => {
   const res = await api.get<ApiResponse<PurchaseRequestListDto[]>>('/api/purchase/pending-payment')
   return res.data.data
@@ -150,12 +145,6 @@ export const downloadPurchaseAttachment = async (talepId: number, fileName?: str
 export const deletePurchaseAttachment = async (talepId: number): Promise<void> => {
   await api.delete(`/api/purchase/${talepId}/attachment`)
 }
-
-export const preApprovePurchase = (talepId: number, aciklama?: string) =>
-  api.post(`/api/purchase/${talepId}/preapprove`, { aciklama }).then((r) => r.data)
-
-export const preRejectPurchase = (talepId: number, redNotu: string) =>
-  api.post(`/api/purchase/${talepId}/prereject`, { redNotu }).then((r) => r.data)
 
 export interface SetPaymentDetailsRequest {
   odemeTuru: string

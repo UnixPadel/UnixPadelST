@@ -140,6 +140,16 @@ export interface OrderDetail {
   odenenMiktar?: number | null
   odemeDurum?: string
   kontrolNot?: string
+  // Teslimat/Montaj altı ekstra maliyetler — revize/amend'de forma yüklenir.
+  extraCosts?: OrderExtraCostView[]
+}
+
+export interface OrderExtraCostView {
+  ekMaliyetID: number
+  aciklama: string
+  tutar: number
+  eklenmeTarihi?: string
+  kullaniciID?: number | null
 }
 
 export interface OrderDetailItem {
@@ -196,6 +206,14 @@ export interface CreateOrderDto {
   details: string[]
   sirket: string
   ekBase64?: string
+  // Teslimat/Montaj altındaki ekstra maliyet kalemleri (yalnız yeni kayıtta).
+  // Her kalem proformaya ayrı satır olur ve toplama eklenir.
+  extraCosts?: ExtraCostInput[]
+}
+
+export interface ExtraCostInput {
+  aciklama: string
+  tutar: number
 }
 
 export interface OrderSetInput {
@@ -228,6 +246,7 @@ export interface QualityControlListDto {
   siparisMiTeklifMi: string
   tarih: string
   sirket?: string
+  kontrol: string   // 'Kontrol' (bekleyen) | 'Onay' (onaylı) — grid'de ayırt için
 }
 
 // ── Factory ───────────────────────────────────────────────────────────────────

@@ -481,6 +481,9 @@ export function AccountingPage() {
           keyField="siparisNo"
           loading={isLoading}
           density="compact"
+          // Sidebar (hamburger) açıkken yatay alan daralınca bir sipariş tek
+          // satırda kalsın; taşma yatay kaydırmaya düşer (hücreler sarmaz).
+          singleLineRows
           onRowClick={(r) => setSelectedNo((r as AccountingOrderListDto).siparisNo)}
           // PROMPT-v5 §5: muhasebeDurumu satır renklendirmesi kaldırıldı — durum
           // kolon/badge'den okunur; yalnız seçili satır vurgusu kalır.

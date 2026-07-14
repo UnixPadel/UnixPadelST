@@ -111,8 +111,12 @@ public interface IOrderRepository : IBaseRepository<Order>
 
     // ── Quality Control ───────────────────────────────────────────────────────
 
-    /// <summary>Returns all orders with Kontrol = 'Kontrol', newest first.</summary>
-    Task<IReadOnlyList<Order>> GetPendingQualityControlAsync();
+    /// <summary>
+    /// Kalite Kontrol listesi: bekleyen (Kontrol='Kontrol') TÜM kayıtlar +
+    /// <paramref name="approvedSince"/> tarihinden sonra onaylanan (Kontrol='Onay',
+    /// SiparisOnaylari'nda 'Onaylandi' audit'i) kayıtlar, en yeni önce.
+    /// </summary>
+    Task<IReadOnlyList<Order>> GetQualityControlListAsync(DateTime approvedSince);
 
     /// <summary>
     /// Sets Kontrol = 'Onay'. If the order is a 'Teklif', also promotes it to 'Siparis'.

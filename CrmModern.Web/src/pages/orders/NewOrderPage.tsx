@@ -74,6 +74,7 @@ const blank = (): CreateOrderDto => ({
   // (hepsi işaretli) seed'li gelir. Ticari/otomatik @@kod seed'lenmez. Revize/Formu
   // Getir modunda detailToForm() bunları kaynağın içeriğiyle ezer.
   sets: [], details: [...STANDART_DETAY_SARTLARI], sirket: 'Unixpadel',
+  extraCosts: [],
 })
 
 /**
@@ -208,6 +209,9 @@ function detailToForm(d: OrderDetail): CreateOrderDto {
     // Round-8 §4 — legacy TR standart satırlar koda normalleştirilir; serbest
     // metin verbatim kalır. Böylece eski siparişler de dil-duyarlı proforma üretir.
     details:      (d.details ?? []).map(normalizeToCode),
+    // Ekstra maliyetler forma yüklenir (revize/amend'de düzenlenebilsin). Sadece
+    // açıklama+tutar taşınır; kayıtta sil-yeniden-yaz yapılır.
+    extraCosts:   (d.extraCosts ?? []).map((e) => ({ aciklama: e.aciklama, tutar: e.tutar })),
   }
 }
 
@@ -711,10 +715,17 @@ export function NewOrderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setTabs, form.montajVar, form.montajFiyat, form.mAdet, form.teslimatVar, form.teslimatFiyat, form.mTeslimat])
 
+  // Ekstra maliyetler KDV/indirim SONRASI toplama düz eklenir (backend
+  // OrderService ile birebir aynı semantik: toplamFiyat += Σ tutar).
+  const extraToplam = useMemo(
+    () => (form.extraCosts ?? []).reduce((a, e) => a + (Number(e.tutar) || 0), 0),
+    [form.extraCosts],
+  )
+
   const toplamFiyat = useMemo(() => {
     const afterIndirim = brutToplam * (1 - (form.indirim || 0) / 100)
-    return afterIndirim * (1 + (form.kdv || 0) / 100)
-  }, [brutToplam, form.indirim, form.kdv])
+    return afterIndirim * (1 + (form.kdv || 0) / 100) + extraToplam
+  }, [brutToplam, form.indirim, form.kdv, extraToplam])
 
   const kaporaMiktari = useMemo(
     () => toplamFiyat * (form.pesinYuzde || 0) / 100,
@@ -1294,6 +1305,61 @@ export function NewOrderPage() {
                     />
                   </Field>
                 </div>
+
+                {/* Ekstra maliyet — Teslimat/Montaj'ın ALTINDA. Her kalem
+                    (açıklama + tutar) proformaya ayrı satır olur ve toplama
+                    eklenir. Oluşturma + revize/amend'de düzenlenebilir; revizede
+                    mevcut kalemler (muhasebe eklentileri dahil) forma yüklenir ve
+                    kayıtta sil-yeniden-yaz ile güncellenir. */}
+                {(
+                  <div className="border-t pt-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold">{t('orders.form.ekstraMaliyet')}</Label>
+                      <Button
+                        type="button" size="sm" variant="outline"
+                        onClick={() => setForm((f) => ({
+                          ...f,
+                          extraCosts: [...(f.extraCosts ?? []), { aciklama: '', tutar: 0 }],
+                        }))}
+                      >
+                        {t('orders.form.ekstraMaliyetEkle')}
+                      </Button>
+                    </div>
+                    {(form.extraCosts ?? []).map((ec, idx) => (
+                      <div key={idx} className="grid grid-cols-[1fr_110px_auto] gap-2 items-end">
+                        <Field label={t('orders.form.ekstraMaliyetAciklama')}>
+                          <Input
+                            value={ec.aciklama}
+                            onChange={(e) => setForm((f) => {
+                              const next = [...(f.extraCosts ?? [])]
+                              next[idx] = { ...next[idx], aciklama: e.target.value }
+                              return { ...f, extraCosts: next }
+                            })}
+                          />
+                        </Field>
+                        <Field label={t('orders.form.ekstraMaliyetTutar')}>
+                          <DecimalInput
+                            value={ec.tutar}
+                            onValueChange={(v) => setForm((f) => {
+                              const next = [...(f.extraCosts ?? [])]
+                              next[idx] = { ...next[idx], tutar: v === '' ? 0 : v }
+                              return { ...f, extraCosts: next }
+                            })}
+                          />
+                        </Field>
+                        <Button
+                          type="button" size="sm" variant="ghost"
+                          onClick={() => setForm((f) => ({
+                            ...f,
+                            extraCosts: (f.extraCosts ?? []).filter((_, i) => i !== idx),
+                          }))}
+                        >
+                          ✕
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </section>
           </div>
@@ -1534,6 +1600,16 @@ export function NewOrderPage() {
                   <span>%{fmt(form.kdv ?? 0)}</span>
                 </div>
               )}
+              {(form.extraCosts ?? [])
+                .filter((e) => (Number(e.tutar) || 0) > 0)
+                .map((e, i) => (
+                  <div key={i} className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {t('orders.form.ekstraMaliyet')}{e.aciklama ? `: ${e.aciklama}` : ''}
+                    </span>
+                    <span>{sym}{fmt(Number(e.tutar) || 0)}</span>
+                  </div>
+                ))}
               <div className="flex justify-between gap-4 font-semibold border-t pt-1.5">
                 <span>{t('orders.form.toplamFiyatLabel')}</span>
                 <span>{sym}{fmt(toplamFiyat)}</span>

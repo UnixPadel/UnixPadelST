@@ -316,6 +316,10 @@
       "montajFiyat": "Montaj Fiyat",
       "miktar": "Miktar",
       "carp": "Çarp",
+      "ekstraMaliyet": "Ekstra Maliyet",
+      "ekstraMaliyetEkle": "+ Ekle",
+      "ekstraMaliyetAciklama": "Açıklama",
+      "ekstraMaliyetTutar": "Tutar",
       "siparisN": "Sipariş {{n}}",
       "anaUrun": "Ana Ürün",
       "anaUrunSec": "Ana ürün seç",
@@ -377,6 +381,7 @@
   "qc": {
     "title": "Kontrol",
     "pendingCount": "{{count}} bekleyen sipariş",
+    "onlyApproved": "Sadece onaylı siparişler",
     "approved": "Başarıyla onaylandı!",
     "approveFailed": "Kayıt bulunamadı veya zaten Onay durumunda.",
     "rejected": "Reddedildi",
@@ -424,6 +429,7 @@
       "paraTipi": "Para Tipi",
       "odemeDurumu": "Ödeme Durumu",
       "asama": "Aşama",
+      "kontrolDurumu": "Kontrol Durumu",
       "tarih": "Tarih",
       "sirket": "Şirket",
       "veriYok": "Veri Yok"

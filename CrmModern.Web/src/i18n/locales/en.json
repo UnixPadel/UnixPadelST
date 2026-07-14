@@ -316,6 +316,10 @@
       "montajFiyat": "Assembly Price",
       "miktar": "Qty",
       "carp": "Multiply",
+      "ekstraMaliyet": "Extra Cost",
+      "ekstraMaliyetEkle": "+ Add",
+      "ekstraMaliyetAciklama": "Description",
+      "ekstraMaliyetTutar": "Amount",
       "siparisN": "Order {{n}}",
       "anaUrun": "Main Product",
       "anaUrunSec": "Select main product",
@@ -377,6 +381,7 @@
   "qc": {
     "title": "Control",
     "pendingCount": "{{count}} pending orders",
+    "onlyApproved": "Approved orders only",
     "approved": "Approved successfully!",
     "approveFailed": "Record not found or already in Approved status.",
     "rejected": "Rejected",
@@ -424,6 +429,7 @@
       "paraTipi": "Currency",
       "odemeDurumu": "Payment Status",
       "asama": "Stage",
+      "kontrolDurumu": "Control Status",
       "tarih": "Date",
       "sirket": "Company",
       "veriYok": "No Data"

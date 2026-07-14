@@ -1,3 +1,5 @@
+using CrmModern.Core.DTOs.Accounting;
+
 namespace CrmModern.Core.DTOs.Order;
 
 /// <summary>
@@ -79,5 +81,10 @@ public sealed record OrderDetailDto(
     // ── PROMPT-v4 §4.1 — Kontrol ekranı cari bloğu ────────────────────────
     decimal? OdenenMiktar = null,
     string?  OdemeDurum   = null,
-    string?  KontrolNot   = null
+    string?  KontrolNot   = null,
+
+    // ── Ekstra maliyetler (Teslimat/Montaj altı) ──────────────────────────
+    // Revize/amend ekranında forma yüklenip düzenlenebilir. Proforma bunları
+    // ayrıca SiparisEkMaliyet'ten okur; burası salt görüntüleme/hidrasyon içindir.
+    IReadOnlyList<OrderExtraCostDto>? ExtraCosts = null
 );

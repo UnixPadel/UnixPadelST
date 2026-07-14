@@ -1,4 +1,5 @@
 using ClosedXML.Excel;
+using CrmModern.Core.DTOs.Accounting;
 using CrmModern.Core.DTOs.Order;
 using CrmModern.Core.Entities;
 using CrmModern.Core.Exceptions;
@@ -87,7 +88,10 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         var bilesenler = (await uow.Components.GetAllAsync())
             .ToDictionary(b => b.BilesenID, b => (b.BilesenAdi, b.Birim));
 
-        return MapToDetailDto(order, ownerAdSoyad, kategoriler, bilesenler);
+        // Ekstra maliyetler — revize/amend ekranında forma yüklenmek için.
+        var extras = await uow.Orders.GetExtraCostsByOrderIdAsync(order.SiparisAlID);
+
+        return MapToDetailDto(order, ownerAdSoyad, kategoriler, bilesenler, extras);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -342,6 +346,39 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         decimal indirimliFiyat = brutToplamFiyat - indirim;
         decimal toplamFiyat    = indirimliFiyat + (indirimliFiyat * kdv / 100m);
 
+        // ── 4b. Ekstra maliyetler (Teslimat/Montaj altı — oluştur + revize) ─
+        // Tutar KDV/indirim SONRASI toplama düz eklenir — muhasebe AddExtraCostAsync
+        // ile birebir aynı semantik (ToplamFiyat += Tutar).
+        //   • dto.ExtraCosts != null  → client otoriter liste gönderdi (form ekstra
+        //     maliyetleri yükleyip düzenledi). Yeni kayıtta insert, revize/amend'de
+        //     sil-yeniden-yaz (replaceExtras). Boş liste → hepsi kaldırılır.
+        //   • dto.ExtraCosts == null  → alan hiç gönderilmedi (eski client). Mevcut
+        //     kayıttaki ekstralar KORUNUR; tutarları toplamda kalsın diye yüklenir,
+        //     tabloya dokunulmaz.
+        List<CreateExtraCostDto> extraCosts;
+        bool replaceExtras;
+        if (dto.ExtraCosts is not null)
+        {
+            extraCosts = dto.ExtraCosts
+                .Where(e => e.Tutar > 0m && !string.IsNullOrWhiteSpace(e.Aciklama))
+                .ToList();
+            replaceExtras = true;
+        }
+        else if (existingOrder is not null)
+        {
+            var mevcutEkstralar = await uow.Orders.GetExtraCostsByOrderIdAsync(existingOrder.SiparisAlID);
+            extraCosts   = mevcutEkstralar.Select(e => new CreateExtraCostDto(e.Aciklama, e.Tutar)).ToList();
+            replaceExtras = false;
+        }
+        else
+        {
+            extraCosts   = new List<CreateExtraCostDto>();
+            replaceExtras = false;
+        }
+        decimal extraSum = extraCosts.Sum(e => e.Tutar);
+        brutToplamFiyat += extraSum;
+        toplamFiyat     += extraSum;
+
         byte[]? ek = string.IsNullOrEmpty(dto.EkBase64)
             ? null
             : Convert.FromBase64String(dto.EkBase64);
@@ -364,11 +401,14 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         await uow.SaveChangesAsync();
 
         // ── 7. INSERT or UPDATE SiparisAlTablo ────────────────────────────
+        // Kayıttan sonra SiparisAlID (identity) üretilir; ekstra maliyet satırları
+        // bu ID'ye bağlanacağı için entity referansını tutuyoruz.
+        Order savedOrder;
         if (existingOrder is null)
         {
-            await uow.Orders.AddAsync(
-                BuildOrderEntity(siparisNo, teklifNo, kullaniciID, dto,
-                                 siparisMiTeklifMi, brutToplamFiyat, toplamFiyat, ek));
+            savedOrder = BuildOrderEntity(siparisNo, teklifNo, kullaniciID, dto,
+                                          siparisMiTeklifMi, brutToplamFiyat, toplamFiyat, ek);
+            await uow.Orders.AddAsync(savedOrder);
         }
         else
         {
@@ -385,6 +425,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
                 existingOrder.DegisiklikTarihi      = DateTime.Now;
             }
             uow.Orders.Update(existingOrder);
+            savedOrder = existingOrder;
         }
 
         await uow.SaveChangesAsync();
@@ -431,6 +472,34 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             await uow.Orders.AddItemsAsync(newItems);
 
         await uow.SaveChangesAsync();
+
+        // ── 10. Ekstra maliyet kalemleri (oluştur + revize/amend) ─────────
+        // replaceExtras: client otoriter listeyi gönderdi → revize/amend'de mevcut
+        // satırları sil, yeni listeyi yaz (form muhasebe eklentileri dahil hepsini
+        // yüklediği için kayıp olmaz). Yeni kayıtta silinecek satır yoktur.
+        // Proforma bunları GetExtraCostsByOrderIdAsync ile çekip ayrı satır olarak
+        // enjekte eder (#TOPLAMFIYAT'a tekrar eklenmez — tutar zaten yansıtıldı).
+        if (replaceExtras)
+        {
+            if (existingOrder is not null)
+            {
+                var eskiEkstralar = await uow.Orders.GetExtraCostsByOrderIdAsync(savedOrder.SiparisAlID);
+                foreach (var eski in eskiEkstralar)
+                    uow.Orders.RemoveExtraCost(eski);
+            }
+            foreach (var ec in extraCosts)
+            {
+                await uow.Orders.AddExtraCostAsync(new OrderExtraCost
+                {
+                    SiparisAlID   = savedOrder.SiparisAlID,
+                    Aciklama      = ec.Aciklama.Trim(),
+                    Tutar         = ec.Tutar,
+                    EklenmeTarihi = DateTime.Now,
+                    KullaniciID   = kullaniciID,
+                });
+            }
+            await uow.SaveChangesAsync();
+        }
 
         return isTeklif ? teklifNo : siparisNo;
     }
@@ -581,7 +650,8 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         Order o,
         string? ownerAdSoyad = null,
         IReadOnlyDictionary<int, string>? kategoriler = null,
-        IReadOnlyDictionary<int, (string BilesenAdi, string? Birim)>? bilesenler = null) => new(
+        IReadOnlyDictionary<int, (string BilesenAdi, string? Birim)>? bilesenler = null,
+        IReadOnlyList<OrderExtraCost>? extras = null) => new(
         SiparisNo:         o.SiparisNo,
         TeklifNo:          o.TeklifNo,
         MusteriAd:         o.MusteriAd,
@@ -642,7 +712,11 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         Details:           o.Details.Select(d => d.Text).ToList(),
         OdenenMiktar:      o.OdenenMiktar,
         OdemeDurum:        o.OdemeDurum,
-        KontrolNot:        o.KontrolNot
+        KontrolNot:        o.KontrolNot,
+        ExtraCosts:        extras?
+                               .Select(e => new OrderExtraCostDto(
+                                   e.EkMaliyetID, e.Aciklama, e.Tutar, e.EklenmeTarihi, e.KullaniciID))
+                               .ToList()
     );
 
     // ═════════════════════════════════════════════════════════════════════════

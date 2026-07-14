@@ -95,6 +95,7 @@ interface KontrolRow extends Record<string, unknown> {
   siparisMiTeklifMi: string
   tarih: string
   sirket?: string
+  kontrol: string
 }
 
 function fromPending(r: QualityControlListDto): KontrolRow {
@@ -106,6 +107,7 @@ function fromPending(r: QualityControlListDto): KontrolRow {
     pesinYuzde: r.pesinYuzde, teslimatCesiti: r.teslimatCesiti,
     paraTipi: r.paraTipi, odemeDurum: r.odemeDurum,
     siparisMiTeklifMi: r.siparisMiTeklifMi, tarih: r.tarih, sirket: r.sirket,
+    kontrol: r.kontrol,
   }
 }
 
@@ -120,6 +122,7 @@ function fromSearch(r: OrderListDto): KontrolRow {
     pesinYuzde: r.pesinYuzde, teslimatCesiti: r.teslimatCesiti,
     paraTipi: r.paraTipi, odemeDurum: r.odemeDurum,
     siparisMiTeklifMi: r.siparisMiTeklifMi, tarih: r.tarih, sirket: r.sirket,
+    kontrol: r.kontrol,
   }
 }
 
@@ -177,6 +180,10 @@ export function QualityControlPage() {
   const [filters, setFilters] = useState<Filters>(defaultFilters())
   const [submitted, setSubmitted] = useState<Filters | null>(null)
   const [selected, setSelected] = useState<string | null>(null)
+  // "Sadece onaylı" — görünümü client-side yalnız Kontrol='Onay' satırlara süzer
+  // (varsayılan liste bekleyen + son 30 gün onaylıyı içerir; işaretlenince
+  // bekleyenler gizlenir). Backend'e ek istek atmaz.
+  const [onlyApproved, setOnlyApproved] = useState(false)
 
   // ── Veri: varsayılan pending listesi (legacy KontorlDataGridLoad) ───────
   const { data: pending = [], isLoading: pendingLoading } = useQuery({
@@ -198,12 +205,12 @@ export function QualityControlPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchPage])
 
-  const rows: KontrolRow[] = useMemo(
-    () => (submitted !== null
+  const rows: KontrolRow[] = useMemo(() => {
+    const base = submitted !== null
       ? (searchPage?.items ?? []).map(fromSearch)
-      : pending.map(fromPending)),
-    [submitted, searchPage, pending],
-  )
+      : pending.map(fromPending)
+    return onlyApproved ? base.filter((r) => r.kontrol === 'Onay') : base
+  }, [submitted, searchPage, pending, onlyApproved])
 
   // ── Filtre dropdown kaynakları ──────────────────────────────────────────
   const { data: customers = [] } = useQuery({ queryKey: ['musteriler'], queryFn: getCustomers })
@@ -387,6 +394,10 @@ export function QualityControlPage() {
       render: (r) => statusLabel(t, r.odemeDurum) },
     { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true,
       render: (r) => statusLabel(t, r.siparisMiTeklifMi) },
+    // Bekleyen ('Kontrol') vs onaylı ('Onay') ayrımı — onaylılar da listede
+    // görünür olduğundan durum kolonu eklendi.
+    { key: 'kontrol', header: t('qc.grid.kontrolDurumu'), sortable: true,
+      render: (r) => statusLabel(t, r.kontrol) },
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)
     { key: 'tarih', header: t('qc.grid.tarih'), sortable: true,
       render: (r) => formatDateShort(r.tarih) },
@@ -411,7 +422,22 @@ export function QualityControlPage() {
       {/* ── Kompakt başlık ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
         <h1 className="text-base font-semibold">{t('qc.title')}</h1>
-        <p className="text-xs text-muted-foreground">{t('qc.pendingCount', { count: pending.length })}</p>
+        <div className="flex items-center gap-4">
+          {/* Sadece onaylı — görünümü client-side Kontrol='Onay' satırlara süzer. */}
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+            <input
+              type="checkbox"
+              className="h-3.5 w-3.5"
+              checked={onlyApproved}
+              onChange={(e) => setOnlyApproved(e.target.checked)}
+            />
+            {t('qc.onlyApproved')}
+          </label>
+          {/* Sayaç yalnız bekleyenleri sayar (liste artık onaylıları da içeriyor). */}
+          <p className="text-xs text-muted-foreground">
+            {t('qc.pendingCount', { count: pending.filter((p) => p.kontrol === 'Kontrol').length })}
+          </p>
+        </div>
       </div>
 
       {/* ── Üst bölge: üç panel (PROMPT-v6 §2 — Fabrika kartı kalktı) ───
@@ -745,6 +771,8 @@ export function QualityControlPage() {
             density="compact"
             onRowClick={(r) => setSelected(r.siparisNo)}
             rowClassName={(r) => cn(
+              // Onaylı satırlar hafif yeşil zemin — bekleyenlerden ayırt için.
+              r.kontrol === 'Onay' && 'bg-emerald-50 dark:bg-emerald-950/30',
               selected === r.siparisNo && 'outline outline-2 -outline-offset-2 outline-primary',
             )}
           />

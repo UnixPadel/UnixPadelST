@@ -360,18 +360,22 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             foreach (var item in items)
             {
                 bool isCategory = item.KategoriID.HasValue && !item.BilesenID.HasValue;
-                decimal fiyat = item.Fiyat ?? 0m;
 
-                string urunText, birimText, birimFiyatText, fiyatText;
+                // Web Products/Components paritesi (OrderDetailModal.tsx): kategori VE
+                // bileşen satırları AYNI formülle fiyatlanır — item.Fiyat tekil (birim)
+                // fiyat, toplam = tekil × adet. Eski proformada bileşen satırı fiyatsızdı
+                // ve kategori "birim = fiyat/adet" (whole-set total) varsayıyordu; web ile
+                // birebir aynı görünüm için ikisi de kaldırıldı.
+                decimal birimFiyat = item.Fiyat ?? 0m;
+                decimal toplam     = birimFiyat * item.Adet;
+
+                string urunText, birimText;
 
                 if (isCategory)
                 {
                     catLookup.TryGetValue(item.KategoriID!.Value, out var name);
                     urunText  = !string.IsNullOrEmpty(name) ? name : $"SET #{item.KategoriID}";
                     birimText = "SET";
-                    decimal birim = item.Adet > 0 ? fiyat / item.Adet : fiyat;
-                    birimFiyatText = paraBirimi + birim.ToString("N2", TrTR);
-                    fiyatText      = paraBirimi + fiyat.ToString("N2", TrTR);
                 }
                 else
                 {
@@ -381,9 +385,10 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                         ? bname
                         : item.OznitelikAdi + " " + bname;
                     birimText = comp?.Birim ?? string.Empty;
-                    birimFiyatText = string.Empty;   // WinForms: bileşen satırında birim/toplam fiyat boş
-                    fiyatText      = string.Empty;
                 }
+
+                string birimFiyatText = paraBirimi + birimFiyat.ToString("N2", TrTR);
+                string fiyatText      = paraBirimi + toplam.ToString("N2", TrTR);
 
                 rowMaps.Add(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {

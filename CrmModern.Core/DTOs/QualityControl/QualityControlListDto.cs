@@ -1,7 +1,9 @@
 namespace CrmModern.Core.DTOs.QualityControl;
 
 /// <summary>
-/// Row returned by the Kontrol DataGrid (WHERE Kontrol = 'Kontrol').
+/// Row returned by the Kontrol DataGrid. Bekleyen (Kontrol='Kontrol') TÜM
+/// kayıtlar + son X günde onaylananlar (Kontrol='Onay'); Kontrol alanı ikisini
+/// grid'de ayırt etmek için taşınır.
 /// KaparoFiyat and KalanBakiye are computed in-service using the same
 /// formula as the WinForms SiparisAlTabloDataGridView query.
 /// </summary>
@@ -18,5 +20,6 @@ public sealed record QualityControlListDto(
     string?  OdemeDurum,
     string   SiparisMiTeklifMi,
     DateTime Tarih,
-    string?  Sirket
+    string?  Sirket,
+    string   Kontrol            // 'Kontrol' (bekleyen) | 'Onay' (onaylı)
 );

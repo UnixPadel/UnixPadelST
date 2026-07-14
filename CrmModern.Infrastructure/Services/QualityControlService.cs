@@ -13,9 +13,16 @@ namespace CrmModern.Infrastructure.Services;
 /// </summary>
 internal sealed class QualityControlService(IUnitOfWork uow, IOrderService orderService) : IQualityControlService
 {
+    // Onaylanan siparişler listede kalsın diye pencere: son 30 gün. Daha eski
+    // onaylılar filtre barından (Kontrol=Onay) aranabilir. Sabit bir gün sayısı —
+    // gerekirse ayara taşınabilir.
+    private const int ApprovedWindowDays = 30;
+
     public async Task<IReadOnlyList<QualityControlListDto>> GetPendingAsync()
     {
-        var orders = await uow.Orders.GetPendingQualityControlAsync();
+        // Bekleyen (Kontrol='Kontrol') TÜM kayıtlar + son 30 günde onaylananlar.
+        var approvedSince = DateTime.Now.AddDays(-ApprovedWindowDays);
+        var orders = await uow.Orders.GetQualityControlListAsync(approvedSince);
         return orders.Select(MapToListDto).ToList().AsReadOnly();
     }
 
@@ -64,6 +71,7 @@ internal sealed class QualityControlService(IUnitOfWork uow, IOrderService order
             OdemeDurum:       o.OdemeDurum,
             SiparisMiTeklifMi: o.SiparisMiTeklifMi,
             Tarih:            o.Tarih,
-            Sirket:           o.Sirket);
+            Sirket:           o.Sirket,
+            Kontrol:          o.Kontrol);
     }
 }

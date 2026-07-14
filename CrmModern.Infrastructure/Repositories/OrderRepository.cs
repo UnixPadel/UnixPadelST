@@ -263,12 +263,27 @@ internal sealed class OrderRepository(AppDbContext context)
 
     // ── Quality Control ───────────────────────────────────────────────────────
 
-    public async Task<IReadOnlyList<Order>> GetPendingQualityControlAsync() =>
-        await _context.SiparisAlTablo
+    public async Task<IReadOnlyList<Order>> GetQualityControlListAsync(DateTime approvedSince)
+    {
+        // Son X günde 'Onaylandi' audit'i olan sipariş no'ları (onay tarihi
+        // SiparisOnaylari.OnayTarih'te; sipariş tablosunda QC onay tarihi yok).
+        var recentlyApprovedNos = await _context.SiparisOnaylari
             .AsNoTracking()
-            .Where(o => o.Kontrol == "Kontrol")
+            .Where(a => a.OnayDurumu == "Onaylandi"
+                     && a.OnayTarih != null
+                     && a.OnayTarih >= approvedSince)
+            .Select(a => a.SiparisNo)
+            .Distinct()
+            .ToListAsync();
+
+        // Bekleyen (Kontrol='Kontrol') TÜMÜ + son X günde onaylanan (Kontrol='Onay').
+        return await _context.SiparisAlTablo
+            .AsNoTracking()
+            .Where(o => o.Kontrol == "Kontrol"
+                     || (o.Kontrol == "Onay" && recentlyApprovedNos.Contains(o.SiparisNo)))
             .OrderByDescending(o => o.SiparisAlID)
             .ToListAsync();
+    }
 
     public async Task<int> ApproveQualityControlAsync(string siparisNo) =>
         await _context.SiparisAlTablo

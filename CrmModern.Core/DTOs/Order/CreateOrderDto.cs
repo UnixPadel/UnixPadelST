@@ -1,3 +1,5 @@
+using CrmModern.Core.DTOs.Accounting;
+
 namespace CrmModern.Core.DTOs.Order;
 
 /// <summary>
@@ -60,5 +62,12 @@ public sealed record CreateOrderDto(
 
     // ── Miscellaneous ─────────────────────────────────────────────────────
     string  Sirket,
-    string? EkBase64    // optional attachment as base64-encoded string
+    string? EkBase64,   // optional attachment as base64-encoded string
+
+    // ── Ekstra maliyetler (Sipariş/Teklif oluştururken; Teslimat/Montaj altı) ──
+    // Her kalem (açıklama + tutar) bir SiparisEkMaliyet satırı olur; tutarı sipariş
+    // toplamına eklenir ve proformaya ayrı satır olarak yansır. Yalnız YENİ kayıtta
+    // uygulanır — mevcut siparişte ekstra maliyet muhasebe düzenleme penceresinden
+    // yönetilir. Boş bırakılırsa null/boş liste gelir.
+    IReadOnlyList<CreateExtraCostDto>? ExtraCosts = null
 );

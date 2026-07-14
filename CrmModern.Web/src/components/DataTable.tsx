@@ -36,6 +36,14 @@ interface DataTableProps<T> {
    * Burcu) opt-in eder; default 'normal' mevcut sayfaları değiştirmez.
    */
   density?: 'normal' | 'compact'
+  /**
+   * Veri hücrelerini tek satıra zorlar (whitespace-nowrap). Sidebar (hamburger)
+   * açılıp yatay alan daralınca yoğun gridlerde hücreler sarıp bir sipariş
+   * birden çok satıra yayılıyordu; bu opt-in ile her satır tek satır kalır,
+   * taşma overflow-x-auto ile yatay kaydırmaya düşer. Başlıklar sarmaya devam
+   * eder (kolonlar dar kalsın diye). Default kapalı → mevcut sayfalar değişmez.
+   */
+  singleLineRows?: boolean
 }
 
 type SortDir = 'asc' | 'desc' | null
@@ -43,7 +51,7 @@ type SortDir = 'asc' | 'desc' | null
 export function DataTable<T extends Record<string, unknown>>({
   columns, data, keyField, loading, emptyMessage,
   onRowClick, onRowDoubleClick, rowClassName,
-  density = 'normal',
+  density = 'normal', singleLineRows = false,
 }: DataTableProps<T>) {
   const { t, i18n } = useTranslation()
   const effectiveEmpty = emptyMessage ?? t('common.noData')
@@ -164,7 +172,7 @@ export function DataTable<T extends Record<string, unknown>>({
                   }
                 >
                   {columns.map((col) => (
-                    <td key={String(col.key)} className={cn(cellPad, col.className)}>
+                    <td key={String(col.key)} className={cn(cellPad, singleLineRows && 'whitespace-nowrap', col.className)}>
                       {(() => {
                         try {
                           return col.render

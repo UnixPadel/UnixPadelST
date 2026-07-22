@@ -242,6 +242,8 @@ export function NewOrderPage() {
     () => Array.from({ length: SET_COUNT }, () => emptySetTab()),
   )
   const [ekFileName, setEkFileName] = useState<string>('')
+  // Detaylar sekmesi — serbest not hızlı-ekleme kutusu (textbox + Ekle butonu).
+  const [newDetailNote, setNewDetailNote] = useState('')
   // Round-11 §1 — Revize/Amend hidrasyonu kaynak başına bir kez çalışsın diye işaret
   // (arka plan refetch'leri kullanıcının düzenlemesini ezmesin).
   const hydratedNoRef = useRef<string | null>(null)
@@ -293,6 +295,15 @@ export function NewOrderPage() {
         ? (f.details.includes(clause) ? f.details : [...f.details, clause])
         : f.details.filter((d) => d !== clause),
     }))
+
+  // Serbest not hızlı-ekleme kutusu: metni details'e (proformada #DETAY altında
+  // gösterilecek serbest not olarak) ekler, kutuyu temizler.
+  const addDetailNote = () => {
+    const note = newDetailNote.trim()
+    if (!note) return
+    setForm((f) => ({ ...f, details: [...f.details, note] }))
+    setNewDetailNote('')
+  }
 
   // ── Validation ────────────────────────────────────────────────────────
   const hasLineItems = (form.details?.length ?? 0) > 0 || (form.sets?.length ?? 0) > 0
@@ -1387,6 +1398,22 @@ export function NewOrderPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-xs">{t('orders.form.freeNotes')}</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={newDetailNote}
+                  onChange={(e) => setNewDetailNote(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      addDetailNote()
+                    }
+                  }}
+                  placeholder={t('orders.form.freeNotes') as string}
+                />
+                <Button type="button" variant="outline" onClick={addDetailNote}>
+                  {t('common.add')}
+                </Button>
+              </div>
               <Textarea
                 rows={4}
                 value={(form.details ?? []).filter(isFreeNote).join('\n')}

@@ -15,7 +15,10 @@ internal sealed class OrderApprovalConfiguration : IEntityTypeConfiguration<Orde
 
         builder.Property(o => o.SiparisNo).HasColumnName("SiparisNo").IsRequired().HasMaxLength(50);
         builder.Property(o => o.KullaniciID).HasColumnName("KullaniciID").IsRequired();
-        builder.Property(o => o.OnayDurumu).HasColumnName("OnayDurumu").IsRequired().HasMaxLength(20);
+        // §17 — audit türü adları 20 karakteri aştı ('LojistikTeklifOnaylandi' 23,
+        // 'LojistikTeklifReddedildi' 24). DatabaseSchemaMigrator kolonu VARCHAR(40)
+        // yapar; model onunla hizalı kalsın.
+        builder.Property(o => o.OnayDurumu).HasColumnName("OnayDurumu").IsRequired().HasMaxLength(40);
         builder.Property(o => o.Aciklama).HasColumnName("Aciklama").HasColumnType("text");
         builder.Property(o => o.OnayTarih).HasColumnName("OnayTarih");
 

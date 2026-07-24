@@ -346,6 +346,13 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         var urunCell = ws.CellsUsed()
             .FirstOrDefault(c => string.Equals(c.GetString().Trim(), "#URUN", StringComparison.OrdinalIgnoreCase));
 
+        // Şablondaki ürün satırları bir Excel Table (ListObject) içinde. Hiç satır
+        // render edilmezse (kalemsiz sipariş + ekstra maliyet de yoksa) şablon satırını
+        // SİLMEK tabloyu 0 satırlı bırakır → ClosedXML SaveAs'te EmptyTableException
+        // ("Table 'Table145' should have at least 1 row") → /excel ve /pdf 500.
+        // Bu durumda satır silinmez, yalnız placeholder'lar boşaltılır.
+        bool itemRowsRendered = false;
+
         if (urunCell is not null)
         {
             // Items'ları DB sırasına göre çek — kategori + altındaki bileşenler
@@ -413,6 +420,8 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     ["#FIYAT"]      = tutarText,
                 });
             }
+
+            itemRowsRendered = rowMaps.Count > 0;
 
             // İlk şablon satırı zaten yerinde — rowMaps.Count satır gerekiyor; aşağıya
             // doğru çoğalt; orijinal şablon satırı en sonda kalır ve #URUN case'inde silinir.
@@ -580,13 +589,16 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     break;
                 }
 
-                // ── Items şablon kalıntısı — son satırdaki placeholder marker'ı sil
+                // ── Items şablon kalıntısı — son satırdaki placeholder marker'ı sil.
+                // Hiç ürün satırı render edilmediyse satır KORUNUR (Excel Table en az
+                // 1 satır ister), yalnız placeholder metni temizlenir.
                 case "#URUN":
                 case "#MIKTAR":
                 case "#BIRIM":
                 case "#BIRIMFIYAT":
                 case "#FIYAT":
-                    rowsToDelete.Add(cell.Address.RowNumber);
+                    if (itemRowsRendered) rowsToDelete.Add(cell.Address.RowNumber);
+                    else                  cell.Value = string.Empty;
                     break;
             }
         }

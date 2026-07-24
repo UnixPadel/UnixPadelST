@@ -91,6 +91,59 @@ public static class DatabaseSchemaMigrator
         // 11) Muhasebe ekstra maliyet kalemleri — SiparisEkMaliyet (yoksa CREATE).
         // Additive: sipariş çekirdek kalemleri (SiparisIslemTablo) değişmez.
         await EnsureSiparisEkMaliyetTableAsync(ctx, logger);
+
+        // 12) §17 — SiparisOnaylari.OnayDurumu varchar(20) → varchar(40).
+        await EnsureOnayDurumuWidenedAsync(ctx, logger);
+    }
+
+    /// <summary>
+    /// §17 — `SiparisOnaylari.OnayDurumu` canlı DB'de varchar(20). Lojistik teklif
+    /// akışının audit türleri bu sınırı aşıyor: 'LojistikTeklifOnaylandi' (23) ve
+    /// 'LojistikTeklifReddedildi' (24). STRICT_TRANS_TABLES altında fazla uzun değer
+    /// kırpılmaz, hard error verir ("Data too long for column 'OnayDurumu'") →
+    /// `POST /api/logistics/offers/{id}/approve` ve `/reject` 500 dönüyordu.
+    /// Kolonu VARCHAR(40) yapmak mevcut değerleri aynen korur (widening) ve
+    /// gelecekteki audit türlerinde aynı tuzağı ortadan kaldırır.
+    /// Idempotent: kolon zaten varchar(&gt;=40) ise dokunmaz.
+    /// </summary>
+    private static async Task EnsureOnayDurumuWidenedAsync(AppDbContext ctx, ILogger? logger)
+    {
+        var conn = ctx.Database.GetDbConnection();
+        string? dataType;
+        long maxLen;
+        await using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText =
+                @"SELECT DATA_TYPE, COALESCE(CHARACTER_MAXIMUM_LENGTH, 0)
+                  FROM INFORMATION_SCHEMA.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME   = 'SiparisOnaylari'
+                    AND COLUMN_NAME  = 'OnayDurumu'
+                  LIMIT 1";
+            if (conn.State != System.Data.ConnectionState.Open)
+                await conn.OpenAsync();
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+            {
+                logger?.LogWarning("SiparisOnaylari.OnayDurumu kolonu bulunamadı — şema migrator atlandı.");
+                return;
+            }
+            dataType = r.GetValue(0)?.ToString()?.ToLowerInvariant();
+            maxLen   = Convert.ToInt64(r.GetValue(1));
+        }
+
+        if (dataType == "varchar" && maxLen >= 40)
+        {
+            logger?.LogInformation("SiparisOnaylari.OnayDurumu zaten varchar({Len}); ALTER atlandı.", maxLen);
+            return;
+        }
+
+        logger?.LogInformation(
+            "SiparisOnaylari.OnayDurumu ({Type}/{Len}) → VARCHAR(40) yapılıyor (§17 — lojistik teklif audit türleri için).",
+            dataType, maxLen);
+        await ctx.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE SiparisOnaylari MODIFY COLUMN OnayDurumu VARCHAR(40) NOT NULL");
+        logger?.LogInformation("SiparisOnaylari.OnayDurumu VARCHAR(40) yapıldı (§17 fix).");
     }
 
     /// <summary>

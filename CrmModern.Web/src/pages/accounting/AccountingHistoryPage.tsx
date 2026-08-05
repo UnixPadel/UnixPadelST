@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+﻿import { useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   getTransactionHistory, downloadAccountingExcel,
-  getAccountingOrderDetail, submitMaliyetTalep,
   type TransactionFilter, type TransactionListItem,
 } from '@/api/accounting'
 import { getCustomers, getUlkeler } from '@/api/customers'
@@ -14,7 +13,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AutocompleteInput } from '@/components/AutocompleteInput'
 import { DecimalInput } from '@/components/DecimalInput'
 import { KPICard } from '@/components/KPICard'
@@ -23,20 +21,18 @@ import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
-import type { AccountingOrderListDto } from '@/types'
 
 /**
- * PROMPT.md ACCOUNTING #15 + PROMPT-v2 §10 — Muhasebe Geçmiş.
+ * PROMPT.md ACCOUNTING #15 + PROMPT-v2 Â§10 â€” Muhasebe GeÃ§miÅŸ.
  *
- * §10.1: Yonetici/Muhasebe için tek "Tutar" sütunu yerine SiparisNo bazında
- * gruplanmış peşinat sütunları (1. Peşinat / 2. Peşinat / …) + Fark (1→2).
- * Görünür peşinat 4 ile sınırlı; fazlası "+N daha" hücresinde toplanır.
- * Gozlemci için eski tek-Tutar görünümü korunur.
+ * Â§10.1: Yonetici/Muhasebe iÃ§in tek "Tutar" sÃ¼tunu yerine SiparisNo bazÄ±nda
+ * gruplanmÄ±ÅŸ peÅŸinat sÃ¼tunlarÄ± (1. PeÅŸinat / 2. PeÅŸinat / â€¦) + Fark (1â†’2).
+ * GÃ¶rÃ¼nÃ¼r peÅŸinat 4 ile sÄ±nÄ±rlÄ±; fazlasÄ± "+N daha" hÃ¼cresinde toplanÄ±r.
+ * Gozlemci iÃ§in eski tek-Tutar gÃ¶rÃ¼nÃ¼mÃ¼ korunur.
  *
- * §10.2: Her satırın en solunda "Maliyet Reçetesi" butonu; modal kar/zarar
- * hesabı yapar (Brüt Kar, Net Kar, Marj %, Tahsilat Oranı) ve maliyet düzenleme
- * affordance'i mevcut `POST /api/accounting/orders/{no}/maliyet` endpoint'ine
- * gider; modal kapanınca accounting-orders query'si invalidate edilir.
+ * Not: Eski "Maliyet ReÃ§etesi" butonu + kar/zarar modalÄ± kaldÄ±rÄ±ldÄ±. Maliyet
+ * reÃ§etesi artÄ±k muhasebe onaydan gelen tahsilatlarÄ±n sÄ±ra sÄ±ra (1. PeÅŸinat /
+ * 2. PeÅŸinat / â€¦) listelenmesinden ibaret.
  */
 
 const SENTINEL_ALL = '__all__'
@@ -53,7 +49,7 @@ interface OrderRow {
   musteriAd?: string
   kullanici?: string
   paraTipi?: string
-  // Round-11 §10: siparişin nihai maliyeti (Maliyet Reçetesi ile aynı kaynak).
+  // Round-11 Â§10: sipariÅŸin nihai maliyeti (Maliyet ReÃ§etesi ile aynÄ± kaynak).
   maliyet?: number | null
   installments: InstallmentCell[]
 }
@@ -63,26 +59,25 @@ export function AccountingHistoryPage() {
   const { toast } = useToast()
   const { getUser } = useAuth()
   const role = getUser()?.yetkiTuru ?? ''
-  // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez: para birimi
-  // toplamları, tahsilat tutar sütunu ve Excel (tutar içerir) gizlenir.
+  // Round-11 Â§3 â€” omur.caliskan (Gozlemci) parasal deÄŸer gÃ¶rmez: para birimi
+  // toplamlarÄ±, tahsilat tutar sÃ¼tunu ve Excel (tutar iÃ§erir) gizlenir.
   const hideMoney = hideMoneyFor(getUser())
-  // PROMPT-v2 §10.3: Sadece Yonetici + Muhasebe peşinat sütunları + Maliyet
-  // Reçetesi butonu görür. Gozlemci eski tek-Tutar görünümünde kalır.
+  // PROMPT-v2 Â§10.3: Sadece Yonetici + Muhasebe peÅŸinat sÃ¼tunlarÄ±nÄ± gÃ¶rÃ¼r.
+  // Gozlemci eski tek-Tutar gÃ¶rÃ¼nÃ¼mÃ¼nde kalÄ±r.
   const showInstallments = role === 'Yonetici' || role === 'Muhasebe'
 
-  // Grouped view için server-side sayfalama bilgili değil — installment'lar
-  // sayfa sınırını aşmasın diye pageSize'ı yükseltiyoruz.
+  // Grouped view iÃ§in server-side sayfalama bilgili deÄŸil â€” installment'lar
+  // sayfa sÄ±nÄ±rÄ±nÄ± aÅŸmasÄ±n diye pageSize'Ä± yÃ¼kseltiyoruz.
   const DEFAULT_PAGE_SIZE = showInstallments ? 200 : 50
   const [filter, setFilter] = useState<TransactionFilter>({ page: 1, pageSize: DEFAULT_PAGE_SIZE })
   const [exporting, setExporting] = useState(false)
-  const [maliyetTarget, setMaliyetTarget] = useState<string | null>(null)
 
-  // ── Filter sources ─────────────────────────────────────────────────────
+  // â”€â”€ Filter sources â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const { data: customers = [] } = useQuery({ queryKey: ['customers'], queryFn: getCustomers })
   const { data: ulkeler   = [] } = useQuery({ queryKey: ['ulkeler'],   queryFn: getUlkeler })
   const { data: users     = [] } = useQuery({ queryKey: ['users-lookup'], queryFn: getUsersLookup })
 
-  // Round-8 §15 — temsilci boyutu yalnız Temsilci rolündeki kullanıcıları gösterir.
+  // Round-8 Â§15 â€” temsilci boyutu yalnÄ±z Temsilci rolÃ¼ndeki kullanÄ±cÄ±larÄ± gÃ¶sterir.
   const temsilciUsers = useMemo(() => users.filter((u) => u.yetkiTuru === 'Temsilci'), [users])
 
   const musteriOptions = useMemo(
@@ -91,7 +86,7 @@ export function AccountingHistoryPage() {
     [customers],
   )
 
-  // ── Excel export ───────────────────────────────────────────────────────
+  // â”€â”€ Excel export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const onExport = async () => {
     setExporting(true)
     try { await downloadAccountingExcel(filter) }
@@ -104,8 +99,8 @@ export function AccountingHistoryPage() {
     queryFn: () => getTransactionHistory(filter),
   })
 
-  // ── Grouping for §10.1 ─────────────────────────────────────────────────
-  // SiparisNo bazında topla; installmentIndex asc sırala.
+  // â”€â”€ Grouping for Â§10.1 â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // SiparisNo bazÄ±nda topla; installmentIndex asc sÄ±rala.
   const orderRows: OrderRow[] = useMemo(() => {
     if (!showInstallments || !page) return []
     const m = new Map<string, OrderRow>()
@@ -118,7 +113,7 @@ export function AccountingHistoryPage() {
           musteriAd: tx.musteriAd,
           kullanici: tx.kullanici,
           paraTipi:  tx.paraTipi,
-          // Round-11 §10: maliyet siparişin tüm satırlarında aynı; ilk satırdan al.
+          // Round-11 Â§10: maliyet sipariÅŸin tÃ¼m satÄ±rlarÄ±nda aynÄ±; ilk satÄ±rdan al.
           maliyet:   tx.maliyet,
           installments: [],
         }
@@ -130,14 +125,14 @@ export function AccountingHistoryPage() {
         tarih:   tx.tarih,
       })
     }
-    // Index asc; aynı sipariş için 0 (sahipsiz) olanlar sona düşer.
+    // Index asc; aynÄ± sipariÅŸ iÃ§in 0 (sahipsiz) olanlar sona dÃ¼ÅŸer.
     return Array.from(m.values()).map((g) => ({
       ...g,
       installments: g.installments.sort((a, b) => a.index - b.index),
     }))
   }, [page, showInstallments])
 
-  // ── Legacy per-transaction view (Gozlemci) ─────────────────────────────
+  // â”€â”€ Legacy per-transaction view (Gozlemci) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   type LegacyRow = TransactionListItem & Record<string, unknown>
   const legacyCols: Column<LegacyRow>[] = [
     { key: 'id',           header: 'ID' },
@@ -152,7 +147,7 @@ export function AccountingHistoryPage() {
     ] satisfies Column<LegacyRow>[] : []),
   ]
 
-  // ── Filter helpers ─────────────────────────────────────────────────────
+  // â”€â”€ Filter helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const update = <K extends keyof TransactionFilter>(k: K, v: TransactionFilter[K]) =>
     setFilter((f) => ({ ...f, [k]: v, page: 1 }))
   const reset = () => setFilter({ page: 1, pageSize: DEFAULT_PAGE_SIZE })
@@ -246,7 +241,7 @@ export function AccountingHistoryPage() {
           </div>
         </div>
 
-        {/* Currency totals strip — Round-11 §3: omur.caliskan için gizli (para birimi toplamları). */}
+        {/* Currency totals strip â€” Round-11 Â§3: omur.caliskan iÃ§in gizli (para birimi toplamlarÄ±). */}
         {!hideMoney && (
           <div>
             <p className="text-xs uppercase text-muted-foreground font-medium mb-2">
@@ -271,7 +266,6 @@ export function AccountingHistoryPage() {
           <InstallmentTable
             rows={orderRows}
             loading={isLoading}
-            onMaliyet={(no) => setMaliyetTarget(no)}
           />
         ) : (
           <DataTable
@@ -282,13 +276,13 @@ export function AccountingHistoryPage() {
           />
         )}
 
-        {/* Pagination — only meaningful in the legacy per-transaction view.
+        {/* Pagination â€” only meaningful in the legacy per-transaction view.
             Installment view loads up to 200 per page; pagination still works
             but a SiparisNo may straddle pages (acceptable v1 limitation). */}
         {page && (
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {t('common.total')}: {page.totalCount} • {t('common.page')} {page.page}
+              {t('common.total')}: {page.totalCount} â€¢ {t('common.page')} {page.page}
             </span>
             <div className="flex gap-2">
               <Button size="sm" variant="outline"
@@ -305,26 +299,19 @@ export function AccountingHistoryPage() {
           </div>
         )}
       </div>
-
-      {/* PROMPT-v2 §10.2: Maliyet Reçetesi modalı. */}
-      <MaliyetRecetesiDialog
-        siparisNo={maliyetTarget}
-        onClose={() => setMaliyetTarget(null)}
-      />
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Installment table
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function InstallmentTable({
-  rows, loading, onMaliyet,
+  rows, loading,
 }: {
   rows: OrderRow[]
   loading: boolean
-  onMaliyet: (siparisNo: string) => void
 }) {
   const { t } = useTranslation()
   if (loading) {
@@ -333,7 +320,7 @@ function InstallmentTable({
   if (rows.length === 0) {
     return <div className="rounded-md border bg-card p-8 text-center text-muted-foreground">{t('accountingHistory.empty')}</div>
   }
-  // Sayfa için en yüksek installment sayısı sütun sayısını belirler.
+  // Sayfa iÃ§in en yÃ¼ksek installment sayÄ±sÄ± sÃ¼tun sayÄ±sÄ±nÄ± belirler.
   const maxN = Math.min(
     MAX_VISIBLE_INSTALLMENTS,
     rows.reduce((acc, r) => Math.max(acc, r.installments.length), 0),
@@ -344,7 +331,6 @@ function InstallmentTable({
       <table className="w-full text-sm">
         <thead className="bg-muted/30 text-xs uppercase">
           <tr>
-            <th className="px-2 py-2 text-left w-32">{t('accountingHistory.maliyetRecetesi')}</th>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.siparisNo')}</th>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.musteri')}</th>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.temsilci')}</th>
@@ -352,7 +338,7 @@ function InstallmentTable({
             {Array.from({ length: maxN }, (_, i) => (
               <th key={i} className="px-2 py-2 text-right">{t('accountingHistory.cols.pesinat', { n: i + 1 })}</th>
             ))}
-            {/* Round-11 §10: sıra — peşinatlar → Diğer → Maliyet → Fark */}
+            {/* Round-11 Â§10: sÄ±ra â€” peÅŸinatlar â†’ DiÄŸer â†’ Maliyet â†’ Fark */}
             <th className="px-2 py-2 text-right">{t('accountingHistory.cols.diger')}</th>
             <th className="px-2 py-2 text-right">{t('accountingHistory.cols.maliyet')}</th>
             <th className="px-2 py-2 text-right">{t('accountingHistory.cols.fark')}</th>
@@ -362,10 +348,10 @@ function InstallmentTable({
           {rows.map((r) => {
             const visible = r.installments.slice(0, maxN)
             const overflow = r.installments.slice(maxN)
-            // Round-11 §10: Toplam Tahsilat = tüm peşinatlar + Diğer (taşanlar dahil).
+            // Round-11 Â§10: Toplam Tahsilat = tÃ¼m peÅŸinatlar + DiÄŸer (taÅŸanlar dahil).
             const toplamTahsilat = r.installments.reduce((acc, i) => acc + (i.miktar ?? 0), 0)
             const maliyet = r.maliyet ?? null
-            // Fark = Toplam Tahsilat − Maliyet (maliyet girilmemişse hesaplanamaz → —).
+            // Fark = Toplam Tahsilat âˆ’ Maliyet (maliyet girilmemiÅŸse hesaplanamaz â†’ â€”).
             const fark = maliyet != null ? toplamTahsilat - maliyet : null
             const farkClass = fark == null
               ? 'text-muted-foreground'
@@ -374,18 +360,13 @@ function InstallmentTable({
               : ''
             return (
               <tr key={r.siparisNo} className="border-t hover:bg-muted/20">
-                <td className="px-2 py-1">
-                  <Button size="sm" variant="outline" onClick={() => onMaliyet(r.siparisNo)}>
-                    {t('accountingHistory.maliyetRecetesi')}
-                  </Button>
-                </td>
                 <td className="px-2 py-1 font-mono text-xs">{r.siparisNo}</td>
-                <td className="px-2 py-1">{r.musteriAd ?? '—'}</td>
-                <td className="px-2 py-1">{r.kullanici ?? '—'}</td>
-                <td className="px-2 py-1">{r.paraTipi ?? '—'}</td>
+                <td className="px-2 py-1">{r.musteriAd ?? 'â€”'}</td>
+                <td className="px-2 py-1">{r.kullanici ?? 'â€”'}</td>
+                <td className="px-2 py-1">{r.paraTipi ?? 'â€”'}</td>
                 {Array.from({ length: maxN }, (_, i) => {
                   const inst = visible[i]
-                  if (!inst) return <td key={i} className="px-2 py-1 text-right text-muted-foreground">—</td>
+                  if (!inst) return <td key={i} className="px-2 py-1 text-right text-muted-foreground">â€”</td>
                   return (
                     <td key={i} className="px-2 py-1 text-right tabular-nums">
                       <div>{formatCurrency(inst.miktar ?? 0, r.paraTipi ?? '')}</div>
@@ -393,10 +374,10 @@ function InstallmentTable({
                     </td>
                   )
                 })}
-                {/* Diğer — maxN'i aşan peşinatlar (tooltip'te dökümü) */}
+                {/* DiÄŸer â€” maxN'i aÅŸan peÅŸinatlar (tooltip'te dÃ¶kÃ¼mÃ¼) */}
                 <td className="px-2 py-1 text-right">
                   {overflow.length === 0
-                    ? <span className="text-muted-foreground">—</span>
+                    ? <span className="text-muted-foreground">â€”</span>
                     : (
                       <span
                         title={overflow
@@ -408,20 +389,20 @@ function InstallmentTable({
                       </span>
                     )}
                 </td>
-                {/* Round-11 §10: Maliyet — Tamamlanmayı Bekleyen'de girilen nihai maliyet */}
+                {/* Round-11 Â§10: Maliyet â€” TamamlanmayÄ± Bekleyen'de girilen nihai maliyet */}
                 <td className="px-2 py-1 text-right tabular-nums">
                   {maliyet != null
                     ? formatCurrency(maliyet, r.paraTipi ?? '')
-                    : <span className="text-muted-foreground">—</span>}
+                    : <span className="text-muted-foreground">â€”</span>}
                 </td>
-                {/* Round-11 §10: Fark = Toplam Tahsilat − Maliyet (yeşil/kırmızı/nötr) */}
+                {/* Round-11 Â§10: Fark = Toplam Tahsilat âˆ’ Maliyet (yeÅŸil/kÄ±rmÄ±zÄ±/nÃ¶tr) */}
                 <td className="px-2 py-1 text-right tabular-nums">
                   {fark == null
-                    ? <span className="text-muted-foreground">—</span>
+                    ? <span className="text-muted-foreground">â€”</span>
                     : (
                       <span
                         className={farkClass}
-                        title={`${t('accountingHistory.cols.toplamTahsilat')}: ${formatCurrency(toplamTahsilat, r.paraTipi ?? '')} − ${t('accountingHistory.cols.maliyet')}: ${formatCurrency(maliyet ?? 0, r.paraTipi ?? '')}`}
+                        title={`${t('accountingHistory.cols.toplamTahsilat')}: ${formatCurrency(toplamTahsilat, r.paraTipi ?? '')} âˆ’ ${t('accountingHistory.cols.maliyet')}: ${formatCurrency(maliyet ?? 0, r.paraTipi ?? '')}`}
                       >
                         {formatCurrency(fark, r.paraTipi ?? '')}
                       </span>
@@ -432,158 +413,6 @@ function InstallmentTable({
           })}
         </tbody>
       </table>
-    </div>
-  )
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Maliyet Reçetesi dialog (PROMPT-v2 §10.2)
-// ─────────────────────────────────────────────────────────────────────────────
-
-function MaliyetRecetesiDialog({
-  siparisNo, onClose,
-}: {
-  siparisNo: string | null
-  onClose: () => void
-}) {
-  const { t } = useTranslation()
-  const qc = useQueryClient()
-  const { toast } = useToast()
-
-  const { data: order, isLoading } = useQuery<AccountingOrderListDto>({
-    queryKey: ['accounting-order-detail', siparisNo],
-    queryFn: () => getAccountingOrderDetail(siparisNo!),
-    enabled: !!siparisNo,
-  })
-
-  const [maliyetEdit, setMaliyetEdit] = useState<number | null>(null)
-  // Aynı sipariş için modal her açılışta servisten gelen maliyeti baseline yap.
-  const baseMaliyet = order?.maliyet ?? null
-  const effectiveMaliyet = maliyetEdit ?? baseMaliyet ?? 0
-
-  const saveMut = useMutation({
-    mutationFn: () => submitMaliyetTalep(siparisNo!, {
-      maliyet:          effectiveMaliyet,
-      maliyetDetayi:    order?.maliyetDetayi,
-      toplamSiparis:    order?.toplamFiyat ?? undefined,
-      kaporaBakiyesi:   order?.kaparoFiyat ?? undefined,
-      kalanBakiyeTalep: order?.kalanBakiye ?? undefined,
-      pesinYuzde:       order?.pesinYuzde,
-    }),
-    onSuccess: () => {
-      toast({ title: t('accountingHistory.dialog.saved') })
-      // Parent grid'i yenile — Kar / Maliyet sütunları güncelsin.
-      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
-      qc.invalidateQueries({ queryKey: ['accounting-order-detail', siparisNo] })
-      qc.invalidateQueries({ queryKey: ['tx-history'] })
-    },
-    onError: () => toast({ title: t('accountingHistory.dialog.saveFailed'), variant: 'destructive' }),
-  })
-
-  // ── Computed math ─────────────────────────────────────────────────────
-  // PROMPT-v2 §10.2 formülleri.
-  const toplam      = order?.toplamFiyat ?? 0
-  const odenen      = order?.odenenMiktar ?? 0
-  const indirimPct  = order?.indirim ?? 0   // İndirim mutlak değil; spec'te yüzde gibi okunuyor.
-  const kdvPct      = order?.kdv ?? 0
-  const maliyet     = effectiveMaliyet
-  const brutKar     = toplam - maliyet
-  const netKar      = toplam * (1 - indirimPct / 100) * (1 - kdvPct / 100) - maliyet
-  const marjPct     = toplam > 0 ? (netKar / toplam) * 100 : 0
-  const tahsilatPct = toplam > 0 ? (odenen / toplam) * 100 : 0
-  const isLoss      = netKar < 0
-  const cur         = order?.paraTipi ?? ''
-
-  const handleClose = () => {
-    setMaliyetEdit(null)
-    onClose()
-  }
-
-  return (
-    <Dialog open={!!siparisNo} onOpenChange={(v) => { if (!v) handleClose() }}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{t('accountingHistory.dialog.title', { no: siparisNo })}</DialogTitle>
-        </DialogHeader>
-
-        {isLoading || !order ? (
-          <p className="text-center py-8 text-muted-foreground">{t('common.loading')}</p>
-        ) : (
-          <div className="space-y-4 text-sm">
-            {/* Read-only girdiler */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <ReadOnlyCell label={t('accountingHistory.dialog.toplamFiyat')} value={formatCurrency(toplam, cur)} />
-              <ReadOnlyCell label={t('accountingHistory.dialog.odenenMiktar')} value={formatCurrency(odenen, cur)} />
-              <ReadOnlyCell label={t('accountingHistory.dialog.indirim')} value={`%${indirimPct}`} />
-              <ReadOnlyCell label={t('accountingHistory.dialog.kdv')} value={`%${kdvPct}`} />
-              <ReadOnlyCell label={t('accountingHistory.dialog.pesin')} value={`%${order.pesinYuzde}`} />
-              <ReadOnlyCell label={t('accountingHistory.dialog.paraTipi')} value={cur} />
-            </div>
-
-            {/* Maliyet — editlenebilir */}
-            <div className="border rounded-md p-3 bg-muted/20 space-y-2">
-              <Label className="text-xs">{t('accountingHistory.dialog.maliyetEdit')}</Label>
-              <div className="flex items-center gap-2">
-                <DecimalInput
-                  value={maliyetEdit ?? baseMaliyet ?? ''}
-                  onValueChange={(v) => setMaliyetEdit(v === '' ? 0 : v)}
-                  className="flex-1"
-                />
-                <span className="text-xs text-muted-foreground">{cur}</span>
-                <Button
-                  size="sm"
-                  disabled={saveMut.isPending || maliyetEdit === null}
-                  onClick={() => saveMut.mutate()}
-                >
-                  {saveMut.isPending ? t('common.saving') : t('accountingHistory.dialog.maliyetKaydet')}
-                </Button>
-              </div>
-              {order.maliyetDetayi && (
-                <p className="text-[11px] text-muted-foreground">{t('accountingHistory.dialog.detay')}: {order.maliyetDetayi}</p>
-              )}
-            </div>
-
-            {/* Hesaplanan çıktılar — Net Kar pozitif yeşil / negatif kırmızı (Zarar). */}
-            <div className={`border rounded-md p-3 space-y-2 ${
-              isLoss ? 'border-red-300 bg-red-50' : 'border-emerald-300 bg-emerald-50'
-            }`}>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <KPICell label={t('accountingHistory.dialog.brutKar')}      value={formatCurrency(brutKar, cur)} />
-                <KPICell
-                  label={isLoss ? t('accountingHistory.dialog.zarar') : t('accountingHistory.dialog.netKar')}
-                  value={formatCurrency(netKar, cur)}
-                  highlight={isLoss ? 'loss' : 'profit'}
-                />
-                <KPICell label={t('accountingHistory.dialog.marj')}        value={`%${marjPct.toFixed(2)}`} />
-                <KPICell label={t('accountingHistory.dialog.tahsilat')}    value={`%${tahsilatPct.toFixed(2)}`} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>{t('common.close')}</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function ReadOnlyCell({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded p-2 bg-muted/30">
-      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
-      <p className="font-semibold text-sm">{value}</p>
-    </div>
-  )
-}
-
-function KPICell({ label, value, highlight }: { label: string; value: string; highlight?: 'loss' | 'profit' }) {
-  const color = highlight === 'loss' ? 'text-red-700' : highlight === 'profit' ? 'text-emerald-700' : ''
-  return (
-    <div className="rounded p-2 bg-card">
-      <p className="text-[10px] uppercase text-muted-foreground">{label}</p>
-      <p className={`font-semibold text-sm ${color}`}>{value}</p>
     </div>
   )
 }

@@ -162,6 +162,9 @@ export interface OrderDetailItem {
   kategoriAdi?: string
   bilesenAdi?: string
   birim?: string
+  // Serbest metin (Özel Kalem) alanları — yalnız custom satırlarda dolu.
+  sBilesenAdi?: string
+  sBirim?: string
 }
 
 export interface CreateOrderDto {
@@ -209,11 +212,21 @@ export interface CreateOrderDto {
   // Teslimat/Montaj altındaki ekstra maliyet kalemleri (yalnız yeni kayıtta).
   // Her kalem proformaya ayrı satır olur ve toplama eklenir.
   extraCosts?: ExtraCostInput[]
+  // Serbest metin kalemleri (BilesenBilgileri'ne yazılmaz).
+  freeItems?: FreeItemInput[]
 }
 
 export interface ExtraCostInput {
   aciklama: string
   tutar: number
+}
+
+export interface FreeItemInput {
+  bilesenAdi: string
+  oznitelikAdi?: string
+  birim?: string
+  adet: number
+  fiyat?: number
 }
 
 export interface OrderSetInput {

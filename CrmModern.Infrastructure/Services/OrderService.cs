@@ -334,10 +334,12 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         // here as KategoriFiyat × Adet — the old "KategoriFiyat = whole-set total"
         // assumption stored totals short by a factor of Adet, so Siparişlerim showed
         // the un-multiplied unit price.
+        decimal freeItemsTotal = (dto.FreeItems ?? []).Sum(fi => fi.Fiyat * fi.Adet);
         decimal brutToplamFiyat =
               dto.Sets.Sum(s => s.KategoriFiyat * s.Adet)
             + (dto.MontajVar   ? dto.MontajFiyat   : 0m)
-            + (dto.TeslimatVar ? dto.TeslimatFiyat : 0m);
+            + (dto.TeslimatVar ? dto.TeslimatFiyat : 0m)
+            + freeItemsTotal;
 
         // ToplamFiyat = (Brut − Indirim) × (1 + Kdv/100)
         // PROMPT-v2 §3: null değerler "boş" anlamına gelir; hesapta 0 olarak alınır.
@@ -468,7 +470,27 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             }
         }
 
-        if (newItems.Count > 0)
+            // ── 9b. Insert free-text items (KategoriID = null, BilesenID = null) ──
+            if (dto.FreeItems is not null)
+            {
+                foreach (var fi in dto.FreeItems)
+                {
+                    newItems.Add(new OrderItem
+                    {
+                        SiparisNo    = siparisNo,
+                        TeklifNo     = teklifNo,
+                        KategoriID   = null,
+                        BilesenID    = null,
+                        SBilesenAdi  = fi.BilesenAdi,
+                        SBirim       = fi.Birim,
+                        OznitelikAdi = fi.OznitelikAdi,
+                        Adet         = fi.Adet,
+                        Fiyat        = fi.Fiyat
+                    });
+                }
+            }
+
+            if (newItems.Count > 0)
             await uow.Orders.AddItemsAsync(newItems);
 
         await uow.SaveChangesAsync();
@@ -708,7 +730,9 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
                                BilesenAdi:  i.BilesenID.HasValue && bilesenler is not null &&
                                             bilesenler.TryGetValue(i.BilesenID.Value, out var bb) ? bb.BilesenAdi : null,
                                Birim:       i.BilesenID.HasValue && bilesenler is not null &&
-                                            bilesenler.TryGetValue(i.BilesenID.Value, out var bb2) ? bb2.Birim : null)).ToList(),
+                                            bilesenler.TryGetValue(i.BilesenID.Value, out var bb2) ? bb2.Birim : null,
+                               SBilesenAdi: i.SBilesenAdi,
+                               SBirim:      i.SBirim)).ToList(),
         Details:           o.Details.Select(d => d.Text).ToList(),
         OdenenMiktar:      o.OdenenMiktar,
         OdemeDurum:        o.OdemeDurum,

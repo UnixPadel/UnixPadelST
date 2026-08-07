@@ -16,6 +16,9 @@ public sealed class OrderItem
     public int      Adet           { get; set; }
     public decimal? Fiyat          { get; set; }
 
+    public string? SBilesenAdi   { get; set; }   // free-text component name (custom line item)
+    public string? SBirim        { get; set; }   // free-text unit (custom line item)
+
     // ── Navigation properties ─────────────────────────────────────────────
     public Order?           Order    { get; set; }
     public ProductCategory? Category { get; set; }

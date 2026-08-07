@@ -69,5 +69,8 @@ public sealed record CreateOrderDto(
     // toplamına eklenir ve proformaya ayrı satır olarak yansır. Yalnız YENİ kayıtta
     // uygulanır — mevcut siparişte ekstra maliyet muhasebe düzenleme penceresinden
     // yönetilir. Boş bırakılırsa null/boş liste gelir.
-    IReadOnlyList<CreateExtraCostDto>? ExtraCosts = null
+    IReadOnlyList<CreateExtraCostDto>? ExtraCosts = null,
+
+    // ── Serbest metin kalemleri (BilesenBilgileri'ne yazılmaz) ───────────
+    IReadOnlyList<FreeItemDto>? FreeItems = null
 );

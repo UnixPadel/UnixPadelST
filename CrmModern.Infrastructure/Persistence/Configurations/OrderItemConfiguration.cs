@@ -26,6 +26,8 @@ internal sealed class OrderItemConfiguration : IEntityTypeConfiguration<OrderIte
         builder.Property(i => i.OznitelikAdi).HasColumnName("OznitelikAdi").HasMaxLength(40);
         builder.Property(i => i.Adet)       .HasColumnName("Adet");
         builder.Property(i => i.Fiyat)      .HasColumnName("Fiyat").HasColumnType("decimal(10,2)");
+        builder.Property(i => i.SBilesenAdi).HasColumnName("SBilesenAdi").HasMaxLength(200);
+        builder.Property(i => i.SBirim)     .HasColumnName("SBirim")     .HasMaxLength(50);
 
         // Navigation properties populated manually in repository
         builder.Ignore(i => i.Order);

@@ -33,7 +33,7 @@ import {
   teslimatCode, odemeCode, upsertClause, parseOdemeFromDetails,
   normalizeToCode, isFreeNote,
 } from '@/lib/clauses'
-import type { CreateOrderDto, OrderDetail, OrderSetInput } from '@/types'
+import type { CreateOrderDto, OrderDetail, OrderSetInput, FreeItemInput } from '@/types'
 
 // §30 — Cari Bilgi para birimleri: "Diğer" dropdown'u kaldırıldı; Sterlin doğrudan
 // 4. radyo olarak eklendi. Sistemin yerel para birimleri: Euro / Dolar / TL / Sterlin.
@@ -75,6 +75,7 @@ const blank = (): CreateOrderDto => ({
   // Getir modunda detailToForm() bunları kaynağın içeriğiyle ezer.
   sets: [], details: [...STANDART_DETAY_SARTLARI], sirket: 'Unixpadel',
   extraCosts: [],
+  freeItems: [],
 })
 
 /**
@@ -212,6 +213,14 @@ function detailToForm(d: OrderDetail): CreateOrderDto {
     // Ekstra maliyetler forma yüklenir (revize/amend'de düzenlenebilsin). Sadece
     // açıklama+tutar taşınır; kayıtta sil-yeniden-yaz yapılır.
     extraCosts:   (d.extraCosts ?? []).map((e) => ({ aciklama: e.aciklama, tutar: e.tutar })),
+    // Serbest kalemler: items'tan KategoriID=null & BilesenID=null olanları ayıkla.
+    freeItems:    (d.items ?? []).filter((i) => !i.kategoriID && !i.bilesenID).map((i) => ({
+      bilesenAdi:   i.sBilesenAdi ?? '',
+      oznitelikAdi: i.oznitelikAdi,
+      birim:        i.sBirim,
+      adet:         i.adet,
+      fiyat:        i.fiyat ?? 0,
+    })),
   }
 }
 
@@ -244,6 +253,12 @@ export function NewOrderPage() {
   const [ekFileName, setEkFileName] = useState<string>('')
   // Detaylar sekmesi — serbest not hızlı-ekleme kutusu (textbox + Ekle butonu).
   const [newDetailNote, setNewDetailNote] = useState('')
+
+  // ── Serbest Metin (Özel Kalem) state ──────────────────────────────────
+  const [freeItemDialogOpen, setFreeItemDialogOpen] = useState(false)
+  const [editingFreeIdx, setEditingFreeIdx] = useState<number | null>(null)
+  const [freeItemDraft, setFreeItemDraft] = useState<FreeItemInput>({ bilesenAdi: '', adet: 1, fiyat: 0 })
+
   // Round-11 §1 — Revize/Amend hidrasyonu kaynak başına bir kez çalışsın diye işaret
   // (arka plan refetch'leri kullanıcının düzenlemesini ezmesin).
   const hydratedNoRef = useRef<string | null>(null)
@@ -305,13 +320,60 @@ export function NewOrderPage() {
     setNewDetailNote('')
   }
 
+  // ── Serbest Metin (Özel Kalem) handlers ───────────────────────────────
+  const openFreeItemDialog = (idx?: number) => {
+    if (idx !== undefined) {
+      const item = (form.freeItems ?? [])[idx]
+      if (item) {
+        setFreeItemDraft({ ...item })
+        setEditingFreeIdx(idx)
+      }
+    } else {
+      setFreeItemDraft({ bilesenAdi: '', adet: 1, fiyat: 0 })
+      setEditingFreeIdx(null)
+    }
+    setFreeItemDialogOpen(true)
+  }
+
+  const saveFreeItem = () => {
+    if (!freeItemDraft.bilesenAdi.trim()) return
+    setForm((f) => {
+      const list = [...(f.freeItems ?? [])]
+      if (editingFreeIdx !== null) {
+        list[editingFreeIdx] = { ...freeItemDraft }
+      } else {
+        list.push({ ...freeItemDraft })
+      }
+      return { ...f, freeItems: list }
+    })
+    setFreeItemDialogOpen(false)
+  }
+
+  const removeFreeItem = (idx: number) => {
+    setForm((f) => ({ ...f, freeItems: (f.freeItems ?? []).filter((_, i) => i !== idx) }))
+  }
+
   // ── Validation ────────────────────────────────────────────────────────
-  const hasLineItems = (form.details?.length ?? 0) > 0 || (form.sets?.length ?? 0) > 0
-  const checkValid = (): boolean => {
+  const buildCurrentSets = (): OrderSetInput[] => {
+    return setTabs.filter(t => t.kategoriID != null).map(t => ({
+      kategoriID:    t.kategoriID!,
+      adet:          t.adet,
+      kategoriFiyat: t.kategoriFiyat,
+      components:    t.components.map((c) => ({
+        bilesenID:    c.bilesenID,
+        oznitelikAdi: c.oznitelikSecili || undefined,
+        adet:         c.adet,
+        fiyat:        c.birimFiyat,
+      })),
+    }))
+  }
+
+  const checkValid = (currentSets: OrderSetInput[]): boolean => {
     setSubmitted(true)
     if (!form.musteriAd.trim()) {
       toast({ title: t('validation.fixErrors'), variant: 'destructive' }); return false
     }
+    const hasLineItems = (form.details?.length ?? 0) > 0 || currentSets.length > 0 || (form.freeItems?.length ?? 0) > 0
     if (!hasLineItems) {
       toast({ title: t('validation.emptyOrder'), variant: 'destructive' }); return false
     }
@@ -326,7 +388,7 @@ export function NewOrderPage() {
   // PROMPT-v5 §3 — yeni kayıt/revize Siparişlerim listesini değiştirir.
   const queryClient = useQueryClient()
   const orderMut = useMutation({
-    mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createOrder(form),
+    mutationFn: (payload: CreateOrderDto) => isReviseMode ? reviseOrder(reviseFrom!, payload) : createOrder(payload),
     onSuccess: (no) => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: isReviseMode ? t('orders.toast.revised') : t('orders.toast.created'), description: no })
@@ -335,7 +397,7 @@ export function NewOrderPage() {
     onError: () => toast({ title: t('orders.toast.error'), variant: 'destructive' }),
   })
   const quoteMut = useMutation({
-    mutationFn: () => isReviseMode ? reviseOrder(reviseFrom!, form) : createQuote(form),
+    mutationFn: (payload: CreateOrderDto) => isReviseMode ? reviseOrder(reviseFrom!, payload) : createQuote(payload),
     onSuccess: (no) => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: isReviseMode ? t('orders.toast.revised') : t('orders.toast.quoteCreated'), description: no })
@@ -345,7 +407,7 @@ export function NewOrderPage() {
   })
   // Round-8 §7 — yerinde düzenleme: numara değişmez, Guncellendi damgalanır.
   const amendMut = useMutation({
-    mutationFn: () => amendOrder(amendFrom!, form, amendGerekce),
+    mutationFn: (payload: CreateOrderDto) => amendOrder(amendFrom!, payload, amendGerekce),
     onSuccess: (no) => {
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: t('orders.toast.amended'), description: no })
@@ -365,9 +427,18 @@ export function NewOrderPage() {
     onError: () => toast({ title: t('orders.toast.uploadFailed'), variant: 'destructive' }),
   })
 
-  const submitOrder = () => { if (checkValid()) orderMut.mutate() }
-  const submitQuote = () => { if (checkValid()) quoteMut.mutate() }
-  const submitAmend = () => { if (amendGerekce.trim() && checkValid()) amendMut.mutate() }
+  const submitOrder = () => {
+    const currentSets = buildCurrentSets()
+    if (checkValid(currentSets)) orderMut.mutate({ ...form, sets: currentSets })
+  }
+  const submitQuote = () => {
+    const currentSets = buildCurrentSets()
+    if (checkValid(currentSets)) quoteMut.mutate({ ...form, sets: currentSets })
+  }
+  const submitAmend = () => {
+    const currentSets = buildCurrentSets()
+    if (amendGerekce.trim() && checkValid(currentSets)) amendMut.mutate({ ...form, sets: currentSets })
+  }
 
   // ── Set tab actions (Çarp / İptal) ────────────────────────────────────
   const updateTab = (idx: number, patch: Partial<SetTabState>) =>
@@ -1084,6 +1155,118 @@ export function NewOrderPage() {
               {/* §31 — "DETAYLAR" sekmesi kaldırıldı; ürün tablosunun ALTINA, Kaydet'in
                   üstüne tam-genişlik bölüm olarak taşındı (grid'in altına bakın). */}
             </Tabs>
+
+            {/* ── Serbest Metin / Özel Kalem ────────────────────────────── */}
+            <div className="mt-4 rounded-md border bg-card p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold">{t('orders.form.ozelKalemBaslik')}</h3>
+                <Button variant="outline" size="sm" onClick={() => openFreeItemDialog()}>
+                  + {t('orders.form.ozelKalemEkle')}
+                </Button>
+              </div>
+              {(form.freeItems ?? []).length > 0 && (
+                <div className="rounded border overflow-auto max-h-48">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/30">
+                      <tr>
+                        <th className="text-left px-2 py-1">{t('orders.form.bilesenAdiLabel')}</th>
+                        <th className="text-left px-2 py-1">{t('orders.form.oznitelik')}</th>
+                        <th className="text-left px-2 py-1">{t('orders.form.birim')}</th>
+                        <th className="text-right px-2 py-1 w-20">{t('orders.form.adet')}</th>
+                        <th className="text-right px-2 py-1 w-28">{t('orders.form.birimFiyat')}</th>
+                        <th className="text-right px-2 py-1 w-24">{t('orders.form.toplam')}</th>
+                        <th className="px-2 py-1 w-16"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(form.freeItems ?? []).map((fi, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="px-2 py-1">
+                            {fi.bilesenAdi}
+                            <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-1.5 py-0.5 rounded-full font-medium">{t('orderDetail.ozelBadge')}</span>
+                          </td>
+                          <td className="px-2 py-1">{fi.oznitelikAdi || '—'}</td>
+                          <td className="px-2 py-1">{fi.birim || '—'}</td>
+                          <td className="px-2 py-1 text-right">{fi.adet}</td>
+                          <td className="px-2 py-1 text-right">{fmt(fi.fiyat ?? 0)}</td>
+                          <td className="px-2 py-1 text-right tabular-nums">{fmt((fi.adet ?? 0) * (fi.fiyat ?? 0))}</td>
+                          <td className="px-2 py-1 text-right">
+                            <Button variant="ghost" size="sm" className="h-6 px-1 text-xs" onClick={() => openFreeItemDialog(idx)}>✏️</Button>
+                            <Button variant="ghost" size="sm" className="h-6 px-1 text-xs text-red-500" onClick={() => removeFreeItem(idx)}>✕</Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Serbest Metin Dialog */}
+            <Dialog open={freeItemDialogOpen} onOpenChange={setFreeItemDialogOpen}>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>{t('orders.form.ozelKalemBaslik')}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>{t('orders.form.bilesenAdiLabel')} *</Label>
+                    <Input
+                      value={freeItemDraft.bilesenAdi}
+                      onChange={(e) => setFreeItemDraft((d) => ({ ...d, bilesenAdi: e.target.value }))}
+                      placeholder={t('orders.form.bilesenAdiPlaceholder')}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{t('orders.form.oznitelik')}</Label>
+                    <Input
+                      value={freeItemDraft.oznitelikAdi ?? ''}
+                      onChange={(e) => setFreeItemDraft((d) => ({ ...d, oznitelikAdi: e.target.value || undefined }))}
+                      placeholder={t('orders.form.oznitelikPlaceholder')}
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="space-y-1">
+                      <Label>{t('orders.form.birim')}</Label>
+                      <select
+                        value={freeItemDraft.birim ?? ''}
+                        onChange={(e) => setFreeItemDraft((d) => ({ ...d, birim: e.target.value || undefined }))}
+                        className="w-full h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm"
+                      >
+                        <option value="">{t('orders.form.birimSecin')}</option>
+                        <option value="Adet">Adet</option>
+                        <option value="Set">Set</option>
+                        <option value="m²">m²</option>
+                        <option value="kg">kg</option>
+                        <option value="Metre">Metre</option>
+                        <option value="Paket">Paket</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t('orders.form.adet')}</Label>
+                      <Input
+                        type="number" min={1}
+                        value={freeItemDraft.adet}
+                        onChange={(e) => setFreeItemDraft((d) => ({ ...d, adet: Math.max(1, Number(e.target.value)) }))}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>{t('orders.form.birimFiyat')}</Label>
+                      <DecimalInput
+                        value={freeItemDraft.fiyat ?? 0}
+                        onValueChange={(v) => setFreeItemDraft((d) => ({ ...d, fiyat: v === '' ? 0 : v }))}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between border-t pt-2">
+                    <span className="text-sm font-medium">{t('orders.form.toplam')}: {fmt((freeItemDraft.adet ?? 0) * (freeItemDraft.fiyat ?? 0))}</span>
+                    <Button size="sm" onClick={saveFreeItem} disabled={!freeItemDraft.bilesenAdi.trim()}>
+                      {editingFreeIdx !== null ? t('common.save') : t('orders.form.ozelKalemEkle')}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </section>
 
           {/* ╔══════════ RIGHT: CARI BİLGİ + TESLİMAT / MONTAJ ════════════ */}

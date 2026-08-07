@@ -354,7 +354,12 @@
       "previewMontajTeslimat": "Assembly / Delivery",
       "previewSartlar": "Terms",
       "previewFiyat": "Pricing",
-      "previewBrut": "Gross Total"
+      "previewBrut": "Gross Total",
+      "ozelKalemEkle": "Add Custom Item",
+      "ozelKalemBaslik": "Custom Line Item",
+      "bilesenAdiPlaceholder": "Enter product/service name",
+      "oznitelikPlaceholder": "Attribute (optional)",
+      "birimSecin": "Select unit"
     },
     "subtitle": "Order Form — 3 columns (Customer / Sets / Account)",
     "sections": {
@@ -1063,7 +1068,9 @@
     "bilesen": "Component {{id}}",
     "redNotu": "Rejection Note",
     "fabrikaNot": "Factory Note",
-    "lojistikNot": "Logistics Note"
+    "lojistikNot": "Logistics Note",
+    "ozelKalem": "Custom Item",
+    "ozelBadge": "Custom"
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",

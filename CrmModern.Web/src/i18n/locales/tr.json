@@ -354,7 +354,12 @@
       "previewMontajTeslimat": "Montaj / Teslimat",
       "previewSartlar": "Şartlar",
       "previewFiyat": "Fiyatlandırma",
-      "previewBrut": "Brüt Toplam"
+      "previewBrut": "Brüt Toplam",
+      "ozelKalemEkle": "Özel Kalem Ekle",
+      "ozelKalemBaslik": "Serbest Metin Kalem",
+      "bilesenAdiPlaceholder": "Ürün/Hizmet adını girin",
+      "oznitelikPlaceholder": "Özellik (opsiyonel)",
+      "birimSecin": "Birim seçin"
     },
     "subtitle": "Sipariş Formu — 3 kolon (Müşteri / Setler / Cari)",
     "sections": {
@@ -1064,7 +1069,9 @@
     "bilesen": "Bileşen {{id}}",
     "redNotu": "Red Notu",
     "fabrikaNot": "Fabrika Notu",
-    "lojistikNot": "Lojistik Notu"
+    "lojistikNot": "Lojistik Notu",
+    "ozelKalem": "Özel Kalem",
+    "ozelBadge": "Özel"
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",

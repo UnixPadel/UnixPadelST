@@ -195,15 +195,18 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
                   <tbody>
                     {order.items.map((item, i) => {
                       const isCategory = !!item.kategoriID && !item.bilesenID
-                      // Fabrikanın "Bileşen 1" yerine gerçek malzeme adını görmesi için
-                      // backend'in join'le çözdüğü kategoriAdi/bilesenAdi gösterilir;
-                      // eski/silinmiş kayıtta isim yoksa ID-bazlı etikete düşülür.
+                      const isFreeItem = !item.kategoriID && !item.bilesenID
                       const ad = isCategory
                         ? (item.kategoriAdi ?? t('orderDetail.set', { id: item.kategoriID }))
-                        : (item.bilesenAdi ?? t('orderDetail.bilesen', { id: item.bilesenID }))
+                        : isFreeItem
+                          ? (item.sBilesenAdi ?? t('orderDetail.ozelKalem'))
+                          : (item.bilesenAdi ?? t('orderDetail.bilesen', { id: item.bilesenID }))
                       return (
                       <tr key={i} className={`border-b ${isCategory ? 'font-semibold bg-muted/20' : ''}`}>
-                        <td className="px-2 py-1">{ad}</td>
+                        <td className="px-2 py-1">
+                          {ad}
+                          {isFreeItem && <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-1.5 py-0.5 rounded-full font-medium">{t('orderDetail.ozelBadge')}</span>}
+                        </td>
                         <td className="px-2 py-1">{item.oznitelikAdi ?? '—'}</td>
                         <td className="text-right px-2 py-1">{item.adet}</td>
                         {!hideMoney && (

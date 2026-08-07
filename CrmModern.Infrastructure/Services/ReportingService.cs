@@ -386,12 +386,23 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                 }
                 else
                 {
-                    Component? comp = item.BilesenID.HasValue && compLookup.TryGetValue(item.BilesenID.Value, out var c) ? c : null;
-                    string bname = comp?.BilesenAdi ?? $"Bileşen #{item.BilesenID}";
+                    string bname;
+                    string bunit;
+                    if (item.BilesenID.HasValue && compLookup.TryGetValue(item.BilesenID.Value, out var c))
+                    {
+                        bname = c.BilesenAdi;
+                        bunit = c.Birim ?? string.Empty;
+                    }
+                    else
+                    {
+                        // Serbest kalem (Özel Kalem) — master tabloya bağlı değil
+                        bname = item.SBilesenAdi ?? "Özel Kalem";
+                        bunit = item.SBirim ?? string.Empty;
+                    }
                     urunText = string.IsNullOrEmpty(item.OznitelikAdi)
                         ? bname
                         : item.OznitelikAdi + " " + bname;
-                    birimText = comp?.Birim ?? string.Empty;
+                    birimText = bunit;
                 }
 
                 string birimFiyatText = paraBirimi + birimFiyat.ToString("N2", TrTR);

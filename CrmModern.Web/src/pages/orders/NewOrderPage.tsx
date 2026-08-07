@@ -470,7 +470,25 @@ export function NewOrderPage() {
     // Pre-update: kullanıcı UI'ı responsive görsün — bileşenler arkadan gelir.
     updateTab(idx, { kategoriID, kategoriAdi, kategoriFiyat, checklist: [], components: [] })
     try {
-      const checklist = toChecklist(await getComponentsByCategory(kategoriID))
+      let checklist = toChecklist(await getComponentsByCategory(kategoriID))
+      if (kategoriAdi.toLowerCase().includes('pickleball')) {
+        const autoCheckNames = ['beton primer', 'resurfacer', 'cushion 1 layer', 'top coat color 3 layer', 'line mark white']
+        checklist = checklist.map((c) => ({
+          ...c,
+          checked: autoCheckNames.some((n) => c.bilesenAdi.toLowerCase().includes(n))
+        }))
+      } else if (kategoriAdi.toLowerCase().includes('plate padel court')) {
+        const autoCheckNames = [
+          '80x80 mm box profile', '80x60 mm box profile', '60x40 mm box profile',
+          'base sheet plate 490-750 mm', 'corner gusset plate 300x180x10 mm', 'corner gusset plate 175x180x10 mm',
+          '50x50x4 mm wire mesh panel', 'fip padel net & posts', '200w led floodlight & pole',
+          '12 mm fip synthetic turf'
+        ]
+        checklist = checklist.map((c) => ({
+          ...c,
+          checked: autoCheckNames.some((n) => c.bilesenAdi.toLowerCase().includes(n))
+        }))
+      }
       setSetTabs((s) => s.map((t, i) => i !== idx ? t : {
         ...t,
         checklist,

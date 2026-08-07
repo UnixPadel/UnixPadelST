@@ -249,6 +249,8 @@
     "reviseTitle": "Revise",
     "reviseSave": "Save Revision",
     "reviseBanner": "Editing revision",
+    "repReassignHint": "On save the order is assigned to the selected representative.",
+    "repReassignFailed": "Saved, but representative reassignment failed.",
     "excelDownloaded": "Excel downloaded",
     "form": {
       "musteri": "Customer",
@@ -1070,7 +1072,12 @@
     "fabrikaNot": "Factory Note",
     "lojistikNot": "Logistics Note",
     "ozelKalem": "Custom Item",
-    "ozelBadge": "Custom"
+    "ozelBadge": "Custom",
+    "temsilci": "Sales Representative",
+    "currentRep": "Current representative",
+    "selectRep": "Select new representative",
+    "changeRep": "Change Representative",
+    "repChanged": "Representative updated"
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",

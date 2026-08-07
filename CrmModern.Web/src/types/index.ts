@@ -133,6 +133,8 @@ export interface OrderDetail {
   tarih?: string
   sTarih?: string   // 2.5 stage-history timeline için (son fabrika işlem tarihi)
   kullaniciAdi?: string
+  // Sahip (Temsilci) ID — revize ekranı temsilci devri seçicisi (yalnız elshan).
+  kullaniciID?: number | null
   // items
   items: OrderDetailItem[]
   details: string[]

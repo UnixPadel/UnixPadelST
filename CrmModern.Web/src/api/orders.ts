@@ -139,6 +139,11 @@ export interface UpdateStageRequest {
 export const updateStage = (no: string, dto: UpdateStageRequest) =>
   api.put(`/api/orders/${no}/stage`, dto).then((r) => r.data)
 
+// Temsilci devri — siparişi başka temsilciye atar. Backend gate: yalnız
+// elshan.rasulov (ControlUser) / süper-admin; diğer kullanıcılara 403 döner.
+export const changeRepresentative = (no: string, kullaniciID: number) =>
+  api.put(`/api/orders/${no}/representative`, { kullaniciID }).then((r) => r.data)
+
 // ── Attachments ─────────────────────────────────────────────────────────────
 
 export const uploadAttachment = (no: string, type: 'ek' | 'muhasebeek', file: File) => {

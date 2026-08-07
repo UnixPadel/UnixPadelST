@@ -249,6 +249,8 @@
     "reviseTitle": "Revize",
     "reviseSave": "Revizeyi Kaydet",
     "reviseBanner": "Revize ediliyor",
+    "repReassignHint": "Güncellenince sipariş seçilen temsilciye atanır.",
+    "repReassignFailed": "Kayıt güncellendi ancak temsilci devri başarısız oldu.",
     "excelDownloaded": "Excel indirildi",
     "form": {
       "musteri": "Müşteri",
@@ -1071,7 +1073,12 @@
     "fabrikaNot": "Fabrika Notu",
     "lojistikNot": "Lojistik Notu",
     "ozelKalem": "Özel Kalem",
-    "ozelBadge": "Özel"
+    "ozelBadge": "Özel",
+    "temsilci": "Satış Temsilcisi",
+    "currentRep": "Mevcut temsilci",
+    "selectRep": "Yeni temsilci seçin",
+    "changeRep": "Temsilciyi Değiştir",
+    "repChanged": "Temsilci güncellendi"
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",

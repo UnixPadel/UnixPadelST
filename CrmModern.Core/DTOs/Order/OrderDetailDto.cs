@@ -86,5 +86,10 @@ public sealed record OrderDetailDto(
     // ── Ekstra maliyetler (Teslimat/Montaj altı) ──────────────────────────
     // Revize/amend ekranında forma yüklenip düzenlenebilir. Proforma bunları
     // ayrıca SiparisEkMaliyet'ten okur; burası salt görüntüleme/hidrasyon içindir.
-    IReadOnlyList<OrderExtraCostDto>? ExtraCosts = null
+    IReadOnlyList<OrderExtraCostDto>? ExtraCosts = null,
+
+    // ── Sahip (Temsilci) ID'si ────────────────────────────────────────────
+    // Revize ekranındaki temsilci devri seçicisi (yalnız elshan.rasulov)
+    // mevcut sahibi önceden seçili göstermek için kullanır.
+    int? KullaniciID = null
 );

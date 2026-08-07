@@ -29,6 +29,10 @@ public interface IOrderService
     Task<string> AmendOrderAsync(int kullaniciID, string no, CreateOrderDto dto, string gerekce, bool isManagerOrElshan);
     Task SoftDeleteOrderAsync(int kullaniciID, string no, string gerekce, bool isManagerOrElshan);
 
+    // ── Temsilci devri — sahipliği (KullaniciID) başka kullanıcıya atar.
+    //    Yalnız ControlUser (elshan.rasulov); gate controller'da uygulanır.
+    Task ChangeRepresentativeAsync(string no, int yeniKullaniciID);
+
     // ── Status transitions ────────────────────────────────────────────────
     Task ConvertToOrderAsync(string teklifNo);
     Task SubmitForApprovalAsync(string siparisNo, int kullaniciID);

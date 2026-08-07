@@ -173,6 +173,21 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         await uow.SaveChangesAsync();
     }
 
+    /// <summary>Sipariş sahipliğini (KullaniciID/Temsilci) başka kullanıcıya devreder.
+    /// Yalnız ControlUser (elshan.rasulov / süper-admin) — gate controller'da.</summary>
+    public async Task ChangeRepresentativeAsync(string no, int yeniKullaniciID)
+    {
+        var order = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
+            ?? throw new NotFoundException("Order", no);
+
+        var yeniKullanici = await uow.Kullanicilar.GetByIdAsync(yeniKullaniciID)
+            ?? throw new NotFoundException("Kullanici", yeniKullaniciID.ToString());
+
+        order.KullaniciID = yeniKullanici.KullaniciID;
+        uow.Orders.Update(order);
+        await uow.SaveChangesAsync();
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Status transitions
     // ─────────────────────────────────────────────────────────────────────────
@@ -416,7 +431,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         {
             // Revise: UPDATE existing row — SiparisNo changes to the new revision number.
             // WinForms: UPDATE ... SET SiparisNo=@YeniNo ... WHERE SiparisNo=@EskiNo
-            ApplyUpdateToOrder(existingOrder, siparisNo, teklifNo, kullaniciID, dto,
+            ApplyUpdateToOrder(existingOrder, siparisNo, teklifNo, dto,
                                siparisMiTeklifMi, brutToplamFiyat, toplamFiyat, ek);
             // Round-8 §7 — yerinde düzenlemede Guncellendi + gerekçe damgası.
             if (amendInPlace)
@@ -617,14 +632,17 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
 
     private static void ApplyUpdateToOrder(
         Order existing, string siparisNo, string teklifNo,
-        int kullaniciID, CreateOrderDto dto, string siparisMiTeklifMi,
+        CreateOrderDto dto, string siparisMiTeklifMi,
         decimal brutToplamFiyat, decimal toplamFiyat, byte[]? ek)
     {
         existing.SiparisNo         = siparisNo;
         existing.TeklifNo          = teklifNo;
         existing.MusteriAd         = dto.MusteriAd;
         existing.SiparisNotu       = dto.SiparisNotu;
-        existing.KullaniciID       = kullaniciID;
+        // KullaniciID (sahip/Temsilci) bilinçli olarak DEĞİŞTİRİLMEZ: başka bir
+        // kullanıcı (ör. elshan.rasulov) revize/düzenleme yapsa da sipariş
+        // oluşturan temsilcide kalır. Sahiplik yalnız ChangeRepresentativeAsync
+        // ile (ControlUser) devredilir; düzenleyen DegisiklikKullaniciID'de izlenir.
         existing.STelefon          = dto.STelefon;
         existing.SFax              = dto.SFax;
         existing.SWeb              = dto.SWeb;
@@ -740,7 +758,8 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         ExtraCosts:        extras?
                                .Select(e => new OrderExtraCostDto(
                                    e.EkMaliyetID, e.Aciklama, e.Tutar, e.EklenmeTarihi, e.KullaniciID))
-                               .ToList()
+                               .ToList(),
+        KullaniciID:       o.KullaniciID   // revize ekranı temsilci seçicisi (elshan)
     );
 
     // ═════════════════════════════════════════════════════════════════════════

@@ -11,7 +11,11 @@ import {
   amendOrder,
   // PROMPT-v3 §6: Formu Getir — kendi siparişlerinden seçip forma yükleme.
   getMyOrders,
+  // Temsilci devri — revize/düzenlemede elshan.rasulov farklı temsilci seçerse.
+  changeRepresentative,
 } from '@/api/orders'
+import { getUsersLookup } from '@/api/users'
+import { isSuperAdmin } from '@/lib/permissions'
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
@@ -237,6 +241,12 @@ export function NewOrderPage() {
   const user = getUser()
   const temsilciAdSoyad = [user?.ad, user?.soyad].filter(Boolean).join(' ') || user?.kullaniciAdi || ''
 
+  // Temsilci devri — YALNIZ elshan.rasulov (ControlUser) / süper-admin. Revize/
+  // düzenleme kaydından sonra seçilen temsilciye sahiplik devredilir; diğer
+  // kullanıcılar seçiciyi hiç görmez (backend gate ayrıca 403 döner).
+  const canReassign = user?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user)
+  const [selectedRepId, setSelectedRepId] = useState('')
+
   const [form, setForm] = useState<CreateOrderDto>(blank())
   const [createdNo, setCreatedNo] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
@@ -277,6 +287,30 @@ export function NewOrderPage() {
   })
   // Round-11 §1 — Revize/Amend tam geri-yükleme aşağıda (hydrateFromDetail
   // categories + toChecklist tanımlandıktan sonra çağrılabildiği için) yapılır.
+
+  // ── Temsilci devri seçicisi (yalnız elshan, revize/amend modunda) ──────
+  const { data: userOptions = [] } = useQuery({
+    queryKey: ['users-lookup'],
+    queryFn: getUsersLookup,
+    enabled: canReassign && (isReviseMode || isAmendMode),
+  })
+  // Seçenekler: Temsilci rolündekiler; mevcut sahip Temsilci değilse (ör. elshan)
+  // listede görünsün diye başa eklenir.
+  const repOptions = useMemo(() => {
+    const reps = userOptions.filter((u) => u.yetkiTuru === 'Temsilci')
+    const ownerId = reviseSource?.kullaniciID
+    if (ownerId && !reps.some((u) => u.kullaniciID === ownerId)) {
+      const owner = userOptions.find((u) => u.kullaniciID === ownerId)
+      if (owner) reps.unshift(owner)
+    }
+    return reps
+  }, [userOptions, reviseSource])
+  // Mevcut sahip önceden seçili gelir; kullanıcının seçimini refetch ezmesin
+  // diye yalnız boşken doldurulur.
+  useEffect(() => {
+    if (reviseSource?.kullaniciID)
+      setSelectedRepId((prev) => prev || String(reviseSource.kullaniciID))
+  }, [reviseSource])
 
   // ── Data sources ───────────────────────────────────────────────────────
   const { data: customers       = [] } = useQuery({ queryKey: ['customers'],            queryFn: getCustomers })
@@ -387,9 +421,26 @@ export function NewOrderPage() {
   // ── Save mutations ────────────────────────────────────────────────────
   // PROMPT-v5 §3 — yeni kayıt/revize Siparişlerim listesini değiştirir.
   const queryClient = useQueryClient()
+
+  // Revize/amend kaydından SONRA: elshan farklı bir temsilci seçtiyse sahipliği
+  // devret (PUT /representative). Kayıt başarılı olduğu için devir hatası kaydı
+  // geri almaz; yalnız uyarı toast'u gösterilir.
+  const maybeReassign = async (no: string) => {
+    const yeniId = Number(selectedRepId)
+    if (!canReassign || !yeniId || yeniId === reviseSource?.kullaniciID) return
+    try {
+      await changeRepresentative(no, yeniId)
+      toast({ title: t('orderDetail.repChanged') })
+      queryClient.invalidateQueries({ queryKey: ['my-orders'] })
+    } catch {
+      toast({ title: t('orders.repReassignFailed'), variant: 'destructive' })
+    }
+  }
+
   const orderMut = useMutation({
     mutationFn: (payload: CreateOrderDto) => isReviseMode ? reviseOrder(reviseFrom!, payload) : createOrder(payload),
-    onSuccess: (no) => {
+    onSuccess: async (no) => {
+      if (isReviseMode) await maybeReassign(no)
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: isReviseMode ? t('orders.toast.revised') : t('orders.toast.created'), description: no })
       setCreatedNo(no)
@@ -398,7 +449,8 @@ export function NewOrderPage() {
   })
   const quoteMut = useMutation({
     mutationFn: (payload: CreateOrderDto) => isReviseMode ? reviseOrder(reviseFrom!, payload) : createQuote(payload),
-    onSuccess: (no) => {
+    onSuccess: async (no) => {
+      if (isReviseMode) await maybeReassign(no)
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: isReviseMode ? t('orders.toast.revised') : t('orders.toast.quoteCreated'), description: no })
       setCreatedNo(no)
@@ -408,7 +460,8 @@ export function NewOrderPage() {
   // Round-8 §7 — yerinde düzenleme: numara değişmez, Guncellendi damgalanır.
   const amendMut = useMutation({
     mutationFn: (payload: CreateOrderDto) => amendOrder(amendFrom!, payload, amendGerekce),
-    onSuccess: (no) => {
+    onSuccess: async (no) => {
+      await maybeReassign(no)
       queryClient.invalidateQueries({ queryKey: ['my-orders'] })
       toast({ title: t('orders.toast.amended'), description: no })
       nav('/orders/mine')
@@ -866,6 +919,28 @@ export function NewOrderPage() {
               <Label className="text-xs">{t('myOrders.amend.reason')}</Label>
               <Textarea rows={2} value={amendGerekce} onChange={(e) => setAmendGerekce(e.target.value)} />
               {submitted && !amendGerekce.trim() && <FieldError message={t('validation.required')} />}
+            </div>
+          </div>
+        )}
+
+        {/* Temsilci devri — YALNIZ elshan.rasulov, revize/düzenleme modunda.
+            Mevcut sahip önceden seçilidir; farklı temsilci seçilir ve kayıt
+            güncellenirse sipariş o kişiye atanır (maybeReassign). */}
+        {(isReviseMode || isAmendMode) && canReassign && (
+          <div className="mb-4 rounded-md border px-4 py-3 text-sm space-y-1">
+            <Label className="text-xs">{t('orderDetail.temsilci')}</Label>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={selectedRepId || undefined} onValueChange={setSelectedRepId}>
+                <SelectTrigger className="w-64"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
+                <SelectContent>
+                  {repOptions.map((u) => (
+                    <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
+                      {`${u.ad} ${u.soyad}`.trim()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">{t('orders.repReassignHint')}</span>
             </div>
           </div>
         )}

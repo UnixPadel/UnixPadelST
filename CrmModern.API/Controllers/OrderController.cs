@@ -368,6 +368,17 @@ public sealed class OrderController(
         return Ok(ApiResponse<object>.Ok(null!, "Cari güncellendi."));
     }
 
+    /// <summary>Temsilci devri: siparişi başka temsilciye atar (yalnız ControlUser —
+    /// elshan.rasulov / süper-admin). Düzenleme sahipliği değiştirmez; devir yalnız buradan.</summary>
+    [HttpPut("{no}/representative")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ChangeRepresentative(string no, [FromBody] ChangeRepresentativeRequest dto)
+    {
+        if (!IsControlUser) return Forbid();
+        await orderService.ChangeRepresentativeAsync(no, dto.KullaniciID);
+        return Ok(ApiResponse<object>.Ok(null!, "Temsilci güncellendi."));
+    }
+
     /// <summary>Aşama Kaydet (legacy fabrikaButton_Click_1): aşama + STarih + KontrolNot.</summary>
     [HttpPut("{no}/stage")]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]

@@ -5,3 +5,7 @@ public sealed record AmendOrderRequest(CreateOrderDto Order, string Gerekce);
 
 /// <summary>Round-8 §7 — yumuşak silme isteği: zorunlu gerekçe.</summary>
 public sealed record DeleteOrderRequest(string Gerekce);
+
+/// <summary>Temsilci devri isteği — siparişin yeni sahibi (KullaniciID).
+/// Yalnız ControlUser (elshan.rasulov) kullanır.</summary>
+public sealed record ChangeRepresentativeRequest(int KullaniciID);

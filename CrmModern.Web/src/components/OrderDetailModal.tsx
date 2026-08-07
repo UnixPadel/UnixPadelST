@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getOrderDetail, downloadExcel, downloadPdf } from '@/api/orders'
+import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative } from '@/api/orders'
+import { getUsersLookup } from '@/api/users'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { resolveClause, isFreeNote } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -53,6 +55,38 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
     enabled: !!siparisNo,
   })
 
+  // Temsilci devri — YALNIZ elshan.rasulov (ControlUser) / süper-admin görür.
+  // Sipariş sahipliği düzenlemede artık değişmez; devir yalnız bu kontrolle yapılır.
+  const queryClient = useQueryClient()
+  const canReassign = !!user && (user.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user))
+  const [newRepId, setNewRepId] = useState('')
+  const [savingRep, setSavingRep] = useState(false)
+  const { data: userOptions = [] } = useQuery({
+    queryKey: ['users-lookup'],
+    queryFn: getUsersLookup,
+    enabled: canReassign && !!siparisNo,
+  })
+  const temsilciler = userOptions.filter((u) => u.yetkiTuru === 'Temsilci')
+
+  const handleChangeRep = async () => {
+    if (!order || !newRepId) return
+    setSavingRep(true)
+    try {
+      await changeRepresentative(order.siparisNo, Number(newRepId))
+      toast({ title: t('orderDetail.repChanged') })
+      setNewRepId('')
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['order-detail', siparisNo] }),
+        queryClient.invalidateQueries({ queryKey: ['my-orders'] }),
+        queryClient.invalidateQueries({ queryKey: ['orders'] }),
+      ])
+    } catch {
+      toast({ title: t('common.error'), variant: 'destructive' })
+    } finally {
+      setSavingRep(false)
+    }
+  }
+
   const handleExcel = async () => {
     if (!siparisNo) return
     try {
@@ -100,6 +134,32 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
               {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
               {order.sirket && <span className="text-muted-foreground">{order.sirket}</span>}
             </div>
+
+            {/* Temsilci devri — YALNIZ elshan.rasulov (ControlUser) / süper-admin.
+                Diğer kullanıcılar bu bloğu hiç görmez; backend gate ayrıca 403 döner. */}
+            {canReassign && (
+              <div className="border rounded-md p-3 space-y-2">
+                <h3 className="font-semibold">{t('orderDetail.temsilci')}</h3>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground">
+                    {t('orderDetail.currentRep')}: <span className="text-foreground font-medium">{order.kullaniciAdi || '—'}</span>
+                  </span>
+                  <Select value={newRepId || undefined} onValueChange={setNewRepId}>
+                    <SelectTrigger className="w-56"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
+                    <SelectContent>
+                      {temsilciler.map((u) => (
+                        <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
+                          {`${u.ad} ${u.soyad}`.trim()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button size="sm" onClick={handleChangeRep} disabled={!newRepId || savingRep}>
+                    {savingRep ? t('common.loading') : t('orderDetail.changeRep')}
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Two-column info grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

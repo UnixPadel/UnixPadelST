@@ -207,7 +207,7 @@ export function QualityControlPage() {
 
   const rows: KontrolRow[] = useMemo(() => {
     const base = submitted !== null
-      ? (searchPage?.items ?? []).map(fromSearch)
+      ? (searchPage?.items ?? []).filter((r) => !r.silindi).map(fromSearch)
       : pending.map(fromPending)
     return onlyApproved ? base.filter((r) => r.kontrol === 'Onay') : base
   }, [submitted, searchPage, pending, onlyApproved])

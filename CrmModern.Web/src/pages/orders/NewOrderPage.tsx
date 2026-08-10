@@ -480,17 +480,31 @@ export function NewOrderPage() {
     onError: () => toast({ title: t('orders.toast.uploadFailed'), variant: 'destructive' }),
   })
 
+  const isSubmittingRef = useRef(false)
+
   const submitOrder = () => {
+    if (isSubmittingRef.current || createdNo) return
     const currentSets = buildCurrentSets()
-    if (checkValid(currentSets)) orderMut.mutate({ ...form, sets: currentSets })
+    if (checkValid(currentSets)) {
+      isSubmittingRef.current = true
+      orderMut.mutate({ ...form, sets: currentSets }, { onSettled: () => { isSubmittingRef.current = false } })
+    }
   }
   const submitQuote = () => {
+    if (isSubmittingRef.current || createdNo) return
     const currentSets = buildCurrentSets()
-    if (checkValid(currentSets)) quoteMut.mutate({ ...form, sets: currentSets })
+    if (checkValid(currentSets)) {
+      isSubmittingRef.current = true
+      quoteMut.mutate({ ...form, sets: currentSets }, { onSettled: () => { isSubmittingRef.current = false } })
+    }
   }
   const submitAmend = () => {
+    if (isSubmittingRef.current || createdNo) return
     const currentSets = buildCurrentSets()
-    if (amendGerekce.trim() && checkValid(currentSets)) amendMut.mutate({ ...form, sets: currentSets })
+    if (amendGerekce.trim() && checkValid(currentSets)) {
+      isSubmittingRef.current = true
+      amendMut.mutate({ ...form, sets: currentSets }, { onSettled: () => { isSubmittingRef.current = false } })
+    }
   }
 
   // ── Set tab actions (Çarp / İptal) ────────────────────────────────────
@@ -1718,7 +1732,7 @@ export function NewOrderPage() {
           {!isAmendMode && (
             <Button
               variant="secondary"
-              disabled={quoteMut.isPending || reviseLoading || isReviseMode}
+              disabled={quoteMut.isPending || reviseLoading || isReviseMode || !!createdNo}
               onClick={submitQuote}
             >
               {t('orders.form.teklifiHazirla')}
@@ -1726,7 +1740,7 @@ export function NewOrderPage() {
           )}
           {!isAmendMode && (
             <Button
-              disabled={orderMut.isPending || reviseLoading || isReviseMode}
+              disabled={orderMut.isPending || reviseLoading || isReviseMode || !!createdNo}
               onClick={submitOrder}
             >
               {t('orders.form.siparisiHazirla')}
@@ -1735,7 +1749,7 @@ export function NewOrderPage() {
           {isReviseMode && (
             <Button
               variant="outline"
-              disabled={orderMut.isPending}
+              disabled={orderMut.isPending || !!createdNo}
               onClick={() => nav('/orders/mine')}
             >
               {t('common.cancel')}
@@ -1744,7 +1758,7 @@ export function NewOrderPage() {
           {isReviseMode && (
             <Button
               variant="default"
-              disabled={orderMut.isPending || reviseLoading}
+              disabled={orderMut.isPending || reviseLoading || !!createdNo}
               onClick={submitOrder}
             >
               {t('orders.form.revizeEt')}
@@ -1754,7 +1768,7 @@ export function NewOrderPage() {
           {isAmendMode && (
             <Button
               variant="default"
-              disabled={amendMut.isPending || reviseLoading || !amendGerekce.trim()}
+              disabled={amendMut.isPending || reviseLoading || !amendGerekce.trim() || !!createdNo}
               onClick={submitAmend}
             >
               {t('myOrders.amend.save')}

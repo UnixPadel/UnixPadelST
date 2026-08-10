@@ -279,8 +279,8 @@ internal sealed class OrderRepository(AppDbContext context)
         // Bekleyen (Kontrol='Kontrol') TÜMÜ + son X günde onaylanan (Kontrol='Onay').
         return await _context.SiparisAlTablo
             .AsNoTracking()
-            .Where(o => o.Kontrol == "Kontrol"
-                     || (o.Kontrol == "Onay" && recentlyApprovedNos.Contains(o.SiparisNo)))
+            .Where(o => !o.Silindi && (o.Kontrol == "Kontrol"
+                     || (o.Kontrol == "Onay" && recentlyApprovedNos.Contains(o.SiparisNo))))
             .OrderByDescending(o => o.SiparisAlID)
             .ToListAsync();
     }

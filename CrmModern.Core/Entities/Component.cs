@@ -9,7 +9,7 @@ public sealed class Component
     public int     BilesenID  { get; set; }
     public string  BilesenAdi { get; set; } = string.Empty;
     public string? Birim      { get; set; }
-    public int? Fiyat     { get; set; }
+    public decimal? Fiyat     { get; set; }   // DB: decimal(10,2) (migrator int→decimal genişletti — Panoramik cıvata listesi kuruşlu)
 
     // ── Navigation properties ─────────────────────────────────────────────
     public ICollection<Attribute>         Attributes         { get; set; } = [];

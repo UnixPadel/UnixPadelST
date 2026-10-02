@@ -16,6 +16,6 @@ public sealed record ComponentDto(
     int     DefaultAdet,
     // PROMPT-v2 §1b: Birim Fiyat'ın default değeri — BilesenBilgileri.Fiyat.
     // Frontend her satır için düzenlenebilir bir hücrede gösterir.
-    int?    DefaultFiyat,
+    decimal? DefaultFiyat,
     IReadOnlyList<string> Attributes
 );

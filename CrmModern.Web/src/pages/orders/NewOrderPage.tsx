@@ -152,6 +152,15 @@ function autoOznitelik(
   return { secili: auto || attributes[0] || '', secenekler }
 }
 
+/**
+ * Panoramic Padel Court: reçetesi Excel "PANORAMİK-ÇELİK-CIVATA FİYATLI LİSTESİ"
+ * (çelik profil + cıvata/sarf, TR / EN adlı) ile kuruldu. Bu kategori seçilince
+ * katalogdaki diğer bileşenler GÖSTERİLMEZ — yalnız reçete kalemleri, hepsi işaretli.
+ * Tam eşleşme: "Single Full Panoramic Padel Court" / "Full Panoramic Court" kapsam dışı.
+ */
+const isPanoramicPadel = (kategoriAdi: string) =>
+  kategoriAdi.trim().toLowerCase() === 'panoramic padel court'
+
 /** §2.3: yeni işaretlenen checklist satırından grid satırı üretir. */
 function buildRow(item: ChecklistItem, kategoriAdi: string, urunAdedi: number): ComponentRow {
   const { secili, secenekler } = autoOznitelik(kategoriAdi, item.bilesenAdi, item.attributes)
@@ -555,6 +564,9 @@ export function NewOrderPage() {
           ...c,
           checked: autoCheckNames.some((n) => c.bilesenAdi.toLowerCase().includes(n))
         }))
+      } else if (isPanoramicPadel(kategoriAdi)) {
+        // Yalnız reçete (Excel çelik + cıvata listesi); başka bileşen listelenmez.
+        checklist = checklist.filter((c) => c.inRecipe).map((c) => ({ ...c, checked: true }))
       }
       setSetTabs((s) => s.map((t, i) => i !== idx ? t : {
         ...t,
@@ -780,8 +792,11 @@ export function NewOrderPage() {
     for (let i = 0; i < count; i++) {
       const g = groups[i]
       const kategoriAdi = categories.find((c) => c.kategoriID === g.kategoriID)?.kategoriAdi ?? ''
-      const checklist = checklistByCat.get(g.kategoriID) ?? []
       const savedIds = new Set(g.comps.map((c) => c.bilesenID!))
+      // Panoramic: yalnız reçete kalemleri + siparişte zaten kayıtlı (eski reçeteden
+      // gelen) bileşenler listelenir; eski siparişlerin satırları kaybolmaz.
+      const checklist = (checklistByCat.get(g.kategoriID) ?? []).filter((c) =>
+        !isPanoramicPadel(kategoriAdi) || c.inRecipe || savedIds.has(c.bilesenID))
       const meta = new Map(checklist.map((c) => [c.bilesenID, c]))
 
       tabs[i] = {

@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -94,6 +95,12 @@ public static class DatabaseSchemaMigrator
 
         // 12) §17 — SiparisOnaylari.OnayDurumu varchar(20) → varchar(40).
         await EnsureOnayDurumuWidenedAsync(ctx, logger);
+
+        // 13) Panoramic Padel Court reçetesi — "PANORAMİK-ÇELİK-CIVATA FİYATLI LİSTESİ"
+        // Excel'i (çelik profiller + cıvata/sarf listesi) BilesenBilgileri'ne TR / EN
+        // adla işler ve kategorinin KategoriBilesenleri reçetesini bu listeyle değiştirir.
+        // Fiyat kolonu int → decimal(10,2) (kuruşlu fiyatlar), Birim ENUM'una Paket/Rulo.
+        await EnsurePanoramicBomSeedAsync(ctx, logger);
     }
 
     /// <summary>
@@ -488,6 +495,159 @@ public static class DatabaseSchemaMigrator
                 "MusteriBilgileri.CreatedByKullaniciID backfill: {N} kayıt dolduruldu.", affected);
     }
 
+    // ── 13) Panoramic Padel Court — Excel reçete seed'i ─────────────────────
+
+    /// <summary>
+    /// Excel "PANORAMİK-ÇELİK-CIVATA-FİYATLI_LİSTESİ": ÇELİK SINIFI sayfası (6 m boy
+    /// profil adetleri, "Number to order" toplamları) + CİVATA sayfası (birim, adet,
+    /// birim fiyat TL). Her kalem BilesenBilgileri'ne "Türkçe Ad / English Name"
+    /// biçiminde yazılır; Panoramic Padel Court reçetesi (KategoriBilesenleri) eski
+    /// genel bileşenler yerine YALNIZ bu kalemlerden oluşur.
+    ///
+    /// Şema ön koşulları (idempotent, genişletme):
+    ///   • BilesenBilgileri.Fiyat int → DECIMAL(10,2): 14,85 / 1,27 gibi kuruşlu
+    ///     fiyatlar int kolonda yuvarlanırdı (STRICT modda hata değil, sessiz kayıp).
+    ///   • BilesenBilgileri.Birim ENUM('Set','M','M2','Kg','Pcs','gr') → +'Paket','Rulo'
+    ///     (STRICT_TRANS_TABLES: enum dışı değer INSERT'te hard error verir —
+    ///     bkz. SiparisMiTeklifMi tuzağı).
+    ///
+    /// Tek seferlik: reçetede listenin ilk kalemi zaten varsa seed atlanır; böylece
+    /// katalog ekranından sonradan yapılan reçete düzenlemeleri her açılışta ezilmez.
+    /// Bileşen satırları ada göre tekilleştirilir (aynı ad varsa yeniden eklenmez).
+    /// Eski Panoramic siparişleri etkilenmez: SiparisIslemTablo BilesenID + SBilesenAdi
+    /// snapshot taşır, eski bileşen satırları silinmez (sadece reçete bağı kalkar).
+    /// </summary>
+    private static async Task EnsurePanoramicBomSeedAsync(AppDbContext ctx, ILogger? logger)
+    {
+        const string KategoriAdi = "Panoramic Padel Court";
+
+        // (BilesenAdi "TR / EN", Birim, Adet, Fiyat TL) — Excel sırası: çelik, sonra cıvata/sarf.
+        // Fiyatı Excel'de boş olan kalemler 0 (çelik profiller) — sipariş
+        // ekranında satır bazında düzeltilebilir.
+        (string Ad, string Birim, int Adet, decimal Fiyat)[] kalemler =
+        [
+            // ÇELİK SINIFI — "Number to order" sütun toplamları (6 m standart boy)
+            ("RHS 100x50x3 Kutu Profil 6 m / RHS 100x50x3 Box Profile 6 m", "Pcs",  38,     0m),
+            ("RHS 30x30x2 Kutu Profil 6 m / RHS 30x30x2 Box Profile 6 m",   "Pcs",  15,     0m),
+            ("LAS 30x30x3 Köşebent 6 m / LAS 30x30x3 Angle Bar 6 m",        "Pcs",  23,     0m),
+            // CİVATA PAKET LİSTESİ
+            ("M14x200 Klipsli Dübel / M14x200 Clip-In Anchor",                               "Pcs",   54,   25.00m),
+            ("M12x100 Gömlekli Dübel / M12x100 Sleeve Anchor",                               "Pcs",   88,   14.85m),
+            ("M12x100 Altıköşe Başlı Tam Paso Cıvata / M12x100 Hex Head Full Thread Bolt",  "Pcs",   58,   15.76m),
+            ("M12x80 Altıköşe Başlı Tam Paso Cıvata / M12x80 Hex Head Full Thread Bolt",    "Pcs",   80,   13.12m),
+            ("M10x35 Havşa Başlı İmbus Cıvata / M10x35 Countersunk Allen Bolt",             "Pcs",  144,    4.11m),
+            ("M10 Flanşlı Somun / M10 Flange Nut",                                           "Pcs",  144,    2.30m),
+            ("M12 Flanşlı Somun / M12 Flange Nut",                                           "Pcs",  138,    3.70m),
+            ("Matkap Uçlu Çatı Vidası 2,5 cm / Self-Drilling Roofing Screw 2.5 cm",         "Pcs",  300,    1.50m),
+            ("Spanzet Orta Boy / Ratchet Strap Medium",                                      "Pcs",    1,  760.00m),
+            ("Conta Kesikli / Slotted Gasket",                                               "Pcs",   36,    1.27m),
+            ("Conta Düz / Flat Gasket",                                                      "Pcs",   48,    1.25m), // Excel 1,245 → DECIMAL(10,2) yuvarlama
+            ("Tutkal / Adhesive",                                                            "Set",    1, 4275.00m),
+            ("Helmetin Bezi / Helmetin Cloth",                                               "Set",    1,   35.00m),
+            ("File / Net",                                                                   "Set",    1, 9000.00m),
+            ("Cam Bandı / Glass Tape",                                                       "M",    100,    1.30m),
+            ("Cam Havşa Contası Büyük / Glass Countersunk Gasket Large",                     "Paket", 110,    6.00m),
+            ("Cam Braketi Yan / Glass Bracket Side",                                         "Pcs",   48,    2.50m),
+            ("Cam Braketi Alt / Glass Bracket Bottom",                                       "Pcs",   36,    2.80m),
+            ("Çelik Halat 8 m / Steel Wire Rope 8 m",                                        "M",     20,   40.00m),
+            ("Çelik Halat Gergisi / Wire Rope Tensioner",                                    "Pcs",    8,   58.59m),
+            ("Çelik Halat Klemensi / Wire Rope Clamp",                                       "Pcs",    8,   17.67m),
+            ("Projektör / Floodlight",                                                       "Pcs",    8,  950.00m),
+            ("Pleksi Levha / Plexiglass Sheet",                                              "Set",   12,  220.00m),
+            ("Halı ve Küçük Çizgi / Turf & Line Marking",                                   "Rulo",   5,  627.00m),
+            ("12 mm Temperli Cam / 12 mm Tempered Glass",                                    "Pcs",   18, 2052.00m),
+        ];
+
+        // a) Fiyat kolonu kuruş taşısın: int → DECIMAL(10,2) (genişletme, veri kaybı yok).
+        var fiyatType = (await ScalarStringAsync(ctx,
+            @"SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'BilesenBilgileri' AND COLUMN_NAME = 'Fiyat'"))
+            ?.ToLowerInvariant();
+        if (fiyatType is null)
+        {
+            logger?.LogWarning("BilesenBilgileri.Fiyat kolonu bulunamadı — Panoramic reçete seed'i atlandı.");
+            return;
+        }
+        if (fiyatType != "decimal")
+        {
+            await ctx.Database.ExecuteSqlRawAsync(
+                "ALTER TABLE BilesenBilgileri MODIFY COLUMN Fiyat DECIMAL(10,2) NULL");
+            logger?.LogInformation("BilesenBilgileri.Fiyat ({Type}) → DECIMAL(10,2) yapıldı.", fiyatType);
+        }
+
+        // b) Birim ENUM'una eksik etiketleri ekle (mevcut etiketler aynen korunur).
+        var birimType = await ScalarStringAsync(ctx,
+            @"SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'BilesenBilgileri' AND COLUMN_NAME = 'Birim'");
+        if (birimType is not null && birimType.StartsWith("enum(", StringComparison.OrdinalIgnoreCase))
+        {
+            var mevcut = birimType[5..^1]
+                .Split(',')
+                .Select(v => v.Trim().Trim('\''))
+                .ToList();
+            var eksik = new[] { "Paket", "Rulo" }.Where(v => !mevcut.Contains(v)).ToList();
+            if (eksik.Count > 0)
+            {
+                var tumu = string.Join(",", mevcut.Concat(eksik).Select(v => $"'{v}'"));
+                // Etiketler INFORMATION_SCHEMA'dan + sabit listeden geliyor; kullanıcı girdisi yok.
+#pragma warning disable EF1002
+                await ctx.Database.ExecuteSqlRawAsync(
+                    $"ALTER TABLE BilesenBilgileri MODIFY COLUMN Birim ENUM({tumu}) NULL");
+#pragma warning restore EF1002
+                logger?.LogInformation("BilesenBilgileri.Birim ENUM genişletildi: +{Eksik}.", string.Join(",", eksik));
+            }
+        }
+
+        // c) Kategori
+        var kategoriId = await ScalarLongAsync(ctx,
+            $"SELECT COALESCE(MIN(KategoriID), 0) FROM UrunKategorileri WHERE KategoriAdi = '{KategoriAdi}'");
+        if (kategoriId == 0)
+        {
+            logger?.LogWarning("UrunKategorileri'nde '{Ad}' yok — Panoramic reçete seed'i atlandı.", KategoriAdi);
+            return;
+        }
+
+        // d) Tek seferlik guard: listenin ilk kalemi reçetede zaten bağlıysa seed yapılmış demektir.
+        var zatenVar = await ScalarLongAsync(ctx,
+            $@"SELECT COUNT(*) FROM KategoriBilesenleri kb
+               JOIN BilesenBilgileri b ON b.BilesenID = kb.BilesenID
+               WHERE kb.KategoriID = {kategoriId} AND b.BilesenAdi = '{kalemler[0].Ad.Replace("'", "''")}'");
+        if (zatenVar > 0)
+        {
+            logger?.LogInformation("Panoramic Padel Court reçetesi zaten Excel listesiyle kurulu; seed atlandı.");
+            return;
+        }
+
+        // e) Bileşenleri (ada göre tekil) ekle + reçeteyi değiştir — tek transaction.
+        await using var tx = await ctx.Database.BeginTransactionAsync();
+        var bilesenIds = new List<(int BilesenID, int Adet)>(kalemler.Length);
+        int yeniBilesen = 0;
+        foreach (var k in kalemler)
+        {
+            var id = await ScalarLongAsync(ctx,
+                $"SELECT COALESCE(MIN(BilesenID), 0) FROM BilesenBilgileri WHERE BilesenAdi = '{k.Ad.Replace("'", "''")}'");
+            if (id == 0)
+            {
+                await ctx.Database.ExecuteSqlInterpolatedAsync(
+                    $"INSERT INTO BilesenBilgileri (BilesenAdi, Birim, Fiyat, Currency) VALUES ({k.Ad}, {k.Birim}, {k.Fiyat}, 'TRY')");
+                id = await ScalarLongAsync(ctx, "SELECT LAST_INSERT_ID()");
+                yeniBilesen++;
+            }
+            bilesenIds.Add(((int)id, k.Adet));
+        }
+
+        int silinen = await ctx.Database.ExecuteSqlInterpolatedAsync(
+            $"DELETE FROM KategoriBilesenleri WHERE KategoriID = {kategoriId}");
+        foreach (var (bilesenId, adet) in bilesenIds)
+            await ctx.Database.ExecuteSqlInterpolatedAsync(
+                $"INSERT INTO KategoriBilesenleri (KategoriID, BilesenID, Adet) VALUES ({kategoriId}, {bilesenId}, {adet})");
+        await tx.CommitAsync();
+
+        logger?.LogInformation(
+            "Panoramic Padel Court (KategoriID {Kat}) reçetesi Excel listesiyle kuruldu: {Yeni} yeni bileşen, {Silinen} eski reçete satırı kaldırıldı, {Toplam} reçete satırı yazıldı.",
+            kategoriId, yeniBilesen, silinen, bilesenIds.Count);
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static async Task<bool> ColumnExistsAsync(AppDbContext ctx, string table, string column)
@@ -518,8 +678,21 @@ public static class DatabaseSchemaMigrator
     {
         var conn = ctx.Database.GetDbConnection();
         await using var cmd = conn.CreateCommand();
+        // Açık bir EF transaction varsa (seed adımları) ham komut da ona katılsın —
+        // MySqlConnector aksi halde "command is not in the same transaction" fırlatır.
+        cmd.Transaction = ctx.Database.CurrentTransaction?.GetDbTransaction();
         cmd.CommandText = sql;
         return Convert.ToInt64(await cmd.ExecuteScalarAsync() ?? 0L);
+    }
+
+    private static async Task<string?> ScalarStringAsync(AppDbContext ctx, string sql)
+    {
+        var conn = ctx.Database.GetDbConnection();
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = ctx.Database.CurrentTransaction?.GetDbTransaction();
+        cmd.CommandText = sql;
+        var v = await cmd.ExecuteScalarAsync();
+        return v is null || v is DBNull ? null : v.ToString();
     }
 
     private static async Task EnsureColumnAsync(AppDbContext ctx, ILogger? logger,

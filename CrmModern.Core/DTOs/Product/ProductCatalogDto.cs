@@ -10,14 +10,14 @@ public sealed record CategoryComponentDto(
     int     BilesenID,
     string  BilesenAdi,
     string? Birim,
-    int Fiyat,
+    decimal Fiyat,
     int     Adet);
 
 public sealed record ProductCatalogComponentDto(
     int     BilesenID,
     string  BilesenAdi,
     string? Birim,
-    int Fiyat);
+    decimal Fiyat);
 
 public sealed record CreateCategoryDto(string KategoriAdi);
 
@@ -25,7 +25,7 @@ public sealed record UpdateCategoryDto(string KategoriAdi);
 
 public sealed record CreateComponentDto(string BilesenAdi, string? Birim);
 
-public sealed record UpdateComponentDto(string BilesenAdi, string? Birim, int Fiyat);
+public sealed record UpdateComponentDto(string BilesenAdi, string? Birim, decimal Fiyat);
 
 public sealed record UpdateRecipeDto(
     int Fiyat,

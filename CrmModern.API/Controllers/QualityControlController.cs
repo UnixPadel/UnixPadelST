@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Order;
 using CrmModern.Core.DTOs.QualityControl;
@@ -27,7 +28,8 @@ public sealed class QualityControlController(IQualityControlService qc) : Contro
 
     private string? CurrentUserName => User.FindFirstValue(ClaimTypes.Name);
 
-    private bool IsControlUser => CurrentUserName == ControlUser;
+    // Süper-admin (admin) de elshan.rasulov ile aynı yetkiye sahiptir.
+    private bool IsControlUser => CurrentUserName == ControlUser || User.IsSuperAdmin();
 
     [HttpGet]
     [HttpGet("pending")]

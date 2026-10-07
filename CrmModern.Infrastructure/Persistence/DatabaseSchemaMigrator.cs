@@ -522,14 +522,14 @@ public static class DatabaseSchemaMigrator
         const string KategoriAdi = "Panoramic Padel Court";
 
         // (BilesenAdi "TR / EN", Birim, Adet, Fiyat TL) — Excel sırası: çelik, sonra cıvata/sarf.
-        // Fiyatı Excel'de boş olan kalemler 0 (çelik profiller) — sipariş
+        // Fiyatlar Excel R02 (çelik profiller dahil) — sipariş
         // ekranında satır bazında düzeltilebilir.
         (string Ad, string Birim, int Adet, decimal Fiyat)[] kalemler =
         [
-            // ÇELİK SINIFI — "Number to order" sütun toplamları (6 m standart boy)
-            ("RHS 100x50x3 Kutu Profil 6 m / RHS 100x50x3 Box Profile 6 m", "Pcs",  38,     0m),
-            ("RHS 30x30x2 Kutu Profil 6 m / RHS 30x30x2 Box Profile 6 m",   "Pcs",  15,     0m),
-            ("LAS 30x30x3 Köşebent 6 m / LAS 30x30x3 Angle Bar 6 m",        "Pcs",  23,     0m),
+            // ÇELİK SINIFI — "Number to order" sütun toplamları (6 m standart boy); fiyatlar R02 "Birim Fiyat (TL/BOY)"
+            ("RHS 100x50x3 Kutu Profil 6 m / RHS 100x50x3 Box Profile 6 m", "Pcs",  38, 1245.50m),
+            ("RHS 30x30x2 Kutu Profil 6 m / RHS 30x30x2 Box Profile 6 m",   "Pcs",  15,  333.00m),
+            ("LAS 30x30x3 Köşebent 6 m / LAS 30x30x3 Angle Bar 6 m",        "Pcs",  23,   34.50m),
             // CİVATA PAKET LİSTESİ
             ("M14x200 Klipsli Dübel / M14x200 Clip-In Anchor",                               "Pcs",   54,   25.00m),
             ("M12x100 Gömlekli Dübel / M12x100 Sleeve Anchor",                               "Pcs",   88,   14.85m),

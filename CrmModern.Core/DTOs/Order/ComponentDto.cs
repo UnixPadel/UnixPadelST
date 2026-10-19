@@ -17,5 +17,8 @@ public sealed record ComponentDto(
     // PROMPT-v2 §1b: Birim Fiyat'ın default değeri — BilesenBilgileri.Fiyat.
     // Frontend her satır için düzenlenebilir bir hücrede gösterir.
     decimal? DefaultFiyat,
+    // DefaultFiyat'ın para birimi (BilesenBilgileri.Currency: EUR/USD/TRY). Sipariş
+    // ekranı fiyatı bu birimden siparişin Para Tipi'ne güncel kurla çevirir.
+    string   Currency,
     IReadOnlyList<string> Attributes
 );

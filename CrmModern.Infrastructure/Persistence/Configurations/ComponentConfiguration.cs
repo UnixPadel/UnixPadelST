@@ -18,6 +18,7 @@ internal sealed class ComponentConfiguration : IEntityTypeConfiguration<Componen
         builder.Property(c => c.BilesenAdi).HasColumnName("BilesenAdi").IsRequired().HasMaxLength(300);
         builder.Property(c => c.Birim)     .HasColumnName("Birim")     .HasMaxLength(50);
         builder.Property(c => c.Fiyat)     .HasColumnName("Fiyat")     .HasColumnType("decimal(10,2)");
+        builder.Property(c => c.Currency)  .HasColumnName("Currency")  .IsRequired().HasMaxLength(3);
 
         builder.HasMany(c => c.Attributes)
                .WithOne(a => a.Component)

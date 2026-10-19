@@ -15,6 +15,10 @@ import {
   changeRepresentative,
 } from '@/api/orders'
 import { getUsersLookup } from '@/api/users'
+import { getExchangeRates } from '@/api/exchangeRates'
+import {
+  convert, isoSymbol, normalizeIso, paraTipiToIso, round2, type IsoCurrency, type Rates,
+} from '@/lib/currency'
 import { isSuperAdmin } from '@/lib/permissions'
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
@@ -39,9 +43,10 @@ import {
 } from '@/lib/clauses'
 import type { CreateOrderDto, OrderDetail, OrderSetInput, FreeItemInput } from '@/types'
 
-// §30 — Cari Bilgi para birimleri: "Diğer" dropdown'u kaldırıldı; Sterlin doğrudan
-// 4. radyo olarak eklendi. Sistemin yerel para birimleri: Euro / Dolar / TL / Sterlin.
-const PARA_TIPLERI_RADIO = ['Euro', 'Dolar', 'TL', 'Sterlin'] as const
+// Cari Bilgi para birimi — eski Euro / Dolar / TL / Sterlin radyoları yerine kur
+// çevirici: TCMB kurları saatte bir yenilenir, seçilen para birimi siparişin
+// Para Tipi'dir ve bileşen fiyatları katalog biriminden bu birime çevrilir.
+const PARA_TIPLERI = ['Euro', 'Dolar', 'TL', 'Sterlin'] as const
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk'] as const
 
 /** Currency symbol for any selected paraTipi (Euro/Dolar/TL/Sterlin). */
@@ -95,8 +100,13 @@ interface ComponentRow {
   oznitelikSecili: string
   oznitelikSecenekler: string[]
   adet: number
-  birimFiyat: number
+  birimFiyat: number      // sipariş para biriminde (payload'a giden değer)
   defaultAdet: number
+  // Döviz çevirisi: fiyatın asıl kaynağı. Katalog fiyatı kendi biriminde (Panoramic
+  // listesi TL) gelir; elle düzeltilen fiyat sipariş biriminde kaynak olur. Para Tipi
+  // ya da kur değişince birimFiyat bu kaynaktan yeniden hesaplanır.
+  kaynakFiyat: number
+  kaynakPara: IsoCurrency
 }
 
 /**
@@ -110,6 +120,7 @@ interface ChecklistItem {
   inRecipe: boolean
   defaultAdet: number
   defaultFiyat: number
+  currency: IsoCurrency   // defaultFiyat'ın para birimi (BilesenBilgileri.Currency)
   attributes: string[]
   checked: boolean
 }
@@ -153,16 +164,23 @@ function autoOznitelik(
 }
 
 /**
- * Panoramic Padel Court: reçetesi Excel "PANORAMİK-ÇELİK-CIVATA FİYATLI LİSTESİ"
- * (çelik profil + cıvata/sarf, TR / EN adlı) ile kuruldu. Bu kategori seçilince
- * katalogdaki diğer bileşenler GÖSTERİLMEZ — yalnız reçete kalemleri, hepsi işaretli.
- * Tam eşleşme: "Single Full Panoramic Padel Court" / "Full Panoramic Court" kapsam dışı.
+ * Excel reçeteli kategoriler (tam ad): Panoramic Padel Court, Full Panoramic Court,
+ * Standard Padel Court, Padbol — Excel birim maliyet analizleri
+ * Excel çelik profil + cıvata/sarf listesiyle (TR / EN adlı) kuruldu. Bu kategoriler
+ * seçilince katalogdaki diğer bileşenler GÖSTERİLMEZ — yalnız reçete kalemleri, hepsi
+ * işaretli. Tam eşleşme: "Single Full Panoramic Padel Court" kapsam dışı.
  */
+const EXCEL_BOM_CATEGORIES = new Set([
+  'panoramic padel court', 'full panoramic court', 'standard padel court', 'padbol',
+])
 const isPanoramicPadel = (kategoriAdi: string) =>
-  kategoriAdi.trim().toLowerCase() === 'panoramic padel court'
+  EXCEL_BOM_CATEGORIES.has(kategoriAdi.trim().toLowerCase())
+
+/** Kaynak fiyatı sipariş para birimine çevirir (kur yoksa kaynak değer aynen kalır). */
+type PriceFn = (amount: number, from: IsoCurrency) => number
 
 /** §2.3: yeni işaretlenen checklist satırından grid satırı üretir. */
-function buildRow(item: ChecklistItem, kategoriAdi: string, urunAdedi: number): ComponentRow {
+function buildRow(item: ChecklistItem, kategoriAdi: string, urunAdedi: number, price: PriceFn): ComponentRow {
   const { secili, secenekler } = autoOznitelik(kategoriAdi, item.bilesenAdi, item.attributes)
   return {
     bilesenID:           item.bilesenID,
@@ -171,8 +189,10 @@ function buildRow(item: ChecklistItem, kategoriAdi: string, urunAdedi: number): 
     oznitelikSecili:     secili,
     oznitelikSecenekler: secenekler,
     adet:                item.defaultAdet * urunAdedi,
-    birimFiyat:          item.defaultFiyat,
+    birimFiyat:          price(item.defaultFiyat, item.currency),
     defaultAdet:         item.defaultAdet,
+    kaynakFiyat:         item.defaultFiyat,
+    kaynakPara:          item.currency,
   }
 }
 
@@ -270,6 +290,57 @@ export function NewOrderPage() {
     () => Array.from({ length: SET_COUNT }, () => emptySetTab()),
   )
   const [ekFileName, setEkFileName] = useState<string>('')
+
+  // ── Kur çevirici (TCMB, TL bazlı) ──────────────────────────────────────
+  // Bileşen kataloğu fiyatları kendi para biriminde (Excel reçeteleri TL); satırlar
+  // siparişin Para Tipi'ne bu kurlarla çevrilir. Kurlar saatte bir yenilenir
+  // (backend de 1 saat önbellekler); satır fiyatı elle düzeltilebilir.
+  const { data: tcmb, dataUpdatedAt: kurZamani } = useQuery({
+    queryKey: ['exchange-rates'],
+    queryFn: getExchangeRates,
+    staleTime: 60 * 60 * 1000,
+    refetchInterval: 60 * 60 * 1000,
+    refetchIntervalInBackground: true,
+  })
+  const rates = useMemo<Rates>(() => tcmb?.rates ?? {}, [tcmb])
+  const orderIso = paraTipiToIso(form.paraTipi)
+  const viewIso = orderIso
+  /** Satırın kaynak fiyatı sipariş biriminde; kur yoksa null. */
+  const shownPrice = (c: ComponentRow) => {
+    const v = convert(c.kaynakFiyat, c.kaynakPara, viewIso, rates)
+    return v == null ? null : round2(v)
+  }
+  const priceIn: PriceFn = (amount, from) => {
+    const v = convert(amount, from, orderIso, rates)
+    return v == null ? amount : round2(v)
+  }
+  // Para Tipi ya da kur değişince bileşen satırları kaynak fiyattan yeniden çevrilir.
+  useEffect(() => {
+    setSetTabs((s) => s.map((tb) => tb.components.length === 0 ? tb : {
+      ...tb,
+      components: tb.components.map((c) => ({ ...c, birimFiyat: priceIn(c.kaynakFiyat, c.kaynakPara) })),
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIso, rates])
+  // Para Tipi değişince elle girilen tutarlar da (set Tekil Fiyat, montaj, teslimat,
+  // ekstra maliyetler) önceki birimden yeni birime çevrilir → Toplam Fiyat seçilen
+  // para birimine göre değişir. Kayıtlı sipariş yüklenirken (Getir/Revize) tutarlar
+  // zaten o siparişin biriminde gelir; yükleyici paraIsoRef'i eşitleyerek çeviriyi atlar.
+  const paraIsoRef = useRef<IsoCurrency>(orderIso)
+  useEffect(() => {
+    const from = paraIsoRef.current
+    paraIsoRef.current = orderIso
+    if (from === orderIso) return
+    const cv = (n: number) => { const v = convert(n, from, orderIso, rates); return v == null ? n : round2(v) }
+    setSetTabs((s) => s.map((tb) => tb.kategoriFiyat ? { ...tb, kategoriFiyat: cv(tb.kategoriFiyat) } : tb))
+    setForm((f) => ({
+      ...f,
+      montajFiyat:   cv(f.montajFiyat),
+      teslimatFiyat: cv(f.teslimatFiyat),
+      extraCosts:    (f.extraCosts ?? []).map((e) => ({ ...e, tutar: cv(Number(e.tutar) || 0) })),
+    }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderIso])
   // Detaylar sekmesi — serbest not hızlı-ekleme kutusu (textbox + Ekle butonu).
   const [newDetailNote, setNewDetailNote] = useState('')
 
@@ -529,6 +600,7 @@ export function NewOrderPage() {
       inRecipe:     !!c.inRecipe,
       defaultAdet:  c.defaultAdet ?? 1,
       defaultFiyat: c.defaultFiyat ?? 0,
+      currency:     normalizeIso(c.currency),
       attributes:   (c.attributes ?? []) as string[],
       checked:      !!c.inRecipe,
     }))
@@ -542,7 +614,8 @@ export function NewOrderPage() {
   const onCategorySelect = async (idx: number, kategoriID: number) => {
     const cat = categories.find((c) => c.kategoriID === kategoriID)
     const kategoriAdi   = cat?.kategoriAdi ?? ''
-    const kategoriFiyat = cat?.fiyat ?? 0
+    // Katalog set fiyatı (UrunKategorileri.Fiyat) Euro bazlıdır; siparişin birimine çevrilir.
+    const kategoriFiyat = priceIn(cat?.fiyat ?? 0, 'EUR')
     // Pre-update: kullanıcı UI'ı responsive görsün — bileşenler arkadan gelir.
     updateTab(idx, { kategoriID, kategoriAdi, kategoriFiyat, checklist: [], components: [] })
     try {
@@ -573,7 +646,7 @@ export function NewOrderPage() {
         checklist,
         components: checklist
           .filter((c) => c.checked)
-          .map((c) => buildRow(c, kategoriAdi, t.adet)),
+          .map((c) => buildRow(c, kategoriAdi, t.adet, priceIn)),
       }))
     } catch {
       toast({ title: t('orders.toast.bilesenLoadFailed'), variant: 'destructive' })
@@ -590,7 +663,7 @@ export function NewOrderPage() {
       if (i !== idx) return t
       const checklist = t.checklist.map((c) => c.bilesenID === bilesenID ? { ...c, checked } : c)
       const components = checked
-        ? [...t.components, buildRow(checklist.find((c) => c.bilesenID === bilesenID)!, t.kategoriAdi, t.adet)]
+        ? [...t.components, buildRow(checklist.find((c) => c.bilesenID === bilesenID)!, t.kategoriAdi, t.adet, priceIn)]
         : t.components.filter((c) => c.bilesenID !== bilesenID)
       return { ...t, checklist, components }
     }))
@@ -818,6 +891,9 @@ export function NewOrderPage() {
             adet:                sc.adet,
             birimFiyat:          sc.fiyat ?? 0,
             defaultAdet:         m?.defaultAdet ?? 1,
+            // Kayıtlı fiyat zaten siparişin para biriminde.
+            kaynakFiyat:         sc.fiyat ?? 0,
+            kaynakPara:          paraTipiToIso(d.paraTipi || 'Euro'),
           }
         }),
       }
@@ -846,6 +922,7 @@ export function NewOrderPage() {
       const d = await getOrderDetail(no)
       const { tabs, sets, odemeSekli } = await hydrateFromDetail(d)
       setSetTabs(tabs)
+      paraIsoRef.current = paraTipiToIso(d.paraTipi || 'Euro')
       setForm({ ...detailToForm(d), sets })
       setOdemeSekli(odemeSekli)
       setCreatedNo(null)
@@ -874,6 +951,7 @@ export function NewOrderPage() {
         const { tabs, sets, odemeSekli } = await hydrateFromDetail(reviseSource)
         if (cancelled) return
         setSetTabs(tabs)
+        paraIsoRef.current = paraTipiToIso(reviseSource.paraTipi || 'Euro')
         setForm({ ...detailToForm(reviseSource), sets })
         setOdemeSekli(odemeSekli)
       } catch {
@@ -1222,8 +1300,8 @@ export function NewOrderPage() {
                           <th className="text-left px-2 py-1">{t('orders.form.bilesenAdiLabel')}</th>
                           <th className="text-left px-2 py-1">{t('orders.form.birim')}</th>
                           <th className="text-right px-2 py-1 w-20">{t('orders.form.adet')}</th>
-                          <th className="text-right px-2 py-1 w-28">{t('orders.form.birimFiyat')}</th>
-                          <th className="text-right px-2 py-1 w-24">{t('orders.form.toplam')}</th>
+                          <th className="text-right px-2 py-1 w-28">{t('orders.form.birimFiyat')} ({isoSymbol(viewIso)})</th>
+                          <th className="text-right px-2 py-1 w-24">{t('orders.form.toplam')} ({isoSymbol(viewIso)})</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1259,13 +1337,27 @@ export function NewOrderPage() {
                                 />
                               </td>
                               <td className="px-2 py-1 text-right">
-                                <DecimalInput
-                                  value={cmp.birimFiyat}
-                                  onValueChange={(v) => updateComponent(i, k, { birimFiyat: v === '' ? 0 : v })}
-                                  className="h-7 text-xs text-right"
-                                />
+                                {/* Gösterim biriminde düzenlenir; girilen değer kaynak olur,
+                                    payload'a giden birimFiyat siparişin birimine çevrilir.
+                                    Kur yoksa katalog fiyatı çevrilmeden (⚠) gösterilir. */}
+                                <div className="flex items-center gap-1">
+                                  {shownPrice(cmp) == null && (
+                                    <span className="text-amber-600" title={`${t('currency.noRate')} (${isoSymbol(cmp.kaynakPara)})`}>⚠</span>
+                                  )}
+                                  <DecimalInput
+                                    value={shownPrice(cmp) ?? cmp.kaynakFiyat}
+                                    onValueChange={(v) => {
+                                      const n = v === '' ? 0 : v
+                                      const from = shownPrice(cmp) == null ? cmp.kaynakPara : viewIso
+                                      updateComponent(i, k, { kaynakFiyat: n, kaynakPara: from, birimFiyat: priceIn(n, from) })
+                                    }}
+                                    className="h-7 text-xs text-right"
+                                  />
+                                </div>
                               </td>
-                              <td className="px-2 py-1 text-right tabular-nums">{fmt(cmp.adet * cmp.birimFiyat)}</td>
+                              <td className="px-2 py-1 text-right tabular-nums">
+                                {fmt(cmp.adet * (shownPrice(cmp) ?? cmp.kaynakFiyat))}
+                              </td>
                             </tr>
                           ))}
                       </tbody>
@@ -1407,20 +1499,38 @@ export function NewOrderPage() {
             <section className="rounded-md border bg-card">
               <h3 className="text-center text-base font-semibold py-2 border-b">{t('orders.sections.cariBilgi')}</h3>
               <div className="p-3 space-y-3">
-                {/* §30 — Para Tipi radyoları: Euro / Dolar / TL / Sterlin (Diğer kaldırıldı) */}
-                <div className="flex items-center gap-3 flex-wrap text-sm">
-                  {PARA_TIPLERI_RADIO.map((p) => (
-                    <label key={p} className="flex items-center gap-1 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="paraTipi"
-                        value={p}
-                        checked={form.paraTipi === p}
-                        onChange={() => setForm((f) => ({ ...f, paraTipi: p }))}
-                      />
-                      <span>{p}</span>
-                    </label>
-                  ))}
+                {/* Kur çevirici — para birimi seçimi + güncel TCMB kurları (saatte bir
+                    yenilenir). Seçim siparişin Para Tipi'dir; bileşen fiyatları katalog
+                    biriminden bu birime çevrilir, kayıt bu birimde yapılır. */}
+                <div className="space-y-1.5">
+                  <div className="grid grid-cols-4 gap-1">
+                    {PARA_TIPLERI.map((p) => {
+                      const iso = paraTipiToIso(p)
+                      const kur = iso === 'TRY' ? 1 : rates[iso]
+                      const secili = form.paraTipi === p
+                      return (
+                        <Button
+                          key={p}
+                          type="button"
+                          size="sm"
+                          variant={secili ? 'default' : 'outline'}
+                          className="h-auto py-1 px-1.5 flex flex-col items-center leading-tight"
+                          onClick={() => setForm((f) => ({ ...f, paraTipi: p }))}
+                        >
+                          <span className="text-xs font-medium">{isoSymbol(iso)} {p}</span>
+                          <span className={`text-[10px] tabular-nums ${secili ? 'opacity-90' : 'text-muted-foreground'}`}>
+                            {iso === 'TRY' ? '—' : kur ? `${fmt(kur)} ₺` : '?'}
+                          </span>
+                        </Button>
+                      )
+                    })}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground tabular-nums">
+                    {tcmb?.tarih
+                      ? <>{t('currency.source')}: TCMB {tcmb.tarih.split('-').reverse().join('.')}
+                          {kurZamani ? <span className="opacity-70"> · {t('currency.refreshed')} {new Date(kurZamani).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {t('currency.hourly')}</span> : null}</>
+                      : <span className="text-amber-600">{t('currency.sourceUnavailable')}</span>}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">

@@ -1138,5 +1138,18 @@
       "approved": "Approved",
       "rejected": "Rejected"
     }
+  },
+  "currency": {
+    "source": "Rate source",
+    "refreshed": "updated",
+    "hourly": "refreshes hourly",
+    "name": {
+      "EUR": "Euro",
+      "USD": "Dollar",
+      "GBP": "Sterling",
+      "TRY": "TRY"
+    },
+    "sourceUnavailable": "CBRT rates unavailable — prices cannot be converted.",
+    "noRate": "No rate — cannot convert"
   }
 }

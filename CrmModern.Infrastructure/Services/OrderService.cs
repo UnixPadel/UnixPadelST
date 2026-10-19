@@ -245,6 +245,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
                 DefaultAdet:  recipe.TryGetValue(c.BilesenID, out int adet) ? adet : 1,
                 // PROMPT-v2 §1b: Bileşen master fiyatı default Birim Fiyat olur.
                 DefaultFiyat: c.Fiyat,
+                Currency:     c.Currency,
                 Attributes:   c.Attributes
                                 .Select(a => a.OznitelikAdı)
                                 .ToList()))

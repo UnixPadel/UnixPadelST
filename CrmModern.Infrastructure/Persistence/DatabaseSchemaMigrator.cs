@@ -96,11 +96,22 @@ public static class DatabaseSchemaMigrator
         // 12) §17 — SiparisOnaylari.OnayDurumu varchar(20) → varchar(40).
         await EnsureOnayDurumuWidenedAsync(ctx, logger);
 
-        // 13) Panoramic Padel Court reçetesi — "PANORAMİK-ÇELİK-CIVATA FİYATLI LİSTESİ"
-        // Excel'i (çelik profiller + cıvata/sarf listesi) BilesenBilgileri'ne TR / EN
-        // adla işler ve kategorinin KategoriBilesenleri reçetesini bu listeyle değiştirir.
-        // Fiyat kolonu int → decimal(10,2) (kuruşlu fiyatlar), Birim ENUM'una Paket/Rulo.
+        // 13a) BilesenBilgileri.Currency — bileşen fiyatının para birimi (Excel reçeteleri TL).
+        // Legacy şemada var; yoksa eklenir. Sipariş ekranı fiyatı bu birimden siparişin
+        // Para Tipi'ne TCMB kuruyla çevirir.
+        await EnsureColumnAsync(ctx, logger,
+            "BilesenBilgileri", "Currency",
+            "ALTER TABLE BilesenBilgileri ADD COLUMN Currency ENUM('EUR','USD','TRY') NOT NULL DEFAULT 'TRY'");
+
+        // 13) Excel reçeteleri — 4 kategori: Panoramic Padel Court, Full Panoramic Court,
+        // Padbol, Standard Padel Court. Her birinin ÇELİK + CİVATA sayfaları BilesenBilgileri'ne
+        // "Türkçe Ad / English Name" biçiminde işlenir; kategorinin KategoriBilesenleri reçetesi
+        // YALNIZ bu kalemlerden oluşur (eski genel bileşenler reçeteden çıkar). Fiyatlar Excel'de
+        // yazıldığı gibi, kategori başına ayrı (aynı adlı kalem farklı fiyatla ayrı satır).
+        // Başka hiçbir kategoriye dokunulmaz.
+        // Şema: Fiyat int → decimal(10,2), Birim ENUM +Paket/Rulo.
         await EnsurePanoramicBomSeedAsync(ctx, logger);
+        await EnsureOtherExcelBomSeedsAsync(ctx, logger);
     }
 
     /// <summary>
@@ -511,9 +522,8 @@ public static class DatabaseSchemaMigrator
     ///     (STRICT_TRANS_TABLES: enum dışı değer INSERT'te hard error verir —
     ///     bkz. SiparisMiTeklifMi tuzağı).
     ///
-    /// Tek seferlik: reçetede listenin ilk kalemi zaten varsa seed atlanır; böylece
-    /// katalog ekranından sonradan yapılan reçete düzenlemeleri her açılışta ezilmez.
-    /// Bileşen satırları ada göre tekilleştirilir (aynı ad varsa yeniden eklenmez).
+    /// Reçete her açılışta Excel listesiyle karşılaştırılır; birebir aynıysa dokunulmaz,
+    /// değilse listeyle değiştirilir (SeedCategoryBomAsync). Fiyat kategori başına ayrı.
     /// Eski Panoramic siparişleri etkilenmez: SiparisIslemTablo BilesenID + SBilesenAdi
     /// snapshot taşır, eski bileşen satırları silinmez (sadece reçete bağı kalkar).
     /// </summary>
@@ -543,9 +553,9 @@ public static class DatabaseSchemaMigrator
             ("Conta Kesikli / Slotted Gasket",                                               "Pcs",   36,    1.27m),
             ("Conta Düz / Flat Gasket",                                                      "Pcs",   48,    1.25m), // Excel 1,245 → DECIMAL(10,2) yuvarlama
             ("Tutkal / Adhesive",                                                            "Set",    1, 4275.00m),
-            ("Helmetin Bezi / Helmetin Cloth",                                               "Set",    1,   35.00m),
+            ("Helmetin Bezi / Helmetin Cloth",                                               "Set",    1,    0m),    // Excel fiyat boş
             ("File / Net",                                                                   "Set",    1, 9000.00m),
-            ("Cam Bandı / Glass Tape",                                                       "M",    100,    1.30m),
+            ("Cam Bandı / Glass Tape",                                                       "M",    100,    0m),    // Excel fiyat boş
             ("Cam Havşa Contası Büyük / Glass Countersunk Gasket Large",                     "Paket", 110,    6.00m),
             ("Cam Braketi Yan / Glass Bracket Side",                                         "Pcs",   48,    2.50m),
             ("Cam Braketi Alt / Glass Bracket Bottom",                                       "Pcs",   36,    2.80m),
@@ -598,54 +608,189 @@ public static class DatabaseSchemaMigrator
             }
         }
 
-        // c) Kategori
+        await SeedCategoryBomAsync(ctx, logger, KategoriAdi, kalemler);
+    }
+
+    /// <summary>
+    /// Diğer üç Excel: "FULL PANORAMİC MALİYET ANALİZİ" (ÇELİK SINIFI + CİVATA),
+    /// "PADBOOL-BİRİM MALİYET ANALİZİ" (ÇELİK + CİVATA), "STANDART-COURT FİYAT LİSTESİ"
+    /// (ÇELİK + CİVATA). Çelik: profil başına "Number to order" toplamı (6 m boy), Unit
+    /// Price TL/BOY; cıvata: ÜRÜN ADI / BİRİM / ADET / BİRİM FİYAT aynen. Sayfaların alt
+    /// kısmındaki maliyet analizi satırları (kum, boya, genel gider, nakliye…) bileşen
+    /// değildir. Excel'de fiyatı boş kalemler 0 TL.
+    /// </summary>
+    private static async Task EnsureOtherExcelBomSeedsAsync(AppDbContext ctx, ILogger? logger)
+    {
+        (string Ad, string Birim, int Adet, decimal Fiyat)[] fullPanoramic =
+        [
+            // ÇELİK SINIFI
+            ("RHS 100x50x3 Kutu Profil 6 m / RHS 100x50x3 Box Profile 6 m", "Pcs", 21, 1245.50m), // Total RHS 50x100x3
+            ("RHS 80x40x2 Kutu Profil 6 m / RHS 80x40x2 Box Profile 6 m",   "Pcs",  1,  810.00m), // Inner profile
+            ("RHS 80x40x3 Kutu Profil 6 m / RHS 80x40x3 Box Profile 6 m",   "Pcs", 17,  810.00m), // Columns + Beams
+            ("RHS 60x40x3 Kutu Profil 6 m / RHS 60x40x3 Box Profile 6 m",   "Pcs",  5,  534.00m), // Light post 2+1+1+1
+            ("RHS 30x30x3 Kutu Profil 6 m / RHS 30x30x3 Box Profile 6 m",   "Pcs", 19,  333.00m), // Mesh panels
+            ("LAS 30x30x3 Köşebent 6 m / LAS 30x30x3 Angle Bar 6 m",        "Pcs", 25,   34.50m), // Total L30x30x3
+            // CİVATA PAKET LİSTESİ
+            ("M12x150 Klipsli Dübel / M12x150 Clip-In Anchor",                               "Pcs",   80,   17.28m), // Excel "M120 X 150"
+            ("M10x100 Gömlekli Dübel / M10x100 Sleeve Anchor",                               "Pcs",  100,    8.61m),
+            ("M12x70 Cıvata / M12x70 Bolt",                                                  "Pcs",  100,   11.73m),
+            ("M12 Somun / M12 Nut",                                                          "Pcs",  100,    2.75m),
+            ("Matkap Uçlu Çatı Vidası 2,5 cm / Self-Drilling Roofing Screw 2.5 cm",         "Pcs",  600,    1.50m),
+            ("M10x35 Havşa Başlı İmbus Cıvata / M10x35 Countersunk Allen Bolt",             "Pcs",  110,    4.11m), // Excel "10*35"
+            ("M10 Somun / M10 Nut",                                                          "Pcs",  110,    1.65m),
+            ("Spanzet Orta Boy / Ratchet Strap Medium",                                      "Pcs",    1,  920.00m),
+            ("Tutkal / Adhesive",                                                            "Set",    1, 4275.00m),
+            ("Helmetin Bezi / Helmetin Cloth",                                               "Set",    1,    0m),
+            ("File / Net",                                                                   "Set",    1, 9000.00m),
+            ("Cam Bandı / Glass Tape",                                                       "M",    100,    0m),
+            ("Cam Havşa Contası Büyük / Glass Countersunk Gasket Large",                     "Paket", 110,    6.00m),
+            ("Cam Braketi Yan / Glass Bracket Side",                                         "Pcs",   54,    2.50m),
+            ("Projektör / Floodlight",                                                       "Pcs",    8,  950.00m),
+            ("Pleksi Levha / Plexiglass Sheet",                                              "Set",   12,  220.00m),
+            ("Halı ve Küçük Çizgi / Turf & Line Marking",                                   "Rulo",   5,  627.00m),
+            ("12 mm Temperli Cam / 12 mm Tempered Glass",                                    "Pcs",   18, 2052.00m),
+        ];
+
+        (string Ad, string Birim, int Adet, decimal Fiyat)[] padbol =
+        [
+            // ÇELİK
+            ("RHS 80x40x3 Kutu Profil 6 m / RHS 80x40x3 Box Profile 6 m",   "Pcs",  7,  810.00m), // 4+1+2
+            ("RHS 80x80x3 Kutu Profil 6 m / RHS 80x80x3 Box Profile 6 m",   "Pcs",  6, 1342.00m), // 4+2
+            ("RHS 100x50x3 Kutu Profil 6 m / RHS 100x50x3 Box Profile 6 m", "Pcs", 10, 1245.50m), // 2+8
+            ("RHS 30x30x2 Kutu Profil 6 m / RHS 30x30x2 Box Profile 6 m",   "Pcs", 18,  333.00m), // 2+6+6+4
+            // CİVATA PAKET LİSTESİ
+            ("M12x200 Klipsli Dübel / M12x200 Clip-In Anchor",                               "Pcs",   70,   29.00m), // Excel "M120 X 200"
+            ("M12x100 Altıköşe Başlı Tam Paso Cıvata / M12x100 Hex Head Full Thread Bolt",  "Pcs",   50,   15.76m), // Excel "m12*100"
+            ("M12 Somun / M12 Nut",                                                          "Pcs",   50,    2.75m),
+            ("Matkap Uçlu Çatı Vidası 7,5 cm / Self-Drilling Roofing Screw 7.5 cm",         "Pcs",   30,    3.21m),
+            ("M10 Flanşlı Somun / M10 Flange Nut",                                           "Pcs",  150,    1.65m),
+            ("M10x35 Havşa Başlı İmbus Cıvata / M10x35 Countersunk Allen Bolt",             "Pcs",  150,    4.11m),
+            ("Matkap Uçlu Çatı Vidası 2,5 cm / Self-Drilling Roofing Screw 2.5 cm",         "Pcs",   60,    1.50m),
+            ("Projektör / Floodlight",                                                       "Pcs",    4,  950.00m),
+            ("Çelik Halat Gergisi / Wire Rope Tensioner",                                    "Pcs",    8,   58.59m),
+            ("Çelik Halat Klemensi / Wire Rope Clamp",                                       "Pcs",    8,   17.67m),
+            ("Çelik Halat 8 mm / Steel Wire Rope 8 mm",                                      "M",     20,   40.00m),
+            ("Pleksi Levha / Plexiglass Sheet",                                              "Pcs",    8,  220.00m),
+            ("Spanzet Orta Boy / Ratchet Strap Medium",                                      "Pcs",    1,  920.00m),
+            ("Conta Düz / Flat Gasket",                                                      "Pcs",  100, 1245.00m), // Excel aynen 1.245,00
+            ("Tutkal / Adhesive",                                                            "Set",    1, 4275.00m),
+            ("Helmetin Bezi / Helmetin Cloth",                                               "Set",    1,    0m),
+            ("File / Net",                                                                   "Pcs",    1, 9000.00m),
+            ("Cam Bandı / Glass Tape",                                                       "M",    100,    0m),
+            ("Cam Havşa Contası Beyaz / Glass Countersunk Gasket White",                     "Pcs",  150,    6.00m),
+            ("Cam Bağlantı Braketi Yan / Glass Connection Bracket Side",                     "Pcs",   72,    3.00m),
+            ("Halı ve Küçük Çizgi / Turf & Line Marking",                                   "Rulo",   5,  627.00m),
+            ("10 mm Temperli Cam / 10 mm Tempered Glass",                                    "Pcs",   18, 1512.00m),
+        ];
+
+        (string Ad, string Birim, int Adet, decimal Fiyat)[] standart =
+        [
+            // ÇELİK
+            ("RHS 100x50x3 Kutu Profil 6 m / RHS 100x50x3 Box Profile 6 m", "Pcs", 22, 1245.50m), // 12+4+6
+            ("RHS 80x40x3 Kutu Profil 6 m / RHS 80x40x3 Box Profile 6 m",   "Pcs", 17,  810.00m), // 12+3+1+1
+            ("LAS 30x30x3 Köşebent 6 m / LAS 30x30x3 Angle Bar 6 m",        "Pcs", 46,   34.50m), // 2+1+2+6+12+13+10
+            // CİVATA PAKET LİSTESİ
+            ("M12x200 Klipsli Dübel / M12x200 Clip-In Anchor",                               "Pcs",  160,   29.00m), // Excel "M120 X 200"
+            ("M10x110 Gömlekli Dübel / M10x110 Sleeve Anchor",                               "Pcs",   60,    8.61m),
+            ("M12x80 Altıköşe Başlı Tam Paso Cıvata / M12x80 Hex Head Full Thread Bolt",    "Pcs",   60,   13.12m), // Excel "M12*80"
+            ("M12x70 Cıvata / M12x70 Bolt",                                                  "Pcs",   30,   11.73m),
+            ("M8x90 Cıvata / M8x90 Bolt",                                                    "Pcs",   20,    6.32m),
+            ("M12 Somun / M12 Nut",                                                          "Pcs",   90,    2.75m),
+            ("M8 Somun / M8 Nut",                                                            "Pcs",   20,    0.88m),
+            ("M10 Flanşlı Somun / M10 Flange Nut",                                           "Pcs",  150,    2.30m),
+            ("M10x35 Havşa Başlı İmbus Cıvata / M10x35 Countersunk Allen Bolt",             "Pcs",  150,    4.11m),
+            ("Matkap Uçlu Çatı Vidası 2,5 cm / Self-Drilling Roofing Screw 2.5 cm",         "Pcs",  400,    1.50m),
+            ("Projektör / Floodlight",                                                       "Pcs",    8,  950.00m),
+            ("Spanzet Orta Boy / Ratchet Strap Medium",                                      "Pcs",    1,  920.00m),
+            ("Conta Kesikli / Slotted Gasket",                                               "Pcs",   36,    1.27m),
+            ("Conta Düz / Flat Gasket",                                                      "Pcs",   72,    1.25m), // Excel 1,245 → DECIMAL(10,2)
+            ("Tutkal / Adhesive",                                                            "Set",    1, 4275.00m),
+            ("Helmetin Bezi / Helmetin Cloth",                                               "Set",    1,    0m),
+            ("File / Net",                                                                   "Pcs",    1,  900.00m),
+            ("Cam Bandı / Glass Tape",                                                       "M",    100,    0m),
+            ("Cam Havşa Contası Beyaz / Glass Countersunk Gasket White",                     "Pcs",  150,    6.00m),
+            ("Cam Bağlantı Braketi Alt / Glass Connection Bracket Bottom",                   "Pcs",   54,    2.50m),
+            ("Cam Bağlantı Braketi Yan / Glass Connection Bracket Side",                     "Pcs",   90,    2.80m),
+            ("Halı ve Küçük Çizgi / Turf & Line Marking",                                   "Rulo",   5,  627.00m),
+            ("10 mm Temperli Cam / 10 mm Tempered Glass",                                    "Pcs",   18, 1512.00m),
+        ];
+
+        await SeedCategoryBomAsync(ctx, logger, "Full Panoramic Court",  fullPanoramic);
+        await SeedCategoryBomAsync(ctx, logger, "Padbol",                padbol);
+        await SeedCategoryBomAsync(ctx, logger, "Standard Padel Court",  standart);
+    }
+
+    /// <summary>
+    /// Reçete yazıcı: kategoriyi TAM adıyla bulur (yoksa hiçbir şey yapmaz). Her kalem
+    /// (ad + fiyat) çiftiyle çözülür — aynı ad başka fiyatla kayıtlıysa paylaşılmaz,
+    /// bu fiyatla yeni bileşen satırı açılır; böylece her kategori Excel'indeki fiyatı
+    /// ayrı taşır. Kategorinin mevcut reçetesi hedef listeyle (BilesenID, Adet) birebir
+    /// aynıysa dokunmaz; değilse tek transaction'da reçeteyi bu listeyle değiştirir.
+    /// Eski bileşen satırları silinmez (yalnız reçete bağı kalkar); eski siparişler
+    /// SiparisIslemTablo'daki kendi snapshot'ını taşıdığı için etkilenmez.
+    /// </summary>
+    private static async Task SeedCategoryBomAsync(AppDbContext ctx, ILogger? logger,
+        string kategoriAdi, (string Ad, string Birim, int Adet, decimal Fiyat)[] kalemler)
+    {
         var kategoriId = await ScalarLongAsync(ctx,
-            $"SELECT COALESCE(MIN(KategoriID), 0) FROM UrunKategorileri WHERE KategoriAdi = '{KategoriAdi}'");
+            $"SELECT COALESCE(MIN(KategoriID), 0) FROM UrunKategorileri WHERE KategoriAdi = '{kategoriAdi.Replace("'", "''")}'");
         if (kategoriId == 0)
         {
-            logger?.LogWarning("UrunKategorileri'nde '{Ad}' yok — Panoramic reçete seed'i atlandı.", KategoriAdi);
+            logger?.LogWarning("UrunKategorileri'nde '{Ad}' yok — reçete seed'i atlandı.", kategoriAdi);
             return;
         }
 
-        // d) Tek seferlik guard: listenin ilk kalemi reçetede zaten bağlıysa seed yapılmış demektir.
-        var zatenVar = await ScalarLongAsync(ctx,
-            $@"SELECT COUNT(*) FROM KategoriBilesenleri kb
-               JOIN BilesenBilgileri b ON b.BilesenID = kb.BilesenID
-               WHERE kb.KategoriID = {kategoriId} AND b.BilesenAdi = '{kalemler[0].Ad.Replace("'", "''")}'");
-        if (zatenVar > 0)
-        {
-            logger?.LogInformation("Panoramic Padel Court reçetesi zaten Excel listesiyle kurulu; seed atlandı.");
-            return;
-        }
-
-        // e) Bileşenleri (ada göre tekil) ekle + reçeteyi değiştir — tek transaction.
         await using var tx = await ctx.Database.BeginTransactionAsync();
-        var bilesenIds = new List<(int BilesenID, int Adet)>(kalemler.Length);
-        int yeniBilesen = 0;
+
+        var hedef = new List<(int BilesenID, int Adet)>(kalemler.Length);
+        int yeni = 0;
         foreach (var k in kalemler)
         {
             var id = await ScalarLongAsync(ctx,
-                $"SELECT COALESCE(MIN(BilesenID), 0) FROM BilesenBilgileri WHERE BilesenAdi = '{k.Ad.Replace("'", "''")}'");
+                $@"SELECT COALESCE(MIN(BilesenID), 0) FROM BilesenBilgileri
+                   WHERE BilesenAdi = '{k.Ad.Replace("'", "''")}'
+                     AND COALESCE(Fiyat, 0) = {k.Fiyat.ToString(System.Globalization.CultureInfo.InvariantCulture)}");
             if (id == 0)
             {
                 await ctx.Database.ExecuteSqlInterpolatedAsync(
                     $"INSERT INTO BilesenBilgileri (BilesenAdi, Birim, Fiyat, Currency) VALUES ({k.Ad}, {k.Birim}, {k.Fiyat}, 'TRY')");
                 id = await ScalarLongAsync(ctx, "SELECT LAST_INSERT_ID()");
-                yeniBilesen++;
+                yeni++;
             }
-            bilesenIds.Add(((int)id, k.Adet));
+            hedef.Add(((int)id, k.Adet));
+        }
+
+        var mevcut = await RecipeRowsAsync(ctx, kategoriId);
+        if (mevcut.Count == hedef.Count && !mevcut.Except(hedef).Any() && !hedef.Except(mevcut).Any())
+        {
+            await tx.CommitAsync();
+            logger?.LogInformation("{Ad} (KategoriID {Kat}) reçetesi Excel listesiyle zaten birebir; dokunulmadı.", kategoriAdi, kategoriId);
+            return;
         }
 
         int silinen = await ctx.Database.ExecuteSqlInterpolatedAsync(
             $"DELETE FROM KategoriBilesenleri WHERE KategoriID = {kategoriId}");
-        foreach (var (bilesenId, adet) in bilesenIds)
+        foreach (var (bilesenId, adet) in hedef)
             await ctx.Database.ExecuteSqlInterpolatedAsync(
                 $"INSERT INTO KategoriBilesenleri (KategoriID, BilesenID, Adet) VALUES ({kategoriId}, {bilesenId}, {adet})");
         await tx.CommitAsync();
 
         logger?.LogInformation(
-            "Panoramic Padel Court (KategoriID {Kat}) reçetesi Excel listesiyle kuruldu: {Yeni} yeni bileşen, {Silinen} eski reçete satırı kaldırıldı, {Toplam} reçete satırı yazıldı.",
-            kategoriId, yeniBilesen, silinen, bilesenIds.Count);
+            "{Ad} (KategoriID {Kat}) reçetesi Excel listesiyle kuruldu: {Yeni} yeni bileşen, {Silinen} eski reçete satırı kaldırıldı, {Toplam} reçete satırı yazıldı.",
+            kategoriAdi, kategoriId, yeni, silinen, hedef.Count);
+    }
+
+    private static async Task<List<(int BilesenID, int Adet)>> RecipeRowsAsync(AppDbContext ctx, long kategoriId)
+    {
+        var rows = new List<(int, int)>();
+        var conn = ctx.Database.GetDbConnection();
+        await using var cmd = conn.CreateCommand();
+        cmd.Transaction = ctx.Database.CurrentTransaction?.GetDbTransaction();
+        cmd.CommandText = $"SELECT BilesenID, Adet FROM KategoriBilesenleri WHERE KategoriID = {kategoriId}";
+        await using var r = await cmd.ExecuteReaderAsync();
+        while (await r.ReadAsync())
+            rows.Add((Convert.ToInt32(r[0]), Convert.ToInt32(r[1])));
+        return rows;
     }
 
     // ── helpers ─────────────────────────────────────────────────────────────

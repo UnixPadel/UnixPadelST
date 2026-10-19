@@ -313,6 +313,39 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         return ms.ToArray();
     }
 
+    /// <summary>
+    /// Excel reçeteli 4 kategori (migrator 13): Panoramic Padel Court, Full Panoramic Court,
+    /// Padbol, Standard Padel Court. Bunların bileşen satırları proformada YALNIZ adla
+    /// (+ miktar/birim) basılır; birim fiyat ve tutar hücreleri boş kalır — fiyat set
+    /// satırında durur. Dönen küme: fiyatı gizlenecek bileşen satırlarının SiparisIslemID'leri.
+    /// Yalnız görünüm — DB'ye yazılmaz.
+    /// </summary>
+    private static HashSet<int> NameOnlyComponentRows(
+        IReadOnlyList<Core.Entities.OrderItem> items, IReadOnlyDictionary<int, string> catLookup)
+    {
+        var hidden = new HashSet<int>();
+        for (int i = 0; i < items.Count; i++)
+        {
+            var set = items[i];
+            if (!(set.KategoriID.HasValue && !set.BilesenID.HasValue)) continue;
+            if (!catLookup.TryGetValue(set.KategoriID.Value, out var ad) || !IsExcelRecipeCategory(ad)) continue;
+
+            // Setin bileşenleri: kategori satırını izleyen BilesenID'li satırlar.
+            for (int j = i + 1; j < items.Count && items[j].BilesenID.HasValue && !items[j].KategoriID.HasValue; j++)
+                hidden.Add(items[j].SiparisIslemID);
+        }
+        return hidden;
+    }
+
+    private static bool IsExcelRecipeCategory(string? ad)
+    {
+        var n = (ad ?? string.Empty).Trim();
+        return n.Equals("Panoramic Padel Court", StringComparison.OrdinalIgnoreCase)
+            || n.Equals("Full Panoramic Court",  StringComparison.OrdinalIgnoreCase)
+            || n.Equals("Standard Padel Court",  StringComparison.OrdinalIgnoreCase)
+            || n.Equals("Padbol",                StringComparison.OrdinalIgnoreCase);
+    }
+
     private static byte[] GenerateProformaFromTemplate(
         byte[] templateBytes,
         Core.Entities.Order order,
@@ -360,6 +393,9 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             var items = order.Items.OrderBy(i => i.SiparisIslemID).ToList();
             int firstRow = urunCell.Address.RowNumber;
 
+            // Excel reçeteli setlerde bileşen satırları yalnız adla basılır (fiyatsız).
+            var nameOnly = NameOnlyComponentRows(items, catLookup);
+
             // Render satır haritaları: önce gerçek sipariş kalemleri, sonra muhasebe
             // ekstra maliyet kalemleri (açıklama + tutar; tek adet, birim fiyat = tutar).
             var rowMaps = new List<Dictionary<string, string>>(items.Count + extras.Count);
@@ -405,8 +441,9 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     birimText = bunit;
                 }
 
-                string birimFiyatText = paraBirimi + birimFiyat.ToString("N2", TrTR);
-                string fiyatText      = paraBirimi + toplam.ToString("N2", TrTR);
+                bool fiyatsiz = nameOnly.Contains(item.SiparisIslemID);
+                string birimFiyatText = fiyatsiz ? string.Empty : paraBirimi + birimFiyat.ToString("N2", TrTR);
+                string fiyatText      = fiyatsiz ? string.Empty : paraBirimi + toplam.ToString("N2", TrTR);
 
                 rowMaps.Add(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {

@@ -1139,5 +1139,18 @@
       "approved": "Onaylandı",
       "rejected": "Reddedildi"
     }
+  },
+  "currency": {
+    "source": "Kur kaynağı",
+    "refreshed": "güncellendi",
+    "hourly": "saatte bir yenilenir",
+    "name": {
+      "EUR": "Euro",
+      "USD": "Dolar",
+      "GBP": "Sterlin",
+      "TRY": "TL"
+    },
+    "sourceUnavailable": "TCMB kurları alınamadı — fiyatlar çevrilemiyor.",
+    "noRate": "Kur yok — çevrilemedi"
   }
 }

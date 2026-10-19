@@ -10,6 +10,7 @@ public sealed class Component
     public string  BilesenAdi { get; set; } = string.Empty;
     public string? Birim      { get; set; }
     public decimal? Fiyat     { get; set; }   // DB: decimal(10,2) (migrator int→decimal genişletti — Panoramik cıvata listesi kuruşlu)
+    public string   Currency  { get; set; } = "TRY";   // DB: ENUM('EUR','USD','TRY') NOT NULL DEFAULT 'TRY' — Fiyat'ın para birimi
 
     // ── Navigation properties ─────────────────────────────────────────────
     public ICollection<Attribute>         Attributes         { get; set; } = [];

@@ -1,4 +1,7 @@
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { getTransactionsForOrder } from '@/api/accounting'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { formatCurrency, formatDate } from '@/lib/utils'
@@ -11,6 +14,10 @@ import type { AccountingOrderListDto } from '@/types'
  * with a small dialog. Optional sections (Maliyet, Kar, Muhasebe Durumu)
  * only render when those fields are populated, matching the original
  * `if (!string.IsNullOrEmpty(...))` guards.
+ *
+ * Muhasebe Geçmişi bölümü: Muhasebe onay ekranındaki "Muhasebe Geçmişi"
+ * sekmesiyle aynı kaynak (MuhasebeIslemTablo — getTransactionsForOrder);
+ * finansal blokların hemen altında, kronolojik + toplam satırıyla.
  */
 interface Props {
   row: AccountingOrderListDto | null
@@ -26,6 +33,18 @@ const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
 
 export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
   const { t } = useTranslation()
+  const siparisNo = row?.siparisNo
+  // Tahsilat Ekle modalıyla aynı queryKey — yeni tahsilat kaydında burası da yenilenir.
+  const { data: transactions = [], isLoading: txLoading } = useQuery({
+    queryKey: ['order-tx', siparisNo],
+    queryFn: () => getTransactionsForOrder(siparisNo!),
+    enabled: !!siparisNo,
+  })
+  const sortedTx = useMemo(
+    () => [...transactions].sort((a, b) => (a.tarih ?? '').localeCompare(b.tarih ?? '')),
+    [transactions],
+  )
+  const txTotal = sortedTx.reduce((sum, tx) => sum + (tx.odenenMiktar ?? 0), 0)
   return (
     <Dialog open={!!row} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-lg">
@@ -52,6 +71,49 @@ export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
             {row.kar != null && (
               <Row label={t('accountingFull.cols.kar')} value={formatCurrency(row.kar, row.paraTipi)} />
             )}
+
+            {/* Muhasebe Geçmişi — girilen tahsilat bakiyeleri */}
+            <div className="my-2 border-t" />
+            <div className="space-y-1">
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-semibold">{t('qc.tabs.muhasebeGecmisi')}</span>
+                {sortedTx.length > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">{sortedTx.length}</span>
+                )}
+              </div>
+              <div className="rounded border">
+                {txLoading ? (
+                  <p className="p-2 text-xs text-muted-foreground">{t('common.loading')}</p>
+                ) : sortedTx.length === 0 ? (
+                  <p className="p-2 text-xs text-muted-foreground">{t('accounting.tahsilat.none')}</p>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/40">
+                      <tr>
+                        <th className="w-8 px-2 py-1 text-left font-medium">#</th>
+                        <th className="px-2 py-1 text-left font-medium">{t('qc.tx.tarih')}</th>
+                        <th className="px-2 py-1 text-right font-medium">{t('qc.tx.odenenBakiye')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sortedTx.map((tx, i) => (
+                        <tr key={tx.id} className="border-t">
+                          <td className="px-2 py-1 text-muted-foreground tabular-nums">{i + 1}</td>
+                          <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
+                          <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(tx.odenenMiktar ?? 0, row.paraTipi)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="border-t bg-muted/30 font-semibold">
+                        <td className="px-2 py-1" colSpan={2}>{t('accountingHistory.cols.toplamTahsilat')}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(txTotal, row.paraTipi)}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                )}
+              </div>
+            </div>
             {row.maliyetDetayi && (
               <>
                 <div className="my-2 border-t" />

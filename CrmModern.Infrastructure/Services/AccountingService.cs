@@ -10,7 +10,7 @@ namespace CrmModern.Infrastructure.Services;
 /// <summary>
 /// Muhasebe + MuhasebeGecmis ekranları.
 /// </summary>
-internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
+internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : IAccountingService
 {
     public async Task<IReadOnlyList<AccountingOrderListDto>> GetAccountingOrdersAsync()
     {
@@ -112,10 +112,66 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
             LojistikOnay:     o.LojistikOnay);
     }
 
-    public async Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(string siparisNo)
+    public async Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(
+        string siparisNo, bool includeCancelled = false)
     {
-        var rows = await uow.Accounting.GetBySiparisNoAsync(NormalizeNo(siparisNo));
-        return rows.Select(MapTx).ToList().AsReadOnly();
+        var rows = await uow.Accounting.GetBySiparisNoAsync(NormalizeNo(siparisNo), includeCancelled);
+        if (!rows.Any(t => t.Iptal))
+            return rows.Select(MapTx).ToList().AsReadOnly();
+
+        // İptal satırlarında "kim iptal etti" adıyla gösterilir.
+        var users = (await uow.Kullanicilar.GetAllAsync())
+            .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
+        return rows.Select(t => MapTx(t) with
+        {
+            IptalKullaniciAdSoyad = t.IptalKullaniciID is int uid && users.TryGetValue(uid, out var ad) ? ad : null,
+        }).ToList().AsReadOnly();
+    }
+
+    public async Task CancelTransactionAsync(int transactionId, string? gerekce, int currentUserId)
+    {
+        gerekce = string.IsNullOrWhiteSpace(gerekce) ? null : gerekce.Trim();
+        if (gerekce?.Length > 500)
+            throw new BusinessException("İptal gerekçesi en fazla 500 karakter olabilir.");
+
+        var tx = await uow.Accounting.GetForUpdateAsync(transactionId)
+            ?? throw new NotFoundException("Tahsilat", transactionId);
+        if (tx.Iptal)
+            throw new BusinessException("Bu tahsilat zaten iptal edilmiş.");
+
+        var order = await uow.Orders.GetByNoAsync(tx.SiparisNo)
+            ?? throw new NotFoundException("Order", tx.SiparisNo);
+
+        // Yeni toplam = bu satır HARİÇ iptal olmayan tahsilatlar (eşzamanlı iki iptal
+        // isteğinde de tutar iki kez düşülmez). Satır işareti + Order güncellemesi
+        // TEK SaveChanges'te commit.
+        decimal yeniOdenen = (await uow.Accounting.GetBySiparisNoAsync(order.SiparisNo))
+            .Where(t => t.ID != tx.ID)
+            .Sum(t => t.OdenenMiktar ?? 0m);
+
+        tx.Iptal            = true;
+        tx.IptalGerekce     = gerekce;
+        tx.IptalKullaniciID = currentUserId;
+        tx.IptalTarihi      = DateTime.Now;
+
+        order.OdenenMiktar = yeniOdenen;
+        order.OdemeDurum   = ((order.ToplamFiyat ?? 0m) - yeniOdenen <= 0m) ? "Ödendi" : "Beklemede";
+        uow.Orders.Update(order);
+
+        await uow.SaveChangesAsync();
+
+        // Genel audit log (EklemeGecmisi). İz zaten satırın kendisinde; log yazımı
+        // başarısız olursa iptal geri alınmaz.
+        try
+        {
+            await audit.LogAsync("TahsilatIptal", "MuhasebeIslemTablo", tx.ID.ToString(), currentUserId,
+                $"{order.SiparisNo} — {tx.OdenenMiktar:N2} {order.ParaTipi} ({tx.Tarih:dd.MM.yyyy}) iptal edildi."
+                + (gerekce is null ? "" : $" Gerekçe: {gerekce}"));
+        }
+        catch
+        {
+            // best-effort
+        }
     }
 
     public async Task<AccountingTransactionDto> AddTransactionAsync(AddTransactionDto dto, int currentUserId)
@@ -590,7 +646,8 @@ internal sealed class AccountingService(IUnitOfWork uow) : IAccountingService
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static AccountingTransactionDto MapTx(AccountingTransaction t) =>
-        new(t.ID, t.SiparisNo, t.MusteriID, t.KullaniciID, t.OdenenMiktar, t.Tarih);
+        new(t.ID, t.SiparisNo, t.MusteriID, t.KullaniciID, t.OdenenMiktar, t.Tarih,
+            t.Iptal, t.IptalGerekce, null, t.IptalTarihi);
 
     private static string NormalizeNo(string no) =>
         no.StartsWith('T') ? "S" + no[1..] : no;

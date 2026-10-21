@@ -44,10 +44,20 @@ internal sealed class AccountingRepository(AppDbContext context)
             .OrderByDescending(t => t.Tarih)
             .ToListAsync();
 
-    public async Task<IReadOnlyList<AccountingTransaction>> GetBySiparisNoAsync(string siparisNo) =>
-        await _context.MuhasebeIslemTablo
-            .AsNoTracking()
+    public async Task<IReadOnlyList<AccountingTransaction>> GetBySiparisNoAsync(
+        string siparisNo, bool includeCancelled = false)
+    {
+        var q = _context.MuhasebeIslemTablo.AsNoTracking();
+        if (includeCancelled)
+            q = q.IgnoreQueryFilters();
+        return await q
             .Where(t => t.SiparisNo == siparisNo)
             .OrderByDescending(t => t.Tarih)
             .ToListAsync();
+    }
+
+    public async Task<AccountingTransaction?> GetForUpdateAsync(int id) =>
+        await _context.MuhasebeIslemTablo
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(t => t.ID == id);
 }

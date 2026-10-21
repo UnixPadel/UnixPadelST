@@ -15,3 +15,15 @@ export function isSuperAdmin(
   const u = user?.kullaniciAdi
   return !!u && SUPER_ADMINS.includes(u)
 }
+
+// Muhasebe Onay kullanıcıları — backend AccountingController.IsAccountingApprover
+// ile aynı küme (burcu.karaman + elshan.rasulov + süper-admin). Tahsilat iptali
+// gibi onaycıya özel aksiyonların görünürlüğü için.
+export const ACCOUNTING_APPROVERS: readonly string[] = ['burcu.karaman', 'elshan.rasulov']
+
+export function isAccountingApprover(
+  user: { kullaniciAdi?: string | null } | null | undefined,
+): boolean {
+  const u = user?.kullaniciAdi
+  return (!!u && ACCOUNTING_APPROVERS.includes(u)) || isSuperAdmin(user)
+}

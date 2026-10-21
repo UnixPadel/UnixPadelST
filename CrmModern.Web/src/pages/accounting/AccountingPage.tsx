@@ -23,6 +23,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MuhasebeRowDetailDialog } from '@/components/MuhasebeRowDetailDialog'
+import { CancelTransactionDialog, CancelTxButton, type CancelTxTarget } from '@/components/CancelTransactionDialog'
+import { useAuth } from '@/hooks/useAuth'
+import { isAccountingApprover } from '@/lib/permissions'
 import { formatDate, formatDateShort, formatCurrency, formatPhone, cn } from '@/lib/utils'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { useToast } from '@/components/ToastProvider'
@@ -57,6 +60,7 @@ export function AccountingPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const { t } = useTranslation()
+  const { getUser } = useAuth()
 
   // ── Selected row (drives top form) ────────────────────────────────────
   const [selectedNo, setSelectedNo] = useState<string | null>(null)
@@ -68,6 +72,9 @@ export function AccountingPage() {
   const [txTutar, setTxTutar] = useState<number>(0)
   const [txTarih, setTxTarih] = useState<string>(() => new Date().toISOString().slice(0, 10))
   const [ekTarget, setEkTarget] = useState<string | null>(null)
+  // Tahsilat iptali — yalnız Muhasebe Onay kullanıcıları (backend aynı kapı).
+  const canCancelTx = isAccountingApprover(getUser())
+  const [cancelTx, setCancelTx] = useState<CancelTxTarget | null>(null)
 
   // Bottom-grid filter (kept from previous version)
   const [search, setSearch] = useState('')
@@ -132,6 +139,20 @@ export function AccountingPage() {
     },
     onError: (e: unknown) => toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' }),
   })
+
+  // Kalan bakiyeyi aşan tahsilatta onay iste (Muhasebe Onay ile aynı kural).
+  // txTarget açılıştaki anlık görüntü; modal açıkken eklenen tahsilatlar için
+  // güncel satır listeden okunur.
+  const confirmOverpay = (): boolean => {
+    if (!txTarget) return true
+    const row = orders.find((o) => o.siparisNo === txTarget.siparisNo) ?? txTarget
+    const kalan = Math.max(row.kalanBakiye ?? 0, 0)
+    if (txTutar <= kalan) return true
+    return window.confirm(t('accApproval.overpay.confirm', {
+      fark: formatCurrency(txTutar - kalan, row.paraTipi),
+      kalan: formatCurrency(kalan, row.paraTipi),
+    }))
+  }
 
   const uploadMut = useMutation({
     mutationFn: ({ no, file }: { no: string; file: File }) => uploadMuhasebeEk(no, file),
@@ -521,13 +542,25 @@ export function AccountingPage() {
                   ? <p className="p-2 text-xs text-muted-foreground">{t('accounting.tahsilat.none')}</p>
                   : <table className="w-full text-xs">
                       <thead className="bg-muted/30">
-                        <tr><th className="text-left px-2 py-1">{t('common.date')}</th><th className="text-right px-2 py-1">{t('accounting.tahsilat.tutar')}</th></tr>
+                        <tr>
+                          <th className="text-left px-2 py-1">{t('common.date')}</th>
+                          <th className="text-right px-2 py-1">{t('accounting.tahsilat.tutar')}</th>
+                          {canCancelTx && <th className="w-8 px-1 py-1" />}
+                        </tr>
                       </thead>
                       <tbody>
                         {txForOrder.map((tx: AccountingTransactionDto) => (
                           <tr key={tx.id} className="border-t">
                             <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
                             <td className="text-right px-2 py-1">{formatCurrency(tx.odenenMiktar ?? 0)}</td>
+                            {canCancelTx && txTarget && (
+                              <td className="px-1 py-0.5 text-center">
+                                <CancelTxButton onClick={() => {
+                                  const row = orders.find((o) => o.siparisNo === txTarget.siparisNo) ?? txTarget
+                                  setCancelTx({ ...tx, paraTipi: row.paraTipi, kalanBakiye: row.kalanBakiye ?? 0 })
+                                }} />
+                              </td>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -537,7 +570,7 @@ export function AccountingPage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setTxTarget(null)}>{t('common.close')}</Button>
-            <Button disabled={txTutar <= 0 || addMut.isPending} onClick={() => addMut.mutate()}>{t('common.save')}</Button>
+            <Button disabled={txTutar <= 0 || addMut.isPending} onClick={() => { if (confirmOverpay()) addMut.mutate() }}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -561,6 +594,7 @@ export function AccountingPage() {
 
       <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} />
       <MuhasebeRowDetailDialog row={doubleClickRow} onClose={() => setDoubleClickRow(null)} />
+      <CancelTransactionDialog target={cancelTx} onClose={() => setCancelTx(null)} />
     </div>
   )
 }

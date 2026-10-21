@@ -6,6 +6,7 @@ import {
   approveMuhasebeAndMoveToPlanning, approveLogistics,
   uploadMuhasebeEk, finalizeCompletion,
 } from '@/api/accounting'
+import { CancelTransactionDialog, CancelTxButton, type CancelTxTarget } from '@/components/CancelTransactionDialog'
 import { getOrderDetail, downloadAttachment, downloadExcel, downloadPdf } from '@/api/orders'
 import { DataTable, type Column } from '@/components/DataTable'
 import { DecimalInput } from '@/components/DecimalInput'
@@ -130,6 +131,9 @@ export function AccountingApprovalPage() {
     pesinat: null, pesinatTarihi: new Date().toISOString().slice(0, 10),
   })
 
+  // Yanlış girilen tahsilat/peşinat iptali (satır silinmez, iptal işaretlenir).
+  const [cancelTarget, setCancelTarget] = useState<CancelTxTarget | null>(null)
+
   // ── Veri ────────────────────────────────────────────────────────────────
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['accounting-orders'],
@@ -152,7 +156,8 @@ export function AccountingApprovalPage() {
 
   const { data: transactions = [] } = useQuery({
     queryKey: ['acc-approval-tx', selected],
-    queryFn: () => getTransactionsForOrder(selected!),
+    // İptal edilenler de gelir (üstü çizili gösterilir, toplama girmez).
+    queryFn: () => getTransactionsForOrder(selected!, true),
     enabled: !!selected,
   })
 
@@ -190,6 +195,8 @@ export function AccountingApprovalPage() {
     qc.invalidateQueries({ queryKey: ['accounting-orders'] })
     qc.invalidateQueries({ queryKey: ['order-detail'] })
     qc.invalidateQueries({ queryKey: ['acc-approval-tx'] })
+    qc.invalidateQueries({ queryKey: ['order-tx'] })
+    qc.invalidateQueries({ queryKey: ['tx-history'] })
     // PROMPT-v5 §3 — aşama geçişleri Siparişlerim'e ≤30 sn'de yansısın.
     qc.invalidateQueries({ queryKey: ['my-orders'] })
     qc.invalidateQueries({ queryKey: ['factory'] })
@@ -242,6 +249,18 @@ export function AccountingApprovalPage() {
     },
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
+
+  // Kalan bakiyeyi aşan peşinat girilirken onay iste (engellemez: gerçek fazla
+  // ödeme yine girilebilir). Eksi bakiyenin en sık nedeni hatalı/çift giriş.
+  const confirmOverpay = (amount: number | null): boolean => {
+    if (!amount || !selectedRow) return true
+    const kalan = Math.max(selectedRow.kalanBakiye ?? 0, 0)
+    if (amount <= kalan) return true
+    return window.confirm(t('accApproval.overpay.confirm', {
+      fark: formatCurrency(amount - kalan, selectedRow.paraTipi),
+      kalan: formatCurrency(kalan, selectedRow.paraTipi),
+    }))
+  }
 
   const uploadMut = useMutation({
     mutationFn: ({ no, file }: { no: string; file: File }) => uploadMuhasebeEk(no, file),
@@ -361,18 +380,35 @@ export function AccountingApprovalPage() {
                       <th className="px-2 py-1 text-left font-medium">{t('qc.tx.paraTuru')}</th>
                       <th className="px-2 py-1 text-right font-medium">{t('qc.tx.odenenBakiye')}</th>
                       <th className="px-2 py-1 text-left font-medium">{t('qc.tx.tarih')}</th>
+                      <th className="w-8 px-1 py-1" />
                     </tr>
                   </thead>
                   <tbody>
                     {!selectedRow || sortedTx.length === 0 ? (
-                      <tr><td colSpan={5} className="px-2 py-2 text-muted-foreground">{t('common.noData')}</td></tr>
+                      <tr><td colSpan={6} className="px-2 py-2 text-muted-foreground">{t('common.noData')}</td></tr>
                     ) : sortedTx.map((tx) => (
-                      <tr key={tx.id} className="border-t">
+                      <tr key={tx.id}
+                        className={cn('border-t', tx.iptal && 'text-muted-foreground line-through')}
+                        title={tx.iptal ? t('accApproval.cancelTx.cancelledInfo', {
+                          kim: tx.iptalKullaniciAdSoyad ?? '—',
+                          tarih: tx.iptalTarihi ? formatDate(tx.iptalTarihi) : '—',
+                        }) : undefined}>
                         <td className="px-2 py-1">{selectedRow.musteriAd}</td>
                         <td className="px-2 py-1">{selectedRow.mUlke ?? ''}</td>
                         <td className="px-2 py-1">{pt}</td>
                         <td className="px-2 py-1 text-right">{formatCurrency(tx.odenenMiktar ?? 0, pt)}</td>
                         <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
+                        <td className="px-1 py-0.5 text-center">
+                          {tx.iptal ? (
+                            <span className="inline-block text-[10px] font-medium text-destructive">
+                              {t('accApproval.cancelTx.badge')}
+                            </span>
+                          ) : (
+                            <CancelTxButton onClick={() => setCancelTarget({
+                              ...tx, paraTipi: pt, kalanBakiye: selectedRow.kalanBakiye ?? 0,
+                            })} />
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -614,20 +650,20 @@ export function AccountingApprovalPage() {
             {canFinalize ? (
               <Button size="sm" className="h-8 w-full text-xs"
                 disabled={finalizeMut.isPending || (finalizeForm.finalMaliyet ?? -1) < 0}
-                onClick={() => { const no = requireSelection(); if (no) finalizeMut.mutate(no) }}>
+                onClick={() => { const no = requireSelection(); if (no && confirmOverpay(finalizeForm.pesinat)) finalizeMut.mutate(no) }}>
                 {t('accApproval.actions.tamamla')}
               </Button>
             ) : canLoj ? (
               <Button size="sm" className="h-8 w-full text-xs"
                 disabled={lojMut.isPending}
-                onClick={() => { const no = requireSelection(); if (no) lojMut.mutate(no) }}>
+                onClick={() => { const no = requireSelection(); if (no && confirmOverpay(pesinatForm.pesinat)) lojMut.mutate(no) }}>
                 {t('accApproval.actions.lojistikOnayla')}
               </Button>
             ) : (
               <Button size="sm" className="h-8 w-full text-xs"
                 disabled={!canCari || cariMut.isPending}
                 title={canCari ? undefined : t('accApproval.disabled.cari')}
-                onClick={() => { const no = requireSelection(); if (no) cariMut.mutate(no) }}>
+                onClick={() => { const no = requireSelection(); if (no && confirmOverpay(pesinatForm.pesinat)) cariMut.mutate(no) }}>
                 {t('accApproval.actions.cariOnayla')}
               </Button>
             )}
@@ -688,6 +724,9 @@ export function AccountingApprovalPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Tahsilat/peşinat iptali — Kalan Bakiye önizlemeli onay */}
+      <CancelTransactionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} />
 
       {/* Form'u getir — salt-okunur sipariş formu */}
       <OrderDetailModal siparisNo={formNo} onClose={() => setFormNo(null)} />

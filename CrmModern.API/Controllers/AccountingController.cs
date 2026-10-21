@@ -55,13 +55,31 @@ public sealed class AccountingController(IAccountingService accountingService) :
     // PROMPT-v4 §4.4: rol seti aynen korunur + elshan.rasulov okuma istisnası.
     [HttpGet("orders/{siparisNo}/transactions")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<AccountingTransactionDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetTransactionsForOrder(string siparisNo)
+    public async Task<IActionResult> GetTransactionsForOrder(
+        string siparisNo, [FromQuery] bool includeCancelled = false)
     {
         if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") &&
-            !User.IsInRole("Gozlemci") && CurrentUserName != ControlUser)
+            !User.IsInRole("Gozlemci") && CurrentUserName != ControlUser && !User.IsSuperAdmin())
             return Forbid();
-        var result = await accountingService.GetTransactionsForOrderAsync(siparisNo);
+        var result = await accountingService.GetTransactionsForOrderAsync(siparisNo, includeCancelled);
         return Ok(ApiResponse<IReadOnlyList<AccountingTransactionDto>>.Ok(result));
+    }
+
+    /// <summary>
+    /// Yanlış girilen tahsilat/peşinatın iptali (gerekçe opsiyonel).
+    /// Satır silinmez; Order.OdenenMiktar/OdemeDurum yeniden hesaplanır.
+    /// Yalnız Muhasebe Onay kullanıcıları (burcu.karaman / elshan.rasulov / admin).
+    /// </summary>
+    [HttpPost("transactions/{id:int}/cancel")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> CancelTransaction(
+        int id, [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CancelTransactionDto? dto = null)
+    {
+        if (!IsAccountingApprover) return Forbid();
+        await accountingService.CancelTransactionAsync(id, dto?.Gerekce, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Tahsilat iptal edildi."));
     }
 
     /// <summary>

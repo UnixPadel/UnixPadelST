@@ -1,10 +1,13 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getTransactionsForOrder } from '@/api/accounting'
+import { getAccountingOrders, getTransactionsForOrder } from '@/api/accounting'
+import { CancelTransactionDialog, CancelTxButton, type CancelTxTarget } from '@/components/CancelTransactionDialog'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { useAuth } from '@/hooks/useAuth'
+import { isAccountingApprover } from '@/lib/permissions'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { statusLabel } from '@/lib/status'
 import type { AccountingOrderListDto } from '@/types'
 
@@ -31,20 +34,38 @@ const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
   </div>
 )
 
-export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
+export function MuhasebeRowDetailDialog({ row: rowProp, onClose }: Props) {
   const { t } = useTranslation()
+  const { getUser } = useAuth()
+  const canCancel = isAccountingApprover(getUser())
+  const [cancelTarget, setCancelTarget] = useState<CancelTxTarget | null>(null)
+  // rowProp açılıştaki anlık görüntü; tahsilat iptalinden sonra Kalan Bakiye /
+  // Ödeme Durumu güncel görünsün diye liste cache'indeki satır tercih edilir.
+  const { data: orders } = useQuery({
+    queryKey: ['accounting-orders'],
+    queryFn: getAccountingOrders,
+    enabled: !!rowProp,
+  })
+  const row = rowProp && (orders?.find((o) => o.siparisNo === rowProp.siparisNo) ?? rowProp)
   const siparisNo = row?.siparisNo
-  // Tahsilat Ekle modalıyla aynı queryKey — yeni tahsilat kaydında burası da yenilenir.
+  // Tahsilat Ekle modalıyla aynı ['order-tx', no] öneki — yeni tahsilat / iptalde
+  // burası da yenilenir. İptaller de gelir (ayrı anahtar: o modal iptalleri almaz).
   const { data: transactions = [], isLoading: txLoading } = useQuery({
-    queryKey: ['order-tx', siparisNo],
-    queryFn: () => getTransactionsForOrder(siparisNo!),
+    queryKey: ['order-tx', siparisNo, 'withCancelled'],
+    queryFn: () => getTransactionsForOrder(siparisNo!, true),
     enabled: !!siparisNo,
   })
   const sortedTx = useMemo(
     () => [...transactions].sort((a, b) => (a.tarih ?? '').localeCompare(b.tarih ?? '')),
     [transactions],
   )
-  const txTotal = sortedTx.reduce((sum, tx) => sum + (tx.odenenMiktar ?? 0), 0)
+  // İptal edilen tahsilatlar üstü çizili görünür; sıra numarası ve toplama girmez.
+  const activeIndex = useMemo(() => {
+    const m = new Map<number, number>()
+    sortedTx.filter((tx) => !tx.iptal).forEach((tx, i) => m.set(tx.id, i + 1))
+    return m
+  }, [sortedTx])
+  const txTotal = sortedTx.reduce((sum, tx) => sum + (tx.iptal ? 0 : (tx.odenenMiktar ?? 0)), 0)
   return (
     <Dialog open={!!row} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent className="max-w-lg">
@@ -77,8 +98,8 @@ export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
             <div className="space-y-1">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm font-semibold">{t('qc.tabs.muhasebeGecmisi')}</span>
-                {sortedTx.length > 0 && (
-                  <span className="text-xs text-muted-foreground tabular-nums">{sortedTx.length}</span>
+                {activeIndex.size > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">{activeIndex.size}</span>
                 )}
               </div>
               <div className="rounded border">
@@ -93,14 +114,33 @@ export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
                         <th className="w-8 px-2 py-1 text-left font-medium">#</th>
                         <th className="px-2 py-1 text-left font-medium">{t('qc.tx.tarih')}</th>
                         <th className="px-2 py-1 text-right font-medium">{t('qc.tx.odenenBakiye')}</th>
+                        {canCancel && <th className="w-8 px-1 py-1" />}
                       </tr>
                     </thead>
                     <tbody>
-                      {sortedTx.map((tx, i) => (
-                        <tr key={tx.id} className="border-t">
-                          <td className="px-2 py-1 text-muted-foreground tabular-nums">{i + 1}</td>
+                      {sortedTx.map((tx) => (
+                        <tr key={tx.id}
+                          className={cn('border-t', tx.iptal && 'text-muted-foreground line-through')}
+                          title={tx.iptal ? t('accApproval.cancelTx.cancelledInfo', {
+                            kim: tx.iptalKullaniciAdSoyad ?? '—',
+                            tarih: tx.iptalTarihi ? formatDate(tx.iptalTarihi) : '—',
+                          }) : undefined}>
+                          <td className="px-2 py-1 text-muted-foreground tabular-nums">
+                            {tx.iptal
+                              ? <span className="inline-block text-[10px] font-medium text-destructive">{t('accApproval.cancelTx.badge')}</span>
+                              : activeIndex.get(tx.id)}
+                          </td>
                           <td className="px-2 py-1">{formatDate(tx.tarih)}</td>
                           <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(tx.odenenMiktar ?? 0, row.paraTipi)}</td>
+                          {canCancel && (
+                            <td className="px-1 py-0.5 text-center">
+                              {!tx.iptal && (
+                                <CancelTxButton onClick={() => setCancelTarget({
+                                  ...tx, paraTipi: row.paraTipi, kalanBakiye: row.kalanBakiye ?? 0,
+                                })} />
+                              )}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -108,6 +148,7 @@ export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
                       <tr className="border-t bg-muted/30 font-semibold">
                         <td className="px-2 py-1" colSpan={2}>{t('accountingHistory.cols.toplamTahsilat')}</td>
                         <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(txTotal, row.paraTipi)}</td>
+                        {canCancel && <td />}
                       </tr>
                     </tfoot>
                   </table>
@@ -135,6 +176,8 @@ export function MuhasebeRowDetailDialog({ row, onClose }: Props) {
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{t('common.close')}</Button>
         </DialogFooter>
+        {/* İç içe dialog: üstteki katman dış tıklamaları alır, bu dialog kapanmaz. */}
+        <CancelTransactionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} />
       </DialogContent>
     </Dialog>
   )

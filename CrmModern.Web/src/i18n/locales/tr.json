@@ -616,6 +616,20 @@
     "pesinat": {
       "hint": "Peşinat, onayla birlikte tahsilat olarak kaydedilir. Maliyet'e yazılmaz."
     },
+    "overpay": {
+      "confirm": "Girilen tutar kalan bakiyeyi ({{kalan}}) {{fark}} aşıyor ve Kalan Bakiye eksiye düşecek.\n\nTutar doğru mu? Devam edilsin mi?"
+    },
+    "cancelTx": {
+      "action": "Tahsilatı iptal et",
+      "title": "Tahsilat İptali — {{no}}",
+      "preview": "Kalan Bakiye: {{once}} → {{sonra}}",
+      "hint": "Kayıt silinmez; iptal olarak işaretlenir, toplamlardan düşer ve geçmişte üstü çizili görünür.",
+      "dismiss": "Vazgeç",
+      "confirm": "İptal Et",
+      "done": "Tahsilat iptal edildi, bakiye güncellendi.",
+      "badge": "İptal",
+      "cancelledInfo": "İptal: {{kim}} · {{tarih}}"
+    },
     "finalize": {
       "title": "Tamamla — {{no}}",
       "pesinat": "3. Peşinat",

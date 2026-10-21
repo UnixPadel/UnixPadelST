@@ -616,6 +616,20 @@
     "pesinat": {
       "hint": "The down payment is recorded as a collection on approval. It is not written to Cost."
     },
+    "overpay": {
+      "confirm": "The amount exceeds the remaining balance ({{kalan}}) by {{fark}} and the Remaining Balance will go negative.\n\nIs the amount correct? Continue?"
+    },
+    "cancelTx": {
+      "action": "Cancel collection",
+      "title": "Cancel Collection — {{no}}",
+      "preview": "Remaining Balance: {{once}} → {{sonra}}",
+      "hint": "The record is not deleted; it is marked as cancelled, excluded from totals and shown struck through in the history.",
+      "dismiss": "Back",
+      "confirm": "Cancel Collection",
+      "done": "Collection cancelled, balance updated.",
+      "badge": "Cancelled",
+      "cancelledInfo": "Cancelled: {{kim}} · {{tarih}}"
+    },
     "finalize": {
       "title": "Complete — {{no}}",
       "pesinat": "3rd Down Payment",

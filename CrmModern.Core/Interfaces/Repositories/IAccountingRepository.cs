@@ -21,6 +21,12 @@ public interface IAccountingRepository : IBaseRepository<AccountingTransaction>
     /// <summary>Bir müşterinin tüm tahsilatlarını sipariş döviz tipiyle birlikte (Order JOIN) döner.</summary>
     Task<IReadOnlyList<AccountingTransaction>> GetByCustomerAsync(int musteriId);
 
-    /// <summary>Bir sipariş için tüm tahsilatlar (sayfa içi panel için).</summary>
-    Task<IReadOnlyList<AccountingTransaction>> GetBySiparisNoAsync(string siparisNo);
+    /// <summary>
+    /// Bir sipariş için tüm tahsilatlar (sayfa içi panel için). includeCancelled=true
+    /// iptal edilmiş satırları da (geçmişte üstü çizili gösterim için) döner.
+    /// </summary>
+    Task<IReadOnlyList<AccountingTransaction>> GetBySiparisNoAsync(string siparisNo, bool includeCancelled = false);
+
+    /// <summary>İptal akışı için izlenen (tracked) satır; iptal filtresi uygulanmaz.</summary>
+    Task<AccountingTransaction?> GetForUpdateAsync(int id);
 }

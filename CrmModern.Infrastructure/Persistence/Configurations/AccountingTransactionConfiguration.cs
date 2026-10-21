@@ -18,5 +18,14 @@ internal sealed class AccountingTransactionConfiguration : IEntityTypeConfigurat
         builder.Property(a => a.KullaniciID)  .HasColumnName("KullaniciID");
         builder.Property(a => a.OdenenMiktar) .HasColumnName("OdenenMiktar") .HasColumnType("decimal(18,2)");
         builder.Property(a => a.Tarih)        .HasColumnName("Tarih");
+
+        builder.Property(a => a.Iptal)            .HasColumnName("Iptal");
+        builder.Property(a => a.IptalGerekce)     .HasColumnName("IptalGerekce").HasMaxLength(500);
+        builder.Property(a => a.IptalKullaniciID) .HasColumnName("IptalKullaniciID");
+        builder.Property(a => a.IptalTarihi)      .HasColumnName("IptalTarihi");
+
+        // İptal edilen tahsilatlar hiçbir toplama / listeye girmez; iptalleri görmek
+        // isteyen okuma IgnoreQueryFilters() ile açıkça ister.
+        builder.HasQueryFilter(a => !a.Iptal);
     }
 }

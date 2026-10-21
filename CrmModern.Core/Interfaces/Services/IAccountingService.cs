@@ -9,7 +9,15 @@ public interface IAccountingService
 {
     Task<IReadOnlyList<AccountingOrderListDto>>  GetAccountingOrdersAsync();
     Task<AccountingOrderListDto>                 GetOrderAccountingDetailAsync(string siparisNo);
-    Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(string siparisNo);
+    Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(
+        string siparisNo, bool includeCancelled = false);
+
+    /// <summary>
+    /// Tahsilat/peşinat iptali (Muhasebe Onay). Satır silinmez: Iptal + (opsiyonel)
+    /// gerekçe + kim/ne zaman işaretlenir; Order.OdenenMiktar = SUM(iptal olmayan) ve OdemeDurum
+    /// aynı SaveChanges'te yeniden hesaplanır → Kalan Bakiye her ekrana yansır.
+    /// </summary>
+    Task CancelTransactionAsync(int transactionId, string? gerekce, int currentUserId);
 
     /// <summary>
     /// Yeni tahsilat. MuhasebeIslemTablo INSERT + Order.OdenenMiktar = SUM + Order.OdemeDurum güncelle.

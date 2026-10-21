@@ -16,8 +16,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { AutocompleteInput } from '@/components/AutocompleteInput'
 import { DecimalInput } from '@/components/DecimalInput'
 import { KPICard } from '@/components/KPICard'
+import { CancelTransactionDialog, CancelTxButton, type CancelTxTarget } from '@/components/CancelTransactionDialog'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
+import { isAccountingApprover } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
 import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -39,6 +41,7 @@ const SENTINEL_ALL = '__all__'
 const MAX_VISIBLE_INSTALLMENTS = 4
 
 interface InstallmentCell {
+  id: number
   index: number
   miktar: number | null
   tarih: string
@@ -65,6 +68,9 @@ export function AccountingHistoryPage() {
   // PROMPT-v2 Â§10.3: Sadece Yonetici + Muhasebe peÅŸinat sÃ¼tunlarÄ±nÄ± gÃ¶rÃ¼r.
   // Gozlemci eski tek-Tutar gÃ¶rÃ¼nÃ¼mÃ¼nde kalÄ±r.
   const showInstallments = role === 'Yonetici' || role === 'Muhasebe'
+  // Tahsilat iptali yalnız Muhasebe Onay kullanıcılarına (backend aynı kapı).
+  const canCancel = isAccountingApprover(getUser()) && !hideMoney
+  const [cancelTarget, setCancelTarget] = useState<CancelTxTarget | null>(null)
 
   // Grouped view iÃ§in server-side sayfalama bilgili deÄŸil â€” installment'lar
   // sayfa sÄ±nÄ±rÄ±nÄ± aÅŸmasÄ±n diye pageSize'Ä± yÃ¼kseltiyoruz.
@@ -120,6 +126,7 @@ export function AccountingHistoryPage() {
         m.set(tx.siparisNo, g)
       }
       g.installments.push({
+        id:      tx.id,
         index:   tx.installmentIndex,
         miktar:  tx.odenenMiktar,
         tarih:   tx.tarih,
@@ -144,6 +151,10 @@ export function AccountingHistoryPage() {
     ...(!hideMoney ? [
       { key: 'odenenMiktar', header: t('common.amount'),
         render: (r) => formatCurrency((r.odenenMiktar as number) ?? 0, r.paraTipi as string) },
+    ] satisfies Column<LegacyRow>[] : []),
+    ...(canCancel ? [
+      { key: 'iptal', header: '',
+        render: (r) => <CancelTxButton onClick={() => setCancelTarget(r as TransactionListItem)} /> },
     ] satisfies Column<LegacyRow>[] : []),
   ]
 
@@ -266,6 +277,12 @@ export function AccountingHistoryPage() {
           <InstallmentTable
             rows={orderRows}
             loading={isLoading}
+            onCancel={canCancel
+              ? (r, inst) => setCancelTarget({
+                  id: inst.id, siparisNo: r.siparisNo, odenenMiktar: inst.miktar,
+                  tarih: inst.tarih, paraTipi: r.paraTipi,
+                })
+              : undefined}
           />
         ) : (
           <DataTable
@@ -299,6 +316,8 @@ export function AccountingHistoryPage() {
           </div>
         )}
       </div>
+
+      <CancelTransactionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} />
     </div>
   )
 }
@@ -308,10 +327,12 @@ export function AccountingHistoryPage() {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function InstallmentTable({
-  rows, loading,
+  rows, loading, onCancel,
 }: {
   rows: OrderRow[]
   loading: boolean
+  /** Verilirse her peşinat hücresinde iptal (X) butonu gösterilir. */
+  onCancel?: (row: OrderRow, inst: InstallmentCell) => void
 }) {
   const { t } = useTranslation()
   if (loading) {
@@ -369,7 +390,10 @@ function InstallmentTable({
                   if (!inst) return <td key={i} className="px-2 py-1 text-right text-muted-foreground">â€”</td>
                   return (
                     <td key={i} className="px-2 py-1 text-right tabular-nums">
-                      <div>{formatCurrency(inst.miktar ?? 0, r.paraTipi ?? '')}</div>
+                      <div className="flex items-center justify-end gap-1">
+                        {formatCurrency(inst.miktar ?? 0, r.paraTipi ?? '')}
+                        {onCancel && <CancelTxButton onClick={() => onCancel(r, inst)} />}
+                      </div>
                       <div className="text-[10px] text-muted-foreground">{formatDate(inst.tarih)}</div>
                     </td>
                   )

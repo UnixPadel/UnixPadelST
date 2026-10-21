@@ -96,6 +96,21 @@ public static class DatabaseSchemaMigrator
         // 12) §17 — SiparisOnaylari.OnayDurumu varchar(20) → varchar(40).
         await EnsureOnayDurumuWidenedAsync(ctx, logger);
 
+        // 12b) MuhasebeIslemTablo tahsilat iptali — yanlış girilen peşinat/tahsilat
+        // silinmez, iptal edilir (gerekçe + kim + ne zaman). Additive.
+        await EnsureColumnAsync(ctx, logger,
+            table: "MuhasebeIslemTablo", column: "Iptal",
+            ddl: "ALTER TABLE MuhasebeIslemTablo ADD COLUMN Iptal TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(ctx, logger,
+            table: "MuhasebeIslemTablo", column: "IptalGerekce",
+            ddl: "ALTER TABLE MuhasebeIslemTablo ADD COLUMN IptalGerekce VARCHAR(500) NULL");
+        await EnsureColumnAsync(ctx, logger,
+            table: "MuhasebeIslemTablo", column: "IptalKullaniciID",
+            ddl: "ALTER TABLE MuhasebeIslemTablo ADD COLUMN IptalKullaniciID INT NULL");
+        await EnsureColumnAsync(ctx, logger,
+            table: "MuhasebeIslemTablo", column: "IptalTarihi",
+            ddl: "ALTER TABLE MuhasebeIslemTablo ADD COLUMN IptalTarihi DATETIME NULL");
+
         // 13a) BilesenBilgileri.Currency — bileşen fiyatının para birimi (Excel reçeteleri TL).
         // Legacy şemada var; yoksa eklenir. Sipariş ekranı fiyatı bu birimden siparişin
         // Para Tipi'ne TCMB kuruyla çevirir.

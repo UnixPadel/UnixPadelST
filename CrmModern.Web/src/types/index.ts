@@ -429,6 +429,11 @@ export interface AccountingTransactionDto {
   kullaniciID: number
   odenenMiktar: number | null
   tarih: string
+  // Tahsilat iptali — yalnız includeCancelled ile istenen listelerde true gelir.
+  iptal?: boolean
+  iptalGerekce?: string | null
+  iptalKullaniciAdSoyad?: string | null
+  iptalTarihi?: string | null
 }
 
 // ── Purchase ──────────────────────────────────────────────────────────────────

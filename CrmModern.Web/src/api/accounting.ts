@@ -13,8 +13,11 @@ export const getAccountingOrderDetail = async (no: string): Promise<AccountingOr
   return res.data.data
 }
 
-export const getTransactionsForOrder = async (no: string): Promise<AccountingTransactionDto[]> => {
-  const res = await api.get<ApiResponse<AccountingTransactionDto[]>>(`/api/accounting/orders/${no}/transactions`)
+/** includeCancelled=true → iptal edilmiş tahsilatlar da (iptal=true) döner; toplamlara katmayın. */
+export const getTransactionsForOrder = async (no: string, includeCancelled = false): Promise<AccountingTransactionDto[]> => {
+  const res = await api.get<ApiResponse<AccountingTransactionDto[]>>(`/api/accounting/orders/${no}/transactions`, {
+    params: includeCancelled ? { includeCancelled: true } : undefined,
+  })
   return res.data.data
 }
 
@@ -126,6 +129,13 @@ export const addTransaction = async (dto: AddTransactionRequest): Promise<Accoun
   const res = await api.post<ApiResponse<AccountingTransactionDto>>('/api/accounting/transactions', dto)
   return res.data.data
 }
+
+/**
+ * Yanlış girilen tahsilat/peşinatın iptali (gerekçe opsiyonel).
+ * Satır silinmez; sipariş Ödenen/Kalan Bakiye sunucuda yeniden hesaplanır.
+ */
+export const cancelTransaction = (id: number, gerekce?: string) =>
+  api.post(`/api/accounting/transactions/${id}/cancel`, { gerekce }).then((r) => r.data)
 
 export const downloadAccountingExcel = async (filter: TransactionFilter = {}) => {
   // PROMPT.md ACCOUNTING #7: Muhasebe Geçmiş Excel export was broken.

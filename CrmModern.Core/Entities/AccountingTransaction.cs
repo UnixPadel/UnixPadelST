@@ -11,4 +11,11 @@ public sealed class AccountingTransaction
     public int      KullaniciID  { get; set; }
     public decimal? OdenenMiktar { get; set; }
     public DateTime Tarih        { get; set; }
+
+    // Tahsilat iptali (yumuşak): satır silinmez, iz kalır. İptal satırları global
+    // query filter ile tüm toplamlardan / listelerden düşer.
+    public bool      Iptal            { get; set; }
+    public string?   IptalGerekce     { get; set; }
+    public int?      IptalKullaniciID { get; set; }
+    public DateTime? IptalTarihi      { get; set; }
 }

@@ -611,10 +611,12 @@
     "cariLabel": {
       "pesinat1": "1st Down Payment",
       "pesinat2": "2nd Down Payment",
+      "pesinatN": "Down Payment #{{n}}",
       "maliyet": "Cost"
     },
     "pesinat": {
-      "hint": "The down payment is recorded as a collection on approval. It is not written to Cost."
+      "hint": "The down payment is recorded as a collection on approval. It is not written to Cost.",
+      "hintEk": "Recorded as a collection; the order stage does not change. With a past date it is numbered by date."
     },
     "overpay": {
       "confirm": "The amount exceeds the remaining balance ({{kalan}}) by {{fark}} and the Remaining Balance will go negative.\n\nIs the amount correct? Continue?"
@@ -653,14 +655,16 @@
     "actions": {
       "cariOnayla": "Approve Account",
       "lojistikOnayla": "Approve Logistics",
-      "tamamla": "Complete"
+      "tamamla": "Complete",
+      "pesinatKaydet": "Save Down Payment"
     },
     "disabled": {
       "cari": "Order must be in 'Siparis' stage with Kontrol='Onay'."
     },
     "toast": {
       "cariApproved": "Cari approved — order moved to Planning.",
-      "logisticsApproved": "Logistics approved — order released to shipment queue."
+      "logisticsApproved": "Logistics approved — order released to shipment queue.",
+      "pesinatSaved": "Down payment saved, balance updated."
     }
   },
   "accounting": {

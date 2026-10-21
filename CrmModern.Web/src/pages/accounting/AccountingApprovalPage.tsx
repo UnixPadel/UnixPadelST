@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import {
   getAccountingOrders, getTransactionsForOrder,
   approveMuhasebeAndMoveToPlanning, approveLogistics,
-  uploadMuhasebeEk, finalizeCompletion,
+  uploadMuhasebeEk, finalizeCompletion, addTransaction,
 } from '@/api/accounting'
 import { CancelTransactionDialog, CancelTxButton, type CancelTxTarget } from '@/components/CancelTransactionDialog'
 import { getOrderDetail, downloadAttachment, downloadExcel, downloadPdf } from '@/api/orders'
@@ -250,6 +250,22 @@ export function AccountingApprovalPage() {
     onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
   })
 
+  // Kuyruk dışı (Tamamlandı vb.) siparişe sonradan peşinat: düz tahsilat,
+  // aşama değişmez. Seçim korunur → Muhasebe Geçmişi'nde yeni satır görünür.
+  const ekPesinatMut = useMutation({
+    mutationFn: (no: string) => addTransaction({
+      siparisNo:    no,
+      odenenMiktar: pesinatForm.pesinat ?? 0,
+      tarih:        pesinatForm.pesinatTarihi || undefined,
+    }),
+    onSuccess: () => {
+      refreshAll()
+      setPesinatForm((f) => ({ ...f, pesinat: null }))
+      toast({ title: t('accApproval.toast.pesinatSaved') })
+    },
+    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+  })
+
   // Kalan bakiyeyi aşan peşinat girilirken onay iste (engellemez: gerçek fazla
   // ödeme yine girilebilir). Eksi bakiyenin en sık nedeni hatalı/çift giriş.
   const confirmOverpay = (amount: number | null): boolean => {
@@ -301,6 +317,12 @@ export function AccountingApprovalPage() {
   const canCari = !!selectedRow && matchesView(selectedRow, 'cariQueue')
   const canLoj  = !!selectedRow && matchesView(selectedRow, 'lojistikQueue')
   const canFinalize = !!selectedRow && matchesView(selectedRow, 'tamamlanmaQueue')
+  // Hiçbir kuyrukta olmayan sipariş (Tamamlandı, Planlama, Üretim, Lojistik…):
+  // onay aksiyonu yok, yalnız sonradan peşinat girilebilir.
+  const canEkPesinat = !!selectedRow && !canCari && !canLoj && !canFinalize
+    && !['Teklif', 'Iptal'].includes(selectedRow.siparisMiTeklifMi ?? '')
+  // Etiket için sıradaki peşinat no (tarih sırası backend'de; geçmiş tarih öne kayar).
+  const nextPesinatNo = transactions.filter((tx) => !tx.iptal).length + 1
 
   // ── Master grid kolonları ───────────────────────────────────────────────
   const columns: Column<AccountingOrderListDto & Record<string, unknown>>[] = [
@@ -626,12 +648,15 @@ export function AccountingApprovalPage() {
                 </div>
               )}
 
-              {/* Round-10 — Peşinat alanı (yalnız Cari/Lojistik kuyruğu): onayla
+              {/* Round-10 — Peşinat alanı (Cari/Lojistik kuyruğu): onayla
                   birlikte MuhasebeIslemTablo'ya tahsilat olarak kaydedilir.
+                  Kuyruk dışı siparişte "Peşinat Kaydet" ile tek başına kaydedilir.
                   Maliyet talebinden TAMAMEN bağımsız — Maliyet'e yazmaz. */}
-              {(canCari || canLoj) && (
+              {(canCari || canLoj || canEkPesinat) && (
                 <div className="space-y-1.5 rounded border border-sky-300 bg-sky-50 p-2">
-                  <CariRow label={t(canLoj ? 'accApproval.cariLabel.pesinat2' : 'accApproval.cariLabel.pesinat1')}>
+                  <CariRow label={canEkPesinat
+                    ? t('accApproval.cariLabel.pesinatN', { n: nextPesinatNo })
+                    : t(canLoj ? 'accApproval.cariLabel.pesinat2' : 'accApproval.cariLabel.pesinat1')}>
                     <DecimalInput className="h-7 text-xs" value={pesinatForm.pesinat ?? ''}
                       onValueChange={(v) => setPesinatForm((f) => ({ ...f, pesinat: v === '' ? null : v }))} />
                   </CariRow>
@@ -639,7 +664,7 @@ export function AccountingApprovalPage() {
                     <Input type="date" className="h-7 text-xs" value={pesinatForm.pesinatTarihi}
                       onChange={(e) => setPesinatForm((f) => ({ ...f, pesinatTarihi: e.target.value }))} />
                   </CariRow>
-                  <p className="text-[10px] text-muted-foreground">{t('accApproval.pesinat.hint')}</p>
+                  <p className="text-[10px] text-muted-foreground">{t(canEkPesinat ? 'accApproval.pesinat.hintEk' : 'accApproval.pesinat.hint')}</p>
                 </div>
               )}
 
@@ -658,6 +683,12 @@ export function AccountingApprovalPage() {
                 disabled={lojMut.isPending}
                 onClick={() => { const no = requireSelection(); if (no && confirmOverpay(pesinatForm.pesinat)) lojMut.mutate(no) }}>
                 {t('accApproval.actions.lojistikOnayla')}
+              </Button>
+            ) : canEkPesinat ? (
+              <Button size="sm" className="h-8 w-full text-xs"
+                disabled={!((pesinatForm.pesinat ?? 0) > 0) || ekPesinatMut.isPending}
+                onClick={() => { const no = requireSelection(); if (no && confirmOverpay(pesinatForm.pesinat)) ekPesinatMut.mutate(no) }}>
+                {t('accApproval.actions.pesinatKaydet')}
               </Button>
             ) : (
               <Button size="sm" className="h-8 w-full text-xs"

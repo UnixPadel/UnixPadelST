@@ -611,10 +611,12 @@
     "cariLabel": {
       "pesinat1": "1. Peşinat",
       "pesinat2": "2. Peşinat",
+      "pesinatN": "{{n}}. Peşinat",
       "maliyet": "Maliyet"
     },
     "pesinat": {
-      "hint": "Peşinat, onayla birlikte tahsilat olarak kaydedilir. Maliyet'e yazılmaz."
+      "hint": "Peşinat, onayla birlikte tahsilat olarak kaydedilir. Maliyet'e yazılmaz.",
+      "hintEk": "Tahsilat olarak kaydedilir; siparişin aşaması değişmez. Geçmiş tarih girilirse numara tarihe göre sıralanır."
     },
     "overpay": {
       "confirm": "Girilen tutar kalan bakiyeyi ({{kalan}}) {{fark}} aşıyor ve Kalan Bakiye eksiye düşecek.\n\nTutar doğru mu? Devam edilsin mi?"
@@ -653,14 +655,16 @@
     "actions": {
       "cariOnayla": "Cari Onayla",
       "lojistikOnayla": "Lojistik Onayla",
-      "tamamla": "Tamamla"
+      "tamamla": "Tamamla",
+      "pesinatKaydet": "Peşinat Kaydet"
     },
     "disabled": {
       "cari": "Sipariş 'Siparis' aşamasında ve Kontrol='Onay' olmalı."
     },
     "toast": {
       "cariApproved": "Cari onay verildi — sipariş Planlama aşamasında.",
-      "logisticsApproved": "Lojistik onay verildi — sipariş sevkiyat kuyruğunda."
+      "logisticsApproved": "Lojistik onay verildi — sipariş sevkiyat kuyruğunda.",
+      "pesinatSaved": "Peşinat kaydedildi, bakiye güncellendi."
     }
   },
   "accounting": {

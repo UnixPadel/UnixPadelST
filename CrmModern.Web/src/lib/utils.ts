@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
+import { formatMoney } from '@/lib/currency'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -44,14 +45,10 @@ export function formatDateShort(date: string | Date | null | undefined): string 
   })
 }
 
+/**
+ * QW-13 — tek para biçimi: "1.234,56 €" (lib/currency.formatMoney). Eski imza
+ * korunur; varsayılan para birimi artık "EUR1.234,56" yerine sembolle basılır.
+ */
 export function formatCurrency(amount: number | null | undefined, currency = 'EUR'): string {
-  if (amount == null) return '-'
-  const symbols: Record<string, string> = {
-    Euro: '€',
-    Dolar: '$',
-    TL: '₺',
-    Sterlin: '£',
-  }
-  const symbol = symbols[currency] ?? currency
-  return `${symbol}${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  return formatMoney(amount, currency)
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getAllPurchaseRequests, overrideApprovePurchase, type PurchaseFilter } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
@@ -9,11 +9,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useToast } from '@/components/ToastProvider'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useAppMutation } from '@/hooks/useAppMutation'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdmin } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
-import { describeApiError } from '@/lib/axios'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { purchaseStatusLabel } from '@/lib/status'
 import type { PurchaseRequestListDto } from '@/types'
@@ -31,9 +32,8 @@ const DEPARTMANLAR = ['Yonetici', 'Muhasebe', 'Fabrika', 'Gozlemci', 'Temsilci',
 
 export function AllPurchaseRequestsPage() {
   const { t } = useTranslation()
-  const { toast } = useToast()
+  const { confirm } = useConfirm()
   const { getUser } = useAuth()
-  const qc = useQueryClient()
   const [filter, setFilter] = useState<PurchaseFilter>({ page: 1, pageSize: 50 })
 
   // PROMPT-v7 §2: override "Onayla" yalnız elshan.rasulov'a render edilir.
@@ -42,23 +42,25 @@ export function AllPurchaseRequestsPage() {
   // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez.
   const hideMoney = hideMoneyFor(getUser())
 
-  const { data: page, isLoading } = useQuery({
-    queryKey: ['purchase-all', filter],
-    queryFn: () => getAllPurchaseRequests(filter),
+  // QW-15 — metin alanı her tuşta sorgu atmasın; yenilemede tablo boşalmasın.
+  const debouncedFilter = useDebouncedValue(filter, 300)
+  const { data: page, isLoading, isError } = useQuery({
+    queryKey: ['purchase-all', debouncedFilter],
+    queryFn: () => getAllPurchaseRequests(debouncedFilter),
+    placeholderData: keepPreviousData,
   })
 
-  const overrideMut = useMutation({
+  // Override sonrası talep tüm bekleyen kuyruklardan düşer (ortak tazeleme).
+  const overrideMut = useAppMutation({
     mutationFn: (talepId: number) => overrideApprovePurchase(talepId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['purchase-all'] })
-      // Override sonrası talep tüm bekleyen kuyruklardan düşmeli.
-      qc.invalidateQueries({ queryKey: ['preapproval'] })
-      qc.invalidateQueries({ queryKey: ['payment-pending'] })
-      qc.invalidateQueries({ queryKey: ['final-pending'] })
-      toast({ title: t('purchase.overrideSuccess') })
-    },
-    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+    successTitle: t('purchase.overrideSuccess'),
+    successDescription: (_d, id) => '#' + id,
+    errorTitle: t('common.error'),
   })
+  const askOverride = async (r: PurchaseRequestListDto) => {
+    if (await confirm({ title: t('purchase.overrideConfirm'), description: '#' + r.talepID + ' ' + r.urunAdi, confirmLabel: t('purchase.overrideApprove') }))
+      overrideMut.mutate(r.talepID)
+  }
 
   // Aşama computed (SatinAlmaTumTalepForm portu) — i18n kod döner, render çevirir.
   const computeAsama = (r: PurchaseRequestListDto): string => {
@@ -71,18 +73,18 @@ export function AllPurchaseRequestsPage() {
   }
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',               header: t('purchase.cols.id') },
-    { key: 'urunAdi',               header: t('purchase.cols.urun') },
+    { key: 'talepID',               header: t('purchase.cols.id'), sortable: true, type: 'number' },
+    { key: 'urunAdi',               header: t('purchase.cols.urun'), sortable: true },
     ...(!hideMoney ? [
       { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => (r.paraBirimi as string) ?? '—' },
-      { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
+      { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), sortable: true, type: 'money', render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
     ] satisfies Column<PurchaseRequestListDto & Record<string, unknown>>[] : []),
     { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
     { key: 'departman',             header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
     { key: 'talepTipi',             header: t('purchase.cols.tip'), render: (r) => t(`purchase.tipLabel.${(r.talepTipi as string) ?? 'SatinAlma'}`, { defaultValue: (r.talepTipi as string) ?? 'SatinAlma' }) },
     { key: 'durum',                 header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     { key: 'asama',                 header: t('purchase.cols.asama'), render: (r) => { const c = computeAsama(r as unknown as PurchaseRequestListDto); return c ? t(`purchase.asamaLabel.${c}`) : '—' } },
-    { key: 'talepTarihi',           header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
+    { key: 'talepTarihi',           header: t('purchase.cols.tarih'), sortable: true, type: 'date', render: (r) => formatDate(r.talepTarihi as string) },
     // PROMPT-v7 §2: override aksiyon kolonu — yalnız elshan.rasulov'a render.
     ...(isOverrideUser ? [{
       key: 'override',
@@ -90,10 +92,9 @@ export function AllPurchaseRequestsPage() {
       render: (r: PurchaseRequestListDto & Record<string, unknown>) =>
         FINAL_DURUMLAR.includes(r.durum as string) ? null : (
           <Button
-            size="sm"
-            className="h-7 text-xs"
-            disabled={overrideMut.isPending}
-            onClick={() => overrideMut.mutate(r.talepID as number)}
+            size="xs"
+            loading={overrideMut.isPendingFor((id) => id === r.talepID)}
+            onClick={() => askOverride(r)}
           >
             {t('purchase.overrideApprove')}
           </Button>
@@ -147,7 +148,7 @@ export function AllPurchaseRequestsPage() {
           </div>
         </div>
 
-        <DataTable columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} density="compact" />
+        <DataTable tableId="purchase-all" exportFileName="satin-alma-talepleri" columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} error={isError} density="compact" />
 
         {page && (
           <div className="flex flex-wrap items-center justify-between gap-2 text-sm">

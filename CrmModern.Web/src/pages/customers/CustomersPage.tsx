@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
-import { describeApiError } from '@/lib/axios'
+import { toastApiError } from '@/lib/apiError'
 import type { Musteri } from '@/types'
 
 /**
@@ -60,7 +60,7 @@ export function CustomersPage() {
       toast({ title: t('customers.toast.deleted') })
     },
     // Siparişi olan müşteride backend BusinessException döner — net mesaj göster.
-    onError: (e) => toast({ title: t('customers.toast.deleteFailed'), description: describeApiError(e), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('customers.toast.deleteFailed'), e),
   })
 
   // Client-side filter on the canonical columns. Sorting by MusteriAd ascending
@@ -90,7 +90,7 @@ export function CustomersPage() {
       key: 'actions',
       header: t('common.actions'),
       render: (r: Musteri & Record<string, unknown>) => (
-        <Button size="sm" variant="destructive" className="h-7 text-xs"
+        <Button size="xs" variant="destructive"
           onClick={() => setDeleteTarget(r as Musteri)}>
           {t('common.delete')}
         </Button>

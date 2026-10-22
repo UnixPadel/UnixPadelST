@@ -1,20 +1,15 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getCarriers } from '@/api/logistics'
 import { submitOffer } from '@/api/logisticsOffers'
 import { INCOTERMS, PARA_BIRIMLERI } from '@/lib/constants'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { FormField } from '@/components/ui/form-field'
+import { SectionTitle } from '@/components/ui/section-title'
 import { DecimalInput } from '@/components/DecimalInput'
+import { CarrierPicker } from '@/components/CarrierPicker'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { FieldError } from '@/components/FieldError'
-import { useToast } from '@/components/ToastProvider'
-
-// Sevk dialogundaki "Diğer" sentinel deseni (kayıtlı taşıyıcılarla çakışmasın).
-const OTHER_CARRIER = '__other__'
+import { useAppMutation } from '@/hooks/useAppMutation'
 
 interface Props {
   siparisNo: string
@@ -23,100 +18,76 @@ interface Props {
 }
 
 /**
- * Lojistik teklif giriş formu — alanlar mevcut sevk dialogu ile birebir
- * (Firma + Taşıma türü + Fiyat + Not). Hem yeni "Lojistik Teklif" ekranında
- * hem de Detay modalındaki "Teklif Gönder" altında kullanılır.
+ * Lojistik teklif giriş formu — alanlar sevk dialogu ile birebir (Firma + Taşıma
+ * türü + Fiyat + Not). Hem "Lojistik Teklif" ekranında hem de Detay panelindeki
+ * "Teklif Gönder" altında kullanılır. Taşıyıcı seçimi ortak CarrierPicker.
  */
 export function LogisticsOfferForm({ siparisNo, onSubmitted }: Props) {
   const { t } = useTranslation()
-  const { toast } = useToast()
-  const qc = useQueryClient()
-  const { data: carriers = [] } = useQuery({ queryKey: ['carriers'], queryFn: getCarriers })
-
-  const [carrierChoice, setCarrierChoice] = useState(OTHER_CARRIER)
-  const [firmaText, setFirmaText] = useState('')
+  const [firmaAdi, setFirmaAdi] = useState('')
   const [lojistikCesit, setLojistikCesit] = useState('')
   const [fiyat, setFiyat] = useState<number>(0)
   const [paraBirimi, setParaBirimi] = useState('Euro')
   const [aciklama, setAciklama] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  const firmaAdi = carrierChoice === OTHER_CARRIER ? firmaText.trim() : carrierChoice
   const valid = !!(firmaAdi && lojistikCesit.trim() && fiyat > 0)
 
-  const mut = useMutation({
-    mutationFn: () => submitOffer(siparisNo, {
+  const mut = useAppMutation({
+    mutationFn: (_: void) => submitOffer(siparisNo, {
       firmaAdi, lojistikCesit, fiyat, paraBirimi, aciklama: aciklama.trim() || undefined,
     }),
+    successTitle: t('logisticsOffer.toast.submitted'),
+    errorTitle: t('logisticsOffer.toast.error'),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['logistics-offers', siparisNo] })
-      qc.invalidateQueries({ queryKey: ['logistics-offer-queue'] })
-      qc.invalidateQueries({ queryKey: ['carriers'] })
-      setCarrierChoice(OTHER_CARRIER); setFirmaText(''); setLojistikCesit('')
+      setFirmaAdi(''); setLojistikCesit('')
       setFiyat(0); setParaBirimi('Euro'); setAciklama(''); setSubmitted(false)
-      toast({ title: t('logisticsOffer.toast.submitted') })
       onSubmitted?.()
     },
-    onError: () => toast({ title: t('logisticsOffer.toast.error'), variant: 'destructive' }),
   })
 
-  const onSubmit = () => {
+  const onSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
     setSubmitted(true)
     if (!valid) return
     mut.mutate()
   }
 
+  const req = (ok: boolean) => (submitted && !ok ? t('validation.required') : null)
+
   return (
-    <div className="space-y-3 rounded-md border bg-muted/30 p-3">
-      <h4 className="text-sm font-semibold">{t('logisticsOffer.addTitle')}</h4>
+    <form onSubmit={onSubmit} className="space-y-3 rounded-md border bg-muted/30 p-3">
+      <SectionTitle as="h4">{t('logisticsOffer.addTitle')}</SectionTitle>
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <div className="space-y-1">
-          <Label>{t('logisticsOffer.firma')}</Label>
-          <Select value={carrierChoice || undefined} onValueChange={setCarrierChoice}>
-            <SelectTrigger><SelectValue placeholder={t('logistics.carrier.select')} /></SelectTrigger>
-            <SelectContent>
-              {carriers.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              <SelectItem value={OTHER_CARRIER}>{t('logistics.carrier.other')}</SelectItem>
-            </SelectContent>
-          </Select>
-          {carrierChoice === OTHER_CARRIER && (
-            <Input value={firmaText} onChange={(e) => setFirmaText(e.target.value)}
-              placeholder={t('logistics.carrier.otherPlaceholder')} />
-          )}
-          {submitted && !firmaAdi && <FieldError message={t('validation.required')} />}
-        </div>
-        <div className="space-y-1">
-          <Label>{t('logisticsOffer.cesit')}</Label>
+        <FormField label={t('logisticsOffer.firma')} required error={req(!!firmaAdi)}>
+          <CarrierPicker value={firmaAdi} onChange={setFirmaAdi} />
+        </FormField>
+        <FormField label={t('logisticsOffer.cesit')} required error={req(!!lojistikCesit.trim())}>
           <Select value={lojistikCesit || undefined} onValueChange={setLojistikCesit}>
             <SelectTrigger><SelectValue placeholder={t('logistics.cesit.select')} /></SelectTrigger>
             <SelectContent>
               {INCOTERMS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
             </SelectContent>
           </Select>
-          {submitted && !lojistikCesit.trim() && <FieldError message={t('validation.required')} />}
-        </div>
-        <div className="space-y-1">
-          <Label>{t('logisticsOffer.fiyat')}</Label>
+        </FormField>
+        <FormField label={t('logisticsOffer.fiyat')} required error={req(fiyat > 0)}>
           <DecimalInput value={fiyat} onValueChange={(v) => setFiyat(v === '' ? 0 : v)} />
-          {submitted && !(fiyat > 0) && <FieldError message={t('validation.required')} />}
-        </div>
-        <div className="space-y-1">
-          <Label>{t('logisticsOffer.paraBirimi')}</Label>
+        </FormField>
+        <FormField label={t('logisticsOffer.paraBirimi')}>
           <Select value={paraBirimi} onValueChange={setParaBirimi}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {PARA_BIRIMLERI.map((p) => <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>)}
             </SelectContent>
           </Select>
-        </div>
-        <div className="space-y-1">
-          <Label>{t('logisticsOffer.not')}</Label>
+        </FormField>
+        <FormField label={t('logisticsOffer.not')} className="md:col-span-2">
           <Textarea rows={1} value={aciklama} onChange={(e) => setAciklama(e.target.value)} />
-        </div>
+        </FormField>
       </div>
       <div className="flex justify-end">
-        <Button size="sm" disabled={mut.isPending} onClick={onSubmit}>{t('logisticsOffer.submit')}</Button>
+        <Button type="submit" size="sm" loading={mut.isPending}>{t('logisticsOffer.submit')}</Button>
       </div>
-    </div>
+    </form>
   )
 }

@@ -13,6 +13,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { FieldError } from '@/components/FieldError'
 import { useToast } from '@/components/ToastProvider'
+import { toastApiError } from '@/lib/apiError'
+import { useEnterNavigation } from '@/hooks/useEnterNavigation'
+import { usePreferences } from '@/lib/preferences'
 import { formatCurrency } from '@/lib/utils'
 import type { CreatePurchaseRequestLine } from '@/types'
 
@@ -77,6 +80,9 @@ export function NewPurchaseRequestPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
   const { t } = useTranslation()
+  // E-3 — ETA tarzı Enter ile sonraki alan (Tercihlerim'den kapatılabilir).
+  const onEnterNav = useEnterNavigation()
+  const { enterNavigation } = usePreferences()
   const { getUser } = useAuth()
   const user = getUser()
 
@@ -142,7 +148,7 @@ export function NewPurchaseRequestPage() {
         : { title: t('purchase.attachment.createButUploadFailed'), variant: 'destructive' })
       nav('/purchase/mine')
     },
-    onError: () => toast({ title: t('purchase.createError'), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('purchase.createError'), e),
   })
 
   const onSubmit = () => {
@@ -163,7 +169,7 @@ export function NewPurchaseRequestPage() {
   return (
     <div>
       <PageHeader title={t('purchase.newTitle')} />
-      <div className="p-4 lg:p-6 max-w-5xl space-y-4">
+      <div className="p-4 lg:p-6 max-w-5xl space-y-4" onKeyDown={enterNavigation ? onEnterNav : undefined}>
 
         {/* Para birimi (belge düzeyinde, tek) */}
         <div className="flex flex-wrap items-end gap-3">

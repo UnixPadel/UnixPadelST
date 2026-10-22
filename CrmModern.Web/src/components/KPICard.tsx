@@ -1,45 +1,45 @@
-import { Card, CardContent } from '@/components/ui/card'
 import type { ReactNode } from 'react'
+import { Link } from 'react-router-dom'
+import { ArrowRight } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 interface KPICardProps {
   baslik: string
   deger: string | number
   altMetin?: string
   ikon?: ReactNode
-  renk?: string  // tailwind text-* color
+  /** Eski tailwind text-* renk sınıfı — QW-11 ile modül ikonları nötr; yalnız geriye uyum. */
+  renk?: string
   vurgu?: 'normal' | 'uyari' | 'basari'
+  /** QW-11 — verilirse kart ilgili kuyruğa giden bir bağlantı olur. */
+  to?: string
 }
 
 /**
- * Dashboard KPI kartı — sayı + başlık + ikon.
- * WinForms'ta karşılığı yoktu (Form3 dashboard yorum satırı); minimum dashboard için eklendi.
+ * Dashboard KPI kartı — sayı + başlık + ikon. QW-11: kart tıklanabilir
+ * (ör. "Bekleyen Kontrol: 7" → Kontrol ekranı); vurgu semantik tonlarla.
  */
-export function KPICard({ baslik, deger, altMetin, ikon, renk, vurgu = 'normal' }: KPICardProps) {
+export function KPICard({ baslik, deger, altMetin, ikon, renk, vurgu = 'normal', to }: KPICardProps) {
   const vurguClass =
-    vurgu === 'uyari'  ? 'border-amber-300 dark:border-amber-700' :
-    vurgu === 'basari' ? 'border-green-300 dark:border-green-700' :
+    vurgu === 'uyari'  ? 'border-warning/50 bg-warning-soft/30' :
+    vurgu === 'basari' ? 'border-success/40' :
                          ''
 
-  return (
-    <Card className={vurguClass}>
+  const body = (
+    <Card className={cn(vurguClass, to && 'transition-shadow group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-ring')}>
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide truncate">
-              {baslik}
-            </p>
-            <p className="text-2xl font-bold mt-1 truncate">{deger}</p>
-            {altMetin && (
-              <p className="text-xs text-muted-foreground mt-1 truncate">{altMetin}</p>
-            )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{baslik}</p>
+            <p className="mt-1 truncate text-2xl font-bold tabular-nums">{deger}</p>
+            {altMetin && <p className="mt-1 truncate text-xs text-muted-foreground">{altMetin}</p>}
           </div>
-          {ikon && (
-            <div className={renk ?? 'text-muted-foreground'}>
-              {ikon}
-            </div>
-          )}
+          {ikon && <div className={cn(renk ?? 'text-muted-foreground', vurgu === 'uyari' && 'text-warning')}>{ikon}</div>}
         </div>
+        {to && <ArrowRight className="mt-1 h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />}
       </CardContent>
     </Card>
   )
+  return to ? <Link to={to} className="group block rounded-lg focus-visible:outline-none" aria-label={`${baslik}: ${deger}`}>{body}</Link> : body
 }

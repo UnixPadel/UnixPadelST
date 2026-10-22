@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import {
   getPendingPayment, getPurchaseById, setPaymentDetails,
@@ -10,22 +11,20 @@ import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useToast } from '@/components/ToastProvider'
+import { useAppMutation } from '@/hooks/useAppMutation'
+import { PurchaseLinesTable } from '@/components/PurchaseLinesTable'
 import { PurchaseAttachment } from '@/components/PurchaseAttachment'
 import { DynamicPaymentForm } from '@/components/DynamicPaymentForm'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { localDateTimeInput } from '@/lib/date'
 import type { PurchaseRequestListDto } from '@/types'
 
 // Ödeme Detayı diyaloğu: seçilen ödeme türüne göre DynamicPaymentForm türe-özel
 // kırılım alanlarını gösterir. Alt-alanlar zorunlu DEĞİLDİR — yalnız ödeme türü
 // seçilmiş olmalı; alanlar boş bırakılsa da kayıt geçer (backend de gevşetildi).
 
-// `yyyy-MM-ddTHH:mm` in the user's local time, suitable for <input type="datetime-local" />.
-function nowForDatetimeLocal(): string {
-  const d = new Date()
-  const tzOffsetMs = d.getTimezoneOffset() * 60_000
-  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 16)
-}
+// `yyyy-MM-ddTHH:mm` in the user's local time — shared helper (lib/date).
+const nowForDatetimeLocal = () => localDateTimeInput()
 
 const buildEmpty = (): SetPaymentDetailsRequest => ({
   odemeTuru: '',
@@ -34,14 +33,15 @@ const buildEmpty = (): SetPaymentDetailsRequest => ({
 
 export function PaymentDetailsPage() {
   const { t } = useTranslation()
-  const qc = useQueryClient()
-  const { toast } = useToast()
-  const [target, setTarget] = useState<number | null>(null)
+  const [params] = useSearchParams()
+  // E-10 — Bekleyen İşler "İşle" → ?sel=ID ile ödeme penceresi açık gelir.
+  const [target, setTarget] = useState<number | null>(() => (params.get('sel') ? Number(params.get('sel')) : null))
   const [form, setForm] = useState<SetPaymentDetailsRequest>(buildEmpty())
 
   // Yalnız ödeme türü zorunlu; alt-alanlar opsiyonel.
   const valid = !!form.odemeTuru
-  const onSubmit = () => {
+  const onSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault()
     if (!valid) return
     saveMut.mutate()
   }
@@ -55,21 +55,18 @@ export function PaymentDetailsPage() {
     enabled: !!target,
   })
 
-  const saveMut = useMutation({
-    mutationFn: () => setPaymentDetails(target!, form),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['payment-pending'] })
-      qc.invalidateQueries({ queryKey: ['final-pending'] })
-      setTarget(null); setForm(buildEmpty())
-      toast({ title: t('purchase.payment.saved') })
-    },
-    onError: (e: unknown) => toast({ title: t('common.failed'), description: (e as Error).message, variant: 'destructive' }),
+  const saveMut = useAppMutation({
+    mutationFn: (_: void) => setPaymentDetails(target!, form),
+    successTitle: t('purchase.payment.saved'),
+    successDescription: () => '#' + target,
+    errorTitle: t('common.failed'),
+    onSuccess: () => { setTarget(null); setForm(buildEmpty()) },
   })
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
     { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
     { key: 'urunAdi',       header: t('purchase.cols.urun') },
-    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0) },
+    { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), type: 'money', sortable: true, render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
     { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
     { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
     { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
@@ -77,7 +74,7 @@ export function PaymentDetailsPage() {
     {
       key: 'actions', header: t('purchase.cols.islem'),
       render: (r) => (
-        <Button size="sm" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()) }}>
+        <Button size="xs" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()) }}>
           {t('purchase.payment.enter')}
         </Button>
       ),
@@ -88,73 +85,63 @@ export function PaymentDetailsPage() {
     <div>
       <PageHeader title={t('purchase.payment.pageTitle')} />
       <div className="p-6">
-        <DataTable columns={cols} data={pending as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
+        <DataTable
+          tableId="payment-details"
+          exportFileName="odeme-detay"
+          columns={cols}
+          data={pending as (PurchaseRequestListDto & Record<string, unknown>)[]}
+          keyField="talepID"
+          loading={isLoading}
+          onRowActivate={(r) => { setTarget(r.talepID as number); setForm(buildEmpty()) }}
+        />
       </div>
 
-      <Dialog open={!!target} onOpenChange={() => setTarget(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null) }}>
+        <DialogContent size="lg">
+          <form onSubmit={onSubmit} className="space-y-3">
           <DialogHeader>
             <DialogTitle>{t('purchase.payment.dialogTitle', { id: target })}</DialogTitle>
           </DialogHeader>
 
+          {!detail && <div className="h-24 animate-pulse rounded-md bg-muted" />}
           {detail && (
-            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1 mb-3">
+            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
               <div className="grid grid-cols-2 gap-2">
                 <div><span className="text-muted-foreground">{t('purchase.detailPanel.urun')}:</span> {detail.urunAdi}</div>
-                <div><span className="text-muted-foreground">{t('purchase.detailPanel.maliyet')}:</span> {formatCurrency(detail.urunMaliyeti ?? 0)}</div>
+                <div><span className="text-muted-foreground">{t('purchase.detailPanel.maliyet')}:</span> {formatCurrency(detail.urunMaliyeti ?? 0, detail.paraBirimi ?? '')}</div>
                 <div><span className="text-muted-foreground">{t('purchase.detailPanel.departman')}:</span> {detail.departman}</div>
                 <div><span className="text-muted-foreground">{t('purchase.detailPanel.talepEden')}:</span> {detail.talepEdenKullaniciAdi}</div>
                 {detail.notlar && <div className="col-span-2"><span className="text-muted-foreground">{t('purchase.detailPanel.not')}:</span> {detail.notlar}</div>}
-                {detail.onIzlemeYapan && <div className="col-span-2 text-xs text-blue-700">{t('purchase.detailPanel.onOnaylayan')}: {detail.onIzlemeYapan} · {detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''}</div>}
+                {detail.onIzlemeYapan && <div className="col-span-2 text-xs text-info">{t('purchase.detailPanel.onOnaylayan')}: {detail.onIzlemeYapan} · {detail.onIzlemeTarihi ? formatDate(detail.onIzlemeTarihi) : ''}</div>}
               </div>
-              {/* Round-9 §9 — kalem satırları (varsa) */}
+              {/* Round-9 §9 — kalem satırları (varsa) — FA ile aynı ortak tablo. */}
               {detail.kalemler && detail.kalemler.length > 0 && (
-                <div className="mt-2 overflow-x-auto border-t pt-2">
-                  <table className="w-full text-xs">
-                    <thead className="uppercase text-muted-foreground">
-                      <tr>
-                        <th className="px-1 py-1 text-left">{t('purchase.lines.urunAdi')}</th>
-                        <th className="px-1 py-1 text-left">{t('purchase.lines.birim')}</th>
-                        <th className="px-1 py-1 text-right">{t('purchase.lines.miktar')}</th>
-                        <th className="px-1 py-1 text-right">{t('purchase.lines.birimFiyat')}</th>
-                        <th className="px-1 py-1 text-right">{t('purchase.lines.satirToplam')}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.kalemler.map((k) => (
-                        <tr key={k.kalemID} className="border-t">
-                          <td className="px-1 py-0.5">{k.urunAdi}</td>
-                          <td className="px-1 py-0.5">{k.birim}</td>
-                          <td className="px-1 py-0.5 text-right tabular-nums">{k.miktar}</td>
-                          <td className="px-1 py-0.5 text-right tabular-nums">{k.birimFiyat != null ? formatCurrency(k.birimFiyat) : '—'}</td>
-                          <td className="px-1 py-0.5 text-right tabular-nums font-medium">{formatCurrency(k.toplam)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                <div className="mt-2 border-t pt-2">
+                  <PurchaseLinesTable kalemler={detail.kalemler} paraBirimi={detail.paraBirimi} grandTotal={detail.urunMaliyeti ?? 0} hideMoney={false} />
                 </div>
               )}
             </div>
           )}
 
           {detail && (
-            <div className="mb-3">
+            <div>
               <PurchaseAttachment talepId={detail.talepID} />
             </div>
           )}
 
           {/* Türe göre kırılım alanları — hiçbiri zorunlu değil (yalnız ödeme türü). */}
           <div className="space-y-3">
-            <h3 className="text-sm font-medium">{t('purchase.payment.heading')}</h3>
+            <h3 className="text-sm font-semibold">{t('purchase.payment.heading')}</h3>
             <DynamicPaymentForm value={form} onChange={setForm} disabled={saveMut.isPending} />
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
-            <Button disabled={saveMut.isPending || !valid} onClick={onSubmit}>
-              {saveMut.isPending ? t('common.saving') : t('common.save')}
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
+            <Button type="submit" loading={saveMut.isPending} disabled={!valid} title={valid ? undefined : t('purchase.payment.typeRequired')}>
+              {t('common.save')}
             </Button>
           </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

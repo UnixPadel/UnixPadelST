@@ -9,6 +9,8 @@ import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdmin } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
+import { formatMoney } from '@/lib/currency'
+import { visibleNavItems, NAV_ITEMS } from '@/lib/navigation'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { KPICard } from '@/components/KPICard'
@@ -46,44 +48,46 @@ interface KpiDef {
   i18nKey: string         // dashboard.kpi.<key> + dashboard.kpi.<key>Hint
   field: keyof DashboardKpi
   icon: React.ReactNode
-  color: string
   highlightWhenPositive?: boolean
+  /** QW-11 — kart tıklanınca gidilecek kuyruk (kullanıcının erişimi varsa). */
+  path?: string
 }
 
 const KPI_DEFS: Record<KpiId, KpiDef> = {
-  last30Orders:    { i18nKey: 'last30Orders',    field: 'son30GunSiparisSayisi',        icon: <ShoppingCart className="h-5 w-5" />, color: 'text-blue-500'    },
-  myOpenOrders:    { i18nKey: 'myOpenOrders',    field: 'kendiAcikSiparisSayisi',       icon: <Activity className="h-5 w-5" />,     color: 'text-cyan-500'    },
-  pendingQC:       { i18nKey: 'pendingQC',       field: 'bekleyenKontrolSayisi',        icon: <CheckSquare className="h-5 w-5" />,  color: 'text-purple-500', highlightWhenPositive: true },
-  inProduction:    { i18nKey: 'inProduction',    field: 'uretimdekiSiparisSayisi',      icon: <Factory className="h-5 w-5" />,      color: 'text-orange-500' },
-  pendingShipment: { i18nKey: 'pendingShipment', field: 'sevkiyatBekleyenSayisi',       icon: <Truck className="h-5 w-5" />,        color: 'text-green-500',  highlightWhenPositive: true },
-  pendingPayment:  { i18nKey: 'pendingPayment',  field: 'odemeBekleyenSayisi',          icon: <Wallet className="h-5 w-5" />,       color: 'text-yellow-600', highlightWhenPositive: true },
-  pendingPurchase: { i18nKey: 'pendingPurchase', field: 'bekleyenSatinAlmaTalepSayisi', icon: <AlertCircle className="h-5 w-5" />,  color: 'text-indigo-500' },
+  last30Orders:    { i18nKey: 'last30Orders',    field: 'son30GunSiparisSayisi',        icon: <ShoppingCart className="h-5 w-5" />, path: '/orders/mine' },
+  myOpenOrders:    { i18nKey: 'myOpenOrders',    field: 'kendiAcikSiparisSayisi',       icon: <Activity className="h-5 w-5" />, path: '/orders/mine' },
+  pendingQC:       { i18nKey: 'pendingQC',       field: 'bekleyenKontrolSayisi',        icon: <CheckSquare className="h-5 w-5" />, highlightWhenPositive: true, path: '/quality-control' },
+  inProduction:    { i18nKey: 'inProduction',    field: 'uretimdekiSiparisSayisi',      icon: <Factory className="h-5 w-5" />, path: '/factory' },
+  pendingShipment: { i18nKey: 'pendingShipment', field: 'sevkiyatBekleyenSayisi',       icon: <Truck className="h-5 w-5" />,  highlightWhenPositive: true, path: '/logistics/ready' },
+  pendingPayment:  { i18nKey: 'pendingPayment',  field: 'odemeBekleyenSayisi',          icon: <Wallet className="h-5 w-5" />, highlightWhenPositive: true, path: '/accounting' },
+  pendingPurchase: { i18nKey: 'pendingPurchase', field: 'bekleyenSatinAlmaTalepSayisi', icon: <AlertCircle className="h-5 w-5" />, path: '/purchase/all' },
 }
 
 // ── Module cards catalog ─────────────────────────────────────────────────────
 // Path → tile metadata. ROLE_LAYOUT.tiles listesindeki path'ler buradan okunur.
 
+// QW-11 — modül ikonları nötr: yeşil/sarı/kırmızı yalnız durum anlamı taşır
+// (önceden Lojistik yeşil, Muhasebe sarı, Kullanıcılar kırmızıydı).
 interface ModuleCard {
   path: string
   titleKey: string
   descKey: string
   icon: React.ReactNode
-  color: string
 }
 
 const MODULES: Record<string, ModuleCard> = {
-  '/quality-control':    { path: '/quality-control',    titleKey: 'nav.qualityControl',    descKey: 'dashboard.moduleCard.qc',                icon: <CheckSquare className="h-6 w-6" />, color: 'text-purple-500' },
-  '/factory':            { path: '/factory',            titleKey: 'nav.factory',           descKey: 'dashboard.moduleCard.factory',           icon: <Factory className="h-6 w-6" />,     color: 'text-orange-500' },
-  '/logistics/ready':    { path: '/logistics/ready',    titleKey: 'nav.logisticsReady',    descKey: 'dashboard.moduleCard.logistics',         icon: <Truck className="h-6 w-6" />,       color: 'text-green-500'  },
-  '/logistics/history':  { path: '/logistics/history',  titleKey: 'nav.logisticsHistory',  descKey: 'dashboard.moduleCard.logisticsHistory',  icon: <Truck className="h-6 w-6" />,       color: 'text-green-500'  },
-  '/accounting':         { path: '/accounting',         titleKey: 'nav.accounting',        descKey: 'dashboard.moduleCard.accounting',        icon: <Calculator className="h-6 w-6" />,  color: 'text-yellow-500' },
-  '/accounting/approval':{ path: '/accounting/approval',titleKey: 'nav.accountingApproval',descKey: 'dashboard.moduleCard.accountingApproval',icon: <CheckSquare className="h-6 w-6" />, color: 'text-amber-500'  },
-  '/accounting/history': { path: '/accounting/history', titleKey: 'nav.accountingHistory', descKey: 'dashboard.moduleCard.accountingHistory', icon: <Calculator className="h-6 w-6" />,  color: 'text-yellow-500' },
-  '/orders/new':         { path: '/orders/new',         titleKey: 'nav.createOrderQuote',  descKey: 'dashboard.moduleCard.createOrderQuote',  icon: <ShoppingCart className="h-6 w-6" />,color: 'text-blue-500'   },
-  '/orders/mine':        { path: '/orders/mine',        titleKey: 'nav.myOrders',          descKey: 'dashboard.moduleCard.myOrders',          icon: <ShoppingCart className="h-6 w-6" />,color: 'text-blue-500'   },
-  '/purchase/mine':      { path: '/purchase/mine',      titleKey: 'nav.purchaseMine',      descKey: 'dashboard.moduleCard.purchase',          icon: <FileText className="h-6 w-6" />,    color: 'text-indigo-500' },
-  '/users':              { path: '/users',              titleKey: 'nav.users',             descKey: 'dashboard.moduleCard.users',             icon: <Users className="h-6 w-6" />,       color: 'text-red-500'    },
-  '/search':             { path: '/search',             titleKey: 'nav.search',            descKey: 'dashboard.moduleCard.search',            icon: <Search className="h-6 w-6" />,      color: 'text-cyan-500'   },
+  '/quality-control':    { path: '/quality-control',    titleKey: 'nav.qualityControl',    descKey: 'dashboard.moduleCard.qc',                icon: <CheckSquare className="h-6 w-6" /> },
+  '/factory':            { path: '/factory',            titleKey: 'nav.factory',           descKey: 'dashboard.moduleCard.factory',           icon: <Factory className="h-6 w-6" /> },
+  '/logistics/ready':    { path: '/logistics/ready',    titleKey: 'nav.logisticsReady',    descKey: 'dashboard.moduleCard.logistics',         icon: <Truck className="h-6 w-6" />  },
+  '/logistics/history':  { path: '/logistics/history',  titleKey: 'nav.logisticsHistory',  descKey: 'dashboard.moduleCard.logisticsHistory',  icon: <Truck className="h-6 w-6" />  },
+  '/accounting':         { path: '/accounting',         titleKey: 'nav.accounting',        descKey: 'dashboard.moduleCard.accounting',        icon: <Calculator className="h-6 w-6" /> },
+  '/accounting/approval':{ path: '/accounting/approval',titleKey: 'nav.accountingApproval',descKey: 'dashboard.moduleCard.accountingApproval',icon: <CheckSquare className="h-6 w-6" />  },
+  '/accounting/history': { path: '/accounting/history', titleKey: 'nav.accountingHistory', descKey: 'dashboard.moduleCard.accountingHistory', icon: <Calculator className="h-6 w-6" /> },
+  '/orders/new':         { path: '/orders/new',         titleKey: 'nav.createOrderQuote',  descKey: 'dashboard.moduleCard.createOrderQuote',  icon: <ShoppingCart className="h-6 w-6" />   },
+  '/orders/mine':        { path: '/orders/mine',        titleKey: 'nav.myOrders',          descKey: 'dashboard.moduleCard.myOrders',          icon: <ShoppingCart className="h-6 w-6" />   },
+  '/purchase/mine':      { path: '/purchase/mine',      titleKey: 'nav.purchaseMine',      descKey: 'dashboard.moduleCard.purchase',          icon: <FileText className="h-6 w-6" /> },
+  '/users':              { path: '/users',              titleKey: 'nav.users',             descKey: 'dashboard.moduleCard.users',             icon: <Users className="h-6 w-6" />    },
+  '/search':             { path: '/search',             titleKey: 'nav.search',            descKey: 'dashboard.moduleCard.search',            icon: <Search className="h-6 w-6" />   },
 }
 
 // ── Per-role layout ──────────────────────────────────────────────────────────
@@ -153,12 +157,8 @@ const DEFAULT_LAYOUT: RoleLayout = {
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Formats money to "12.345,67 €" style with currency symbol. */
-function formatCiro(amount: number, paraTipi: string): string {
-  const sym = paraTipi === 'Euro' ? '€' : paraTipi === 'Dolar' ? '$' : paraTipi === 'TL' ? '₺' : paraTipi === 'Sterlin' ? '£' : ''
-  const formatted = amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  return `${formatted} ${sym}`.trim()
-}
+/** QW-13 — ortak para biçimi ("12.345,67 €"). */
+const formatCiro = (amount: number, paraTipi: string): string => formatMoney(amount, paraTipi)
 
 // ── Component ────────────────────────────────────────────────────────────────
 
@@ -233,6 +233,7 @@ export function DashboardPage() {
   // Welcome string: Ad Soyad'tan üretiliyor, kullanıcı adına geri düşüyor.
   const fullName = [user?.ad, user?.soyad].filter(Boolean).join(' ') || user?.kullaniciAdi || ''
 
+  const reachable = useMemo(() => new Set(visibleNavItems(user).map((n) => n.path)), [user])
   const renderKpi = (id: KpiId) => {
     const def = KPI_DEFS[id]
     const value = kpis ? (kpis[def.field] as number) : (loading ? '…' : 0)
@@ -246,8 +247,8 @@ export function DashboardPage() {
         deger={value}
         altMetin={t(`dashboard.kpi.${def.i18nKey}Hint`)}
         ikon={def.icon}
-        renk={def.color}
         vurgu={def.highlightWhenPositive ? highlight : undefined}
+        to={def.path && reachable.has(def.path) ? def.path : undefined}
       />
     )
   }
@@ -302,10 +303,11 @@ export function DashboardPage() {
           <p className="text-xs uppercase text-muted-foreground font-medium mb-2">{t('dashboard.modules')}</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {tiles.map((m) => (
-              <Link key={m.path} to={m.path}>
-                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+              <Link key={m.path} to={m.path} className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">
                   <CardHeader className="pb-2">
-                    <div className={m.color}>{m.icon}</div>
+                    {/* Menüyle aynı (benzersiz) ikon — lib/navigation kaydından. */}
+                    <div className="text-primary">{(() => { const I = NAV_ITEMS.find((n) => n.path === m.path)?.icon; return I ? <I className="h-6 w-6" /> : m.icon })()}</div>
                     <CardTitle className="text-base mt-2">{t(m.titleKey)}</CardTitle>
                   </CardHeader>
                   <CardContent>

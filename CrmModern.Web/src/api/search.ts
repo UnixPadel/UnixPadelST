@@ -20,7 +20,8 @@ export const searchOrders = async (params: SearchParams): Promise<SearchResultDt
 
 // ── Faz 7 unified topbar search ─────────────────────────────────────────────
 
-export const unifiedSearch = async (q: string): Promise<UnifiedSearchResult> => {
-  const res = await api.get<ApiResponse<UnifiedSearchResult>>('/api/search/unified', { params: { q } })
+// SR-10 — signal: yeni tuş vuruşu önceki isteği iptal eder (yarış koşulu yok).
+export const unifiedSearch = async (q: string, signal?: AbortSignal): Promise<UnifiedSearchResult> => {
+  const res = await api.get<ApiResponse<UnifiedSearchResult>>('/api/search/unified', { params: { q }, signal })
   return res.data.data
 }

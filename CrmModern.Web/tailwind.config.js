@@ -49,6 +49,16 @@ export default {
           foreground: 'hsl(var(--card-foreground))',
         },
 
+        // QW-1 — semantik durum tonları (index.css). Kullanım:
+        //   bg-success-soft text-success-soft-foreground border-success/30
+        ...Object.fromEntries(
+          ['success', 'warning', 'danger', 'info', 'progress', 'neutral'].map((tone) => [tone, {
+            DEFAULT: `hsl(var(--${tone}))`,
+            soft: `hsl(var(--${tone}-soft))`,
+            'soft-foreground': `hsl(var(--${tone}-soft-foreground))`,
+          }]),
+        ),
+
         // Faz 8.6 — WinForms grid renkleri BIREBIR (hex):
         //   Onaylandı           RGB(198,239,206) #C6EFCE
         //   Muhasebe Tamamlandı RGB(221,235,247) #DDEBF7

@@ -80,7 +80,7 @@ export function RepPerformancePage() {
     try {
       await exportRepReport(detail.kullaniciID, baslangic, bitis, detail.adSoyad)
     } catch {
-      toast({ title: t('common.error'), variant: 'destructive' })
+      toast({ title: t('common.error'), description: t('common.operationFailed'), variant: 'destructive' })
     } finally {
       setExporting(false)
     }

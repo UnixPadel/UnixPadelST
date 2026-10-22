@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
 using CrmModern.Core.Interfaces.Repositories;
@@ -81,6 +82,42 @@ internal sealed class OrderRepository(AppDbContext context)
             .AnyAsync(o => o.MusteriId == musteriId
                 || (musteriAd != "" && o.MusteriAd == musteriAd));
 
+    // ── İç denetim (workflow) ─────────────────────────────────────────────────
+
+    // Yalnız akış kolonları + başlık; Ek/MuhasebeEk blob'ları ve tutarlar yüklenmez.
+    private static readonly Expression<Func<Order, Order>> WorkflowHeader = o => new Order
+    {
+        SiparisNo         = o.SiparisNo,
+        MusteriAd         = o.MusteriAd,
+        MUlke             = o.MUlke,
+        KullaniciID       = o.KullaniciID,
+        SiparisMiTeklifMi = o.SiparisMiTeklifMi,
+        Kontrol           = o.Kontrol,
+        LojistikOnay      = o.LojistikOnay,
+        Silindi           = o.Silindi,
+        Tarih             = o.Tarih,
+        STarih            = o.STarih,
+        DegisiklikTarihi  = o.DegisiklikTarihi,
+    };
+
+    public async Task<IReadOnlyList<Order>> GetWorkflowHeadersAsync(
+        Expression<Func<Order, bool>> predicate,
+        Expression<Func<Order, bool>>? narrow,
+        int? kullaniciID)
+    {
+        var q = _context.SiparisAlTablo.AsNoTracking().Where(predicate);
+        if (narrow is not null) q = q.Where(narrow);
+        if (kullaniciID is int uid) q = q.Where(o => o.KullaniciID == uid);
+        return await q.OrderByDescending(o => o.SiparisAlID).Select(WorkflowHeader).ToListAsync();
+    }
+
+    public async Task<Order?> GetWorkflowHeaderAsync(string siparisNo) =>
+        await _context.SiparisAlTablo
+            .AsNoTracking()
+            .Where(o => o.SiparisNo == siparisNo)
+            .Select(WorkflowHeader)
+            .FirstOrDefaultAsync();
+
     public async Task<int> GetNextSequenceAsync()
     {
         // Matches the WinForms query: SELECT MAX(SiparisAlID) FROM SiparisAlTablo
@@ -137,9 +174,11 @@ internal sealed class OrderRepository(AppDbContext context)
     // de üstlenir. MoveToProduction kullanıcı tarafından seçilen "üretim tarihi"
     // ile yazar (anlamlı bir tarih); MarkAsReady ise gerçek işlem zamanı (Now)
     // ile yazar.
+    // İç denetim — yalnız Planlama'daki sipariş üretime alınır (önceden aşama
+    // kontrolü yoktu; Siparis/Hazir/Lojistik kayıt da Uretim'e geri çekilebiliyordu).
     public async Task<int> MoveToProductionAsync(string siparisNo, DateTime stTarih, string fabrikaNot) =>
         await _context.SiparisAlTablo
-            .Where(o => o.SiparisNo == siparisNo)
+            .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "Planlama")
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.SiparisMiTeklifMi, "Uretim")
                 .SetProperty(o => o.STarih, (DateTime?)stTarih)
@@ -165,9 +204,12 @@ internal sealed class OrderRepository(AppDbContext context)
             .OrderByDescending(o => o.SiparisAlID)
             .ToListAsync();
 
+    // İç denetim — sevk yalnız Kontrol onaylı ve muhasebe lojistik onayı verilmiş
+    // (veya gate'siz eski kayıt: NULL) Hazir siparişte (OrderWorkflow.Sevkiyat).
     public async Task<int> MoveToLogisticsAsync(string siparisNo, DateTime stTarih, string lojistikNot) =>
         await _context.SiparisAlTablo
-            .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "Hazir")
+            .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "Hazir"
+                     && o.Kontrol == "Onay" && (o.LojistikOnay == null || o.LojistikOnay == "Onay"))
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.SiparisMiTeklifMi, "Lojistik")
                 .SetProperty(o => o.STarih, (DateTime?)stTarih)

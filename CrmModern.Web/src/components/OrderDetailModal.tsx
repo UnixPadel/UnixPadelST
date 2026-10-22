@@ -1,21 +1,30 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
+import { Copy, Download, FileText } from 'lucide-react'
 import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative } from '@/api/orders'
 import { getUsersLookup } from '@/api/users'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { resolveClause, isFreeNote } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { SectionTitle } from '@/components/ui/section-title'
+import { KeyValue } from '@/components/ui/key-value'
 import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
 import { OrderStageTimeline } from '@/components/OrderStageTimeline'
 import { LogisticsOfferForm } from '@/components/LogisticsOfferForm'
+import { DocumentFlow } from '@/components/order/DocumentFlow'
 import { useToast } from '@/components/ToastProvider'
+import { toastApiError } from '@/lib/apiError'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdmin } from '@/lib/permissions'
 import { hideMoneyFor } from '@/lib/visibility'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
 
 interface Props {
   siparisNo: string | null
@@ -34,9 +43,35 @@ interface Props {
   factoryView?: boolean
 }
 
-export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logisticsView = false, factoryView = false }: Props) {
+type PanelProps = Omit<Props, 'onClose'> & {
+  /** E-9 — panel bir master-detail düzeninde satır içi gösterilirken true. */
+  embedded?: boolean
+}
+
+/** Modal sarmalayıcı — mevcut tüm ekranlar bunu kullanmaya devam eder. */
+export function OrderDetailModal({ siparisNo, onClose, ...rest }: Props) {
+  const { t } = useTranslation()
+  return (
+    <Dialog open={!!siparisNo} onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent size="xl" className="max-h-[90vh]">
+        <DialogHeader className="pr-8">
+          <DialogTitle>{t('orderDetail.title', { no: siparisNo })}</DialogTitle>
+        </DialogHeader>
+        {siparisNo && <OrderDetailPanel siparisNo={siparisNo} {...rest} />}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * E-9 / E-8 — sipariş detayının gövdesi; hem modalda hem master-detail sağ
+ * panelinde kullanılır. Sekmeler (Fiori Object Page çapa çubuğu):
+ *   Genel · Kalemler · Belge Akışı · Notlar
+ */
+export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView = false, factoryView = false, embedded = false }: PanelProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
+  const nav = useNavigate()
   // PROMPT-v2 §2 + Round-11 §3: parasal değer gizleme (Fabrika rolü + omur.caliskan
   // gibi ad-bazlı kullanıcılar). Fiyatlandırma bloğu, bileşen Fiyat/Toplam sütunları,
   // proforma Excel butonu gizlenir. Backend de aynı gate'lere sahip.
@@ -47,9 +82,11 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
   // Sadece logisticsView'da görünür.
   const canOffer = logisticsView && !!user &&
     (user.yetkiTuru === 'Lojistik' || isSuperAdmin(user))
+  const canCreateOrders = !!user && (user.yetkiTuru === 'Temsilci' || user.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user))
   const [showOfferForm, setShowOfferForm] = useState(false)
+  const [downloading, setDownloading] = useState<'excel' | 'pdf' | null>(null)
 
-  const { data: order, isLoading } = useQuery({
+  const { data: order, isLoading, isError } = useQuery({
     queryKey: ['order-detail', siparisNo],
     queryFn: () => getOrderDetail(siparisNo!),
     enabled: !!siparisNo,
@@ -73,279 +110,251 @@ export function OrderDetailModal({ siparisNo, onClose, hideNotes = false, logist
     setSavingRep(true)
     try {
       await changeRepresentative(order.siparisNo, Number(newRepId))
-      toast({ title: t('orderDetail.repChanged') })
+      toast({ title: t('orderDetail.repChanged'), variant: 'success' })
       setNewRepId('')
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['order-detail', siparisNo] }),
-        queryClient.invalidateQueries({ queryKey: ['my-orders'] }),
-        queryClient.invalidateQueries({ queryKey: ['orders'] }),
-      ])
-    } catch {
-      toast({ title: t('common.error'), variant: 'destructive' })
+      await invalidateOrderGraph(queryClient)
+    } catch (e) {
+      toastApiError(toast, t('common.error'), e)
     } finally {
       setSavingRep(false)
     }
   }
 
-  const handleExcel = async () => {
+  const handleDownload = async (kind: 'excel' | 'pdf') => {
     if (!siparisNo) return
+    setDownloading(kind)
     try {
-      await downloadExcel(siparisNo)
-      toast({ title: 'Excel indirildi' })
-    } catch {
-      toast({ title: 'Hata', variant: 'destructive' })
+      await (kind === 'excel' ? downloadExcel(siparisNo) : downloadPdf(siparisNo))
+      toast({ title: kind === 'excel' ? t('orderDetail.excelDownloaded') : t('orderDetail.pdfDownloaded'), variant: 'success' })
+    } catch (e) {
+      toastApiError(toast, t('common.error'), e)
+    } finally {
+      setDownloading(null)
     }
   }
 
-  // Aynı proformanın PDF'i (sunucuda LibreOffice ile birebir dönüşüm).
-  const handlePdf = async () => {
-    if (!siparisNo) return
-    try {
-      await downloadPdf(siparisNo)
-      toast({ title: 'PDF indirildi' })
-    } catch {
-      toast({ title: 'Hata', variant: 'destructive' })
-    }
+  if (isLoading) {
+    return (
+      <div className="space-y-3 py-2" aria-busy>
+        {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />)}
+      </div>
+    )
   }
+  if (isError || !order) {
+    return <p className="py-8 text-center text-sm text-destructive">{t('orderDetail.loadError')}</p>
+  }
+
+  const notes = factoryView ? (order.details ?? []).filter(isFreeNote) : order.details
+  const showNotes = !hideNotes && !!notes && notes.length > 0
 
   return (
-    <Dialog open={!!siparisNo} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center justify-between">
-            <span>{t('orderDetail.title', { no: siparisNo })}</span>
-            {!hideMoney && (
-              <div className="flex gap-2">
-                <Button size="sm" variant="outline" onClick={handleExcel}>📥 {t('common.excel')}</Button>
-                <Button size="sm" variant="outline" onClick={handlePdf}>📄 PDF</Button>
+    <div className="space-y-3 text-sm">
+      {/* Başlık şeridi: durum + tarih + aksiyonlar */}
+      <div className="flex flex-wrap items-center gap-2">
+        {embedded && <span className="font-mono text-sm font-semibold">{siparisNo}</span>}
+        <StatusBadge value={order.siparisMiTeklifMi} context="stage" />
+        <StatusBadge value={order.kontrol} context="kontrol" />
+        {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
+        {order.sirket && <span className="text-muted-foreground">· {order.sirket}</span>}
+        <div className="ml-auto flex flex-wrap gap-1.5">
+          {canCreateOrders && (
+            <Button size="xs" variant="outline" title={t('orderDetail.copyHint')}
+              onClick={() => nav(`/orders/new?copyFrom=${encodeURIComponent(order.siparisNo)}`)}>
+              <Copy className="h-3.5 w-3.5" /> {t('orderDetail.copyAsNew')}
+            </Button>
+          )}
+          {!hideMoney && (
+            <>
+              <Button size="xs" variant="outline" loading={downloading === 'excel'} onClick={() => handleDownload('excel')}>
+                <Download className="h-3.5 w-3.5" /> {t('common.excel')}
+              </Button>
+              <Button size="xs" variant="outline" loading={downloading === 'pdf'} onClick={() => handleDownload('pdf')}>
+                <FileText className="h-3.5 w-3.5" /> PDF
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Rejection note — her sekmede görünür kalsın diye başlığın altında. */}
+      {order.kontrol === 'Reddet' && order.red && (
+        <div role="alert" className="rounded-md border border-danger/40 bg-danger-soft p-3 text-danger-soft-foreground">
+          <p className="font-semibold">{t('orderDetail.redNotu')}</p>
+          <p>{order.red}</p>
+        </div>
+      )}
+
+      <Tabs defaultValue="general">
+        <TabsList className="h-9">
+          <TabsTrigger value="general" className="text-xs">{t('orderDetail.tabs.general')}</TabsTrigger>
+          <TabsTrigger value="items" className="text-xs">
+            {t('orderDetail.tabs.items')} <span className="ml-1 text-muted-foreground">({order.items?.length ?? 0})</span>
+          </TabsTrigger>
+          <TabsTrigger value="flow" className="text-xs">{t('orderDetail.tabs.flow')}</TabsTrigger>
+          {showNotes && <TabsTrigger value="notes" className="text-xs">{t('orderDetail.tabs.notes')}</TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="general" className="space-y-4">
+          {/* Temsilci devri — YALNIZ elshan.rasulov (ControlUser) / süper-admin.
+              Diğer kullanıcılar bu bloğu hiç görmez; backend gate ayrıca 403 döner. */}
+          {canReassign && (
+            <div className="space-y-2 rounded-md border p-3">
+              <SectionTitle>{t('orderDetail.temsilci')}</SectionTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-muted-foreground">
+                  {t('orderDetail.currentRep')}: <span className="font-medium text-foreground">{order.kullaniciAdi || '—'}</span>
+                </span>
+                <Select value={newRepId || undefined} onValueChange={setNewRepId}>
+                  <SelectTrigger className="h-8 w-56 text-xs"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
+                  <SelectContent>
+                    {temsilciler.map((u) => (
+                      <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
+                        {`${u.ad} ${u.soyad}`.trim()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button size="xs" onClick={handleChangeRep} disabled={!newRepId} loading={savingRep}>
+                  {t('orderDetail.changeRep')}
+                </Button>
               </div>
-            )}
-          </DialogTitle>
-        </DialogHeader>
-
-        {isLoading && <p className="text-center py-8 text-muted-foreground">{t('common.loading')}</p>}
-
-        {order && (
-          <div className="space-y-6 text-sm">
-            {/* Status row */}
-            <div className="flex gap-4 items-center">
-              <StatusBadge value={order.siparisMiTeklifMi} />
-              <StatusBadge value={order.kontrol} />
-              {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
-              {order.sirket && <span className="text-muted-foreground">{order.sirket}</span>}
             </div>
+          )}
 
-            {/* Temsilci devri — YALNIZ elshan.rasulov (ControlUser) / süper-admin.
-                Diğer kullanıcılar bu bloğu hiç görmez; backend gate ayrıca 403 döner. */}
-            {canReassign && (
-              <div className="border rounded-md p-3 space-y-2">
-                <h3 className="font-semibold">{t('orderDetail.temsilci')}</h3>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-muted-foreground">
-                    {t('orderDetail.currentRep')}: <span className="text-foreground font-medium">{order.kullaniciAdi || '—'}</span>
-                  </span>
-                  <Select value={newRepId || undefined} onValueChange={setNewRepId}>
-                    <SelectTrigger className="w-56"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
-                    <SelectContent>
-                      {temsilciler.map((u) => (
-                        <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
-                          {`${u.ad} ${u.soyad}`.trim()}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" onClick={handleChangeRep} disabled={!newRepId || savingRep}>
-                    {savingRep ? t('common.loading') : t('orderDetail.changeRep')}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Two-column info grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Customer */}
-              <div className="space-y-2 border rounded-md p-3">
-                <h3 className="font-semibold">{t('orderDetail.musteriInfo')}</h3>
-                <Row label={t('orderDetail.musteri')} value={order.musteriAd} />
-                <Row label={t('orderDetail.ulke')} value={order.mUlke} />
-                <Row label={t('orderDetail.telefon')} value={order.mTelefon} />
-                <Row label={t('orderDetail.email')} value={order.mMail} />
-                <Row label={t('orderDetail.vat')} value={order.mVATNumarasi} />
-                <Row label={t('orderDetail.adres')} value={order.mAdres} />
-              </div>
-
-              {/* Delivery */}
-              {order.teslimatVar && (
-                <div className="space-y-2 border rounded-md p-3">
-                  <h3 className="font-semibold">{t('orderDetail.teslimatAddr')}</h3>
-                  <Row label={t('orderDetail.teslimAlan')} value={order.tTeslimAlanAdi} />
-                  <Row label={t('orderDetail.ilgiliKisi')} value={order.tIlgiliKisi} />
-                  <Row label={t('orderDetail.ulke')} value={order.tUlke} />
-                  <Row label={t('orderDetail.telefon')} value={order.tTelefon} />
-                  <Row label={t('orderDetail.email')} value={order.tE_Mail} />
-                  <Row label={t('orderDetail.adres')} value={order.tAdres} />
+          {/* Lojistik görünümü — fabrika notu + Teklif Gönder fiyatlandırmanın üstünde. */}
+          {logisticsView && (
+            <div className="space-y-3">
+              {order.fabrikaNot && (
+                <div className="rounded-md border p-3">
+                  <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>
                 </div>
               )}
+              {canOffer && (
+                showOfferForm
+                  ? <LogisticsOfferForm siparisNo={order.siparisNo} onSubmitted={() => setShowOfferForm(false)} />
+                  : <Button size="sm" onClick={() => setShowOfferForm(true)}>{t('logisticsOffer.sendOffer')}</Button>
+              )}
             </div>
+          )}
 
-            {/* Lojistik görünümü — Fiyatlandırmanın ÜSTÜNDE: fabrika notu →
-                aşama geçmişi → Teklif Gönder. Diğer ekranlar (logisticsView yok)
-                değişmez; aynı bloklar aşağıda tekrar gösterilmez. */}
-            {logisticsView && (
-              <div className="space-y-4">
-                {order.fabrikaNot && (
-                  <div className="border rounded-md p-3">
-                    <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>
-                  </div>
-                )}
-                <div className="border rounded-md p-3">
-                  <OrderStageTimeline
-                    tarih={order.tarih}
-                    sTarih={order.sTarih}
-                    currentStage={order.siparisMiTeklifMi}
+          <div className={embedded ? 'grid grid-cols-1 gap-3 2xl:grid-cols-2' : 'grid grid-cols-1 gap-3 md:grid-cols-2'}>
+            <div className="space-y-1.5 rounded-md border p-3">
+              <SectionTitle>{t('orderDetail.musteriInfo')}</SectionTitle>
+              <KeyValue label={t('orderDetail.musteri')} value={order.musteriAd} />
+              <KeyValue label={t('orderDetail.ulke')} value={order.mUlke} />
+              <KeyValue label={t('orderDetail.telefon')} value={order.mTelefon} />
+              <KeyValue label={t('orderDetail.email')} value={order.mMail} />
+              <KeyValue label={t('orderDetail.vat')} value={order.mVATNumarasi} />
+              <KeyValue label={t('orderDetail.adres')} value={order.mAdres} />
+            </div>
+            {order.teslimatVar && (
+              <div className="space-y-1.5 rounded-md border p-3">
+                <SectionTitle>{t('orderDetail.teslimatAddr')}</SectionTitle>
+                <KeyValue label={t('orderDetail.teslimAlan')} value={order.tTeslimAlanAdi} />
+                <KeyValue label={t('orderDetail.ilgiliKisi')} value={order.tIlgiliKisi} />
+                <KeyValue label={t('orderDetail.ulke')} value={order.tUlke} />
+                <KeyValue label={t('orderDetail.telefon')} value={order.tTelefon} />
+                <KeyValue label={t('orderDetail.email')} value={order.tE_Mail} />
+                <KeyValue label={t('orderDetail.adres')} value={order.tAdres} />
+              </div>
+            )}
+          </div>
+
+          {/* Pricing — PROMPT-v2 §2: Fabrika için tamamen gizli. İndirim yüzde
+              olarak gösterilir (diğer ekranlarla aynı). */}
+          {!hideMoney && (
+            <div className="space-y-2 rounded-md border p-3">
+              <SectionTitle>{t('orderDetail.pricing')}</SectionTitle>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                <PriceBox label={t('orderDetail.paraBirimi')} value={order.paraTipi} />
+                <PriceBox label={t('orderDetail.brut')} value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
+                {(order.indirim ?? 0) > 0 && <PriceBox label={t('orderDetail.indirim')} value={`%${order.indirim}`} />}
+                {(order.kdv ?? 0) > 0 && <PriceBox label={t('orderDetail.kdv')} value={`%${order.kdv}`} />}
+                <PriceBox label={t('orderDetail.toplam')} value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
+                <PriceBox label={t('orderDetail.pesinYuzde')} value={`%${order.pesinYuzde ?? 0}`} />
+                {(order.pesinYuzde ?? 0) > 0 && (
+                  <PriceBox
+                    label={t('orderDetail.pesinatTutar')}
+                    value={formatCurrency(((order.toplamFiyat ?? 0) * (order.pesinYuzde ?? 0)) / 100, order.paraTipi)}
                   />
-                </div>
-                {canOffer && (
-                  showOfferForm
-                    ? <LogisticsOfferForm siparisNo={order.siparisNo} onSubmitted={() => setShowOfferForm(false)} />
-                    : <Button onClick={() => setShowOfferForm(true)}>{t('logisticsOffer.sendOffer')}</Button>
                 )}
+                {order.montajVar && <PriceBox label={t('orderDetail.montaj')} value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
+                {order.teslimatVar && <PriceBox label={t('orderDetail.teslimat')} value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Pricing — PROMPT-v2 §2: Fabrika için tamamen gizli. */}
-            {!hideMoney && (
-              <div className="border rounded-md p-3 space-y-2">
-                <h3 className="font-semibold">{t('orderDetail.pricing')}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <PriceBox label={t('orderDetail.paraBirimi')} value={order.paraTipi} />
-                  <PriceBox label={t('orderDetail.brut')} value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
-                  {(order.indirim ?? 0) > 0 && <PriceBox label={t('orderDetail.indirim')} value={`-${formatCurrency(order.indirim, order.paraTipi)}`} />}
-                  {(order.kdv ?? 0) > 0 && <PriceBox label={t('orderDetail.kdv')} value={`%${order.kdv}`} />}
-                  <PriceBox label={t('orderDetail.toplam')} value={formatCurrency(order.toplamFiyat, order.paraTipi)} highlight />
-                  <PriceBox label={t('orderDetail.pesinYuzde')} value={`%${order.pesinYuzde}`} />
-                  {(order.pesinYuzde ?? 0) > 0 && (
-                    <PriceBox
-                      label={t('orderDetail.pesinatTutar')}
-                      value={formatCurrency(((order.toplamFiyat ?? 0) * (order.pesinYuzde ?? 0)) / 100, order.paraTipi)}
-                    />
-                  )}
-                  {order.montajVar && <PriceBox label={t('orderDetail.montaj')} value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
-                  {order.teslimatVar && <PriceBox label={t('orderDetail.teslimat')} value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
-                </div>
-              </div>
-            )}
+          {((order.fabrikaNot && !logisticsView) || order.lojistikNot) && (
+            <div className="space-y-1 rounded-md border p-3">
+              {order.fabrikaNot && !logisticsView && <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>}
+              {order.lojistikNot && <p><span className="font-semibold">{t('orderDetail.lojistikNot')}:</span> {order.lojistikNot}</p>}
+            </div>
+          )}
+        </TabsContent>
 
-            {/* Products table */}
-            {order.items && order.items.length > 0 && (
-              <div className="border rounded-md p-3">
-                <h3 className="font-semibold mb-2">{t('orderDetail.products')}</h3>
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th className="text-left px-2 py-1">{t('orderDetail.tur')}</th>
-                      <th className="text-left px-2 py-1">{t('orderDetail.oznitelik')}</th>
-                      <th className="text-right px-2 py-1">{t('orderDetail.adet')}</th>
-                      {/* PROMPT-v2 §2: Fabrika Fiyat sütununu görmez. */}
-                      {/* Round-11 §4: Fiyat = tekil (birim) fiyat; Toplam = Tekil Fiyat × Adet. */}
-                      {!hideMoney && <th className="text-right px-2 py-1">{t('orderDetail.fiyat')}</th>}
-                      {!hideMoney && <th className="text-right px-2 py-1">{t('orderDetail.toplam')}</th>}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {order.items.map((item, i) => {
-                      const isCategory = !!item.kategoriID && !item.bilesenID
-                      const isFreeItem = !item.kategoriID && !item.bilesenID
-                      const ad = isCategory
-                        ? (item.kategoriAdi ?? t('orderDetail.set', { id: item.kategoriID }))
-                        : isFreeItem
-                          ? (item.sBilesenAdi ?? t('orderDetail.ozelKalem'))
-                          : (item.bilesenAdi ?? t('orderDetail.bilesen', { id: item.bilesenID }))
-                      return (
-                      <tr key={i} className={`border-b ${isCategory ? 'font-semibold bg-muted/20' : ''}`}>
-                        <td className="px-2 py-1">
+        <TabsContent value="items">
+          {order.items && order.items.length > 0 ? (
+            <div className="overflow-auto rounded-md border">
+              <table className="w-full text-xs">
+                <thead className="bg-muted">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orderDetail.tur')}</th>
+                    <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orderDetail.oznitelik')}</th>
+                    <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.adet')}</th>
+                    {/* Round-11 §4: Fiyat = tekil (birim) fiyat; Toplam = Tekil Fiyat × Adet. */}
+                    {!hideMoney && <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.fiyat')}</th>}
+                    {!hideMoney && <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.toplam')}</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {order.items.map((item, i) => {
+                    const isCategory = !!item.kategoriID && !item.bilesenID
+                    const isFreeItem = !item.kategoriID && !item.bilesenID
+                    const ad = isCategory
+                      ? (item.kategoriAdi ?? t('orderDetail.set', { id: item.kategoriID }))
+                      : isFreeItem
+                        ? (item.sBilesenAdi ?? t('orderDetail.ozelKalem'))
+                        : (item.bilesenAdi ?? t('orderDetail.bilesen', { id: item.bilesenID }))
+                    return (
+                      <tr key={i} className={`border-t ${isCategory ? 'bg-muted/40 font-semibold' : ''}`}>
+                        <td className={`px-2 py-1 ${!isCategory && !isFreeItem ? 'pl-5' : ''}`}>
                           {ad}
-                          {isFreeItem && <span className="ml-1 text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-1.5 py-0.5 rounded-full font-medium">{t('orderDetail.ozelBadge')}</span>}
+                          {isFreeItem && <Badge variant="warning" className="ml-1 px-1.5 py-0 text-[10px]">{t('orderDetail.ozelBadge')}</Badge>}
                         </td>
                         <td className="px-2 py-1">{item.oznitelikAdi ?? '—'}</td>
-                        <td className="text-right px-2 py-1">{item.adet}</td>
-                        {!hideMoney && (
-                          <td className="text-right px-2 py-1">{formatCurrency(item.fiyat, order.paraTipi)}</td>
-                        )}
-                        {!hideMoney && (
-                          <td className="text-right px-2 py-1 tabular-nums">{formatCurrency((item.fiyat ?? 0) * item.adet, order.paraTipi)}</td>
-                        )}
+                        <td className="px-2 py-1 text-right tabular-nums">{item.adet}</td>
+                        {!hideMoney && <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(item.fiyat, order.paraTipi)}</td>}
+                        {!hideMoney && <td className="px-2 py-1 text-right tabular-nums">{formatCurrency((item.fiyat ?? 0) * item.adet, order.paraTipi)}</td>}
                       </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ) : <p className="py-6 text-center text-muted-foreground">{t('common.noData')}</p>}
+        </TabsContent>
 
-            {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes).
-                Fabrika görünümünde yalnız serbest (custom) notlar gösterilir;
-                default @@ standart şartlar ve 17 önceden tanımlı detay şartı
-                ayıklanır (isFreeNote). Serbest not yoksa bölüm hiç çıkmaz. */}
-            {!hideNotes && (() => {
-              const notes = factoryView ? (order.details ?? []).filter(isFreeNote) : order.details
-              if (!notes || notes.length === 0) return null
-              return (
-                <div className="border rounded-md p-3">
-                  <h3 className="font-semibold mb-2">{t('orderDetail.notes')}</h3>
-                  <ul className="space-y-1 text-muted-foreground">
-                    {notes.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
-                  </ul>
-                </div>
-              )
-            })()}
-
-            {/* Rejection note */}
-            {order.kontrol === 'Reddet' && order.red && (
-              <div className="border border-red-300 rounded-md p-3 bg-red-50">
-                <h3 className="font-semibold text-red-700 mb-1">{t('orderDetail.redNotu')}</h3>
-                <p className="text-red-600">{order.red}</p>
-              </div>
-            )}
-
-            {/* Factory / Logistics notes — logisticsView'da fabrika notu yukarı
-                taşındığı için burada yalnız lojistik notu kalır. */}
-            {((order.fabrikaNot && !logisticsView) || order.lojistikNot) && (
-              <div className="border rounded-md p-3 space-y-1">
-                {order.fabrikaNot && !logisticsView && <p><span className="font-semibold">{t('orderDetail.fabrikaNot')}:</span> {order.fabrikaNot}</p>}
-                {order.lojistikNot && <p><span className="font-semibold">{t('orderDetail.lojistikNot')}:</span> {order.lojistikNot}</p>}
-              </div>
-            )}
-
-            {/* 2.5 — Aşama Geçmişi: Tarih + STarih + currentStage'den türetildi.
-                logisticsView'da yukarı taşındı; burada tekrar gösterilmez. */}
-            {!logisticsView && (
-              <div className="border rounded-md p-3">
-                <OrderStageTimeline
-                  tarih={order.tarih}
-                  sTarih={order.sTarih}
-                  currentStage={order.siparisMiTeklifMi}
-                />
-              </div>
-            )}
-
-            {/* Approval timeline (Faz 3) */}
-            <div className="border rounded-md p-3">
+        <TabsContent value="flow" className="space-y-4">
+          <DocumentFlow order={order} />
+          <details className="rounded-md border p-3">
+            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">{t('orderDetail.legacyTimelines')}</summary>
+            <div className="mt-3 space-y-4">
+              <OrderStageTimeline tarih={order.tarih} sTarih={order.sTarih} currentStage={order.siparisMiTeklifMi} />
               <OrderApprovalTimeline siparisNo={siparisNo} />
             </div>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
-  )
-}
+          </details>
+        </TabsContent>
 
-function Row({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null
-  return (
-    <div className="flex gap-2">
-      <span className="text-muted-foreground min-w-24">{label}:</span>
-      <span>{value}</span>
+        {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes).
+            Fabrika görünümünde yalnız serbest (custom) notlar gösterilir. */}
+        {showNotes && (
+          <TabsContent value="notes">
+            <ul className="space-y-1 rounded-md border p-3 text-muted-foreground">
+              {notes!.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
+            </ul>
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   )
 }
@@ -354,7 +363,7 @@ function PriceBox({ label, value, highlight }: { label: string; value: string; h
   return (
     <div className={`rounded p-2 text-center ${highlight ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}>
       <p className="text-xs opacity-70">{label}</p>
-      <p className="font-semibold">{value}</p>
+      <p className="font-semibold tabular-nums">{value}</p>
     </div>
   )
 }

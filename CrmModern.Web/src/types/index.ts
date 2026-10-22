@@ -684,11 +684,26 @@ export interface UnifiedSearchResult {
 
 // ── Changelog (Faz 7) ─────────────────────────────────────────────────────────
 
+/** Eski "Faz" kayıtları (2.0–2.7) — yalnız geçmiş sayfasında, sürüm karşılaştırmasına girmez. */
 export interface ChangelogEntry {
   versiyon: string
   tarih: string // YYYY-MM-DD
   baslik: string
   maddeler: string[]
+}
+
+/** TR + EN metin (sürüm notları, kılavuz). */
+export interface Localized<T = string> {
+  tr: T
+  en: T
+}
+
+/** Sürüm notu — `versiyon` package.json sürümüyle birebir aynı olmalı (ör. '0.3.0'). */
+export interface ReleaseNote {
+  versiyon: string
+  tarih: string // YYYY-MM-DD
+  baslik: Localized
+  maddeler: Localized<string[]>
 }
 
 // ── Auth context ──────────────────────────────────────────────────────────────
@@ -700,4 +715,36 @@ export interface AuthUser {
   soyad: string
   yetkiTuru: string
   token: string
+}
+
+// ── İç denetim (workflow) ─────────────────────────────────────────────────────
+// Parasal alan yok — tüm roller (Fabrika dahil) okur.
+
+export type WorkflowStepCode =
+  | 'temsilciDuzeltme' | 'kontrolOnayi' | 'siparisCevirme' | 'cariOnay' | 'uretimeAlma'
+  | 'uretim' | 'lojistikOnay' | 'sevkiyat' | 'teslimat' | 'kapanis'
+
+export type WorkflowDepartment = 'Satis' | 'Kontrol' | 'Muhasebe' | 'Fabrika' | 'Lojistik'
+
+export type WorkflowScreen =
+  | 'qc' | 'accounting-cari' | 'factory' | 'logistics-offers' | 'accounting-lojistik'
+  | 'logistics-ready' | 'accounting-tamamlanma' | 'final-approval'
+
+export interface WaitingOrderDto {
+  siparisNo: string
+  musteriAd: string
+  mUlke: string | null
+  asama: string
+  stepCode: WorkflowStepCode
+  department: WorkflowDepartment
+  waitingSince: string | null
+  temsilci: string | null
+}
+
+export interface OrderWorkflowStatusDto {
+  siparisNo: string
+  asama: string
+  stepCode: WorkflowStepCode | null
+  department: WorkflowDepartment | null
+  waitingSince: string | null
 }

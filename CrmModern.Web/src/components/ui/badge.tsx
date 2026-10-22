@@ -2,8 +2,10 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
+// QW-1 — durum rozetleri semantik "soft" tonlarla (koyu metin + açık zemin +
+// ince border). Eski `success`/`warning` adları korunur (soft tona alias).
 const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+  'inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
   {
     variants: {
       variant: {
@@ -11,13 +13,19 @@ const badgeVariants = cva(
         secondary: 'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
         destructive: 'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
         outline: 'text-foreground',
-        success: 'border-transparent bg-green-500 text-white',
-        warning: 'border-transparent bg-yellow-500 text-white',
+        // Tailwind JIT dinamik sınıfları göremez → tam sınıf adları açıkça yazılır.
+        neutral:  'border-neutral/30 bg-neutral-soft text-neutral-soft-foreground',
+        info:     'border-info/30 bg-info-soft text-info-soft-foreground',
+        progress: 'border-progress/30 bg-progress-soft text-progress-soft-foreground',
+        success:  'border-success/30 bg-success-soft text-success-soft-foreground',
+        warning:  'border-warning/30 bg-warning-soft text-warning-soft-foreground',
+        danger:   'border-danger/30 bg-danger-soft text-danger-soft-foreground',
       },
     },
     defaultVariants: { variant: 'default' },
   }
 )
+export type BadgeVariant = NonNullable<VariantProps<typeof badgeVariants>['variant']>
 
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,

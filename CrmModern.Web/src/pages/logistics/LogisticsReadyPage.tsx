@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getReadyForShipment, createShipment, getCarriers } from '@/api/logistics'
+import { Truck } from 'lucide-react'
+import { getReadyForShipment, createShipment } from '@/api/logistics'
 import { INCOTERMS } from '@/lib/constants'
 import { stageLabel } from '@/lib/status'
 import { PageHeader } from '@/components/PageHeader'
@@ -11,221 +13,219 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DecimalInput } from '@/components/DecimalInput'
-import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { FormField } from '@/components/ui/form-field'
+import { KeyValue } from '@/components/ui/key-value'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { OrderDetailModal } from '@/components/OrderDetailModal'
-import { FieldError } from '@/components/FieldError'
-import { useToast } from '@/components/ToastProvider'
+import { CarrierPicker } from '@/components/CarrierPicker'
+import { FilterBar, FilterField, ALL, useFilterState } from '@/components/FilterBar'
+import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
+import { useNotHereHint } from '@/hooks/useNotHereHint'
+import { useShortcutHints } from '@/components/StatusBar'
+import { useAppMutation } from '@/hooks/useAppMutation'
+import { useEnterNavigation } from '@/hooks/useEnterNavigation'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { trLower } from '@/components/ui/combobox'
 import type { LogisticsOrderListDto } from '@/types'
+import { localDateInput } from '@/lib/date'
 
-// PROMPT-v6 §4 — firma Select'inde "Diğer" seçeneği için sentinel değer
-// (kayıtlı taşıyıcı adlarıyla çakışmasın diye ayraçlı).
-const OTHER_CARRIER = '__other__'
+type Row = LogisticsOrderListDto & Record<string, unknown>
 
 const blank = () => ({
   firmaAdi: '', lojistikCesit: '', fiyat: 0, lNot: '',
-  sTarih: new Date().toISOString().slice(0, 10),
+  sTarih: localDateInput(),
   lojistikNot: '',
 })
 
+const FILTER_DEFAULTS = { siparisNo: '', musteri: '', asama: ALL }
+
+/**
+ * Lojistik — Hazır. Sevk talebi penceresi artık bir form (Enter ilerler/gönderir),
+ * taşıyıcı ortak CarrierPicker ile yazarak seçilir, fiyat 0 iken uyarı verilir;
+ * detay sağ panelde (E-9); filtreler URL'de kalıcı.
+ */
 export function LogisticsReadyPage() {
-  const qc = useQueryClient()
-  const { toast } = useToast()
   const { t } = useTranslation()
+  const [params] = useSearchParams()
   const [target, setTarget] = useState<LogisticsOrderListDto | null>(null)
   const [form, setForm] = useState(blank())
-  // Firma seçimi: kayıtlı taşıyıcı adı | OTHER_CARRIER (Diğer → serbest metin)
-  // PROMPT-v7 §5 — dialog açılışında "Diğer" seçili gelir (serbest metin kutusu açık).
-  const [carrierChoice, setCarrierChoice] = useState(OTHER_CARRIER)
-  const [detailNo, setDetailNo] = useState<string | null>(null)
+  const [activeNo, setActiveNo] = useState<string | null>(() => params.get('sel'))
   const [submitted, setSubmitted] = useState(false)
+  const { values: f, set, setAll, reset } = useFilterState(FILTER_DEFAULTS)
+  const onEnterNav = useEnterNavigation()
 
-  // Diğer seçiliyse firmaAdi serbest metinden gelir; boşsa required hatası.
-  const firmaAdi = carrierChoice === OTHER_CARRIER ? form.firmaAdi.trim() : carrierChoice
-  const valid = !!(firmaAdi && form.lojistikCesit.trim())
-  const onSubmit = () => {
-    setSubmitted(true)
-    if (!valid) return
-    createMut.mutate()
-  }
+  const valid = !!(form.firmaAdi && form.lojistikCesit.trim())
 
-  // §25 — filtreler
-  const [fNo, setFNo] = useState('')
-  const [fMusteri, setFMusteri] = useState('')
-  const [fAsama, setFAsama] = useState('__all__')
-
-  const { data: ready = [], isLoading } = useQuery({
+  const { data: ready = [], isLoading, isError } = useQuery({
     queryKey: ['logistics-ready'], queryFn: getReadyForShipment,
   })
-  const { data: carriers = [] } = useQuery({ queryKey: ['carriers'], queryFn: getCarriers })
 
-  // Unique stages from loaded data
   const stageOptions = useMemo(
     () => Array.from(new Set(ready.map((r) => r.siparisMiTeklifMi).filter(Boolean))).sort(),
     [ready],
   )
 
   const filtered = useMemo(() => {
+    const no = trLower(f.siparisNo), mu = trLower(f.musteri)
     const list = ready.filter((r) => {
-      if (fNo && !r.siparisNo.toLowerCase().includes(fNo.toLowerCase())) return false
-      if (fMusteri && !(r.musteriAd ?? '').toLowerCase().includes(fMusteri.toLowerCase())) return false
-      if (fAsama !== '__all__' && r.siparisMiTeklifMi !== fAsama) return false
+      if (no && !trLower(r.siparisNo).includes(no)) return false
+      if (mu && !trLower(r.musteriAd ?? '').includes(mu)) return false
+      if (f.asama !== ALL && r.siparisMiTeklifMi !== f.asama) return false
       return true
     })
-    // Aşamalarda en üstte üretimde olanlar gözüksün (kararlı sıralama; kullanıcı
-    // başlığa tıklayınca DataTable kendi sıralamasını uygular).
+    // Sevke hazır (Hazir) satırlar üstte; üretimdekiler ("Hazırlanıyor") altta.
     return [...list].sort((a, b) =>
-      (a.siparisMiTeklifMi === 'Uretim' ? 0 : 1) - (b.siparisMiTeklifMi === 'Uretim' ? 0 : 1))
-  }, [ready, fNo, fMusteri, fAsama])
+      (a.siparisMiTeklifMi === 'Hazir' ? 0 : 1) - (b.siparisMiTeklifMi === 'Hazir' ? 0 : 1))
+  }, [ready, f])
+  const notHere = useNotHereHint(f.siparisNo, !isLoading && !isError && filtered.length === 0)
 
-  const createMut = useMutation({
-    mutationFn: () => createShipment({ siparisNo: target!.siparisNo, ...form, firmaAdi }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['logistics-ready'] })
-      qc.invalidateQueries({ queryKey: ['logistics-history'] })
-      qc.invalidateQueries({ queryKey: ['carriers'] })
-      // PROMPT-v5 §3 — sipariş statüsü değişti: Siparişlerim canlı yansısın.
-      qc.invalidateQueries({ queryKey: ['my-orders'] })
-      setTarget(null); setForm(blank()); setCarrierChoice(OTHER_CARRIER); setSubmitted(false)
-      // Paket 3: yeni akış — sevk talebi muhasebe onayını bekler.
-      toast({ title: t('logistics.toast.created') })
-    },
-    onError: () => toast({ title: t('logistics.toast.error'), variant: 'destructive' }),
+  const createMut = useAppMutation({
+    mutationFn: (_: void) => createShipment({ siparisNo: target!.siparisNo, ...form }),
+    // Paket 3: yeni akış — sevk talebi muhasebe onayını bekler.
+    successTitle: t('logistics.toast.created'),
+    successDescription: () => target?.siparisNo,
+    errorTitle: t('logistics.toast.error'),
+    onSuccess: () => { setTarget(null); setForm(blank()); setSubmitted(false) },
   })
 
+  const openShipment = (o: LogisticsOrderListDto) => {
+    setTarget(o)
+    // Onaylı lojistik teklifi varsa sevk formunu ön-doldur.
+    setForm({ ...blank(), firmaAdi: o.onayliFirma ?? '', lojistikCesit: o.onayliCesit ?? '', fiyat: o.onayliFiyat ?? 0 })
+    setSubmitted(false)
+  }
+
+  const onSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    setSubmitted(true)
+    if (!valid) return
+    createMut.mutate()
+  }
+
   // Round-8 §12 — müşteri Peşin/Vadeli kolonu kaldırıldı; taşıyıcı anlaşması
-  // sevkiyat oluşturulurken girilir (Ready listesi sevk-öncesi olduğundan
-  // satır bazında taşıyıcı tutarı yoktur — anlaşma dialog'da özetlenir).
-  const cols: Column<LogisticsOrderListDto & Record<string, unknown>>[] = [
-    { key: 'siparisNo',         header: t('common.orderNo'), sortable: true },
+  // sevkiyat oluşturulurken girilir.
+  const cols: Column<Row>[] = [
+    { key: 'siparisNo',         header: t('common.orderNo'), sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
     { key: 'musteriAd',         header: t('common.customer'), sortable: true },
-    { key: 'mUlke',             header: t('common.country') },
-    { key: 'siparisMiTeklifMi', header: t('common.stage'), render: (r) => (
+    { key: 'mUlke',             header: t('common.country'), sortable: true },
+    { key: 'siparisMiTeklifMi', header: t('common.stage'), sortable: true, render: (r) => (
       // Üretimdeki sipariş lojistikte "Hazırlanıyor" olarak yansır (gerçek aşama 'Uretim').
       r.siparisMiTeklifMi === 'Uretim'
-        ? <Badge variant="warning">{t('logistics.preparing')}</Badge>
-        : <StatusBadge value={r.siparisMiTeklifMi as string} />
+        ? <Badge variant="progress">{t('logistics.preparing')}</Badge>
+        : <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
     ) },
-    { key: 'tarih',             header: t('common.date'), render: (r) => formatDate((r.tarih as string) ?? '-') },
+    { key: 'onayliFirma',       header: t('logistics.approvedOffer'), render: (r) => r.onayliFirma ? `${r.onayliFirma}${r.onayliCesit ? ` · ${r.onayliCesit}` : ''}` : '—' },
+    { key: 'tarih',             header: t('common.date'), sortable: true, type: 'date', render: (r) => formatDate((r.tarih as string) ?? '-') },
     {
-      key: 'actions', header: t('common.actions'),
+      key: 'actions', header: t('common.actions'), hideable: false, exportValue: false,
       render: (r) => {
         // Sevk yalnız 'Hazir' aşamasında yapılabilir; 'Hazırlanıyor' (Uretim) için pasif.
         const canShip = r.siparisMiTeklifMi === 'Hazir'
         return (
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setDetailNo(r.siparisNo as string)}>{t('common.details')}</Button>
-          <Button size="sm" disabled={!canShip} title={canShip ? undefined : t('logistics.preparing')} onClick={() => {
-            const o = r as LogisticsOrderListDto
-            setTarget(o)
-            // "Her ikisi de" — onaylı lojistik teklifi varsa sevk formunu ön-doldur.
-            setForm({ ...blank(), firmaAdi: o.onayliFirma ?? '', lojistikCesit: o.onayliCesit ?? '', fiyat: o.onayliFiyat ?? 0 })
-            setCarrierChoice(o.onayliFirma && carriers.includes(o.onayliFirma) ? o.onayliFirma : OTHER_CARRIER)
-            setSubmitted(false)
-          }}>{t('logistics.createShipment')}</Button>
-        </div>
+          <Button size="xs" disabled={!canShip} title={canShip ? undefined : t('logistics.preparingHint')} onClick={() => openShipment(r)}>
+            <Truck className="h-3.5 w-3.5" /> {t('logistics.createShipment')}
+          </Button>
         )
       },
     },
   ]
 
+  useShortcutHints([
+    { keys: '↑↓', label: t('shortcuts.moveRow') },
+    { keys: 'Shift+F10', label: t('shortcuts.rowMenu') },
+  ])
+
   return (
     <div>
-      <PageHeader title={t('logistics.readyTitle')} />
-      <div className="p-6 space-y-4">
-        {/* §25 — filtre şeridi */}
-        <div className="rounded-md border bg-card p-3">
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="space-y-1">
-              <Label>{t('common.orderNo')}</Label>
-              <Input value={fNo} onChange={(e) => setFNo(e.target.value)} placeholder="…" />
-            </div>
-            <div className="space-y-1">
-              <Label>{t('common.customer')}</Label>
-              <Input value={fMusteri} onChange={(e) => setFMusteri(e.target.value)} placeholder="…" />
-            </div>
-            <div className="space-y-1">
-              <Label>{t('common.stage')}</Label>
-              <Select value={fAsama} onValueChange={setFAsama}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">{t('myOrders.filter.all')}</SelectItem>
-                  {stageOptions.map((s) => (
-                    <SelectItem key={s} value={s}>{stageLabel(t, s)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1 flex items-end">
-              <Button variant="outline" className="w-full" onClick={() => { setFNo(''); setFMusteri(''); setFAsama('__all__') }}>
-                {t('myOrders.filter.reset')}
-              </Button>
-            </div>
-          </div>
-        </div>
-        <DataTable columns={cols} data={filtered as (LogisticsOrderListDto & Record<string, unknown>)[]} keyField="siparisNo" loading={isLoading} density="compact" />
+      <PageHeader title={t('logistics.readyTitle')} description={t('logistics.readyDescription')} />
+      <div className="space-y-3 p-4 lg:p-6">
+        <FilterBar onReset={reset} tableId="logistics-ready" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
+          <FilterField label={t('common.orderNo')}>
+            <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
+          </FilterField>
+          <FilterField label={t('common.customer')}>
+            <Input inputSize="sm" value={f.musteri} onChange={(e) => set('musteri', e.target.value)} />
+          </FilterField>
+          <FilterField label={t('common.stage')}>
+            <Select value={f.asama} onValueChange={(v) => set('asama', v)}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
+                {stageOptions.map((s) => <SelectItem key={s} value={s}>{stageLabel(t, s)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </FilterField>
+        </FilterBar>
+
+        {/* İç denetim — Hazır ama sevke açılmamış: Muhasebe lojistik onayı (2. peşinat) bekleyenler. */}
+        <WaitingUpstreamPanel screen="logistics-ready" />
+
+        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
+          <DataTable
+            tableId="logistics-ready"
+            exportFileName="lojistik-hazir"
+            columns={cols}
+            data={filtered as Row[]}
+            keyField="siparisNo"
+            loading={isLoading}
+            error={isError}
+            emptyMessage={notHere}
+            density="compact"
+            activeRowKey={activeNo}
+            onActiveRowChange={(r) => setActiveNo(r.siparisNo)}
+            rowActions={[
+              { key: 'detail', label: t('common.details'), shortcut: 'Enter', onSelect: (r) => setActiveNo(r.siparisNo) },
+              { key: 'ship', label: t('logistics.createShipment'), disabled: (r) => r.siparisMiTeklifMi !== 'Hazir', onSelect: (r) => openShipment(r) },
+            ]}
+          />
+        </MasterDetailLayout>
       </div>
 
-      <Dialog open={!!target} onOpenChange={() => setTarget(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{t('logistics.shipmentTitle', { no: target?.siparisNo })}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>{t('logistics.carrierLabel')}</Label>
-              <Select value={carrierChoice || undefined}
-                onValueChange={(v) => setCarrierChoice(v)}>
-                <SelectTrigger><SelectValue placeholder={t('logistics.carrier.select')} /></SelectTrigger>
-                <SelectContent>
-                  {carriers.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  <SelectItem value={OTHER_CARRIER}>{t('logistics.carrier.other')}</SelectItem>
-                </SelectContent>
-              </Select>
-              {carrierChoice === OTHER_CARRIER && (
-                <Input value={form.firmaAdi}
-                  onChange={(e) => setForm((f) => ({ ...f, firmaAdi: e.target.value }))}
-                  placeholder={t('logistics.carrier.otherPlaceholder')} />
-              )}
-              {submitted && !firmaAdi && <FieldError message={t('validation.required')} />}
-            </div>
-            <div className="space-y-1">
-              <Label>{t('logistics.transportType')}</Label>
-              {/* PROMPT-v7 §5 — serbest metin/datalist yerine Incoterms dropdown'u (ortak sabit). */}
-              <Select value={form.lojistikCesit || undefined}
-                onValueChange={(v) => setForm((f) => ({ ...f, lojistikCesit: v }))}>
+      <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null) }}>
+        <DialogContent size="md">
+          <form onSubmit={onSubmit} onKeyDown={onEnterNav} className="space-y-3">
+            <DialogHeader><DialogTitle>{t('logistics.shipmentTitle', { no: target?.siparisNo })}</DialogTitle></DialogHeader>
+            {target?.onayliFirma && (
+              <p className="rounded-md bg-info-soft px-2 py-1 text-xs text-info-soft-foreground">{t('logistics.prefilledFromOffer')}</p>
+            )}
+            <FormField label={t('logistics.carrierLabel')} required error={submitted && !form.firmaAdi ? t('validation.required') : null}>
+              <CarrierPicker autoFocus value={form.firmaAdi} onChange={(v) => setForm((x) => ({ ...x, firmaAdi: v }))} />
+            </FormField>
+            <FormField label={t('logistics.transportType')} required error={submitted && !form.lojistikCesit.trim() ? t('validation.required') : null}>
+              {/* PROMPT-v7 §5 — Incoterms dropdown'u (ortak sabit). */}
+              <Select value={form.lojistikCesit || undefined} onValueChange={(v) => setForm((x) => ({ ...x, lojistikCesit: v }))}>
                 <SelectTrigger><SelectValue placeholder={t('logistics.cesit.select')} /></SelectTrigger>
-                <SelectContent>
-                  {INCOTERMS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                </SelectContent>
+                <SelectContent>{INCOTERMS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
               </Select>
-              {submitted && !form.lojistikCesit.trim() && <FieldError message={t('validation.required')} />}
+            </FormField>
+            <div className="grid grid-cols-2 gap-2">
+              <FormField label={t('logistics.agreedAmount')} hint={form.fiyat > 0 ? undefined : t('logistics.zeroPriceHint')}>
+                <DecimalInput value={form.fiyat} onValueChange={(v) => setForm((x) => ({ ...x, fiyat: v === '' ? 0 : v }))} />
+              </FormField>
+              <FormField label={t('logistics.shipDate')}>
+                <Input type="date" value={form.sTarih} onChange={(e) => setForm((x) => ({ ...x, sTarih: e.target.value }))} />
+              </FormField>
             </div>
-            <div className="space-y-1"><Label>{t('logistics.agreedAmount')}</Label><DecimalInput value={form.fiyat} onValueChange={(v) => setForm((f) => ({ ...f, fiyat: v === '' ? 0 : v }))} /></div>
-            <div className="space-y-1"><Label>{t('logistics.shipDate')}</Label><Input type="date" value={form.sTarih} onChange={(e) => setForm((f) => ({ ...f, sTarih: e.target.value }))} /></div>
-            <div className="space-y-1"><Label>{t('logistics.note')}</Label><Textarea rows={2} value={form.lojistikNot} onChange={(e) => setForm((f) => ({ ...f, lojistikNot: e.target.value }))} /></div>
+            <FormField label={t('logistics.note')}>
+              <Textarea rows={2} value={form.lojistikNot} onChange={(e) => setForm((x) => ({ ...x, lojistikNot: e.target.value }))} />
+            </FormField>
 
-            {/* Round-8 §12 — taşıyıcı anlaşması özeti (müşteri ödeme türünün yerini aldı):
-                kiminle, nasıl ve ne kadara anlaşıldığı. */}
-            <div className="space-y-1">
-              <Label>{t('logistics.agreement.title')}</Label>
-              <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm space-y-0.5">
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">{t('logistics.agreement.firm')}</span><span className="font-medium">{firmaAdi || t('logistics.agreement.empty')}</span></div>
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">{t('logistics.agreement.type')}</span><span>{form.lojistikCesit || t('logistics.agreement.empty')}</span></div>
-                <div className="flex justify-between gap-2"><span className="text-muted-foreground">{t('logistics.agreement.amount')}</span><span className="font-medium">{form.fiyat > 0 ? formatCurrency(form.fiyat) : t('logistics.agreement.empty')}</span></div>
-                {form.lojistikNot.trim() && <div className="pt-1 text-xs text-muted-foreground whitespace-pre-wrap">{t('logistics.agreement.note')}: {form.lojistikNot}</div>}
-              </div>
+            {/* Round-8 §12 — taşıyıcı anlaşması özeti: kiminle, nasıl ve ne kadara. */}
+            <div className="space-y-1 rounded-md border bg-muted/40 px-3 py-2">
+              <p className="text-xs font-medium text-muted-foreground">{t('logistics.agreement.title')}</p>
+              <KeyValue label={t('logistics.agreement.firm')} value={form.firmaAdi || t('logistics.agreement.empty')} />
+              <KeyValue label={t('logistics.agreement.type')} value={form.lojistikCesit || t('logistics.agreement.empty')} />
+              <KeyValue label={t('logistics.agreement.amount')} value={form.fiyat > 0 ? formatCurrency(form.fiyat) : <span className="text-warning">{t('logistics.agreement.empty')}</span>} />
             </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
-            <Button disabled={createMut.isPending} onClick={onSubmit}>{t('logistics.ship')}</Button>
-          </DialogFooter>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setTarget(null)}>{t('common.cancel')}</Button>
+              <Button type="submit" loading={createMut.isPending}><Truck className="h-4 w-4" /> {t('logistics.ship')}</Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
-
-      <OrderDetailModal siparisNo={detailNo} onClose={() => setDetailNo(null)} logisticsView />
     </div>
   )
 }

@@ -80,8 +80,9 @@ internal sealed class FactoryService(IUnitOfWork uow) : IFactoryService
             if (exists is null)
                 throw new NotFoundException("Order", siparisNo);
 
+            // İç denetim — repository UPDATE'i yalnız Planlama'yı eşler; mesaj kullanıcıya (toast) gider.
             throw new BusinessException(
-                $"Order '{siparisNo}' is not in 'Planlama' stage and cannot be moved to production.");
+                $"'{siparisNo}' Planlama aşamasında değil ({exists.SiparisMiTeklifMi}) — üretime alınamaz.");
         }
     }
 

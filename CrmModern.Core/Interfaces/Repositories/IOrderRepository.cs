@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
 
@@ -55,7 +56,7 @@ public interface IOrderRepository : IBaseRepository<Order>
     /// <summary>Returns orders in production stages (Planlama/Uretim/Hazir/Lojistik/Tamamlandi), newest first.</summary>
     Task<IReadOnlyList<Order>> GetProductionStagesAsync();
 
-    /// <summary>Promotes order to 'Uretim', sets STarih and FabrikaNot. Returns rows affected.</summary>
+    /// <summary>Promotes order from 'Planlama' → 'Uretim', sets STarih and FabrikaNot. Returns rows affected (0 = not in Planlama).</summary>
     Task<int> MoveToProductionAsync(string siparisNo, DateTime stTarih, string fabrikaNot);
 
     /// <summary>Promotes order from 'Uretim' → 'Hazir'. Returns rows affected.</summary>
@@ -66,7 +67,10 @@ public interface IOrderRepository : IBaseRepository<Order>
     /// <summary>Returns orders in logistics-trackable stages (Siparis/Planlama/Uretim/Hazir/Lojistik/Tamamlandi).</summary>
     Task<IReadOnlyList<Order>> GetLogisticsStagesAsync();
 
-    /// <summary>Promotes order from 'Hazir' → 'Lojistik', sets STarih and LojistikNot. Returns rows affected.</summary>
+    /// <summary>
+    /// Promotes order from 'Hazir' → 'Lojistik', sets STarih and LojistikNot. Returns rows affected
+    /// (0 = not Hazir, Kontrol not 'Onay', or LojistikOnay 'Bekliyor').
+    /// </summary>
     Task<int> MoveToLogisticsAsync(string siparisNo, DateTime stTarih, string lojistikNot);
 
     /// <summary>
@@ -181,6 +185,20 @@ public interface IOrderRepository : IBaseRepository<Order>
 
     /// <summary>§19 — Verilen sipariş numaralarına ait SiparisIslemTablo kalemleri (toplu yükleme).</summary>
     Task<IReadOnlyList<OrderItem>> GetItemsForOrdersAsync(IReadOnlyCollection<string> siparisNolar);
+
+    // ── İç denetim (workflow) ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// OrderWorkflow adım koşuluna (ve opsiyonel daraltmaya) uyan siparişlerin
+    /// başlık alanları, en yeni önce. Blob/parasal kolonlar yüklenmez.
+    /// </summary>
+    Task<IReadOnlyList<Order>> GetWorkflowHeadersAsync(
+        Expression<Func<Order, bool>> predicate,
+        Expression<Func<Order, bool>>? narrow,
+        int? kullaniciID);
+
+    /// <summary>Tek siparişin iş akışı başlık alanları; bulunamazsa null.</summary>
+    Task<Order?> GetWorkflowHeaderAsync(string siparisNo);
 
     /// <summary>Round-8 §10 — müşterinin (id veya ad eşleşmesiyle) herhangi bir
     /// siparişi/teklifi var mı? Müşteri silmeden önce güvenlik kontrolü.</summary>

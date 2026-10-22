@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { CheckCheck } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   getPendingFinal, getPurchaseById, finalApprovePurchase, finalRejectPurchase,
@@ -8,14 +10,19 @@ import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
-import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useAppMutation } from '@/hooks/useAppMutation'
+import { describeApiError } from '@/lib/axios'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
 import { PurchaseLinesTable } from '@/components/PurchaseLinesTable'
+import { KeyValue } from '@/components/ui/key-value'
 import { PurchaseAttachment } from '@/components/PurchaseAttachment'
+import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
@@ -26,9 +33,12 @@ export function FinalApprovalPage() {
   const { getUser } = useAuth()
   // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez.
   const hideMoney = hideMoneyFor(getUser())
-  const [detailId, setDetailId] = useState<number | null>(null)
-  const [rejectTarget, setRejectTarget] = useState<number | null>(null)
-  const [redNotu, setRedNotu] = useState('')
+  const { askReason, confirm } = useConfirm()
+  const [params] = useSearchParams()
+  // E-10 — Bekleyen İşler "İşle" → ?sel=ID ile inceleme penceresi açık gelir.
+  const [detailId, setDetailId] = useState<number | null>(() => (params.get('sel') ? Number(params.get('sel')) : null))
+  const [selection, setSelection] = useState<(string | number)[]>([])
+  const [bulkRunning, setBulkRunning] = useState(false)
 
   const { data: pending = [], isLoading } = useQuery({
     queryKey: ['final-pending'], queryFn: getPendingFinal,
@@ -39,25 +49,45 @@ export function FinalApprovalPage() {
     enabled: !!detailId,
   })
 
-  const approveMut = useMutation({
+  const approveMut = useAppMutation({
     mutationFn: (id: number) => finalApprovePurchase(id),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['final-pending'] })
-      setDetailId(null)
-      toast({ title: t('purchase.final.approved') })
-    },
-    onError: (e: unknown) => toast({ title: t('purchase.final.approveFailed'), description: (e as Error).message, variant: 'destructive' }),
+    successTitle: t('purchase.final.approved'),
+    successDescription: (_d, id) => '#' + id,
+    errorTitle: t('purchase.final.approveFailed'),
+    onSuccess: () => setDetailId(null),
   })
 
-  const rejectMut = useMutation({
+  const rejectMut = useAppMutation({
     mutationFn: ({ id, not }: { id: number; not: string }) => finalRejectPurchase(id, not),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['final-pending'] })
-      setRejectTarget(null); setRedNotu(''); setDetailId(null)
-      toast({ title: t('purchase.final.rejected') })
-    },
-    onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
+    successTitle: t('purchase.final.rejected'),
+    errorTitle: t('common.error'),
+    onSuccess: () => setDetailId(null),
   })
+
+  // Ret: ortak zorunlu gerekçe penceresi (önceden detay penceresinin üstünde ikinci pencere açılıyordu).
+  const askReject = async (id: number) => {
+    const not = await askReason({ title: t('purchase.reject.title', { id }), label: t('purchase.reject.note'), destructive: true, confirmLabel: t('common.reject') })
+    if (not) rejectMut.mutate({ id, not })
+  }
+
+  // E-17 — toplu nihai onay (kural ihlali olan satırlar seçilemez).
+  const bulkApprove = async (rows: PurchaseRequestListDto[]) => {
+    if (!(await confirm({ title: t('purchase.final.bulkConfirm', { count: rows.length }), description: rows.map((r) => '#' + r.talepID + ' ' + r.urunAdi).join(', '), confirmLabel: t('common.approve') }))) return
+    setBulkRunning(true)
+    const failed: number[] = []
+    let lastErr: unknown = null
+    for (const r of rows) {
+      try { await finalApprovePurchase(r.talepID) } catch (e) { failed.push(r.talepID); lastErr = e }
+    }
+    setBulkRunning(false)
+    void invalidateOrderGraph(qc)
+    setSelection(failed)
+    toast({
+      title: t('purchase.final.approved') + ' — ' + t('bulk.result', { ok: rows.length - failed.length, failed: failed.length }),
+      description: failed.length ? describeApiError(lastErr) : undefined,
+      variant: failed.length ? 'warning' : 'success',
+    })
+  }
 
   const isSatinAlma = (r: PurchaseRequestListDto) =>
     !r.talepTipi || r.talepTipi === 'SatinAlma'
@@ -81,11 +111,16 @@ export function FinalApprovalPage() {
     { key: 'talepTipi',     header: t('purchase.cols.tip'), render: (r) => t(`purchase.tipLabel.${(r.talepTipi as string) ?? 'SatinAlma'}`, { defaultValue: (r.talepTipi as string) ?? 'SatinAlma' }) },
     { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },
     { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
-    { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
+    { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => (
+      <span className="flex items-center gap-1">
+        <PurchaseStatusBadge value={r.durum as string} />
+        {ruleBlocked(r as PurchaseRequestListDto) && <Badge variant="warning" title={t('purchase.final.ruleBlocked')}>{t('purchase.final.needsPayment')}</Badge>}
+      </span>
+    ) },
     {
-      key: 'actions', header: t('purchase.cols.islem'),
+      key: 'actions', header: t('purchase.cols.islem'), hideable: false, exportValue: false,
       render: (r) => (
-        <Button size="sm" variant="outline" onClick={() => setDetailId(r.talepID as number)}>
+        <Button size="xs" variant="outline" onClick={() => setDetailId(r.talepID as number)}>
           {t('purchase.final.reviewApprove')}
         </Button>
       ),
@@ -95,17 +130,36 @@ export function FinalApprovalPage() {
   return (
     <div>
       <PageHeader title={t('approval.finalTitle')} />
-      <div className="p-6">
-        <DataTable columns={cols} data={pending as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
+      <div className="space-y-3 p-6">
+        {/* İç denetim — sipariş maliyet talebi kapanışta açılır: Muhasebe kapanışı (3. peşinat) bekleyenler. */}
+        <WaitingUpstreamPanel screen="final-approval" />
+        <DataTable
+          tableId="final-approval"
+          exportFileName="nihai-onay"
+          columns={cols}
+          data={pending as (PurchaseRequestListDto & Record<string, unknown>)[]}
+          keyField="talepID"
+          loading={isLoading}
+          onRowActivate={(r) => setDetailId(r.talepID as number)}
+          selectable={(r) => !ruleBlocked(r as PurchaseRequestListDto)}
+          selectedKeys={selection}
+          onSelectionChange={setSelection}
+          bulkActions={(rows) => (
+            <Button size="xs" loading={bulkRunning} onClick={() => bulkApprove(rows as PurchaseRequestListDto[])}>
+              <CheckCheck className="h-3.5 w-3.5" /> {t('purchase.final.bulkApprove', { count: rows.length })}
+            </Button>
+          )}
+        />
       </div>
 
       {/* Detail + onay panel */}
-      <Dialog open={!!detailId} onOpenChange={() => setDetailId(null)}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!detailId} onOpenChange={(o) => { if (!o) setDetailId(null) }}>
+        <DialogContent size="lg" className="max-w-3xl">
           <DialogHeader>
             <DialogTitle>{t('purchase.final.reviewTitle', { id: detailId })}</DialogTitle>
           </DialogHeader>
 
+          {!detail && <div className="h-40 animate-pulse rounded-md bg-muted" />}
           {detail && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Sol: Talep + Muhasebe paneli */}
@@ -144,7 +198,7 @@ export function FinalApprovalPage() {
                       <Row label={t('purchase.final.fields.muhasebeYapan')} value={detail.muhasebeYapanKullanici} />
                       <Row label={t('purchase.final.fields.muhasebeTarihi')} value={detail.muhasebeTarihi ? formatDate(detail.muhasebeTarihi) : null} />
                     </>
-                  : <p className="text-orange-700 text-xs">
+                  : <p className="text-xs text-warning">
                       {t('purchase.final.noPayment')}
                     </p>}
               </div>
@@ -173,11 +227,14 @@ export function FinalApprovalPage() {
             <Button variant="outline" onClick={() => setDetailId(null)}>{t('common.close')}</Button>
             <Button
               variant="destructive"
-              onClick={() => { setRejectTarget(detailId); setRedNotu('') }}
-              disabled={rejectMut.isPending}
+              onClick={() => askReject(detailId!)}
+              loading={rejectMut.isPending}
+              disabled={!detail}
             >{t('common.reject')}</Button>
+            {/* Detay yüklenmeden onay verilemez (önceden detail undefined iken aktifti). */}
             <Button
-              disabled={approveMut.isPending || (detail && !detail.odemeTuru && (!detail.talepTipi || detail.talepTipi === 'SatinAlma'))}
+              loading={approveMut.isPending}
+              disabled={!detail || (!detail.odemeTuru && (!detail.talepTipi || detail.talepTipi === 'SatinAlma'))}
               title={detail && !detail.odemeTuru && (!detail.talepTipi || detail.talepTipi === 'SatinAlma') ? t('purchase.final.ruleBlocked') : ''}
               onClick={() => approveMut.mutate(detailId!)}
             >{t('common.approve')}</Button>
@@ -185,34 +242,11 @@ export function FinalApprovalPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reject sub-modal */}
-      <Dialog open={rejectTarget !== null} onOpenChange={() => setRejectTarget(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{t('purchase.reject.title', { id: rejectTarget })}</DialogTitle></DialogHeader>
-          <div className="space-y-2">
-            <Label>{t('purchase.reject.note')}</Label>
-            <Textarea rows={3} value={redNotu} onChange={(e) => setRedNotu(e.target.value)} />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>{t('common.cancel')}</Button>
-            <Button variant="destructive" disabled={!redNotu.trim() || rejectMut.isPending}
-              onClick={() => rejectMut.mutate({ id: rejectTarget!, not: redNotu })}>{t('common.reject')}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* dummy reference to silence unused-var lint */}
-      <span hidden>{pending.filter(ruleBlocked).length}</span>
     </div>
   )
 }
 
 function Row({ label, value }: { label: string; value?: string | null }) {
   if (!value) return null
-  return (
-    <div className="flex gap-2">
-      <span className="text-muted-foreground min-w-32">{label}:</span>
-      <span>{value}</span>
-    </div>
-  )
+  return <KeyValue label={label} value={value} className="justify-start [&>span:first-child]:min-w-32 [&>span:last-child]:text-left" />
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
@@ -14,6 +14,8 @@ import { cn } from '@/lib/utils'
  *  - Free typing is preserved — onChange always fires with the raw text, so
  *    a partial-name string travels through as the filter value.
  *  - Closes on outside click or Escape; keyboard up/down + Enter to pick.
+ *  - SR-3: Enter yalnız liste AÇIKKEN seçer (önceden kapalı listede de
+ *    filtered[hover] yazılan metni eziyordu); ARIA combobox/listbox rolleri.
  */
 export interface AutocompleteInputProps {
   value: string
@@ -33,6 +35,7 @@ export function AutocompleteInput({
   const [open, setOpen] = useState(false)
   const [hover, setHover] = useState(0)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const listId = useId()
 
   const filtered = useMemo(() => {
     const q = value.trim().toLocaleLowerCase('tr-TR')
@@ -60,7 +63,7 @@ export function AutocompleteInput({
       setOpen(true); return
     }
     if (e.key === 'Escape') { setOpen(false); return }
-    if (!filtered.length) return
+    if (!open || !filtered.length) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHover((i) => Math.min(filtered.length - 1, i + 1))
@@ -77,6 +80,12 @@ export function AutocompleteInput({
   return (
     <div ref={wrapRef} className={cn('relative', className)}>
       <Input
+        role="combobox"
+        aria-expanded={open && filtered.length > 0}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={open && filtered.length > 0 ? `${listId}-${hover}` : undefined}
+        autoComplete="off"
         value={value}
         placeholder={placeholder}
         disabled={disabled}
@@ -85,10 +94,14 @@ export function AutocompleteInput({
         onKeyDown={onKey}
       />
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-60 overflow-y-auto">
+        <div id={listId} role="listbox" className="absolute z-50 mt-1 w-full rounded-md border bg-popover shadow-md max-h-60 overflow-y-auto">
           {filtered.map((opt, i) => (
             <button
               type="button"
+              role="option"
+              id={`${listId}-${i}`}
+              aria-selected={i === hover}
+              tabIndex={-1}
               key={`${opt}-${i}`}
               className={cn(
                 'w-full text-left px-3 py-1.5 text-sm hover:bg-accent hover:text-accent-foreground',

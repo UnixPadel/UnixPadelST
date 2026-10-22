@@ -1,15 +1,12 @@
-import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getOffers, approveOffer, revokeOffer, rejectOffer } from '@/api/logisticsOffers'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { FieldError } from '@/components/FieldError'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useToast } from '@/components/ToastProvider'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useAppMutation } from '@/hooks/useAppMutation'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 
 interface Props {
   siparisNo: string
@@ -19,54 +16,34 @@ interface Props {
 
 /**
  * Bir siparişin lojistik tekliflerini listeler. Yönetici tek teklifi onaylar
- * (diğer onay düşer), reddeder (açıklama zorunlu) veya onayı geri alır.
- * Teklif oluşturma burada YOK — yalnız Lojistik rolü teklif girer.
+ * (diğer onay düşer), reddeder (açıklama zorunlu — ortak gerekçe penceresi) veya
+ * onayı geri alır (onaylı). Durum rengi rozetten gelir; kart çerçevesi yalnız
+ * vurgudur (QW-1 tonları, dark mode uyumlu).
  */
 export function LogisticsOffersList({ siparisNo, canApprove }: Props) {
   const { t } = useTranslation()
-  const { toast } = useToast()
-  const qc = useQueryClient()
-
-  const [rejectTarget, setRejectTarget] = useState<number | null>(null)
-  const [rejectReason, setRejectReason] = useState('')
-  const [rejectSubmitted, setRejectSubmitted] = useState(false)
+  const { confirm, askReason } = useConfirm()
 
   const { data: offers = [], isLoading } = useQuery({
     queryKey: ['logistics-offers', siparisNo],
     queryFn: () => getOffers(siparisNo),
   })
 
-  const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['logistics-offers', siparisNo] })
-    qc.invalidateQueries({ queryKey: ['logistics-offer-queue'] })
-    qc.invalidateQueries({ queryKey: ['logistics-ready'] })
-  }
-
-  const approveMut = useMutation({
+  const approveMut = useAppMutation({
     mutationFn: (teklifId: number) => approveOffer(teklifId),
-    onSuccess: () => { invalidate(); toast({ title: t('logisticsOffer.toast.approved') }) },
-    onError: () => toast({ title: t('logisticsOffer.toast.error'), variant: 'destructive' }),
+    successTitle: t('logisticsOffer.toast.approved'),
+    errorTitle: t('logisticsOffer.toast.error'),
   })
-  const revokeMut = useMutation({
+  const revokeMut = useAppMutation({
     mutationFn: (teklifId: number) => revokeOffer(teklifId),
-    onSuccess: () => { invalidate(); toast({ title: t('logisticsOffer.toast.revoked') }) },
-    onError: () => toast({ title: t('logisticsOffer.toast.error'), variant: 'destructive' }),
+    successTitle: t('logisticsOffer.toast.revoked'),
+    errorTitle: t('logisticsOffer.toast.error'),
   })
-  const rejectMut = useMutation({
+  const rejectMut = useAppMutation({
     mutationFn: ({ teklifId, redNotu }: { teklifId: number; redNotu: string }) => rejectOffer(teklifId, redNotu),
-    onSuccess: () => {
-      invalidate()
-      setRejectTarget(null); setRejectReason(''); setRejectSubmitted(false)
-      toast({ title: t('logisticsOffer.toast.rejected') })
-    },
-    onError: () => toast({ title: t('logisticsOffer.toast.error'), variant: 'destructive' }),
+    successTitle: t('logisticsOffer.toast.rejected'),
+    errorTitle: t('logisticsOffer.toast.error'),
   })
-
-  const onReject = () => {
-    setRejectSubmitted(true)
-    if (!rejectReason.trim() || rejectTarget == null) return
-    rejectMut.mutate({ teklifId: rejectTarget, redNotu: rejectReason.trim() })
-  }
 
   if (isLoading) return <p className="text-xs text-muted-foreground">{t('common.loading')}</p>
   if (offers.length === 0) return <p className="text-xs text-muted-foreground">{t('logisticsOffer.empty')}</p>
@@ -79,7 +56,7 @@ export function LogisticsOffersList({ siparisNo, canApprove }: Props) {
         return (
           <div
             key={o.teklifID}
-            className={`rounded-md border p-2 text-sm ${approved ? 'border-green-400 bg-green-50' : rejected ? 'border-red-300 bg-red-50' : ''}`}
+            className={cn('rounded-md border p-2 text-sm', approved && 'border-success/50 bg-success-soft/40', rejected && 'border-danger/40 opacity-80')}
           >
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <span className="font-medium">{o.firmaAdi}</span>
@@ -89,20 +66,30 @@ export function LogisticsOffersList({ siparisNo, canApprove }: Props) {
               <span className="text-xs text-muted-foreground">{o.kullaniciAdSoyad ?? '—'}</span>
               <span className="text-xs text-muted-foreground">{formatDate(o.olusturmaTarihi)}</span>
               {approved && <Badge variant="success">{t('logisticsOffer.approved')}</Badge>}
-              {rejected && <Badge variant="destructive">{t('logisticsOffer.rejected')}</Badge>}
-              {!approved && !rejected && <Badge variant="secondary">{t('logisticsOffer.pending')}</Badge>}
+              {rejected && <Badge variant="danger">{t('logisticsOffer.rejected')}</Badge>}
+              {!approved && !rejected && <Badge variant="warning">{t('logisticsOffer.pending')}</Badge>}
               {canApprove && (
-                <div className="ml-auto flex gap-2">
+                <div className="ml-auto flex gap-1.5">
                   {approved ? (
-                    <Button size="sm" variant="outline" disabled={revokeMut.isPending}
-                      onClick={() => revokeMut.mutate(o.teklifID)}>{t('logisticsOffer.revoke')}</Button>
+                    <Button size="xs" variant="outline" loading={revokeMut.isPendingFor((id) => id === o.teklifID)}
+                      onClick={async () => {
+                        if (await confirm({ title: t('logisticsOffer.revokeConfirm'), description: o.firmaAdi, confirmLabel: t('logisticsOffer.revoke') }))
+                          revokeMut.mutate(o.teklifID)
+                      }}>{t('logisticsOffer.revoke')}</Button>
                   ) : (
                     <>
-                      <Button size="sm" disabled={approveMut.isPending}
+                      <Button size="xs" loading={approveMut.isPendingFor((id) => id === o.teklifID)}
                         onClick={() => approveMut.mutate(o.teklifID)}>{t('logisticsOffer.approve')}</Button>
                       {!rejected && (
-                        <Button size="sm" variant="destructive"
-                          onClick={() => { setRejectTarget(o.teklifID); setRejectReason(''); setRejectSubmitted(false) }}>
+                        <Button size="xs" variant="destructive" loading={rejectMut.isPendingFor((v) => v.teklifId === o.teklifID)}
+                          onClick={async () => {
+                            const redNotu = await askReason({
+                              title: t('logisticsOffer.rejectTitle'), label: t('logisticsOffer.rejectReason'),
+                              description: `${o.firmaAdi} · ${formatCurrency(o.fiyat, o.paraBirimi ?? undefined)}`,
+                              destructive: true, confirmLabel: t('logisticsOffer.reject'),
+                            })
+                            if (redNotu) rejectMut.mutate({ teklifId: o.teklifID, redNotu })
+                          }}>
                           {t('logisticsOffer.reject')}
                         </Button>
                       )}
@@ -119,23 +106,6 @@ export function LogisticsOffersList({ siparisNo, canApprove }: Props) {
           </div>
         )
       })}
-
-      {/* Red açıklaması dialogu (Yönetici) */}
-      <Dialog open={rejectTarget != null}
-        onOpenChange={(open) => { if (!open) { setRejectTarget(null); setRejectReason(''); setRejectSubmitted(false) } }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader><DialogTitle>{t('logisticsOffer.rejectTitle')}</DialogTitle></DialogHeader>
-          <div className="space-y-1">
-            <Label>{t('logisticsOffer.rejectReason')}</Label>
-            <Textarea rows={3} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
-            {rejectSubmitted && !rejectReason.trim() && <FieldError message={t('validation.required')} />}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectTarget(null)}>{t('common.cancel')}</Button>
-            <Button variant="destructive" disabled={rejectMut.isPending} onClick={onReject}>{t('logisticsOffer.reject')}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

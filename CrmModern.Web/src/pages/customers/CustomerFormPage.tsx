@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
+import { useEnterNavigation } from '@/hooks/useEnterNavigation'
+import { usePreferences } from '@/lib/preferences'
 import { FieldError } from '@/components/FieldError'
 import { describeApiError } from '@/lib/axios'
 
@@ -48,6 +50,9 @@ export function CustomerFormPage() {
 
   const qc = useQueryClient()
   const { t } = useTranslation()
+  // E-3 — ETA tarzı Enter ile sonraki alan (Tercihlerim'den kapatılabilir).
+  const onEnterNav = useEnterNavigation()
+  const { enterNavigation } = usePreferences()
   const { toast } = useToast()
 
   const [form, setForm] = useState<CustomerWriteDto>(blank)
@@ -147,7 +152,7 @@ export function CustomerFormPage() {
   return (
     <div>
       <PageHeader title={isEdit ? t('customers.editTitle') : t('customers.addTitle')} />
-      <div className="p-6 max-w-3xl space-y-4">
+      <div className="p-6 max-w-3xl space-y-4" onKeyDown={enterNavigation ? onEnterNav : undefined}>
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1 col-span-2">

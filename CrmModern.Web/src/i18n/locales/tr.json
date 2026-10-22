@@ -111,7 +111,22 @@
     "users": "Kullanıcılar",
     "search": "Ara",
     "updates": "Neler Yeni",
-    "reporting": "Rapor · Temsilciler"
+    "reporting": "Rapor · Temsilciler",
+    "menu": "Ana menü",
+    "inbox": "Bekleyen İşler",
+    "preferences": "Tercihlerim",
+    "pendingCount_one": "{{count}} bekleyen",
+    "pendingCount_other": "{{count}} bekleyen",
+    "groups": {
+      "general": "Genel",
+      "sales": "Satış",
+      "operations": "Operasyon",
+      "logistics": "Lojistik",
+      "accounting": "Muhasebe",
+      "purchase": "Satın Alma",
+      "admin": "Yönetim"
+    },
+    "guide": "Kullanım Kılavuzu"
   },
   "customers": {
     "title": "Müşteriler",
@@ -242,7 +257,11 @@
       "convertFailed": "Çevirme başarısız.",
       "deleted": "Sipariş silindi.",
       "deleteFailed": "Silme başarısız."
-    }
+    },
+    "convertConfirm": {
+      "title": "Teklif siparişe çevrilsin mi?"
+    },
+    "newOrder": "Yeni sipariş/teklif"
   },
   "orders": {
     "newOrderTitle": "Sipariş/Teklif Oluştur",
@@ -255,7 +274,7 @@
     "form": {
       "musteri": "Müşteri",
       "musteriSec": "Müşteri seç",
-      "musteriAd": "Müşteri Adı *",
+      "musteriAd": "Müşteri Adı",
       "telefon": "Telefon",
       "email": "E-posta",
       "ulke": "Ülke",
@@ -278,7 +297,7 @@
       "receteAc": "Reçeteden Aç",
       "details": "Detaylar",
       "detailsHint": "Her satır ayrı bir not olarak kaydedilir.",
-      "saveFirstHint": "Kalemleri eklemek için önce siparişi/teklifi kaydedin.",
+      "saveFirstHint": "Ek yüklemek için önce teklifi/siparişi kaydedin.",
       "expandOrderHint": "Kalemleri sipariş kaydedildikten sonra \"Reçeteden Aç\" ile kategoriye dayalı olarak ekleyebilirsiniz.",
       "teslimAlanAdi": "Teslim Alan Adı",
       "ilgiliKisi": "İlgili Kişi",
@@ -287,7 +306,7 @@
       "teslimatVarLabel": "Var",
       "teslimatFiyat": "Teslimat Fiyat",
       "teslimatAdet": "Teslimat Adet",
-      "ekDosya": "Ek Dosya (PDF/JPG vb.)",
+      "ekDosya": "Ek dosya (ZIP/RAR)",
       "ekYuklendi": "Ek yüklendi",
       "ekYuklemeFailed": "Yükleme başarısız",
       "reviseMode": "Revize modu",
@@ -341,7 +360,7 @@
       "cesidi": "Çeşidi",
       "altTelefon": "Alternatif Telefon",
       "musteriTeslimat": "Müşteri / Teslimat",
-      "formuGetir": "Formu Getir",
+      "formuGetir": "Referanstan Oluştur",
       "teklifiHazirla": "Teklifi Hazırla",
       "siparisiHazirla": "Siparişi Hazırla",
       "revizeEt": "Revize Et",
@@ -361,9 +380,30 @@
       "ozelKalemBaslik": "Serbest Metin Kalem",
       "bilesenAdiPlaceholder": "Ürün/Hizmet adını girin",
       "oznitelikPlaceholder": "Özellik (opsiyonel)",
-      "birimSecin": "Birim seçin"
+      "birimSecin": "Birim seçin",
+      "musteriHint": "Yazarak arayın; F4 ile detaylı liste.",
+      "openBalance": "Açık bakiye",
+      "ekSec": "Ek dosya seç (ZIP/RAR)",
+      "formuGetirHint": "Seçtiğiniz kaydın içeriği YENİ bir teklif/sipariş olarak forma yüklenir.",
+      "setAdd": "Set ekle",
+      "setIncludedHint": "Ana ürünü seçili her set siparişe dahildir.",
+      "setRemove": "Seti kaldır",
+      "setRemoveHint": "Bu seti siparişten çıkarır",
+      "bilesenAra": "Bileşen ara…",
+      "checkedCount": "{{checked}} / {{total}} seçili",
+      "infoOnly": "bilgi",
+      "infoOnlyHint": "Bileşen ve serbest kalem tutarları bilgi amaçlıdır; toplam fiyata set fiyatı × adet girer.",
+      "freeItemRemoveTitle": "Serbest kalem silinsin mi?",
+      "extraCount_one": "{{count}} ekstra maliyet",
+      "extraCount_other": "{{count}} ekstra maliyet",
+      "none": "Yok",
+      "carpHint": "Fiyat × miktar sonucu fiyat alanına yazılır, miktar 1'e döner.",
+      "iliskilendirHint": "Müşteri bölümündeki adres ve iletişim bilgilerini teslimat alanlarına kopyalar.",
+      "sameAsCustomer": "Müşteriyle aynı",
+      "termsSummary": "{{checked}}/{{total}} standart şart · {{notes}} not",
+      "freeNotePlaceholder": "Not yazıp Enter'a basın"
     },
-    "subtitle": "Sipariş Formu — 3 kolon (Müşteri / Setler / Cari)",
+    "subtitle": "Müşteri, ürün setleri, teslimat ve cari bilgilerini doldurun; Ctrl+S ile gözden geçirip kaydedin.",
     "sections": {
       "musteri": "Müşteri",
       "temsilci": "Temsilci",
@@ -382,7 +422,59 @@
       "invalidNumber": "Lütfen geçerli bir sayı giriniz.",
       "noFabrikaOption": "Fabrika seçeneği mevcut değil.",
       "amended": "Sipariş güncellendi",
-      "bilesenLoadFailed": "Bileşenler yüklenemedi"
+      "bilesenLoadFailed": "Bileşenler yüklenemedi",
+      "exwApplied": "EXW: Fabrika teslimat adresi uygulandı, teslimat fiyatı 0 yapıldı."
+    },
+    "newForm": "Yeni form",
+    "unsavedBadge": "Kaydedilmedi",
+    "nav": {
+      "label": "Form bölümleri",
+      "sets_one": "Setler ({{count}})",
+      "sets_other": "Setler ({{count}})"
+    },
+    "issues": {
+      "musteriAd": "Müşteri adı girilmedi",
+      "lineItems": "En az bir set veya serbest kalem ekleyin",
+      "pesinYuzde": "Peşin % girilmedi",
+      "amendReason": "Düzenleme gerekçesi girilmedi"
+    },
+    "summary": {
+      "title": "Sipariş Özeti",
+      "sets_one": "Setler ({{count}})",
+      "sets_other": "Setler ({{count}})",
+      "freeItemsNote_one": "{{count}} serbest kalem bilgi amaçlıdır, toplama dahil değildir.",
+      "freeItemsNote_other": "{{count}} serbest kalem bilgi amaçlıdır, toplama dahil değildir.",
+      "ready": "Kaydetmeye hazır",
+      "missing": "Eksikler (tıklayın):",
+      "missingCount_one": "{{count}} eksik",
+      "missingCount_other": "{{count}} eksik"
+    },
+    "draft": {
+      "found": "Kaydedilmemiş bir taslak var ({{time}} · {{customer}}).",
+      "restore": "Taslağı yükle",
+      "discard": "Sil",
+      "restored": "Taslak yüklendi"
+    },
+    "success": {
+      "title": "{{no}} kaydedildi",
+      "desc": "Ek yükleyebilir, detayı açabilir veya yeni bir form başlatabilirsiniz."
+    },
+    "confirm": {
+      "currencyTitle": "Para birimi değiştirilsin mi?",
+      "currencyDesc": "Girilen tüm fiyatlar {{from}} biriminden {{to}} birimine güncel kurla çevrilecek.",
+      "currencyOk": "Çevir",
+      "customerTitle": "Müşteri bilgileri değişsin mi?",
+      "customerDesc": "Müşteri bölümündeki iletişim alanları \"{{name}}\" kaydıyla değiştirilecek.",
+      "overwrite": "Üzerine yaz",
+      "categoryTitle": "Ana ürün değişsin mi?",
+      "categoryDesc_one": "Bu sekmedeki {{count}} bileşen satırı ve düzenlemeleri silinecek.",
+      "categoryDesc_other": "Bu sekmedeki {{count}} bileşen satırı ve düzenlemeleri silinecek.",
+      "setRemoveTitle": "Set siparişten kaldırılsın mı?",
+      "deliveryTitle": "Teslimat bilgileri değişsin mi?",
+      "deliveryDesc": "Teslimat alanları müşteri bilgileriyle değiştirilecek.",
+      "extraRemoveTitle": "Ekstra maliyet silinsin mi?",
+      "resetTitle": "Yeni form açılsın mı?",
+      "resetDesc": "Kaydedilmemiş değişiklikler kaybolacak."
     }
   },
   "qc": {
@@ -517,7 +609,17 @@
       "remaining": "Kalan",
       "stage": "Aşama",
       "date": "Tarih"
-    }
+    },
+    "alreadyApproved": "Bu sipariş zaten onaylı",
+    "approveConfirmTitle": "Sipariş onaylansın mı?",
+    "approveNotePlaceholder": "Onay notu (isteğe bağlı)",
+    "capped": "İlk 200 sonuç gösteriliyor — filtreyi daraltın",
+    "legend": {
+      "approved": "Onaylı"
+    },
+    "nextHint": "Karardan sonra sıradaki bekleyen sipariş seçilir.",
+    "noPending": "Kontrol bekleyen sipariş yok.",
+    "splitter": "Üst panel yüksekliği (↑/↓)"
   },
   "users": {
     "title": "Kullanıcılar",
@@ -563,7 +665,9 @@
       "aciklamaPlaceholder": "Örn. Ek nakliye, gümrük, montaj farkı…",
       "tutar": "Tutar",
       "none": "Ekstra maliyet kalemi yok.",
-      "locked": "Bu aşamada ekstra maliyet düzenlenemez (yalnız cari/lojistik onay penceresinde)."
+      "locked": "Bu aşamada ekstra maliyet düzenlenemez (yalnız cari/lojistik onay penceresinde).",
+      "added": "Ekstra maliyet eklendi",
+      "deleted": "Ekstra maliyet silindi"
     },
     "cols": {
       "sirket": "Şirket",
@@ -618,8 +722,13 @@
       "hint": "Peşinat, onayla birlikte tahsilat olarak kaydedilir. Maliyet'e yazılmaz.",
       "hintEk": "Tahsilat olarak kaydedilir; siparişin aşaması değişmez. Geçmiş tarih girilirse numara tarihe göre sıralanır."
     },
+    "noPesinat": {
+      "confirm": "Bu siparişte %{{yuzde}} peşinat ({{kapora}}) bekleniyor ama henüz hiç tahsilat girilmedi.\n\nPeşinat girmeden Cari Onay verilirse sipariş ödemesiz olarak üretime gidebilir. Yine de onaylansın mı?",
+      "title": "Peşinat girilmedi"
+    },
     "overpay": {
-      "confirm": "Girilen tutar kalan bakiyeyi ({{kalan}}) {{fark}} aşıyor ve Kalan Bakiye eksiye düşecek.\n\nTutar doğru mu? Devam edilsin mi?"
+      "confirm": "Girilen tutar kalan bakiyeyi ({{kalan}}) {{fark}} aşıyor ve Kalan Bakiye eksiye düşecek.\n\nTutar doğru mu? Devam edilsin mi?",
+      "title": "Kalan bakiye aşılıyor"
     },
     "cancelTx": {
       "action": "Tahsilatı iptal et",
@@ -640,7 +749,8 @@
       "maliyetNotu": "Maliyet Notu",
       "hint": "3. Peşinat tahsilat olarak kaydedilir; Final Maliyet maliyet reçetesine işlenir. Sipariş 'Tamamlandı' olur.",
       "submit": "Tamamla",
-      "done": "Sipariş tamamlandı."
+      "done": "Sipariş tamamlandı.",
+      "needCost": "Tamamlamak için final maliyet girin."
     },
     "blocks": {
       "ozet": "Özet"
@@ -665,6 +775,9 @@
       "cariApproved": "Cari onay verildi — sipariş Planlama aşamasında.",
       "logisticsApproved": "Lojistik onay verildi — sipariş sevkiyat kuyruğunda.",
       "pesinatSaved": "Peşinat kaydedildi, bakiye güncellendi."
+    },
+    "shortcut": {
+      "form": "Sipariş formu"
     }
   },
   "accounting": {
@@ -681,7 +794,8 @@
       "musteriPlaceholder": "Müşteri seç veya yaz",
       "reset": "Sıfırla",
       "totalsLabel": "Filtre sonucu toplam ödeme (para birimi bazında)",
-      "rowCount": "Bulunan kayıt"
+      "rowCount": "Bulunan kayıt",
+      "search": "Ara"
     },
     "tahsilat": {
       "title": "Tahsilat — {{no}}",
@@ -692,8 +806,22 @@
       "previous": "Önceki tahsilatlar:",
       "none": "Henüz tahsilat yok.",
       "ekTitle": "Muhasebe Eki — {{no}}",
-      "dosya": "Dosya (PDF/ZIP/JPG…)"
-    }
+      "dosya": "Dosya (PDF/ZIP/JPG…)",
+      "add": "Tahsilat ekle",
+      "ekHint": "Muhasebe eki siparişe dosya olarak eklenir; aynı ada sahip önceki ekin yerini alır.",
+      "ekUpload": "Muhasebe eki yükle",
+      "ekUploaded": "Muhasebe eki yüklendi",
+      "saveClose": "Kaydet ve kapat",
+      "saved": "{{amount}} tahsilat kaydedildi"
+    },
+    "history": {
+      "excelHint": "Seçili filtrelere göre işlem geçmişini Excel olarak indirir",
+      "txId": "İşlem No"
+    },
+    "historyExcel": "İşlem geçmişi (Excel)",
+    "historyExcelHint": "Tüm tahsilat işlem geçmişini indirir. Ekrandaki listeyi almak için tablonun üstündeki Dışa aktar'ı kullanın.",
+    "ordersViewDescription": "Tüm teklif ve siparişler (salt-okunur); proforma Excel/PDF olarak açılabilir.",
+    "rowSummary": "Talep detayları"
   },
   "accountingHistory": {
     "maliyetRecetesi": "Maliyet Reçetesi",
@@ -743,7 +871,8 @@
     "carrier": {
       "select": "Firma seç",
       "other": "Diğer",
-      "otherPlaceholder": "Firma adı yazın"
+      "otherPlaceholder": "Firma adı yazın",
+      "pickOrType": "Kayıtlı firmayı seçin veya yeni ad yazın"
     },
     "cesit": {
       "select": "Taşıma türü seç"
@@ -765,7 +894,7 @@
       "empty": "Henüz girilmedi"
     },
     "toast": {
-      "created": "Sevk talebi oluşturuldu — Muhasebe onayı bekliyor.",
+      "created": "Sevkiyat oluşturuldu — sipariş yolda.",
       "error": "İşlem başarısız",
       "completed": "Sevkiyat tamamlandı",
       "cancelled": "Sevkiyat iptal edildi"
@@ -776,8 +905,24 @@
       "operator": "Operatör",
       "complete": "Tamamla",
       "cancelPrompt": "İptal gerekçesi:",
-      "firmaPlaceholder": "Firma Adı"
-    }
+      "firmaPlaceholder": "Firma Adı",
+      "cancelTitle": "Sevkiyatı iptal et",
+      "bulkComplete_one": "Tamamla ({{count}})",
+      "bulkComplete_other": "Tamamla ({{count}})",
+      "cancelConfirm": "Sevkiyatı iptal et",
+      "completeNote": "Teslim notu (isteğe bağlı)",
+      "completeTitle_one": "Sevkiyat tamamlansın mı?",
+      "completeTitle_other": "{{count}} sevkiyat tamamlansın mı?",
+      "shipmentId": "Sevk No"
+    },
+    "approvedOffer": "Onaylı teklif",
+    "carriersDescription": "Sevk kayıtlarında geçen taşıyıcılar ve taşıma türleri.",
+    "carriersList": "Taşıyıcılar",
+    "prefilledFromOffer": "Form onaylı lojistik teklifinden dolduruldu; gerekirse değiştirin.",
+    "preparingHint": "Sipariş üretimde; Hazır olunca sevk talebi açılabilir.",
+    "readyDescription": "Sevke hazır siparişler üstte. Sevkiyat oluşturulunca sipariş yola çıkmış sayılır.",
+    "transportTypes": "Taşıma türleri",
+    "zeroPriceHint": "Anlaşma tutarı 0 — doğru mu?"
   },
   "logisticsOffer": {
     "title": "Lojistik · Teklif",
@@ -809,7 +954,8 @@
       "revoked": "Onay iptal edildi.",
       "rejected": "Teklif reddedildi.",
       "error": "İşlem başarısız."
-    }
+    },
+    "revokeConfirm": "Teklif onayı geri alınsın mı?"
   },
   "logApprovals": {
     "sevkId": "Sevk #",
@@ -843,7 +989,23 @@
     "uretimTarihi": "Üretim Tarihi",
     "fabrikaNot": "Fabrika Notu",
     "fabrikaNotPlaceholder": "Fabrika notu girin...",
-    "cariOnayTarih": "Cari Onay Tarihi"
+    "cariOnayTarih": "Cari Onay Tarihi",
+    "bulkProduction_one": "Üretime al ({{count}})",
+    "bulkProduction_other": "Üretime al ({{count}})",
+    "bulkProductionTitle_one": "{{count}} siparişi üretime al",
+    "bulkProductionTitle_other": "{{count}} siparişi üretime al",
+    "bulkReady_one": "Hazır ({{count}})",
+    "bulkReady_other": "Hazır ({{count}})",
+    "description": "Planlamadaki siparişleri üretime alın, biten üretimleri Hazır yapın. Birden çok satırı seçip toplu işlem yapabilirsiniz.",
+    "readyConfirmTitle_one": "Sipariş Hazır yapılsın mı?",
+    "readyConfirmTitle_other": "{{count}} sipariş Hazır yapılsın mı?",
+    "toast": {
+      "markedReady": "Hazır olarak işaretlendi",
+      "moveFailed": "Üretime alınamadı",
+      "movedToProduction": "Üretime alındı",
+      "readyFailed": "Hazır yapılamadı"
+    },
+    "uretimTarihiHint": "Yerel saat; varsayılan şimdi."
   },
   "purchase": {
     "newTitle": "Satın Alma · Yeni Talep",
@@ -922,7 +1084,10 @@
       "tarih": "Tarih",
       "islem": "İşlem"
     },
-    "tipLabel": { "SatinAlma": "Satın Alma", "Muhasebe": "Muhasebe" },
+    "tipLabel": {
+      "SatinAlma": "Satın Alma",
+      "Muhasebe": "Muhasebe"
+    },
     "asamaLabel": {
       "fabrikaOnIzleme": "Fabrika / Ön İzleme",
       "muhasebe": "Muhasebe",
@@ -942,7 +1107,11 @@
       "title": "Talebi Reddet — #{{id}}",
       "note": "Red Notu *"
     },
-    "pre": { "approved": "Ön onaylandı", "rejected": "Reddedildi", "reviewTitle": "Ön Onay İnceleme — #{{id}}" },
+    "pre": {
+      "approved": "Ön onaylandı",
+      "rejected": "Reddedildi",
+      "reviewTitle": "Ön Onay İnceleme — #{{id}}"
+    },
     "payment": {
       "pageTitle": "Ödeme Detayı (Muhasebe)",
       "dialogTitle": "Ödeme Detayı — Talep #{{id}}",
@@ -951,7 +1120,8 @@
       "odemeTuru": "Ödeme Türü *",
       "islemTarihi": "İşlem Tarihi *",
       "saved": "Ödeme detayı kaydedildi (Muhasebe Tamamlandı)",
-      "selectPlaceholder": "Seçin"
+      "selectPlaceholder": "Seçin",
+      "typeRequired": "Ödeme türü seçin"
     },
     "final": {
       "reviewApprove": "İncele / Onayla",
@@ -987,7 +1157,12 @@
         "aciklama": "Açıklama",
         "muhasebeYapan": "Muhasebe Yapan",
         "muhasebeTarihi": "Muhasebe Tarihi"
-      }
+      },
+      "bulkApprove_one": "Onayla ({{count}})",
+      "bulkApprove_other": "Onayla ({{count}})",
+      "bulkConfirm_one": "Talep onaylansın mı?",
+      "bulkConfirm_other": "{{count}} talep onaylansın mı?",
+      "needsPayment": "Ödeme bekleniyor"
     },
     "detailPanel": {
       "urun": "Ürün",
@@ -996,7 +1171,8 @@
       "talepEden": "Talep Eden",
       "not": "Not",
       "onOnaylayan": "Ön Onaylayan"
-    }
+    },
+    "overrideConfirm": "Talep doğrudan onaylansın mı?"
   },
   "roles": {
     "Yonetici": "Yönetici",
@@ -1020,7 +1196,11 @@
   "reporting": {
     "repTitle": "Temsilci Performansı",
     "repSubtitle": "Seçili dönem için temsilci bazlı metrikler",
-    "period": { "day": "Bugün", "week": "Bu Hafta", "month": "Bu Ay" },
+    "period": {
+      "day": "Bugün",
+      "week": "Bu Hafta",
+      "month": "Bu Ay"
+    },
     "cols": {
       "olusturulan": "Oluşturulan",
       "teklif": "Teklif",
@@ -1096,7 +1276,19 @@
     "currentRep": "Mevcut temsilci",
     "selectRep": "Yeni temsilci seçin",
     "changeRep": "Temsilciyi Değiştir",
-    "repChanged": "Temsilci güncellendi"
+    "repChanged": "Temsilci güncellendi",
+    "excelDownloaded": "Excel indirildi",
+    "pdfDownloaded": "PDF indirildi",
+    "loadError": "Sipariş detayı yüklenemedi.",
+    "copyHint": "Bu siparişin içeriğiyle yeni bir teklif/sipariş formu açar",
+    "copyAsNew": "Kopyala ile yeni",
+    "legacyTimelines": "Aşama ve onay ayrıntıları",
+    "tabs": {
+      "general": "Genel",
+      "items": "Kalemler",
+      "flow": "Belge Akışı",
+      "notes": "Notlar"
+    }
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",
@@ -1115,7 +1307,7 @@
   "validation": {
     "required": "Bu alan zorunludur",
     "fixErrors": "Lütfen işaretli alanları doldurun",
-    "emptyOrder": "En az bir kalem ekleyin (Detaylar veya Setler boş olamaz)."
+    "emptyOrder": "En az bir set veya serbest kalem ekleyin."
   },
   "orderStage": {
     "title": "Aşama Geçmişi",
@@ -1156,6 +1348,12 @@
       "accountingDone": "Muhasebe Tamamlandı",
       "approved": "Onaylandı",
       "rejected": "Reddedildi"
+    },
+    "logistics": {
+      "awaitingAccounting": "Muhasebe Onayı Bekliyor",
+      "inTransit": "Sevk Yolda",
+      "awaitingCompletion": "Muhasebe Tamamlama Onayı Bekliyor",
+      "completed": "Tamamlandı"
     }
   },
   "currency": {
@@ -1170,5 +1368,293 @@
     },
     "sourceUnavailable": "TCMB kurları alınamadı — fiyatlar çevrilemiyor.",
     "noRate": "Kur yok — çevrilemedi"
+  },
+  "unsaved": {
+    "title": "Kaydedilmemiş değişiklikler",
+    "description": "Bu sayfada kaydedilmemiş değişiklikler var. Ayrılırsanız kaybolacak.",
+    "leave": "Değişiklikleri at ve ayrıl",
+    "stay": "Sayfada kal"
+  },
+  "table": {
+    "rowCount_one": "{{count}} kayıt",
+    "rowCount_other": "{{count}} kayıt",
+    "exportHint": "Ekrandaki filtreli satırları ve görünür kolonları Excel'de açılabilir CSV olarak indirir",
+    "export": "Dışa aktar",
+    "columns": "Kolonlar",
+    "resetLayout": "Varsayılan düzene dön",
+    "bulkBar": "Toplu işlem",
+    "selected_one": "{{count}} kayıt seçili",
+    "selected_other": "{{count}} kayıt seçili",
+    "clearSelection": "Seçimi temizle",
+    "selectAll": "Tümünü seç",
+    "selectRow": "Satırı seç",
+    "loadError": "Veriler yüklenemedi. F5 ile yeniden deneyin.",
+    "pageOf": "Sayfa {{page}} / {{count}}",
+    "moreActions": "Diğer işlemler",
+    "refreshing": "Yenileniyor…"
+  },
+  "filter": {
+    "reset": "Sıfırla"
+  },
+  "views": {
+    "title": "Görünümler",
+    "saveTitle": "Görünümü kaydet",
+    "name": "Görünüm adı",
+    "deleteTitle": "Görünümü sil",
+    "empty": "Kayıtlı görünüm yok.",
+    "setDefault": "Varsayılan yap",
+    "saveCurrent": "Mevcut görünümü kaydet"
+  },
+  "combobox": {
+    "placeholder": "Yazarak arayın…",
+    "lookup": "Listeden seç (F4)",
+    "toggle": "Listeyi aç",
+    "useCustom": "\"{{value}}\" kullan",
+    "empty": "Eşleşme yok",
+    "typeToFilter": "Daha fazlası için yazmaya devam edin"
+  },
+  "lookup": {
+    "searchPlaceholder": "Ad, ülke, VAT, telefon… ile arayın",
+    "hint": "{{count}} sonuç · ↑↓ gez · Enter seç · Esc kapat"
+  },
+  "palette": {
+    "title": "Komut paleti",
+    "trigger": "Ara veya komut yaz (örn. YS, SP 2025-0123)…",
+    "placeholder": "Sipariş, müşteri, ekran adı veya işlem kodu…",
+    "screens": "Ekranlar",
+    "commands": "Komutlar",
+    "recent": "Son aramalar",
+    "noResults": "Sonuç bulunamadı.",
+    "help": "Sipariş numarası, müşteri adı, bileşen, kullanıcı ya da ekran adı yazın.",
+    "codesHint": "İşlem kodları: YS Yeni Sipariş · SL Siparişlerim · KK Kontrol · FB Fabrika · LH Lojistik · TH Tahsilat · BI Bekleyen İşler. Belge: SP <no> detay · RV <no> revize · KP <no> kopyala.",
+    "navigate": "gez",
+    "open": "aç",
+    "doc": {
+      "SP": "{{no}} sipariş detayını aç",
+      "RV": "{{no}} revize et",
+      "KP": "{{no}} kopyalayarak yeni sipariş"
+    }
+  },
+  "statusBar": {
+    "messages": "Mesaj günlüğü",
+    "ready": "Hazır",
+    "log": "Oturum mesajları",
+    "empty": "Henüz mesaj yok."
+  },
+  "shortcuts": {
+    "title": "Klavye kısayolları",
+    "palette": "Komut paleti",
+    "help": "Kısayol yardımı",
+    "back": "Geri",
+    "refresh": "Verileri yenile",
+    "toggleMenu": "Menüyü daralt/genişlet",
+    "focusFilter": "Filtreye odaklan",
+    "applyFilter": "Filtreyi uygula",
+    "moveRow": "Satırlar arasında gez",
+    "openRow": "Satırı aç / detay",
+    "selectRow": "Satırı seç (toplu işlem)",
+    "rowMenu": "Satır menüsü",
+    "nextField": "Sonraki alan",
+    "prevField": "Önceki alan",
+    "lookup": "Listeden seç (değer yardımı)",
+    "save": "Kaydet",
+    "newLine": "Yeni satır",
+    "confirmDialog": "Pencereyi onayla",
+    "closeDialog": "Pencereyi kapat",
+    "qcApprove": "Kontrol: onayla",
+    "qcReject": "Kontrol: reddet",
+    "groups": {
+      "global": "Genel",
+      "lists": "Listeler",
+      "forms": "Formlar",
+      "qc": "Kalite Kontrol"
+    },
+    "guide": "Kullanım kılavuzu"
+  },
+  "approvalTimeline": {
+    "title": "Onay Geçmişi",
+    "loading": "Onay geçmişi yükleniyor…",
+    "empty": "Onay kaydı yok."
+  },
+  "docFlow": {
+    "title": "Belge Akışı",
+    "approval": {
+      "approved": "Onaylandı",
+      "rejected": "Reddedildi",
+      "pending": "Bekliyor"
+    },
+    "quoteCreated": "Teklif {{no}} oluşturuldu",
+    "orderCreated": "Sipariş {{no}} oluşturuldu",
+    "convertedFromQuote": "Teklif {{no}} siparişe çevrildi",
+    "qc": "Kontrol",
+    "approvalStep": "Onay",
+    "payment": "{{n}}. tahsilat · {{amount}}",
+    "paymentCancelled": "{{n}}. tahsilat iptal edildi",
+    "productionDone": "Üretim tamamlandı",
+    "inProduction": "Üretimde",
+    "awaitingProduction": "Üretim bekliyor",
+    "logisticsOffer": "Lojistik teklifi: {{firma}}",
+    "shipped": "Sevk edildi",
+    "awaitingShipment": "Sevkiyat bekliyor"
+  },
+  "inbox": {
+    "title": "Bekleyen İşler",
+    "description": "Size düşen bekleyen işler, kuyruk bazında.",
+    "total_one": "{{count}} bekleyen iş",
+    "total_other": "{{count}} bekleyen iş",
+    "noQueues": "Rolünüz için tanımlı bir iş kuyruğu yok.",
+    "openScreen": "Ekranı aç",
+    "empty": "Bekleyen iş yok",
+    "age_one": "{{count}} gün",
+    "age_other": "{{count}} gün",
+    "process": "İşle",
+    "queues": {
+      "qc": "Kontrol bekleyen",
+      "cari": "Cari onay bekleyen",
+      "lojistikOnay": "Lojistik onay bekleyen",
+      "tamamlanma": "Tamamlanma bekleyen",
+      "planning": "Üretime alınacak",
+      "production": "Üretimde (Hazır'a alınacak)",
+      "shipment": "Sevk talebi oluşturulacak",
+      "inTransit": "Yoldaki sevkiyatlar",
+      "finalApproval": "Satın alma nihai onay",
+      "payment": "Ödeme detayı girilecek",
+      "rejected": "Reddedilen siparişlerim"
+    },
+    "hints": {
+      "qc": "Onayla/Reddet ile karar verin.",
+      "cari": "Peşinatı girip cari onaya alın.",
+      "lojistikOnay": "Hazır siparişlerin lojistik onayı.",
+      "tamamlanma": "Final maliyet ve son peşinat girişi.",
+      "planning": "Üretim tarihi ve fabrika notuyla üretime alın.",
+      "production": "Üretimi biten siparişleri Hazır yapın.",
+      "shipment": "Taşıyıcı ve Incoterm seçip sevk talebi açın.",
+      "inTransit": "Teslim edilenleri tamamlayın.",
+      "finalApproval": "Talepleri inceleyip onaylayın/reddedin.",
+      "payment": "Ödeme türü ve detaylarını girin.",
+      "rejected": "Red notunu okuyup revize edin."
+    },
+    "loadError": "Kuyruk yüklenemedi (F5 ile yenileyin)."
+  },
+  "preferences": {
+    "title": "Tercihlerim",
+    "description": "Varsayılanlarınız; yeni formlar bu değerlerle açılır. Değişiklikler anında kaydedilir.",
+    "saved": "Tercih kaydedildi",
+    "orderDefaults": "Yeni sipariş varsayılanları",
+    "defaultPesin": "Varsayılan peşin %",
+    "defaultPesinHint": "Boş bırakırsanız her siparişte girilmesi gerekir.",
+    "workspace": "Çalışma alanı",
+    "startPage": "Açılış sayfası",
+    "tableDensity": "Tablo yoğunluğu",
+    "density": {
+      "normal": "Normal",
+      "compact": "Sıkı (daha çok satır)"
+    },
+    "enterNavigation": "Formlarda Enter ile sonraki alana geç",
+    "showShortcutHints": "Alt çubukta kısayol ipuçlarını göster",
+    "reset": "Varsayılanlara dön"
+  },
+  "bulk": {
+    "result": "{{ok}} başarılı, {{failed}} hatalı"
+  },
+  "masterDetail": {
+    "close": "Detayı kapat",
+    "expand": "Tam ekran aç"
+  },
+  "payment": {
+    "select": "Seçin",
+    "types": {
+      "pesin": "Peşin",
+      "vadeli": "Vadeli",
+      "malMukabili": "Mal Mukabili",
+      "cekSenet": "Çek / Senet",
+      "havale": "Havale / EFT",
+      "kart": "Kredi Kartı / Banka Kartı"
+    },
+    "fields": {
+      "odemeTuru": "Ödeme türü",
+      "odenenTutar": "Ödenen tutar",
+      "tutar": "Tutar",
+      "islemTarihi": "İşlem tarihi",
+      "belgeNo": "Belge no",
+      "bankaAdi": "Banka adı",
+      "vadeSuresi": "Vade süresi",
+      "vadeSuresiHint": "Örn. 30 gün",
+      "vadeTutari": "Vade tutarı",
+      "aciklama": "Açıklama",
+      "vadeTarihi": "Vade tarihi",
+      "kartTipi": "Kart tipi",
+      "taksit": "Taksit sayısı"
+    }
+  },
+  "statement": {
+    "title": "Cari Hesap Ekstresi",
+    "description_page": "Müşterinin borç (sipariş) ve alacak (tahsilat) hareketleri, döviz başına yürüyen bakiyeyle.",
+    "pickCustomer": "Ekstre için müşteri seçin (yazarak veya F4).",
+    "debit": "Borç",
+    "credit": "Alacak",
+    "description": "Açıklama",
+    "movementsIn": "{{currency}} hareketleri",
+    "noBalance": "Bu müşteri için bakiye kaydı yok.",
+    "noMovements": "Seçili aralıkta hareket yok.",
+    "open": "Açık",
+    "closed": "Kapalı",
+    "opening": "Devreden bakiye",
+    "orderLine": "Sipariş tutarı",
+    "payment": "Tahsilat",
+    "paymentN": "{{n}}. tahsilat"
+  },
+  "workflow": {
+    "panelTitle": "Önceki aşamada bekleyenler",
+    "panelHint": "Bu siparişler henüz bu ekrana düşmedi; bir önceki adım tamamlanınca listeye gelir.",
+    "buttonLabel": "Önceki aşama",
+    "empty": "Önceki aşamada bekleyen sipariş yok.",
+    "loadError": "Önceki aşama yüklenemedi.",
+    "currentStep": "Şu an bekleniyor",
+    "notHere": "{{no}} bu ekranda değil: {{reason}}.",
+    "notHereDone": "{{no}} bu ekranda değil: sipariş kapanmış ({{stage}}).",
+    "notFound": "{{no}} numaralı sipariş bulunamadı.",
+    "steps": {
+      "temsilciDuzeltme": "Temsilci düzeltmesi bekleniyor (reddedildi)",
+      "kontrolOnayi": "Kontrol onayı bekleniyor",
+      "siparisCevirme": "Temsilcinin siparişe çevirmesi bekleniyor",
+      "cariOnay": "Muhasebe cari onayı bekleniyor (1. peşinat)",
+      "uretimeAlma": "Fabrikanın üretime alması bekleniyor",
+      "uretim": "Fabrikada üretimde — \"Hazır\" bekleniyor",
+      "lojistikOnay": "Muhasebe lojistik onayı bekleniyor (2. peşinat)",
+      "sevkiyat": "Lojistiğin sevk talebi açması bekleniyor",
+      "teslimat": "Lojistik teslimatı bekleniyor",
+      "kapanis": "Muhasebe kapanışı bekleniyor (3. peşinat)"
+    },
+    "departments": {
+      "Satis": "Satış",
+      "Kontrol": "Kontrol",
+      "Muhasebe": "Muhasebe",
+      "Fabrika": "Fabrika",
+      "Lojistik": "Lojistik"
+    }
+  },
+  "guide": {
+    "button": "Kılavuz",
+    "title": "Kullanım Kılavuzu",
+    "sections": "Bölümler",
+    "steps": "Nasıl yapılır",
+    "tips": "İpuçları",
+    "goToScreen": "Ekrana git",
+    "fullPage": "Tam sayfada aç",
+    "print": "Yazdır",
+    "hint": "Bulunduğunuz ekranın bölümü açıldı; diğer bölümler listede.",
+    "pageDescription": "Ekranların kısa kullanım anlatımı. Panel olarak açmak için üstteki Kılavuz butonu ya da Shift+F1."
+  },
+  "whatsNew": {
+    "title": "Neler Yeni",
+    "missed_one": "Son girişinizden bu yana {{count}} sürüm yayınlandı.",
+    "missed_other": "Son girişinizden bu yana {{count}} sürüm yayınlandı.",
+    "allVersions": "Tüm sürümler",
+    "openGuide": "Kılavuzu aç",
+    "gotIt": "Anladım",
+    "currentVersion": "Şu anki sürüm: v{{version}}",
+    "legacyTitle": "Önceki geliştirme fazları",
+    "legacyHint": "eski numaralandırma"
   }
 }

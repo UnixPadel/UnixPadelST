@@ -74,7 +74,26 @@ SemVer:
 - `0.x.0` — yeni özellik
 - `x.0.0` — büyük yapısal değişiklik
 
-### 2. Commit + tag + push
+### 2. Sürüm notunu yaz ("Neler Yeni")
+
+`CrmModern.Web/src/data/changelog.ts` → `RELEASE_NOTES` dizisinin **başına**, `versiyon`
+alanı package.json ile **birebir aynı** olan TR + EN bir kayıt ekle:
+
+```ts
+{
+  versiyon: '0.3.0',
+  tarih:    '2026-10-22',
+  baslik:   { tr: 'Kısa başlık', en: 'Short title' },
+  maddeler: { tr: ['Kullanıcının anlayacağı dille madde'], en: ['Same item in English'] },
+},
+```
+
+- Kullanıcılar güncellemeden sonraki ilk girişte bu notu **bir kez** görür (kullanıcı başına;
+  atladıkları sürümlerin notları da birlikte gösterilir).
+- Kayıt unutulursa yayın durmaz; Actions'ta **"Sürüm notu eksik"** uyarısı çıkar ve o sürümde
+  pencere açılmaz. Lokal kontrol: `node CrmModern.Web/scripts/check-release-notes.mjs`
+
+### 3. Commit + tag + push
 
 ```powershell
 git commit -am "release: v0.2.1"
@@ -84,11 +103,11 @@ git push && git push --tags
 
 Tag push edilir edilmez GitHub Actions otomatik tetiklenir.
 
-### 3. Build'i izle
+### 4. Build'i izle
 
 `UnixPadel/UnixPadelST` repo'sunda **Actions** sekmesi → çalışan workflow'u takip et (~8-12 dk).
 
-### 4. Draft release'i yayına al
+### 5. Draft release'i yayına al
 
 Workflow başarılı olunca `UnixPadelST-Releases` repo'sunda **draft release** oluşur.
 
@@ -96,7 +115,7 @@ Workflow başarılı olunca `UnixPadelST-Releases` repo'sunda **draft release** 
 2. Draft `v0.2.1`'i bul → **Edit** → release notes yaz (opsiyonel)
 3. **Publish release** ← bu butona basmadan kullanıcılar güncelleme almaz
 
-### 5. Auto-update sessizce yayılır
+### 6. Auto-update sessizce yayılır
 
 - Mevcut kullanıcılar bir sonraki açılışta 5 sn içinde kontrol yapar
 - Yeni sürüm arka planda iner (~1-2 dk)

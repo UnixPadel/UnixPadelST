@@ -50,3 +50,29 @@ export function convert(amount: number, from: IsoCurrency, to: IsoCurrency, rate
 
 /** Sipariş satırı fiyatları DB'de decimal(10,2) — kuruşa yuvarla. */
 export const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100
+
+/**
+ * QW-13 — tek sembol çözücü: Para Tipi (Euro/Dolar/TL/Sterlin), ISO kodu
+ * (EUR/USD/TRY/GBP) veya zaten sembol (€ $ ₺ £) kabul eder. Bilinmeyen değer
+ * olduğu gibi döner; boş → ''. (Önceden utils, CurrencyTotals ve
+ * CustomerBalancePage'de üç ayrı harita vardı.)
+ */
+export function currencySymbolOf(c?: string | null): string {
+  const s = (c ?? '').trim()
+  if (!s) return ''
+  if (['€', '$', '₺', '£'].includes(s)) return s
+  const u = s.toUpperCase()
+  if (u === 'EUR' || u === 'EURO') return '€'
+  if (u === 'USD' || u === 'DOLAR') return '$'
+  if (u === 'TRY' || u === 'TL') return '₺'
+  if (u === 'GBP' || u === 'STERLIN') return '£'
+  return s
+}
+
+/** "1.234,56 €" — TR biçimi, sembol sonda. null/undefined → '-'. */
+export function formatMoney(amount: number | null | undefined, currency?: string | null): string {
+  if (amount == null || !Number.isFinite(amount)) return '-'
+  const num = amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const sym = currencySymbolOf(currency)
+  return sym ? `${num} ${sym}` : num
+}

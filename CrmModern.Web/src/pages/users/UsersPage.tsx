@@ -11,6 +11,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
+import { toastApiError } from '@/lib/apiError'
+import { useConfirm } from '@/components/ui/confirm-dialog'
 import type { UserListDto, CreateUserDto, UpdateUserDto } from '@/types'
 
 const YETKI_TURLERI = ['Yonetici', 'Muhasebe', 'Fabrika', 'Gozlemci', 'Temsilci', 'Lojistik']
@@ -23,6 +25,7 @@ const emptyCreate = (): CreateUserDto => ({
 export function UsersPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
+  const { confirm } = useConfirm()
   const { t } = useTranslation()
   const [showCreate, setShowCreate] = useState(false)
   const [createForm, setCreateForm] = useState<CreateUserDto>(emptyCreate())
@@ -40,19 +43,19 @@ export function UsersPage() {
   const createMut = useMutation({
     mutationFn: () => createUser(createForm),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); setShowCreate(false); setCreateForm(emptyCreate()); toast({ title: t('users.createSuccess') }) },
-    onError: (e: unknown) => toast({ title: t('common.error'), description: (e as Error).message, variant: 'destructive' }),
+    onError: (e: unknown) => toastApiError(toast, t('common.error'), e),
   })
 
   const updateMut = useMutation({
     mutationFn: () => updateUser(editUser!.kullaniciID, editForm),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); setEditUser(null); toast({ title: t('users.updateSuccess') }) },
-    onError: () => toast({ title: t('common.error'), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('common.error'), e),
   })
 
   const deleteMut = useMutation({
     mutationFn: (id: number) => deleteUser(id),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); toast({ title: t('users.deleteSuccess') }) },
-    onError: () => toast({ title: t('common.failed'), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('common.failed'), e),
   })
 
   const pwMut = useMutation({
@@ -84,8 +87,9 @@ export function UsersPage() {
           <Button size="sm" variant="outline" onClick={() => { setPwUser(r as UserListDto); setPwValue('') }}>
             {t('login.password')}
           </Button>
-          <Button size="sm" variant="destructive" onClick={() => {
-            if (window.confirm(t('users.deleteConfirm'))) deleteMut.mutate(r.kullaniciID as number)
+          <Button size="sm" variant="destructive" onClick={async () => {
+            if (await confirm({ title: t('common.delete'), description: t('users.deleteConfirm'), destructive: true, confirmLabel: t('common.delete') }))
+              deleteMut.mutate(r.kullaniciID as number)
           }}>
             {t('common.delete')}
           </Button>

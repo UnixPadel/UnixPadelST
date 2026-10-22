@@ -3,6 +3,7 @@ using CrmModern.Core.Entities;
 using CrmModern.Core.Exceptions;
 using CrmModern.Core.Interfaces;
 using CrmModern.Core.Interfaces.Services;
+using CrmModern.Core.Workflow;
 
 namespace CrmModern.Infrastructure.Services;
 
@@ -71,6 +72,15 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             throw new BusinessException(
                 $"'{siparisNo}' 'Hazir' aşamasında değil — sevk oluşturulamaz.");
 
+        // İç denetim — liste onaysız siparişi gizliyordu ama API doğrudan çağrılınca
+        // gate yoktu. Kural OrderWorkflow.Sevkiyat ile aynı (tek tanım).
+        if (existing.LojistikOnay == "Bekliyor")
+            throw new BusinessException(
+                $"'{siparisNo}' için muhasebe lojistik onayı (2. peşinat) bekleniyor — sevk oluşturulamaz.");
+        if (!OrderWorkflow.Sevkiyat.Matches(existing))
+            throw new BusinessException(
+                $"'{siparisNo}' sevke hazır değil (Kontrol: {existing.Kontrol}, Lojistik onay: {existing.LojistikOnay ?? "-"}) — sevk oluşturulamaz.");
+
         // 1) LojistikTablo INSERT
         var entry = new LogisticsEntry
         {
@@ -84,7 +94,12 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         await uow.LogisticsEntries.AddAsync(entry);
 
         // 2) Order: Hazir → Lojistik + STarih/LojistikNot setle (sevk yola çıktı).
-        await uow.Orders.MoveToLogisticsAsync(siparisNo, dto.STarih, dto.LojistikNot);
+        // UPDATE aynı gate'i WHERE'de de uygular; arada durum değiştiyse 0 satır →
+        // SaveChanges'ten önce hata, LojistikTablo satırı yazılmaz.
+        int rows = await uow.Orders.MoveToLogisticsAsync(siparisNo, dto.STarih, dto.LojistikNot);
+        if (rows == 0)
+            throw new BusinessException(
+                $"'{siparisNo}' sevk sırasında durum değişti — sevk oluşturulamadı, listeyi yenileyin.");
 
         // 3) SiparisOnaylari UPSERT (Paket 2 audit).
         var note = string.IsNullOrWhiteSpace(dto.LojistikNot) ? "Sevkiyat oluşturuldu." : dto.LojistikNot;

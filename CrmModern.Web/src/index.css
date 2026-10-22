@@ -24,6 +24,28 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* QW-1 — semantik durum tonları. Soft zeminler legacy WinForms/Excel
+       hücre renkleridir (#C6EFCE / #FFEB9C / #FFC7CE / #DDEBF7); operatör
+       bunları zaten tanıyor. *-soft-foreground koyu metin → WCAG AA. */
+    --success: 142 71% 32%;
+    --success-soft: 132 59% 86%;
+    --success-soft-foreground: 142 72% 20%;
+    --warning: 32 95% 40%;
+    --warning-soft: 48 100% 81%;
+    --warning-soft-foreground: 28 80% 22%;
+    --danger: 0 72% 45%;
+    --danger-soft: 352 100% 89%;
+    --danger-soft-foreground: 0 70% 30%;
+    --info: 212 75% 42%;
+    --info-soft: 208 67% 92%;
+    --info-soft-foreground: 212 75% 26%;
+    --progress: 262 55% 50%;
+    --progress-soft: 262 80% 93%;
+    --progress-soft-foreground: 262 55% 32%;
+    --neutral: 215 16% 47%;
+    --neutral-soft: 210 20% 93%;
+    --neutral-soft-foreground: 215 25% 27%;
   }
 
   .dark {
@@ -46,6 +68,25 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 224.3 76.3% 48%;
+
+    --success: 142 60% 50%;
+    --success-soft: 142 40% 17%;
+    --success-soft-foreground: 142 60% 80%;
+    --warning: 38 92% 55%;
+    --warning-soft: 38 60% 17%;
+    --warning-soft-foreground: 45 90% 78%;
+    --danger: 0 75% 60%;
+    --danger-soft: 0 45% 20%;
+    --danger-soft-foreground: 0 85% 85%;
+    --info: 212 85% 62%;
+    --info-soft: 212 45% 20%;
+    --info-soft-foreground: 212 85% 85%;
+    --progress: 262 75% 68%;
+    --progress-soft: 262 35% 22%;
+    --progress-soft-foreground: 262 85% 88%;
+    --neutral: 215 15% 65%;
+    --neutral-soft: 217 25% 20%;
+    --neutral-soft-foreground: 210 30% 85%;
   }
 }
 

@@ -1,5 +1,8 @@
 import { useTranslation } from 'react-i18next'
 import { formatDate } from '@/lib/utils'
+import { stageLabel, statusTone } from '@/lib/status'
+import { Timeline, type TimelineItem } from '@/components/ui/timeline'
+import { SectionTitle } from '@/components/ui/section-title'
 
 interface Props {
   tarih?: string                // sipariş oluşturma tarihi
@@ -19,6 +22,7 @@ interface Props {
  *
  * Hazır/Lojistik/Tamamlandi aşamalarına geçildiğinde her birinin ayrı
  * timestamp'i tutulmadığı için yalnız EN SON aşama görünür.
+ * QW-12 — mevcut aşama ham enum yerine çevrilmiş etiketle gösterilir.
  */
 export function OrderStageTimeline({ tarih, sTarih, currentStage }: Props) {
   const { t } = useTranslation()
@@ -33,33 +37,20 @@ export function OrderStageTimeline({ tarih, sTarih, currentStage }: Props) {
   }
   const lastEventKey = stageMessageKey[currentStage]
 
+  const items: TimelineItem[] = []
+  if (tarih) items.push({ key: 'created', label: t('orderStage.created'), tone: 'info', date: formatDate(tarih) })
+  if (sTarih && lastEventKey) items.push({ key: 'last', label: t(lastEventKey), tone: 'progress', date: formatDate(sTarih) })
+  items.push({
+    key: 'current',
+    label: t('orderStage.current'),
+    tone: statusTone(currentStage, 'stage'),
+    meta: <span className="font-medium text-foreground">{stageLabel(t, currentStage)}</span>,
+  })
+
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-semibold">{t('orderStage.title')}</h4>
-      <ol className="relative border-l ml-2 pl-4 space-y-3">
-        {tarih && (
-          <li className="text-sm">
-            <span className="inline-block px-2 py-0.5 text-xs rounded mr-2 bg-blue-100 text-blue-700">
-              {t('orderStage.created')}
-            </span>
-            <span className="text-muted-foreground">{formatDate(tarih)}</span>
-          </li>
-        )}
-        {sTarih && lastEventKey && (
-          <li className="text-sm">
-            <span className="inline-block px-2 py-0.5 text-xs rounded mr-2 bg-orange-100 text-orange-700">
-              {t(lastEventKey)}
-            </span>
-            <span className="text-muted-foreground">{formatDate(sTarih)}</span>
-          </li>
-        )}
-        <li className="text-sm">
-          <span className="inline-block px-2 py-0.5 text-xs rounded mr-2 bg-green-100 text-green-700">
-            {t('orderStage.current')}
-          </span>
-          <span className="font-medium">{currentStage}</span>
-        </li>
-      </ol>
+      <SectionTitle as="h4">{t('orderStage.title')}</SectionTitle>
+      <Timeline items={items} />
       {!sTarih && (
         <p className="text-xs text-muted-foreground italic">
           {t('orderStage.noHistoryNote')}

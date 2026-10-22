@@ -1,78 +1,137 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { CheckCheck, XCircle } from 'lucide-react'
 import { getLogisticsHistory, completeShipment, cancelShipment } from '@/api/logistics'
 import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
 import { PageHeader } from '@/components/PageHeader'
 import { DataTable, type Column } from '@/components/DataTable'
 import { LogisticsStatusBadge } from '@/components/LogisticsStatusBadge'
+import { FilterBar, FilterField, useFilterState } from '@/components/FilterBar'
+import { MasterDetailLayout } from '@/components/MasterDetailLayout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ToastProvider'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useAppMutation } from '@/hooks/useAppMutation'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
+import { describeApiError } from '@/lib/axios'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { formatCurrency } from '@/lib/utils'
+import { sumByCurrency } from '@/lib/export'
 import type { LogisticsHistoryDto } from '@/types'
 
+type Row = LogisticsHistoryDto & Record<string, unknown>
+const FILTER_DEFAULTS = { siparisNo: '', firmaAdi: '' }
+
+/**
+ * Lojistik — Geçmiş. Bu turda: etiketli FilterBar + debounce (her tuşta sorgu
+ * yoktu artık), Tamamla onaylı ve isteğe bağlı teslim notuyla (API `not` kabul
+ * ediyor), İptal zorunlu gerekçeyle (window.prompt yerine), satır bazlı bekleme,
+ * toplu Tamamla (E-17), detay sağ panelde (E-9).
+ */
 export function LogisticsHistoryPage() {
   const qc = useQueryClient()
   const { toast } = useToast()
+  const { askReason } = useConfirm()
   const { t } = useTranslation()
   const { getUser } = useAuth()
   const role = getUser()?.yetkiTuru ?? ''
   const canMutate = role === 'Yonetici' || role === 'Lojistik'
   // Round-11 §3 — omur.caliskan (Gozlemci) lojistik tutarını görmez.
   const hideMoney = hideMoneyFor(getUser())
+  const { values: f, set, setAll, reset } = useFilterState(FILTER_DEFAULTS)
+  const debounced = useDebouncedValue(f, 300)
+  const [activeNo, setActiveNo] = useState<string | null>(null)
+  const [selection, setSelection] = useState<(string | number)[]>([])
+  const [bulkRunning, setBulkRunning] = useState(false)
 
-  const [filter, setFilter] = useState({ siparisNo: '', firmaAdi: '' })
-
-  const { data = [], isLoading } = useQuery({
-    queryKey: ['logistics-history', filter],
-    queryFn: () => getLogisticsHistory(filter.siparisNo || undefined, filter.firmaAdi || undefined),
+  const { data = [], isLoading, isError } = useQuery({
+    queryKey: ['logistics-history', debounced],
+    queryFn: () => getLogisticsHistory(debounced.siparisNo || undefined, debounced.firmaAdi || undefined),
+    placeholderData: keepPreviousData,
   })
 
-  const completeMut = useMutation({
-    mutationFn: (sevkId: number) => completeShipment(sevkId),
-    // PROMPT-v5 §3 — sipariş statü geçişleri Siparişlerim'e canlı yansısın.
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['logistics-history'] }); qc.invalidateQueries({ queryKey: ['my-orders'] }); toast({ title: t('logistics.toast.completed') }) },
-    onError: () => toast({ title: t('logistics.toast.error'), variant: 'destructive' }),
+  const completeMut = useAppMutation({
+    mutationFn: ({ id, not }: { id: number; not?: string }) => completeShipment(id, not),
+    successTitle: t('logistics.toast.completed'),
+    errorTitle: t('logistics.toast.error'),
   })
-
-  const cancelMut = useMutation({
+  const cancelMut = useAppMutation({
     mutationFn: ({ id, sebep }: { id: number; sebep: string }) => cancelShipment(id, sebep),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['logistics-history'] }); qc.invalidateQueries({ queryKey: ['my-orders'] }); toast({ title: t('logistics.toast.cancelled') }) },
-    onError: () => toast({ title: t('logistics.toast.error'), variant: 'destructive' }),
+    successTitle: t('logistics.toast.cancelled'),
+    errorTitle: t('logistics.toast.error'),
   })
 
-  const cols: Column<LogisticsHistoryDto & Record<string, unknown>>[] = [
-    { key: 'id',           header: 'ID',          sortable: true },
-    { key: 'siparisNo',    header: t('common.orderNo'),  sortable: true },
+  const askComplete = async (rows: Row[]) => {
+    const not = await askReason({
+      title: t('logistics.history.completeTitle', { count: rows.length }),
+      description: rows.map((r) => `${r.siparisNo} · ${r.firmaAdi}`).join(', '),
+      label: t('logistics.history.completeNote'),
+      required: false,
+      confirmLabel: t('logistics.history.complete'),
+    })
+    if (not === null) return
+    if (rows.length === 1) { completeMut.mutate({ id: rows[0].id, not: not || undefined }); return }
+    setBulkRunning(true)
+    const failed: number[] = []
+    let lastErr: unknown = null
+    for (const r of rows) {
+      try { await completeShipment(r.id, not || undefined) } catch (e) { failed.push(r.id); lastErr = e }
+    }
+    setBulkRunning(false)
+    void invalidateOrderGraph(qc)
+    setSelection(failed)
+    toast({
+      title: `${t('logistics.toast.completed')} — ${t('bulk.result', { ok: rows.length - failed.length, failed: failed.length })}`,
+      description: failed.length ? describeApiError(lastErr) : undefined,
+      variant: failed.length ? 'warning' : 'success',
+    })
+  }
+
+  const askCancel = async (r: Row) => {
+    // QW-6 — window.prompt yerine zorunlu gerekçeli uygulama penceresi.
+    const sebep = await askReason({
+      title: t('logistics.history.cancelTitle'),
+      description: `${r.siparisNo} · ${r.firmaAdi}`,
+      label: t('logistics.history.cancelPrompt'),
+      destructive: true,
+      confirmLabel: t('logistics.history.cancelConfirm'),
+      cancelLabel: t('common.back'),
+    })
+    if (sebep) cancelMut.mutate({ id: r.id, sebep })
+  }
+
+  const cols: Column<Row>[] = [
+    { key: 'siparisNo',    header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
     { key: 'firmaAdi',     header: t('logistics.history.firma'), sortable: true },
     { key: 'lojistikCesit',header: t('logistics.history.tur'),   sortable: true },
     // PROMPT.md OBSERVER #18: operatör Ad Soyad kolonu.
     { key: 'kullaniciAdSoyad', header: t('logistics.history.operator'), sortable: true,
       render: (r) => (r.kullaniciAdSoyad as string) || '—' },
     ...(!hideMoney ? [
-      { key: 'fiyat', header: t('common.amount'), render: (r) => formatCurrency((r.fiyat as number) ?? 0) },
-    ] satisfies Column<LogisticsHistoryDto & Record<string, unknown>>[] : []),
-    { key: 'siparisMiTeklifMi', header: t('common.status'),
+      { key: 'fiyat', header: t('common.amount'), sortable: true, type: 'money', render: (r) => formatCurrency((r.fiyat as number) ?? 0),
+        footer: (rows) => sumByCurrency(rows, (x) => x.fiyat as number, () => 'Euro').map(([c, v]) => formatCurrency(v, c)).join(' · ') },
+    ] satisfies Column<Row>[] : []),
+    { key: 'siparisMiTeklifMi', header: t('common.status'), sortable: true,
       render: (r) => <LogisticsStatusBadge value={(r.siparisMiTeklifMi as string) ?? ''} /> },
-    { key: 'lNot',         header: t('common.note'),      render: (r) => <span className="text-sm text-muted-foreground">{(r.lNot as string) ?? '—'}</span> },
+    { key: 'lNot',         header: t('common.note'), render: (r) => <span className="text-muted-foreground">{(r.lNot as string) ?? '—'}</span> },
+    { key: 'id',           header: t('logistics.history.shipmentId'), sortable: true, type: 'number', defaultHidden: true },
     {
-      key: 'actions', header: t('common.actions'),
+      key: 'actions', header: t('common.actions'), hideable: false, exportValue: false,
       render: (r) => {
         if (!canMutate) return null
         // Paket 3: sadece "Sevk Yolda" (Order=Lojistik) satırlarda Tamamla/İptal gösterilir.
-        // "Muhasebe Onayı Bekliyor" (Hazir) için aksiyon Muhasebe'ye aittir.
-        const stage = r.siparisMiTeklifMi as string | undefined
-        if (stage !== 'Lojistik') return <span className="text-xs text-muted-foreground">—</span>
+        if (r.siparisMiTeklifMi !== 'Lojistik') return <span className="text-xs text-muted-foreground">—</span>
         return (
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => completeMut.mutate(r.id as number)} disabled={completeMut.isPending}>{t('logistics.history.complete')}</Button>
-            <Button size="sm" variant="destructive"
-              onClick={() => {
-                const sebep = window.prompt(t('logistics.history.cancelPrompt'))
-                if (sebep) cancelMut.mutate({ id: r.id as number, sebep })
-              }}>{t('common.cancel')}</Button>
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="xs" loading={completeMut.isPendingFor((v) => v.id === r.id)} onClick={() => askComplete([r])}>
+              <CheckCheck className="h-3.5 w-3.5" /> {t('logistics.history.complete')}
+            </Button>
+            <Button size="xs" variant="outline" className="text-destructive" loading={cancelMut.isPendingFor((v) => v.id === r.id)} onClick={() => askCancel(r)}>
+              <XCircle className="h-3.5 w-3.5" /> {t('common.cancel')}
+            </Button>
           </div>
         )
       },
@@ -82,12 +141,43 @@ export function LogisticsHistoryPage() {
   return (
     <div>
       <PageHeader title={t('logistics.historyTitle')} />
-      <div className="p-6 space-y-3">
-        <div className="flex gap-2 max-w-2xl">
-          <Input placeholder={t('common.orderNo')} value={filter.siparisNo} onChange={(e) => setFilter((f) => ({ ...f, siparisNo: e.target.value }))} />
-          <Input placeholder={t('logistics.history.firmaPlaceholder')} value={filter.firmaAdi} onChange={(e) => setFilter((f) => ({ ...f, firmaAdi: e.target.value }))} />
-        </div>
-        <DataTable columns={cols} data={data as (LogisticsHistoryDto & Record<string, unknown>)[]} keyField="id" loading={isLoading} density="compact" />
+      <div className="space-y-3 p-4 lg:p-6">
+        <FilterBar onReset={reset} tableId="logistics-history" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
+          <FilterField label={t('common.orderNo')}>
+            <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
+          </FilterField>
+          <FilterField label={t('logistics.history.firma')}>
+            <Input inputSize="sm" placeholder={t('logistics.history.firmaPlaceholder')} value={f.firmaAdi} onChange={(e) => set('firmaAdi', e.target.value)} />
+          </FilterField>
+        </FilterBar>
+        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
+          <DataTable
+            tableId="logistics-history"
+            exportFileName="lojistik-gecmis"
+            columns={cols}
+            data={data as Row[]}
+            keyField="id"
+            loading={isLoading}
+            error={isError}
+            density="compact"
+            showFooter={!hideMoney}
+            activeRowKey={data.find((r) => r.siparisNo === activeNo)?.id ?? null}
+            onActiveRowChange={(r) => setActiveNo(r.siparisNo)}
+            selectable={canMutate ? (r) => r.siparisMiTeklifMi === 'Lojistik' : false}
+            selectedKeys={selection}
+            onSelectionChange={setSelection}
+            bulkActions={(rows) => (
+              <Button size="xs" loading={bulkRunning} onClick={() => askComplete(rows)}>
+                <CheckCheck className="h-3.5 w-3.5" /> {t('logistics.history.bulkComplete', { count: rows.length })}
+              </Button>
+            )}
+            rowActions={[
+              { key: 'detail', label: t('common.details'), shortcut: 'Enter', onSelect: (r) => setActiveNo(r.siparisNo) },
+              { key: 'complete', label: t('logistics.history.complete'), hidden: (r) => !canMutate || r.siparisMiTeklifMi !== 'Lojistik', onSelect: (r) => askComplete([r]) },
+              { key: 'cancel', label: t('common.cancel'), destructive: true, hidden: (r) => !canMutate || r.siparisMiTeklifMi !== 'Lojistik', onSelect: (r) => askCancel(r) },
+            ]}
+          />
+        </MasterDetailLayout>
       </div>
     </div>
   )

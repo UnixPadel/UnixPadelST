@@ -1,10 +1,16 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { getApprovals } from '@/api/orders'
 import { formatDate } from '@/lib/utils'
+import { Timeline } from '@/components/ui/timeline'
+import { SectionTitle } from '@/components/ui/section-title'
+import { approvalLabel, approvalTone } from '@/components/order/DocumentFlow'
 
 interface Props { siparisNo: string | null }
 
+// QW-12 — başlık/yükleniyor/boş metinleri i18n; durum ham değer yerine etiket + ton.
 export function OrderApprovalTimeline({ siparisNo }: Props) {
+  const { t } = useTranslation()
   const { data = [], isLoading } = useQuery({
     queryKey: ['approvals', siparisNo],
     queryFn: () => getApprovals(siparisNo!),
@@ -12,31 +18,22 @@ export function OrderApprovalTimeline({ siparisNo }: Props) {
   })
 
   if (!siparisNo) return null
-  if (isLoading) return <div className="text-sm text-muted-foreground">Onay geçmişi yükleniyor...</div>
-  if (data.length === 0) return <div className="text-sm text-muted-foreground">Onay kaydı yok.</div>
+  if (isLoading) return <div className="text-sm text-muted-foreground">{t('approvalTimeline.loading')}</div>
+  if (data.length === 0) return <div className="text-sm text-muted-foreground">{t('approvalTimeline.empty')}</div>
 
   return (
     <div className="space-y-2">
-      <h4 className="text-sm font-semibold">Onay Geçmişi</h4>
-      <ol className="relative border-l ml-2 pl-4 space-y-3">
-        {data.map((a) => (
-          <li key={a.onayID} className="text-sm">
-            <span
-              className={
-                'inline-block px-2 py-0.5 text-xs rounded mr-2 ' +
-                (a.onayDurumu === 'Onaylandi' ? 'bg-green-100 text-green-700'
-                  : a.onayDurumu === 'Reddedildi' ? 'bg-red-100 text-red-700'
-                  : 'bg-yellow-100 text-yellow-700')
-              }
-            >
-              {a.onayDurumu}
-            </span>
-            <span className="text-muted-foreground">{a.kullaniciAdi ?? `#${a.kullaniciID}`}</span>
-            {a.onayTarih && <span className="text-muted-foreground"> — {formatDate(a.onayTarih)}</span>}
-            {a.aciklama && <p className="mt-1 ml-1 text-xs">{a.aciklama}</p>}
-          </li>
-        ))}
-      </ol>
+      <SectionTitle as="h4">{t('approvalTimeline.title')}</SectionTitle>
+      <Timeline
+        items={data.map((a) => ({
+          key: a.onayID,
+          label: approvalLabel(t, a.onayDurumu),
+          tone: approvalTone(a.onayDurumu),
+          meta: a.kullaniciAdi ?? `#${a.kullaniciID}`,
+          date: a.onayTarih ? formatDate(a.onayTarih) : undefined,
+          body: a.aciklama,
+        }))}
+      />
     </div>
   )
 }

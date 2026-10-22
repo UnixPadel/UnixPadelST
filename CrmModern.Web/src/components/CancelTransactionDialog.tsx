@@ -5,7 +5,8 @@ import { cancelTransaction } from '@/api/accounting'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
-import { describeApiError } from '@/lib/axios'
+import { toastApiError } from '@/lib/apiError'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 /**
@@ -29,7 +30,7 @@ export function CancelTxButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation()
   return (
     <Button size="sm" variant="ghost"
-      className="h-6 w-6 p-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+      className="h-6 w-6 p-0 text-destructive hover:bg-danger-soft hover:text-destructive"
       title={t('accApproval.cancelTx.action')}
       aria-label={t('accApproval.cancelTx.action')}
       onClick={(e) => { e.stopPropagation(); onClick() }}>
@@ -49,14 +50,12 @@ export function CancelTransactionDialog({ target, onClose }: {
   const mut = useMutation({
     mutationFn: (id: number) => cancelTransaction(id),
     onSuccess: () => {
-      // Tahsilat / bakiye gösteren tüm listeler.
-      for (const key of ['accounting-orders', 'order-detail', 'acc-approval-tx', 'order-tx', 'tx-history']) {
-        qc.invalidateQueries({ queryKey: [key] })
-      }
+      // SR-7 — tahsilat / bakiye gösteren tüm listeler (ortak sipariş grafiği).
+      void invalidateOrderGraph(qc)
       onClose()
-      toast({ title: t('accApproval.cancelTx.done') })
+      toast({ title: t('accApproval.cancelTx.done'), variant: 'success' })
     },
-    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('common.error'), e),
   })
 
   const pt = target?.paraTipi ?? undefined

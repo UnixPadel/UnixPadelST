@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Slot } from '@radix-ui/react-slot'
 import { cva, type VariantProps } from 'class-variance-authority'
+import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
@@ -18,8 +19,11 @@ const buttonVariants = cva(
       size: {
         default: 'h-10 px-4 py-2',
         sm: 'h-9 rounded-md px-3',
+        // QW-3 — yoğun gridler/araç çubukları için (eski `h-7 text-xs` ezmeleri).
+        xs: 'h-7 rounded-md px-2 text-xs gap-1',
         lg: 'h-11 rounded-md px-8',
         icon: 'h-10 w-10',
+        'icon-sm': 'h-7 w-7',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
@@ -30,12 +34,28 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean
+  /** QW-3 — bekleme durumu: spinner + disabled + aria-busy. */
+  loading?: boolean
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button'
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />
+    if (asChild) {
+      return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>{children}</Comp>
+    }
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={disabled || loading}
+        aria-busy={loading || undefined}
+        {...props}
+      >
+        {loading && <Loader2 className={cn('animate-spin', size === 'xs' || size === 'icon-sm' ? 'h-3 w-3' : 'h-4 w-4')} />}
+        {children}
+      </Comp>
+    )
   }
 )
 Button.displayName = 'Button'

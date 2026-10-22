@@ -1,19 +1,102 @@
-import type { ChangelogEntry } from '@/types'
+import type { ChangelogEntry, ReleaseNote } from '@/types'
 
 /**
- * Faz 7 — Yenilik (Changelog).
+ * Sürüm notları ("Neler Yeni").
  *
- * WinForms karşılığı: `Yenilik.cs` formu — sabit metin tek bir TextBox'tan okunuyordu
- * (resources.GetString("textBox1.Text")). Bu modülün DB bağlantısı yok; modern UI'da
- * statik veri olarak tutuluyor.
- *
- * Her yeni faz/sürümde başa yeni bir entry eklenir. Versiyon karşılaştırması
- * `UpdatesModal` içinde semver'sız basit string eşitliği üzerinden yapılır
- * (localStorage `lastSeenVersion`).
+ * Her yayında (RELEASE.md) package.json `version` ile AYNI `versiyon` değeriyle
+ * RELEASE_NOTES'un başına TR + EN bir kayıt eklenir. Uygulama sürümü derlemede
+ * `__APP_VERSION__` olarak gelir; kullanıcı başına son görülen sürümden yeni
+ * notlar girişte bir kez gösterilir (lib/releaseNotes.ts, UpdatesModal).
+ * Kayıt unutulursa `scripts/check-release-notes.mjs` yayın sırasında uyarır.
  */
-export const CURRENT_VERSION = '2.7.0'
+export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    versiyon: '0.3.0',
+    tarih:    '2026-10-22',
+    baslik: {
+      tr: 'Arayüz yenilendi: daha hızlı giriş, daha az hata, iç denetim',
+      en: 'Redesigned interface: faster entry, fewer errors, internal control',
+    },
+    maddeler: {
+      tr: [
+        'Hatalar düzeltildi: “1.234,56” gibi tutarlar artık doğru kaydediliyor, tarih/saat yerel saatle geliyor, boş sipariş kaydedilemiyor.',
+        'Yeni sipariş formu: sağda canlı toplam ve eksik listesi, otomatik taslak, kaydetmeden ayrılma uyarısı; Ctrl+S önce özeti gösterir, sonra kaydeder.',
+        'Listeler: detay listenin yanında açılır; kolon seçimi, kayıtlı görünümler, sağ tık menüsü, toplu işlem, Excel’e aktarma ve döviz bazında toplam.',
+        'Klavye: Ctrl+K komut kutusu (YS, KK, FB, SP <no>…), Enter ile sonraki alan, F4 ile liste, F1 ile kısayollar.',
+        'Bekleyen İşler: rolünüze düşen tüm işler tek ekranda, kaç gündür beklediğiyle.',
+        'Yeni ekranlar: Belge Akışı (siparişin tüm adımları), Cari Hesap Ekstresi, Tercihlerim.',
+        'İç denetim: her departman ekranında “Önceki aşamada bekleyenler” — siparişin neden henüz size düşmediği yazar (ör. “Muhasebe lojistik onayı bekleniyor (2. peşinat)”).',
+        'Kontroller: muhasebe lojistik onayı olmadan sevkiyat açılamaz; yalnız Planlama’daki sipariş üretime alınabilir.',
+        'Durum renkleri her ekranda aynı: yeşil tamam, sarı bekliyor, mavi süreçte, mor üretimde, kırmızı red/iptal.',
+        'Üst çubukta Kılavuz butonu (Shift+F1): bulunduğunuz ekranın kısa kullanım anlatımı.',
+      ],
+      en: [
+        'Fixes: amounts like “1.234,56” are now saved correctly, dates/times use local time, empty orders cannot be saved.',
+        'New order form: live total and missing-fields list on the right, automatic draft, leave-without-saving warning; Ctrl+S shows the summary, then saves.',
+        'Lists: details open beside the list; column chooser, saved views, right-click menu, bulk actions, Excel export and per-currency totals.',
+        'Keyboard: Ctrl+K command box (YS, KK, FB, SP <no>…), Enter moves to the next field, F4 opens lists, F1 shows shortcuts.',
+        'Pending Tasks: all work waiting for your role on one screen, with how many days it has waited.',
+        'New screens: Document Flow (every step of an order), Customer Account Statement, Preferences.',
+        'Internal control: each department screen shows “Waiting at the previous step” — why an order has not reached you yet (e.g. “Waiting for accounting logistics approval (2nd down payment)”).',
+        'Checks: a shipment cannot be created without accounting logistics approval; only orders in Planning can be moved to production.',
+        'Status colours are the same everywhere: green done, yellow waiting, blue in progress, purple in production, red rejected/cancelled.',
+        'Guide button in the top bar (Shift+F1): a short how-to for the screen you are on.',
+      ],
+    },
+  },
+  {
+    versiyon: '0.2.47',
+    tarih:    '2026-10-21',
+    baslik: { tr: 'Onay ekranında kuyruk dışı siparişe peşinat', en: 'Down payment for out-of-queue orders on the approval screen' },
+    maddeler: {
+      tr: ['Muhasebe Onay ekranında kuyrukta olmayan (Tamamlandı) siparişe de peşinat girilebiliyor.'],
+      en: ['On the Accounting Approval screen a down payment can also be entered for orders outside the queues (Completed).'],
+    },
+  },
+  {
+    versiyon: '0.2.46',
+    tarih:    '2026-10-21',
+    baslik: { tr: 'Tahsilat iptali ve fazla tahsilat uyarısı', en: 'Payment cancellation and overpayment warning' },
+    maddeler: {
+      tr: ['Tahsilat satırı kırmızı X ile iptal edilebiliyor.', 'Sipariş tutarını aşan tahsilatta uyarı gösteriliyor.'],
+      en: ['A payment row can be cancelled with the red X.', 'A warning is shown when a payment exceeds the order total.'],
+    },
+  },
+  {
+    versiyon: '0.2.45',
+    tarih:    '2026-10-20',
+    baslik: { tr: 'Talep Detayları’nda Muhasebe Geçmişi', en: 'Accounting History in Request Details' },
+    maddeler: {
+      tr: ['Talep Detayları’nda siparişin tahsilat bakiyeleri (Muhasebe Geçmişi) görünüyor.'],
+      en: ['Request Details now show the order’s payment balances (Accounting History).'],
+    },
+  },
+  {
+    versiyon: '0.2.44',
+    tarih:    '2026-10-19',
+    baslik: { tr: 'Excel reçeteleri ve kur çevirici', en: 'Excel recipes and currency converter' },
+    maddeler: {
+      tr: ['4 kort tipi için Excel reçeteleri eklendi.', 'Cari Bilgi’ye kur çevirici eklendi.'],
+      en: ['Excel recipes added for 4 court types.', 'Currency converter added to Account Info.'],
+    },
+  },
+  {
+    versiyon: '0.2.43',
+    tarih:    '2026-10-07',
+    baslik: { tr: 'Panoramic Padel Court çelik profil fiyatları', en: 'Panoramic Padel Court steel profile prices' },
+    maddeler: {
+      tr: ['Panoramic Padel Court çelik profil fiyatları Excel R02 listesine göre güncellendi.'],
+      en: ['Panoramic Padel Court steel profile prices updated from the Excel R02 list.'],
+    },
+  },
+]
 
-export const CHANGELOG: ChangelogEntry[] = [
+/**
+ * Faz 7 öncesi geliştirme fazları (eski "2.x = Faz x" numaralandırması; yayın
+ * sürümleriyle ilgisi yok). Yalnız geçmiş sayfasında gösterilir.
+ * WinForms karşılığı: `Yenilik.cs` (sabit metin).
+ */
+export const LEGACY_CHANGELOG: ChangelogEntry[] = [
   {
     versiyon: '2.7.0',
     tarih:    '2026-05-18',

@@ -1,7 +1,7 @@
 {
   "name": "unixpadelst",
   "private": true,
-  "version": "0.2.47",
+  "version": "0.3.0",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -11,7 +11,7 @@
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && electron-builder",
     "dist": "npm run build && electron-builder",
-    "release": "npm run build && electron-builder --publish always"
+    "release": "node scripts/check-release-notes.mjs && npm run build && electron-builder --publish always"
   },
   "build": {
     "appId": "com.unixpadelst.app",

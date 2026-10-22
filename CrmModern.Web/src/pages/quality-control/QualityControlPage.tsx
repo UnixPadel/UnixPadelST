@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getPendingQC, getQCById, approveQC, rejectQC } from '@/api/qualityControl'
@@ -15,12 +15,25 @@ import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Combobox } from '@/components/ui/combobox'
+import { ReadOnlyField } from '@/components/ui/key-value'
+import { FieldError } from '@/components/FieldError'
+import { PageHeader } from '@/components/PageHeader'
+import { StatusBadge } from '@/components/StatusBadge'
+import { FilterBar, FilterField } from '@/components/FilterBar'
+import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
+import { useShortcutHints } from '@/components/StatusBar'
+import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useHotkeys } from '@/hooks/useHotkeys'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
+import { toastApiError } from '@/lib/apiError'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
-import { describeApiError } from '@/lib/axios'
 import { formatDateShort, formatCurrency, cn } from '@/lib/utils'
 import { statusLabel } from '@/lib/status'
 import { resolveClause } from '@/lib/clauses'
@@ -126,29 +139,8 @@ function fromSearch(r: OrderListDto): KontrolRow {
   }
 }
 
-// ── Kompakt read-only alan (form görünümlü muted input) ───────────────────────
-
-function ROField({ label, value, multiline = false, className }: {
-  label: string
-  value?: string | null
-  multiline?: boolean
-  className?: string
-}) {
-  return (
-    <div className={cn('space-y-0.5 min-w-0', className)}>
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground truncate">{label}</p>
-      {multiline ? (
-        <div className="rounded border bg-muted/40 px-1.5 py-1 text-xs whitespace-pre-wrap break-words min-h-[2.5rem] max-h-20 overflow-y-auto">
-          {value || '—'}
-        </div>
-      ) : (
-        <div className="rounded border bg-muted/40 px-1.5 py-1 text-xs truncate" title={value ?? undefined}>
-          {value || '—'}
-        </div>
-      )}
-    </div>
-  )
-}
+// SR-6 — salt-okunur alanlar ortak ReadOnlyField (components/ui/key-value).
+const ROField = ReadOnlyField
 
 /** Cari sekmesi satırı — legacy "etiket solda, kutu sağda" düzeni. */
 function CariRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -174,36 +166,34 @@ export function QualityControlPage() {
   const qc = useQueryClient()
   const nav = useNavigate()
   const { toast } = useToast()
+  const { confirm } = useConfirm()
   const { t } = useTranslation()
+  const [params] = useSearchParams()
 
   // ── Filtre + arama state ────────────────────────────────────────────────
   const [filters, setFilters] = useState<Filters>(defaultFilters())
   const [submitted, setSubmitted] = useState<Filters | null>(null)
-  const [selected, setSelected] = useState<string | null>(null)
+  // E-10 — Bekleyen İşler "İşle" → ?sel=NO ile satır seçili açılır.
+  const [selected, setSelected] = useState<string | null>(() => params.get('sel'))
   // "Sadece onaylı" — görünümü client-side yalnız Kontrol='Onay' satırlara süzer
   // (varsayılan liste bekleyen + son 30 gün onaylıyı içerir; işaretlenince
   // bekleyenler gizlenir). Backend'e ek istek atmaz.
   const [onlyApproved, setOnlyApproved] = useState(false)
 
   // ── Veri: varsayılan pending listesi (legacy KontorlDataGridLoad) ───────
-  const { data: pending = [], isLoading: pendingLoading } = useQuery({
+  const { data: pending = [], isLoading: pendingLoading, isError: pendingError } = useQuery({
     queryKey: ['quality-control'],
     queryFn: getPendingQC,
   })
 
   // ── Veri: filtreli arama (legacy araButtonInTab_Click_1) ────────────────
-  const { data: searchPage, isLoading: searchLoading } = useQuery({
+  const { data: searchPage, isLoading: searchLoading, isError: searchError } = useQuery({
     queryKey: ['qc-search', submitted],
     queryFn: () => getOrders(buildSearchParams(submitted!)),
     enabled: submitted !== null,
   })
 
-  // Boş sonuç → toast (legacy MessageBox)
-  useEffect(() => {
-    if (submitted !== null && searchPage && searchPage.items.length === 0)
-      toast({ title: t('qc.noResults'), variant: 'destructive' })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchPage])
+  // QW-7 — boş sonuç artık hata toast'u değil; tablonun boş durumu gösterilir.
 
   const rows: KontrolRow[] = useMemo(() => {
     const base = submitted !== null
@@ -218,7 +208,7 @@ export function QualityControlPage() {
   const { data: users = [] } = useQuery({ queryKey: ['users-lookup'], queryFn: getUsersLookup })
 
   // ── Seçili sipariş detayı ───────────────────────────────────────────────
-  const { data: detail } = useQuery({
+  const { data: detail, isLoading: detailLoading } = useQuery({
     queryKey: ['qc-detail', selected],
     queryFn: () => getQCById(selected!),
     enabled: !!selected,
@@ -233,6 +223,9 @@ export function QualityControlPage() {
   const [redNotu, setRedNotu] = useState('')
   const [formNo, setFormNo] = useState<string | null>(null)
   const [odenenInput, setOdenenInput] = useState<number | ''>('')
+  const [redTouched, setRedTouched] = useState(false)
+  // SR-8 — opsiyonel onay notu (api approveQC kontrolNot kabul ediyor).
+  const [onayNotu, setOnayNotu] = useState('')
 
   // Round-Next §11 — splitter ARTIK ÜST bölgenin yüksekliğini ayarlar (eskiden
   // grid'i sabitliyordu; üst h-auto + sayfa scroll'u yüzünden tablo yalnız aşağı
@@ -264,17 +257,22 @@ export function QualityControlPage() {
     setOdenenInput(detail?.odenenMiktar ?? '')
   }, [detail])
 
-  const refreshAll = () => {
-    qc.invalidateQueries({ queryKey: ['quality-control'] })
-    qc.invalidateQueries({ queryKey: ['qc-search'] })
-    qc.invalidateQueries({ queryKey: ['qc-detail'] })
-    qc.invalidateQueries({ queryKey: ['my-orders'] })
-    setSelected(null)
+  // SR-7 — tüm sipariş grafiği tazelenir (önceden accounting-orders atlanıyordu).
+  // SR-8 — "Onayla ve sonrakine geç": işlemden sonra seçim temizlenmek yerine
+  // listedeki bir sonraki bekleyen ('Kontrol') satıra geçer.
+  const nextPendingAfter = (no: string): string | null => {
+    const i = rows.findIndex((r) => r.siparisNo === no)
+    const after = [...rows.slice(i + 1), ...rows.slice(0, Math.max(i, 0))]
+    return after.find((r) => r.kontrol === 'Kontrol' && r.siparisNo !== no)?.siparisNo ?? null
+  }
+  const refreshAll = (no?: string) => {
+    void invalidateOrderGraph(qc)
+    setSelected(no ? nextPendingAfter(no) : null)
   }
 
   const requireSelection = (): string | null => {
     if (!selected) {
-      toast({ title: t('qc.selectFirst'), variant: 'destructive' })
+      toast({ title: t('qc.selectFirst'), variant: 'warning' })
       return null
     }
     return selected
@@ -282,44 +280,51 @@ export function QualityControlPage() {
 
   // ── Mutations ───────────────────────────────────────────────────────────
   const approveMut = useMutation({
-    mutationFn: (no: string) => approveQC(no),
-    onSuccess: () => { refreshAll(); toast({ title: t('qc.approved') }) },
-    onError: (e) => toast({ title: t('qc.approveFailed'), description: describeApiError(e), variant: 'destructive' }),
+    mutationFn: (no: string) => approveQC(no, onayNotu.trim() || undefined),
+    onSuccess: (_d, no) => { refreshAll(no); setOnayNotu(''); toast({ title: t('qc.approved'), description: no, variant: 'success' }) },
+    onError: (e) => toastApiError(toast, t('qc.approveFailed'), e),
   })
 
   const rejectMut = useMutation({
     mutationFn: ({ no, red }: { no: string; red: string }) => rejectQC(no, red),
-    onSuccess: () => {
-      refreshAll(); setRejectOpen(false); setRedNotu('')
-      toast({ title: t('qc.rejected') })
+    onSuccess: (_d, vars) => {
+      refreshAll(vars.no); setRejectOpen(false); setRedNotu('')
+      toast({ title: t('qc.rejected'), description: vars.no, variant: 'success' })
     },
-    onError: (e) => toast({ title: t('qc.rejectFailed'), description: describeApiError(e), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('qc.rejectFailed'), e),
   })
 
   const cariMut = useMutation({
     mutationFn: ({ no, miktar }: { no: string; miktar: number }) => updatePaidAmount(no, miktar),
     onSuccess: (_d, vars) => {
       // Cari blok yeniden hesaplansın ama seçim korunup form yerinde kalsın.
-      qc.invalidateQueries({ queryKey: ['quality-control'] })
-      qc.invalidateQueries({ queryKey: ['qc-search'] })
-      qc.invalidateQueries({ queryKey: ['qc-detail', vars.no] })
-      qc.invalidateQueries({ queryKey: ['my-orders'] })
-      toast({ title: t('qc.cariUpdated') })
+      void invalidateOrderGraph(qc)
+      toast({ title: t('qc.cariUpdated'), description: vars.no, variant: 'success' })
     },
-    onError: (e) => toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' }),
+    onError: (e) => toastApiError(toast, t('common.error'), e),
   })
 
   // PROMPT-v6 §2 — Fabrika kartı (stage mutasyonu) UI'dan kaldırıldı;
   // backend PUT /api/orders/{no}/stage endpoint'i dokunulmadı.
 
   // ── Aksiyon handler'ları ────────────────────────────────────────────────
+  const selectedRow = rows.find((r) => r.siparisNo === selected) ?? null
+  // QW-7 — onaylı satırda Onayla anlamsız (backend reddediyordu) → kilitli + sebep.
+  const approveBlocked = !selected ? t('qc.selectFirst') : selectedRow?.kontrol === 'Onay' ? t('qc.alreadyApproved') : null
+
   const handleApprove = () => {
     const no = requireSelection()
-    if (no) approveMut.mutate(no)
+    if (no && !approveBlocked) approveMut.mutate(no)
+  }
+  // Klavye 'O': hızlı ama kazara değil — Enter ile onaylanan kısa bir pencere.
+  const handleApproveKey = async () => {
+    if (approveBlocked || !selected) { if (approveBlocked) toast({ title: approveBlocked, variant: 'warning' }); return }
+    const ok = await confirm({ title: t('qc.approveConfirmTitle'), description: selected + ' — ' + (selectedRow?.musteriAd ?? ''), confirmLabel: t('qc.actions.onayla') })
+    if (ok) approveMut.mutate(selected)
   }
 
   const handleRejectOpen = () => {
-    if (requireSelection()) { setRedNotu(''); setRejectOpen(true) }
+    if (requireSelection()) { setRedNotu(''); setRedTouched(false); setRejectOpen(true) }
   }
 
   const handleRevise = () => {
@@ -337,7 +342,7 @@ export function QualityControlPage() {
     const no = requireSelection()
     if (!no) return
     if (odenenInput === '' || odenenInput < 0) {
-      toast({ title: t('qc.invalidPaidAmount'), variant: 'destructive' })
+      toast({ title: t('qc.invalidPaidAmount'), variant: 'warning' })
       return
     }
     cariMut.mutate({ no, miktar: odenenInput })
@@ -348,8 +353,8 @@ export function QualityControlPage() {
     if (!no) return
     try {
       await downloadAttachment(no, type)
-    } catch {
-      toast({ title: t('qc.attachmentNotFound'), variant: 'destructive' })
+    } catch (e) {
+      toastApiError(toast, t('qc.attachmentNotFound'), e)
     }
   }
 
@@ -359,7 +364,7 @@ export function QualityControlPage() {
     try {
       await downloadExcel(no)
     } catch (e) {
-      toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' })
+      toastApiError(toast, t('common.error'), e)
     }
   }
 
@@ -369,7 +374,7 @@ export function QualityControlPage() {
     try {
       await downloadPdf(no)
     } catch (e) {
-      toast({ title: t('common.error'), description: describeApiError(e), variant: 'destructive' })
+      toastApiError(toast, t('common.error'), e)
     }
   }
 
@@ -379,27 +384,27 @@ export function QualityControlPage() {
       render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
     { key: 'musteriAd', header: t('qc.grid.musteriAd'), sortable: true },
     { key: 'mUlke', header: t('qc.grid.ulke'), sortable: true },
-    { key: 'toplamFiyat', header: t('qc.grid.toplamSiparis'), sortable: true,
+    { key: 'toplamFiyat', header: t('qc.grid.toplamSiparis'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.toplamFiyat ?? 0, r.paraTipi) },
-    { key: 'kaparoFiyat', header: t('qc.grid.kaparoBakiyesi'), sortable: true,
+    { key: 'kaparoFiyat', header: t('qc.grid.kaparoBakiyesi'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.kaparoFiyat, r.paraTipi) },
-    { key: 'kalanBakiye', header: t('qc.grid.kalanBakiye'), sortable: true,
+    { key: 'kalanBakiye', header: t('qc.grid.kalanBakiye'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.kalanBakiye, r.paraTipi) },
-    { key: 'pesinYuzde', header: t('qc.grid.pesinYuzde'), sortable: true },
+    { key: 'pesinYuzde', header: t('qc.grid.pesinYuzde'), sortable: true, type: 'number' },
     // Legacy COALESCE(TeslimatÇeşiti, 'Veri Yok')
     { key: 'teslimatCesiti', header: t('qc.grid.teslimatCesiti'),
       render: (r) => r.teslimatCesiti || t('qc.grid.veriYok') },
     { key: 'paraTipi', header: t('qc.grid.paraTipi'), sortable: true },
     { key: 'odemeDurum', header: t('qc.grid.odemeDurumu'), sortable: true,
-      render: (r) => statusLabel(t, r.odemeDurum) },
+      render: (r) => <StatusBadge value={r.odemeDurum} context="odeme" /> },
     { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true,
-      render: (r) => statusLabel(t, r.siparisMiTeklifMi) },
+      render: (r) => <StatusBadge value={r.siparisMiTeklifMi} context="stage" /> },
     // Bekleyen ('Kontrol') vs onaylı ('Onay') ayrımı — onaylılar da listede
     // görünür olduğundan durum kolonu eklendi.
     { key: 'kontrol', header: t('qc.grid.kontrolDurumu'), sortable: true,
-      render: (r) => statusLabel(t, r.kontrol) },
+      render: (r) => <StatusBadge value={r.kontrol} context="kontrol" /> },
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)
-    { key: 'tarih', header: t('qc.grid.tarih'), sortable: true,
+    { key: 'tarih', header: t('qc.grid.tarih'), sortable: true, type: 'date',
       render: (r) => formatDateShort(r.tarih) },
     { key: 'sirket', header: t('qc.grid.sirket'), sortable: true },
   ]
@@ -413,31 +418,49 @@ export function QualityControlPage() {
   const siparisBakiye = Math.max(toplam - odenen, 0)
 
   const loading = submitted !== null ? searchLoading : pendingLoading
+  const pendingCount = pending.filter((p) => p.kontrol === 'Kontrol').length
+  const capped = submitted !== null && (searchPage?.items.length ?? 0) >= 200
+
+  // E-2 / SR-8 — klavye: ↑↓ satır (tablo), O onayla, R reddet, Enter form detayı.
+  useHotkeys({
+    o: () => { void handleApproveKey() },
+    r: () => handleRejectOpen(),
+  })
+  useShortcutHints([
+    { keys: '↑↓', label: t('shortcuts.moveRow') },
+    { keys: 'O', label: t('shortcuts.qcApprove') },
+    { keys: 'R', label: t('shortcuts.qcReject') },
+    { keys: 'Enter', label: t('shortcuts.openRow') },
+  ])
+  const customerOptions = useMemo(
+    () => [{ value: 'all', label: t('common.all') }, ...[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr')).map((m) => ({ value: m.musteriAd, label: m.musteriAd, description: m.ulkeAdi }))],
+    [customers, t],
+  )
+  const submitSearch = () => { setSubmitted({ ...filters }); setSelected(null) }
 
   return (
     // Round-Next §11 — sabit-viewport bölünmüş düzen: container overflow-hidden;
     // üst bölge (topH, kendi içinde kayar) ile grid (flex-1) viewport'u paylaşır,
     // sayfa dikeyde kaymaz. Splitter yukarı çekilince grid gerçekten yukarı çıkar.
     <div className="flex h-full flex-col overflow-hidden">
-      {/* ── Kompakt başlık ─────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b px-4 py-2 shrink-0">
-        <h1 className="text-base font-semibold">{t('qc.title')}</h1>
-        <div className="flex items-center gap-4">
-          {/* Sadece onaylı — görünümü client-side Kontrol='Onay' satırlara süzer. */}
-          <label className="flex cursor-pointer items-center gap-1.5 text-xs">
-            <input
-              type="checkbox"
-              className="h-3.5 w-3.5"
-              checked={onlyApproved}
-              onChange={(e) => setOnlyApproved(e.target.checked)}
-            />
-            {t('qc.onlyApproved')}
-          </label>
-          {/* Sayaç yalnız bekleyenleri sayar (liste artık onaylıları da içeriyor). */}
-          <p className="text-xs text-muted-foreground">
-            {t('qc.pendingCount', { count: pending.filter((p) => p.kontrol === 'Kontrol').length })}
-          </p>
-        </div>
+      {/* ── Kompakt başlık (QW-4: ortak PageHeader) ─────────────────────── */}
+      <div className="shrink-0">
+        <PageHeader
+          density="compact"
+          title={t('qc.title')}
+          meta={
+            // Sayaç yalnız bekleyenleri sayar (liste onaylıları da içeriyor).
+            <Badge variant={pendingCount ? 'warning' : 'success'}>{t('qc.pendingCount', { count: pendingCount })}</Badge>
+          }
+          actions={
+            <>
+              {/* İç denetim — reddedilip temsilci düzeltmesi bekleyenler (bir önceki adım). */}
+              <WaitingUpstreamPanel screen="qc" variant="button" />
+              {/* Sadece onaylı — görünümü client-side Kontrol='Onay' satırlara süzer. */}
+              <Checkbox label={t('qc.onlyApproved')} labelClassName="text-xs" checked={onlyApproved} onCheckedChange={setOnlyApproved} />
+            </>
+          }
+        />
       </div>
 
       {/* ── Üst bölge: üç panel (PROMPT-v6 §2 — Fabrika kartı kalktı) ───
@@ -491,13 +514,13 @@ export function QualityControlPage() {
                   <CariValue value={d ? formatCurrency(siparisBakiye, d.paraTipi) : ''} />
                 </CariRow>
                 <CariRow label={t('qc.fields.odenenBakiye')}>
-                  <DecimalInput className="h-7 text-xs" value={odenenInput} onValueChange={setOdenenInput} />
+                  <DecimalInput inputSize="sm" className="h-7" value={odenenInput} onValueChange={setOdenenInput} disabled={!selected} />
                 </CariRow>
                 <div className="mx-auto flex w-full max-w-[220px] flex-col gap-1.5 pt-2">
-                  <Button size="sm" className="h-7 text-xs" disabled={cariMut.isPending} onClick={handleCari}>
+                  <Button size="xs" loading={cariMut.isPending} disabled={!selected} onClick={handleCari}>
                     {t('qc.actions.cariGuncelle')}
                   </Button>
-                  <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleRevise}>
+                  <Button size="xs" variant="outline" disabled={!selected} onClick={handleRevise}>
                     {t('qc.actions.revizeEt')}
                   </Button>
                 </div>
@@ -532,12 +555,8 @@ export function QualityControlPage() {
                 <ROField label={t('qc.fields.vat')} value={d?.tVATNumarasi} />
                 <ROField label={t('qc.fields.adres')} value={d?.tAdres} multiline className="col-span-3" />
                 <div className="col-span-3 flex flex-wrap items-center gap-3 text-xs">
-                  <label className="flex items-center gap-1">
-                    <input type="checkbox" checked={d?.montajVar ?? false} disabled /> {t('qc.fields.montaj')}
-                  </label>
-                  <label className="flex items-center gap-1">
-                    <input type="checkbox" checked={d?.teslimatVar ?? false} disabled /> {t('qc.fields.teslimat')}
-                  </label>
+                  <Checkbox label={t('qc.fields.montaj')} labelClassName="text-xs" checked={d?.montajVar ?? false} disabled readOnly />
+                  <Checkbox label={t('qc.fields.teslimat')} labelClassName="text-xs" checked={d?.teslimatVar ?? false} disabled readOnly />
                   <span>{t('qc.fields.montajFiyati')}: {d ? formatCurrency(d.montajFiyat ?? 0, d.paraTipi) : '—'}</span>
                   <span>{t('qc.fields.teslimatFiyati')}: {d ? formatCurrency(d.teslimatFiyat ?? 0, d.paraTipi) : '—'}</span>
                   <span>{t('qc.fields.teslimatCesidi')}: {d ? (d.teslimatCesiti || t('qc.grid.veriYok')) : '—'}</span>
@@ -617,44 +636,54 @@ export function QualityControlPage() {
 
         {/* 3 — Kontrol (Sipariş No + Not + 2×3 aksiyon grid'i) */}
         <div className="flex w-[300px] shrink-0 flex-col gap-1.5 rounded-md border p-2">
-          <p className="text-sm font-semibold text-center">{t('qc.title')}</p>
-          <div className="space-y-0.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.siparisNo')}</p>
-            <div className="rounded border bg-muted/40 px-1.5 py-1 font-mono text-xs min-h-[1.6rem]">
-              {selected || '—'}
-            </div>
+          <div className="flex items-center justify-between gap-2">
+            <ROField className="flex-1" mono label={t('qc.fields.siparisNo')} value={selected} />
+            {selected && detailLoading && <span className="text-[11px] text-muted-foreground">{t('common.loading')}</span>}
           </div>
           <div className="flex flex-1 flex-col space-y-0.5">
-            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t('qc.fields.not')}</p>
-            {/* Sipariş notu serbest metin — yalnız bu kutu max-h ile sınırlı
-                 (alan-düzeyi sınır; §2'nin hedefi yarım görünen sekmelerdi). */}
-            <div className="min-h-[4rem] max-h-24 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
+            <p className="text-[11px] font-medium text-muted-foreground">{t('qc.fields.not')}</p>
+            {/* Sipariş notu serbest metin — yalnız bu kutu max-h ile sınırlı. */}
+            <div className="min-h-[3.5rem] max-h-24 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
               {d?.siparisNotu || '—'}
             </div>
           </div>
-          <div className="grid shrink-0 grid-cols-2 gap-1.5">
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('ek')}>
+          {/* İkincil aksiyonlar — küçük, eş ağırlıklı. */}
+          <div className="grid shrink-0 grid-cols-3 gap-1">
+            <Button size="xs" variant="outline" disabled={!selected} onClick={() => handleAttachment('ek')}>
               {t('qc.actions.saticiEk')}
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => handleAttachment('muhasebeek')}>
+            <Button size="xs" variant="outline" disabled={!selected} onClick={() => handleAttachment('muhasebeek')}>
               {t('qc.actions.muhasebeEk')}
             </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleExcel}>
-              {t('qc.actions.excelYaz')}
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handlePdf}>
-              PDF
-            </Button>
-            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={handleFormGetir}>
+            <Button size="xs" variant="outline" disabled={!selected} onClick={handleFormGetir} title="Enter">
               {t('qc.actions.formGetir')}
             </Button>
-            {/* Round-8 §3 — Onayla solda/üstte, Reddet sağda/altta. */}
-            <Button size="sm" className="h-7 text-xs" disabled={approveMut.isPending} onClick={handleApprove}>
-              {t('qc.actions.onayla')}
+            <Button size="xs" variant="outline" disabled={!selected} onClick={handleExcel}>
+              {t('qc.actions.excelYaz')}
             </Button>
-            <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={handleRejectOpen}>
-              {t('qc.actions.reddet')}
+            <Button size="xs" variant="outline" disabled={!selected} onClick={handlePdf}>
+              PDF
             </Button>
+          </div>
+          {/* Karar — birincil aksiyonlar ayrı ve belirgin (Round-8 §3: Onayla solda). */}
+          <div className="space-y-1.5 border-t pt-1.5">
+            <Input
+              inputSize="sm"
+              value={onayNotu}
+              onChange={(e) => setOnayNotu(e.target.value)}
+              placeholder={t('qc.approveNotePlaceholder')}
+              aria-label={t('qc.approveNotePlaceholder')}
+              disabled={!!approveBlocked}
+            />
+            <div className="grid grid-cols-2 gap-1.5">
+              <Button size="sm" loading={approveMut.isPending} disabled={!!approveBlocked} title={approveBlocked ?? `${t('qc.actions.onayla')} (O)`} onClick={handleApprove}>
+                {t('qc.actions.onayla')}
+              </Button>
+              <Button size="sm" variant="destructive" disabled={!selected} title={!selected ? t('qc.selectFirst') : `${t('qc.actions.reddet')} (R)`} onClick={handleRejectOpen}>
+                {t('qc.actions.reddet')}
+              </Button>
+            </div>
+            <p className="text-center text-[10px] text-muted-foreground">{t('qc.nextHint')}</p>
           </div>
         </div>
       </div>
@@ -663,8 +692,17 @@ export function QualityControlPage() {
       <div
         role="separator"
         aria-orientation="horizontal"
-        className="mx-4 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded bg-border/60 hover:bg-border"
+        aria-label={t('qc.splitter')}
+        tabIndex={0}
+        className="mx-4 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded bg-border/60 hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onPointerDown={startSplitterDrag}
+        onKeyDown={(e) => {
+          // Klavye ile de ayarlanabilir (↑/↓ 24px).
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
+          e.preventDefault()
+          const cur = topRef.current?.getBoundingClientRect().height ?? 240
+          setTopH(Math.min(Math.max(cur + (e.key === 'ArrowDown' ? 24 : -24), 72), window.innerHeight - 220))
+        }}
       >
         <div className="h-0.5 w-10 rounded bg-muted-foreground/40" />
       </div>
@@ -673,25 +711,26 @@ export function QualityControlPage() {
            bar; sol dikey Filtreme kartının yerini aldı. Alan seti ve davranış
            (Sipariş No diğerlerini ezer, default Kontrol, Ara/Reset) AYNEN. */}
       <div className="shrink-0 px-4 pb-2">
-        <div className="grid grid-cols-2 gap-2 rounded-md border bg-card p-2 md:grid-cols-4 lg:grid-cols-8">
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.siparisNo')}</Label>
-            <Input className="h-8 text-xs" value={filters.siparisNo}
+        {/* SR-5 — ortak FilterBar: Enter/F8 arar, Sıfırla legacy resetButton_Click. */}
+        <FilterBar
+          onSubmit={submitSearch}
+          submitLabel={t('qc.filter.ara')}
+          onReset={() => {
+            // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
+            setFilters(defaultFilters())
+            setSubmitted(null)
+            setSelected(null)
+          }}
+        >
+          <FilterField label={t('qc.filter.siparisNo')}>
+            <Input inputSize="sm" value={filters.siparisNo}
               onChange={(e) => setFilters((f) => ({ ...f, siparisNo: e.target.value }))} />
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.musteriAdi')}</Label>
-            <Select value={filters.musteriAd} onValueChange={(v) => setFilters((f) => ({ ...f, musteriAd: v }))}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('common.all')}</SelectItem>
-                {[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr'))
-                  .map((m) => <SelectItem key={m.musteriID} value={m.musteriAd}>{m.musteriAd}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.temsilci')}</Label>
+          </FilterField>
+          <FilterField label={t('qc.filter.musteriAdi')}>
+            <Combobox inputSize="sm" options={customerOptions} value={filters.musteriAd}
+              onValueChange={(v) => setFilters((f) => ({ ...f, musteriAd: v || 'all' }))} />
+          </FilterField>
+          <FilterField label={t('qc.filter.temsilci')}>
             <Select value={filters.kullaniciID} onValueChange={(v) => setFilters((f) => ({ ...f, kullaniciID: v }))}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -701,9 +740,8 @@ export function QualityControlPage() {
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.ulke')}</Label>
+          </FilterField>
+          <FilterField label={t('qc.filter.ulke')}>
             <Select value={filters.ulke} onValueChange={(v) => setFilters((f) => ({ ...f, ulke: v }))}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -712,9 +750,8 @@ export function QualityControlPage() {
                   .map((u) => <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.kontrolDurumu')}</Label>
+          </FilterField>
+          <FilterField label={t('qc.filter.kontrolDurumu')}>
             <Select value={filters.kontrol} onValueChange={(v) => setFilters((f) => ({ ...f, kontrol: v }))}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -722,9 +759,8 @@ export function QualityControlPage() {
                 {CONTROLS.map((c) => <SelectItem key={c} value={c}>{statusLabel(t, c)}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.odemeDurumu')}</Label>
+          </FilterField>
+          <FilterField label={t('qc.filter.odemeDurumu')}>
             <Select value={filters.odemeDurum} onValueChange={(v) => setFilters((f) => ({ ...f, odemeDurum: v }))}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -732,9 +768,8 @@ export function QualityControlPage() {
                 {PAYMENTS.map((p) => <SelectItem key={p} value={p}>{statusLabel(t, p)}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-0.5">
-            <Label className="text-[10px]">{t('qc.filter.asama')}</Label>
+          </FilterField>
+          <FilterField label={t('qc.filter.asama')}>
             <Select value={filters.asama} onValueChange={(v) => setFilters((f) => ({ ...f, asama: v }))}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -742,38 +777,44 @@ export function QualityControlPage() {
                 {STAGES.map((s) => <SelectItem key={s} value={s}>{statusLabel(t, s)}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          {/* Round-Next §11 — Başlangıç/Bitiş Tarihi filtreleri kaldırıldı. */}
-          <div className="col-span-2 flex items-end gap-1.5 md:col-span-2 lg:col-span-1">
-            <Button size="sm" variant="outline" className="h-8 flex-1" onClick={() => {
-              // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
-              setFilters(defaultFilters())
-              setSubmitted(null)
-              setSelected(null)
-            }}>
-              {t('qc.filter.reset')}
-            </Button>
-            <Button size="sm" className="h-8 flex-1" onClick={() => { setSubmitted({ ...filters }); setSelected(null) }}>
-              {t('qc.filter.ara')}
-            </Button>
-          </div>
-        </div>
+          </FilterField>
+        </FilterBar>
       </div>
 
       {/* ── Alt bölge: master grid (tam genişlik, iç scroll) ───────────── */}
       <div className="flex-1 min-h-0 px-4 pb-2">
         <div className="h-full overflow-auto rounded-md">
           <DataTable
+            tableId="qc"
+            exportFileName="kontrol"
             columns={columns}
             data={rows}
             keyField="siparisNo"
             loading={loading}
+            error={submitted !== null ? searchError : pendingError}
             density="compact"
-            onRowClick={(r) => setSelected(r.siparisNo)}
+            emptyMessage={submitted !== null ? t('qc.noResults') : t('qc.noPending')}
+            activeRowKey={selected}
+            onActiveRowChange={(r) => setSelected(r.siparisNo)}
+            onRowActivate={(r) => setFormNo(r.siparisNo)}
+            onRowDoubleClick={(r) => setFormNo(r.siparisNo)}
+            toolbar={
+              <span className="flex items-center gap-3">
+                {/* Renk açıklaması — renk tek başına bilgi taşımaz, Kontrol kolonunda rozet de var. */}
+                <span className="flex items-center gap-1"><span className="h-3 w-3 rounded-sm border border-success/40 bg-success-soft" />{t('qc.legend.approved')}</span>
+                {capped && <span className="text-warning">{t('qc.capped')}</span>}
+              </span>
+            }
+            rowActions={[
+              { key: 'detail', label: t('qc.actions.formGetir'), shortcut: 'Enter', onSelect: (r) => setFormNo(r.siparisNo) },
+              { key: 'approve', label: t('qc.actions.onayla'), shortcut: 'O', disabled: (r) => r.kontrol === 'Onay', onSelect: (r) => { setSelected(r.siparisNo); approveMut.mutate(r.siparisNo) } },
+              { key: 'reject', label: t('qc.actions.reddet'), shortcut: 'R', destructive: true, onSelect: (r) => { setSelected(r.siparisNo); setRedNotu(''); setRedTouched(false); setRejectOpen(true) } },
+              { key: 'revise', label: t('qc.actions.revizeEt'), separatorBefore: true, onSelect: (r) => nav('/orders/new?revise=' + encodeURIComponent(r.siparisNo)) },
+              { key: 'pdf', label: 'PDF', onSelect: (r) => { void downloadPdf(r.siparisNo).catch((e) => toastApiError(toast, t('common.error'), e)) } },
+            ]}
             rowClassName={(r) => cn(
-              // Onaylı satırlar hafif yeşil zemin — bekleyenlerden ayırt için.
-              r.kontrol === 'Onay' && 'bg-emerald-50 dark:bg-emerald-950/30',
-              selected === r.siparisNo && 'outline outline-2 -outline-offset-2 outline-primary',
+              // Onaylı satırlar hafif yeşil zemin — bekleyenlerden ayırt için (lejant üstte).
+              r.kontrol === 'Onay' && 'bg-success-soft/50',
             )}
           />
         </div>
@@ -782,28 +823,39 @@ export function QualityControlPage() {
       {/* ── Reddet dialog'u (legacy KontrolRed formu) ──────────────────── */}
       <Dialog open={rejectOpen} onOpenChange={(o) => { if (!o) { setRejectOpen(false); setRedNotu('') } }}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{t('qc.rejectTitle')} — {selected}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2">
-            <Label>{t('qc.rejectNote')}</Label>
-            <Textarea
-              placeholder={t('qc.rejectPlaceholder')}
-              value={redNotu}
-              onChange={(e) => setRedNotu(e.target.value)}
-              rows={4}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setRejectOpen(false)}>{t('common.cancel')}</Button>
-            <Button
-              variant="destructive"
-              disabled={!redNotu.trim() || rejectMut.isPending}
-              onClick={() => rejectMut.mutate({ no: selected!, red: redNotu })}
-            >
-              {t('common.reject')}
-            </Button>
-          </DialogFooter>
+          {/* QW-14 — form: Ctrl+Enter gönderir; boş gerekçe satır içi hata verir. */}
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (!redNotu.trim()) { setRedTouched(true); return }
+              rejectMut.mutate({ no: selected!, red: redNotu })
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>{t('qc.rejectTitle')} — {selected}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-1">
+              <Label htmlFor="qc-red">{t('qc.rejectNote')}</Label>
+              <Textarea
+                id="qc-red"
+                autoFocus
+                placeholder={t('qc.rejectPlaceholder')}
+                value={redNotu}
+                aria-invalid={redTouched && !redNotu.trim()}
+                onChange={(e) => setRedNotu(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); e.currentTarget.form?.requestSubmit() } }}
+                rows={4}
+              />
+              {redTouched && !redNotu.trim() && <FieldError message={t('validation.required')} />}
+            </div>
+            <DialogFooter className="gap-2">
+              <Button type="button" variant="outline" onClick={() => setRejectOpen(false)}>{t('common.cancel')}</Button>
+              <Button type="submit" variant="destructive" loading={rejectMut.isPending} title="Ctrl+Enter">
+                {t('common.reject')}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
 

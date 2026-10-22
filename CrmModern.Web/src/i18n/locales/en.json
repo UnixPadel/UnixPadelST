@@ -111,7 +111,22 @@
     "users": "Users",
     "search": "Search",
     "updates": "What's New",
-    "reporting": "Reports · Representatives"
+    "reporting": "Reports · Representatives",
+    "menu": "Main menu",
+    "inbox": "Pending Tasks",
+    "preferences": "Preferences",
+    "pendingCount_one": "{{count}} pending",
+    "pendingCount_other": "{{count}} pending",
+    "groups": {
+      "general": "General",
+      "sales": "Sales",
+      "operations": "Operations",
+      "logistics": "Logistics",
+      "accounting": "Accounting",
+      "purchase": "Purchasing",
+      "admin": "Admin"
+    },
+    "guide": "User Guide"
   },
   "customers": {
     "title": "Customers",
@@ -242,7 +257,11 @@
       "convertFailed": "Conversion failed.",
       "deleted": "Order deleted.",
       "deleteFailed": "Delete failed."
-    }
+    },
+    "convertConfirm": {
+      "title": "Convert quote to order?"
+    },
+    "newOrder": "New order/quote"
   },
   "orders": {
     "newOrderTitle": "Create Order / Quote",
@@ -255,7 +274,7 @@
     "form": {
       "musteri": "Customer",
       "musteriSec": "Select customer",
-      "musteriAd": "Customer Name *",
+      "musteriAd": "Customer Name",
       "telefon": "Phone",
       "email": "Email",
       "ulke": "Country",
@@ -278,7 +297,7 @@
       "receteAc": "Open from Recipe",
       "details": "Details",
       "detailsHint": "Each line is saved as a separate note.",
-      "saveFirstHint": "Save the order/quote first to add line items.",
+      "saveFirstHint": "Save the quote/order first to upload an attachment.",
       "expandOrderHint": "After saving the order, use \"Open from Recipe\" to add items based on category.",
       "teslimAlanAdi": "Recipient Name",
       "ilgiliKisi": "Contact Person",
@@ -287,7 +306,7 @@
       "teslimatVarLabel": "Yes",
       "teslimatFiyat": "Delivery Price",
       "teslimatAdet": "Delivery Qty",
-      "ekDosya": "Attachment (PDF/JPG etc.)",
+      "ekDosya": "Attachment (ZIP/RAR)",
       "ekYuklendi": "Attachment uploaded",
       "ekYuklemeFailed": "Upload failed",
       "reviseMode": "Revise mode",
@@ -341,7 +360,7 @@
       "cesidi": "Type",
       "altTelefon": "Alternate Phone",
       "musteriTeslimat": "Customer / Delivery",
-      "formuGetir": "Load Form",
+      "formuGetir": "Create from Reference",
       "teklifiHazirla": "Prepare Quote",
       "siparisiHazirla": "Prepare Order",
       "revizeEt": "Revise",
@@ -361,9 +380,30 @@
       "ozelKalemBaslik": "Custom Line Item",
       "bilesenAdiPlaceholder": "Enter product/service name",
       "oznitelikPlaceholder": "Attribute (optional)",
-      "birimSecin": "Select unit"
+      "birimSecin": "Select unit",
+      "musteriHint": "Type to search; F4 for the full list.",
+      "openBalance": "Open balance",
+      "ekSec": "Choose attachment (ZIP/RAR)",
+      "formuGetirHint": "The selected record is loaded into the form as a NEW quote/order.",
+      "setAdd": "Add set",
+      "setIncludedHint": "Every set with a main product is included in the order.",
+      "setRemove": "Remove set",
+      "setRemoveHint": "Removes this set from the order",
+      "bilesenAra": "Search components…",
+      "checkedCount": "{{checked}} / {{total}} selected",
+      "infoOnly": "info",
+      "infoOnlyHint": "Component and free item amounts are informational; the total uses set price × quantity.",
+      "freeItemRemoveTitle": "Delete free item?",
+      "extraCount_one": "{{count}} extra cost",
+      "extraCount_other": "{{count}} extra costs",
+      "none": "None",
+      "carpHint": "Writes price × quantity into the price field and resets quantity to 1.",
+      "iliskilendirHint": "Copies the customer's address and contact details into the delivery fields.",
+      "sameAsCustomer": "Same as customer",
+      "termsSummary": "{{checked}}/{{total}} standard terms · {{notes}} notes",
+      "freeNotePlaceholder": "Type a note and press Enter"
     },
-    "subtitle": "Order Form — 3 columns (Customer / Sets / Account)",
+    "subtitle": "Fill in customer, product sets, delivery and account details; press Ctrl+S to review and save.",
     "sections": {
       "musteri": "Customer",
       "temsilci": "Representative",
@@ -382,7 +422,59 @@
       "invalidNumber": "Please enter a valid number.",
       "noFabrikaOption": "The 'Factory' option is not available.",
       "amended": "Order updated",
-      "bilesenLoadFailed": "Could not load components"
+      "bilesenLoadFailed": "Could not load components",
+      "exwApplied": "EXW: factory delivery address applied, delivery price set to 0."
+    },
+    "newForm": "New form",
+    "unsavedBadge": "Unsaved",
+    "nav": {
+      "label": "Form sections",
+      "sets_one": "Sets ({{count}})",
+      "sets_other": "Sets ({{count}})"
+    },
+    "issues": {
+      "musteriAd": "Customer name is missing",
+      "lineItems": "Add at least one set or free item",
+      "pesinYuzde": "Down payment % is missing",
+      "amendReason": "Edit reason is missing"
+    },
+    "summary": {
+      "title": "Order Summary",
+      "sets_one": "Sets ({{count}})",
+      "sets_other": "Sets ({{count}})",
+      "freeItemsNote_one": "{{count}} free item is informational and not included in the total.",
+      "freeItemsNote_other": "{{count}} free items are informational and not included in the total.",
+      "ready": "Ready to save",
+      "missing": "Missing (click):",
+      "missingCount_one": "{{count}} missing",
+      "missingCount_other": "{{count}} missing"
+    },
+    "draft": {
+      "found": "An unsaved draft exists ({{time}} · {{customer}}).",
+      "restore": "Restore draft",
+      "discard": "Discard",
+      "restored": "Draft restored"
+    },
+    "success": {
+      "title": "{{no}} saved",
+      "desc": "You can upload an attachment, open the details or start a new form."
+    },
+    "confirm": {
+      "currencyTitle": "Change currency?",
+      "currencyDesc": "All entered prices will be converted from {{from}} to {{to}} at the current rate.",
+      "currencyOk": "Convert",
+      "customerTitle": "Replace customer details?",
+      "customerDesc": "Contact fields in the customer section will be replaced with \"{{name}}\".",
+      "overwrite": "Overwrite",
+      "categoryTitle": "Change main product?",
+      "categoryDesc_one": "{{count}} component row and its edits on this tab will be removed.",
+      "categoryDesc_other": "{{count}} component rows and their edits on this tab will be removed.",
+      "setRemoveTitle": "Remove set from order?",
+      "deliveryTitle": "Replace delivery details?",
+      "deliveryDesc": "Delivery fields will be replaced with the customer details.",
+      "extraRemoveTitle": "Delete extra cost?",
+      "resetTitle": "Start a new form?",
+      "resetDesc": "Unsaved changes will be lost."
     }
   },
   "qc": {
@@ -517,7 +609,17 @@
       "remaining": "Remaining",
       "stage": "Stage",
       "date": "Date"
-    }
+    },
+    "alreadyApproved": "This order is already approved",
+    "approveConfirmTitle": "Approve order?",
+    "approveNotePlaceholder": "Approval note (optional)",
+    "capped": "Showing first 200 results — narrow the filter",
+    "legend": {
+      "approved": "Approved"
+    },
+    "nextHint": "After a decision the next pending order is selected.",
+    "noPending": "No orders awaiting control.",
+    "splitter": "Top panel height (↑/↓)"
   },
   "users": {
     "title": "Users",
@@ -563,7 +665,9 @@
       "aciklamaPlaceholder": "e.g. Extra freight, customs, installation difference…",
       "tutar": "Amount",
       "none": "No extra cost items.",
-      "locked": "Extra costs can't be edited at this stage (only within the accounting/logistics approval window)."
+      "locked": "Extra costs can't be edited at this stage (only within the accounting/logistics approval window).",
+      "added": "Extra cost added",
+      "deleted": "Extra cost deleted"
     },
     "cols": {
       "sirket": "Company",
@@ -618,8 +722,13 @@
       "hint": "The down payment is recorded as a collection on approval. It is not written to Cost.",
       "hintEk": "Recorded as a collection; the order stage does not change. With a past date it is numbered by date."
     },
+    "noPesinat": {
+      "confirm": "This order expects a {{yuzde}}% down payment ({{kapora}}) but no collection has been entered yet.\n\nIf Cari approval is given without a down payment, the order may go to production unpaid. Approve anyway?",
+      "title": "No down payment entered"
+    },
     "overpay": {
-      "confirm": "The amount exceeds the remaining balance ({{kalan}}) by {{fark}} and the Remaining Balance will go negative.\n\nIs the amount correct? Continue?"
+      "confirm": "The amount exceeds the remaining balance ({{kalan}}) by {{fark}} and the Remaining Balance will go negative.\n\nIs the amount correct? Continue?",
+      "title": "Remaining balance exceeded"
     },
     "cancelTx": {
       "action": "Cancel collection",
@@ -640,7 +749,8 @@
       "maliyetNotu": "Cost Note",
       "hint": "The 3rd down payment is recorded as a collection; Final Cost feeds the cost sheet. The order becomes 'Completed'.",
       "submit": "Complete",
-      "done": "Order completed."
+      "done": "Order completed.",
+      "needCost": "Enter the final cost to complete."
     },
     "blocks": {
       "ozet": "Summary"
@@ -665,6 +775,9 @@
       "cariApproved": "Cari approved — order moved to Planning.",
       "logisticsApproved": "Logistics approved — order released to shipment queue.",
       "pesinatSaved": "Down payment saved, balance updated."
+    },
+    "shortcut": {
+      "form": "Order form"
     }
   },
   "accounting": {
@@ -681,7 +794,8 @@
       "musteriPlaceholder": "Select or type a customer",
       "reset": "Reset",
       "totalsLabel": "Total payments in the filtered result (by currency)",
-      "rowCount": "Records found"
+      "rowCount": "Records found",
+      "search": "Search"
     },
     "tahsilat": {
       "title": "Collection — {{no}}",
@@ -692,8 +806,22 @@
       "previous": "Previous collections:",
       "none": "No collections yet.",
       "ekTitle": "Accounting Attachment — {{no}}",
-      "dosya": "File (PDF/ZIP/JPG…)"
-    }
+      "dosya": "File (PDF/ZIP/JPG…)",
+      "add": "Add payment",
+      "ekHint": "The accounting attachment is stored on the order and replaces the previous one.",
+      "ekUpload": "Upload accounting attachment",
+      "ekUploaded": "Accounting attachment uploaded",
+      "saveClose": "Save and close",
+      "saved": "Payment of {{amount}} saved"
+    },
+    "history": {
+      "excelHint": "Downloads the transaction history for the current filters as Excel",
+      "txId": "Transaction No"
+    },
+    "historyExcel": "Transaction history (Excel)",
+    "historyExcelHint": "Downloads the full collection history. Use Export above the table to get the list on screen.",
+    "ordersViewDescription": "All quotes and orders (read-only); proforma can be opened as Excel/PDF.",
+    "rowSummary": "Request details"
   },
   "accountingHistory": {
     "maliyetRecetesi": "Cost Sheet",
@@ -743,7 +871,8 @@
     "carrier": {
       "select": "Select carrier",
       "other": "Other",
-      "otherPlaceholder": "Type carrier name"
+      "otherPlaceholder": "Type carrier name",
+      "pickOrType": "Pick a saved carrier or type a new name"
     },
     "cesit": {
       "select": "Select transport type"
@@ -765,7 +894,7 @@
       "empty": "Not entered yet"
     },
     "toast": {
-      "created": "Shipment request created — awaiting accounting approval.",
+      "created": "Shipment created — the order is in transit.",
       "error": "Operation failed",
       "completed": "Shipment completed",
       "cancelled": "Shipment cancelled"
@@ -776,8 +905,24 @@
       "operator": "Operator",
       "complete": "Complete",
       "cancelPrompt": "Cancellation reason:",
-      "firmaPlaceholder": "Carrier name"
-    }
+      "firmaPlaceholder": "Carrier name",
+      "cancelTitle": "Cancel shipment",
+      "bulkComplete_one": "Complete ({{count}})",
+      "bulkComplete_other": "Complete ({{count}})",
+      "cancelConfirm": "Cancel shipment",
+      "completeNote": "Delivery note (optional)",
+      "completeTitle_one": "Complete shipment?",
+      "completeTitle_other": "Complete {{count}} shipments?",
+      "shipmentId": "Shipment No"
+    },
+    "approvedOffer": "Approved offer",
+    "carriersDescription": "Carriers and transport types used in shipments.",
+    "carriersList": "Carriers",
+    "prefilledFromOffer": "Prefilled from the approved logistics offer; change if needed.",
+    "preparingHint": "Order is in production; a shipment can be requested once it is Ready.",
+    "readyDescription": "Orders ready to ship are on top. Once a shipment is created, the order counts as in transit.",
+    "transportTypes": "Transport types",
+    "zeroPriceHint": "Agreed amount is 0 — is that correct?"
   },
   "logisticsOffer": {
     "title": "Logistics · Offers",
@@ -809,7 +954,8 @@
       "revoked": "Approval revoked.",
       "rejected": "Offer rejected.",
       "error": "Operation failed."
-    }
+    },
+    "revokeConfirm": "Revoke the offer approval?"
   },
   "logApprovals": {
     "sevkId": "Shipment #",
@@ -843,7 +989,23 @@
     "uretimTarihi": "Production Date",
     "fabrikaNot": "Factory Note",
     "fabrikaNotPlaceholder": "Enter factory note...",
-    "cariOnayTarih": "Account Approval Date"
+    "cariOnayTarih": "Account Approval Date",
+    "bulkProduction_one": "Start production ({{count}})",
+    "bulkProduction_other": "Start production ({{count}})",
+    "bulkProductionTitle_one": "Start production for {{count}} order",
+    "bulkProductionTitle_other": "Start production for {{count}} orders",
+    "bulkReady_one": "Ready ({{count}})",
+    "bulkReady_other": "Ready ({{count}})",
+    "description": "Move planned orders into production and mark finished ones Ready. Select several rows for bulk actions.",
+    "readyConfirmTitle_one": "Mark order as Ready?",
+    "readyConfirmTitle_other": "Mark {{count}} orders as Ready?",
+    "toast": {
+      "markedReady": "Marked as ready",
+      "moveFailed": "Could not start production",
+      "movedToProduction": "Moved to production",
+      "readyFailed": "Could not mark as ready"
+    },
+    "uretimTarihiHint": "Local time; defaults to now."
   },
   "purchase": {
     "newTitle": "Purchase · New Request",
@@ -921,7 +1083,10 @@
       "tarih": "Date",
       "islem": "Action"
     },
-    "tipLabel": { "SatinAlma": "Purchase", "Muhasebe": "Accounting" },
+    "tipLabel": {
+      "SatinAlma": "Purchase",
+      "Muhasebe": "Accounting"
+    },
     "asamaLabel": {
       "fabrikaOnIzleme": "Factory / Pre-Review",
       "muhasebe": "Accounting",
@@ -941,7 +1106,11 @@
       "title": "Reject Request — #{{id}}",
       "note": "Rejection Note *"
     },
-    "pre": { "approved": "Pre-approved", "rejected": "Rejected", "reviewTitle": "Pre-Approval Review — #{{id}}" },
+    "pre": {
+      "approved": "Pre-approved",
+      "rejected": "Rejected",
+      "reviewTitle": "Pre-Approval Review — #{{id}}"
+    },
     "payment": {
       "pageTitle": "Payment Details (Accounting)",
       "dialogTitle": "Payment Details — Request #{{id}}",
@@ -950,7 +1119,8 @@
       "odemeTuru": "Payment Type *",
       "islemTarihi": "Transaction Date *",
       "saved": "Payment details saved (Accounting Done)",
-      "selectPlaceholder": "Select"
+      "selectPlaceholder": "Select",
+      "typeRequired": "Select a payment type"
     },
     "final": {
       "reviewApprove": "Review / Approve",
@@ -986,7 +1156,12 @@
         "aciklama": "Description",
         "muhasebeYapan": "Processed By",
         "muhasebeTarihi": "Processing Date"
-      }
+      },
+      "bulkApprove_one": "Approve ({{count}})",
+      "bulkApprove_other": "Approve ({{count}})",
+      "bulkConfirm_one": "Approve request?",
+      "bulkConfirm_other": "Approve {{count}} requests?",
+      "needsPayment": "Awaiting payment"
     },
     "detailPanel": {
       "urun": "Product",
@@ -995,7 +1170,8 @@
       "talepEden": "Requested By",
       "not": "Note",
       "onOnaylayan": "Pre-Approver"
-    }
+    },
+    "overrideConfirm": "Approve this request directly?"
   },
   "roles": {
     "Yonetici": "Manager",
@@ -1019,7 +1195,11 @@
   "reporting": {
     "repTitle": "Representative Performance",
     "repSubtitle": "Per-representative metrics for the selected period",
-    "period": { "day": "Today", "week": "This Week", "month": "This Month" },
+    "period": {
+      "day": "Today",
+      "week": "This Week",
+      "month": "This Month"
+    },
     "cols": {
       "olusturulan": "Created",
       "teklif": "Quotes",
@@ -1095,7 +1275,19 @@
     "currentRep": "Current representative",
     "selectRep": "Select new representative",
     "changeRep": "Change Representative",
-    "repChanged": "Representative updated"
+    "repChanged": "Representative updated",
+    "excelDownloaded": "Excel downloaded",
+    "pdfDownloaded": "PDF downloaded",
+    "loadError": "Order details could not be loaded.",
+    "copyHint": "Opens a new quote/order form prefilled with this order",
+    "copyAsNew": "Copy as new",
+    "legacyTimelines": "Stage and approval details",
+    "tabs": {
+      "general": "General",
+      "items": "Items",
+      "flow": "Document Flow",
+      "notes": "Notes"
+    }
   },
   "approval": {
     "preTitle": "Approval · Pre-Approval",
@@ -1114,7 +1306,7 @@
   "validation": {
     "required": "This field is required",
     "fixErrors": "Please fill in the highlighted fields",
-    "emptyOrder": "Add at least one line item (Details or Sets cannot be empty)."
+    "emptyOrder": "Add at least one set or free item."
   },
   "orderStage": {
     "title": "Stage History",
@@ -1155,6 +1347,12 @@
       "accountingDone": "Accounting Done",
       "approved": "Approved",
       "rejected": "Rejected"
+    },
+    "logistics": {
+      "awaitingAccounting": "Awaiting Accounting Approval",
+      "inTransit": "In Transit",
+      "awaitingCompletion": "Awaiting Accounting Completion",
+      "completed": "Completed"
     }
   },
   "currency": {
@@ -1169,5 +1367,293 @@
     },
     "sourceUnavailable": "CBRT rates unavailable — prices cannot be converted.",
     "noRate": "No rate — cannot convert"
+  },
+  "unsaved": {
+    "title": "Unsaved changes",
+    "description": "This page has unsaved changes. They will be lost if you leave.",
+    "leave": "Discard and leave",
+    "stay": "Stay on page"
+  },
+  "table": {
+    "rowCount_one": "{{count}} record",
+    "rowCount_other": "{{count}} records",
+    "exportHint": "Downloads the filtered rows and visible columns as an Excel-ready CSV",
+    "export": "Export",
+    "columns": "Columns",
+    "resetLayout": "Reset to default layout",
+    "bulkBar": "Bulk actions",
+    "selected_one": "{{count}} selected",
+    "selected_other": "{{count}} selected",
+    "clearSelection": "Clear selection",
+    "selectAll": "Select all",
+    "selectRow": "Select row",
+    "loadError": "Data could not be loaded. Press F5 to retry.",
+    "pageOf": "Page {{page}} / {{count}}",
+    "moreActions": "More actions",
+    "refreshing": "Refreshing…"
+  },
+  "filter": {
+    "reset": "Reset"
+  },
+  "views": {
+    "title": "Views",
+    "saveTitle": "Save view",
+    "name": "View name",
+    "deleteTitle": "Delete view",
+    "empty": "No saved views.",
+    "setDefault": "Set as default",
+    "saveCurrent": "Save current view"
+  },
+  "combobox": {
+    "placeholder": "Type to search…",
+    "lookup": "Pick from list (F4)",
+    "toggle": "Open list",
+    "useCustom": "Use \"{{value}}\"",
+    "empty": "No matches",
+    "typeToFilter": "Keep typing to narrow down"
+  },
+  "lookup": {
+    "searchPlaceholder": "Search by name, country, VAT, phone…",
+    "hint": "{{count}} results · ↑↓ move · Enter pick · Esc close"
+  },
+  "palette": {
+    "title": "Command palette",
+    "trigger": "Search or type a command (e.g. YS, SP 2025-0123)…",
+    "placeholder": "Order, customer, screen name or transaction code…",
+    "screens": "Screens",
+    "commands": "Commands",
+    "recent": "Recent searches",
+    "noResults": "No results.",
+    "help": "Type an order number, customer, component, user or screen name.",
+    "codesHint": "Codes: YS New Order · SL My Orders · KK Control · FB Factory · LH Logistics · TH Collections · BI Pending Tasks. Documents: SP <no> details · RV <no> revise · KP <no> copy.",
+    "navigate": "move",
+    "open": "open",
+    "doc": {
+      "SP": "Open order {{no}}",
+      "RV": "Revise {{no}}",
+      "KP": "New order copied from {{no}}"
+    }
+  },
+  "statusBar": {
+    "messages": "Message log",
+    "ready": "Ready",
+    "log": "Session messages",
+    "empty": "No messages yet."
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "palette": "Command palette",
+    "help": "Shortcut help",
+    "back": "Back",
+    "refresh": "Refresh data",
+    "toggleMenu": "Collapse/expand menu",
+    "focusFilter": "Focus filter",
+    "applyFilter": "Apply filter",
+    "moveRow": "Move between rows",
+    "openRow": "Open row / details",
+    "selectRow": "Select row (bulk)",
+    "rowMenu": "Row menu",
+    "nextField": "Next field",
+    "prevField": "Previous field",
+    "lookup": "Pick from list (value help)",
+    "save": "Save",
+    "newLine": "New line",
+    "confirmDialog": "Confirm dialog",
+    "closeDialog": "Close dialog",
+    "qcApprove": "Control: approve",
+    "qcReject": "Control: reject",
+    "groups": {
+      "global": "General",
+      "lists": "Lists",
+      "forms": "Forms",
+      "qc": "Quality Control"
+    },
+    "guide": "User guide"
+  },
+  "approvalTimeline": {
+    "title": "Approval History",
+    "loading": "Loading approval history…",
+    "empty": "No approval records."
+  },
+  "docFlow": {
+    "title": "Document Flow",
+    "approval": {
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "pending": "Pending"
+    },
+    "quoteCreated": "Quote {{no}} created",
+    "orderCreated": "Order {{no}} created",
+    "convertedFromQuote": "Converted from quote {{no}}",
+    "qc": "Control",
+    "approvalStep": "Approval",
+    "payment": "Payment #{{n}} · {{amount}}",
+    "paymentCancelled": "Payment #{{n}} cancelled",
+    "productionDone": "Production finished",
+    "inProduction": "In production",
+    "awaitingProduction": "Awaiting production",
+    "logisticsOffer": "Logistics offer: {{firma}}",
+    "shipped": "Shipped",
+    "awaitingShipment": "Awaiting shipment"
+  },
+  "inbox": {
+    "title": "Pending Tasks",
+    "description": "Pending work assigned to you, grouped by queue.",
+    "total_one": "{{count}} pending item",
+    "total_other": "{{count}} pending items",
+    "noQueues": "No work queues are defined for your role.",
+    "openScreen": "Open screen",
+    "empty": "Nothing pending",
+    "age_one": "{{count}} day",
+    "age_other": "{{count}} days",
+    "process": "Process",
+    "queues": {
+      "qc": "Awaiting control",
+      "cari": "Awaiting account approval",
+      "lojistikOnay": "Awaiting logistics approval",
+      "tamamlanma": "Awaiting completion",
+      "planning": "To start production",
+      "production": "In production (to mark ready)",
+      "shipment": "Shipment request to create",
+      "inTransit": "Shipments in transit",
+      "finalApproval": "Purchase final approval",
+      "payment": "Payment details to enter",
+      "rejected": "My rejected orders"
+    },
+    "hints": {
+      "qc": "Decide with Approve/Reject.",
+      "cari": "Enter the down payment and approve.",
+      "lojistikOnay": "Logistics approval for ready orders.",
+      "tamamlanma": "Enter final cost and last payment.",
+      "planning": "Start production with date and factory note.",
+      "production": "Mark finished orders as Ready.",
+      "shipment": "Pick carrier and Incoterm to request shipment.",
+      "inTransit": "Complete delivered shipments.",
+      "finalApproval": "Review and approve/reject requests.",
+      "payment": "Enter payment type and details.",
+      "rejected": "Read the rejection note and revise."
+    },
+    "loadError": "Queue could not be loaded (press F5)."
+  },
+  "preferences": {
+    "title": "Preferences",
+    "description": "Your defaults; new forms open with these values. Changes are saved instantly.",
+    "saved": "Preference saved",
+    "orderDefaults": "New order defaults",
+    "defaultPesin": "Default down payment %",
+    "defaultPesinHint": "Leave empty to enter it on every order.",
+    "workspace": "Workspace",
+    "startPage": "Start page",
+    "tableDensity": "Table density",
+    "density": {
+      "normal": "Normal",
+      "compact": "Compact (more rows)"
+    },
+    "enterNavigation": "Enter moves to the next field in forms",
+    "showShortcutHints": "Show shortcut hints in the status bar",
+    "reset": "Reset to defaults"
+  },
+  "bulk": {
+    "result": "{{ok}} succeeded, {{failed}} failed"
+  },
+  "masterDetail": {
+    "close": "Close details",
+    "expand": "Open full screen"
+  },
+  "payment": {
+    "select": "Select",
+    "types": {
+      "pesin": "Cash in advance",
+      "vadeli": "Deferred",
+      "malMukabili": "Cash on goods",
+      "cekSenet": "Cheque / Note",
+      "havale": "Bank transfer",
+      "kart": "Credit / Debit card"
+    },
+    "fields": {
+      "odemeTuru": "Payment type",
+      "odenenTutar": "Amount paid",
+      "tutar": "Amount",
+      "islemTarihi": "Transaction date",
+      "belgeNo": "Document no",
+      "bankaAdi": "Bank name",
+      "vadeSuresi": "Term",
+      "vadeSuresiHint": "e.g. 30 days",
+      "vadeTutari": "Term amount",
+      "aciklama": "Description",
+      "vadeTarihi": "Due date",
+      "kartTipi": "Card type",
+      "taksit": "Installments"
+    }
+  },
+  "statement": {
+    "title": "Customer Account Statement",
+    "description_page": "Customer debit (orders) and credit (payments) movements with a running balance per currency.",
+    "pickCustomer": "Select a customer (type or press F4).",
+    "debit": "Debit",
+    "credit": "Credit",
+    "description": "Description",
+    "movementsIn": "{{currency}} movements",
+    "noBalance": "No balance records for this customer.",
+    "noMovements": "No movements in the selected range.",
+    "open": "Open",
+    "closed": "Closed",
+    "opening": "Opening balance",
+    "orderLine": "Order amount",
+    "payment": "Payment",
+    "paymentN": "Payment #{{n}}"
+  },
+  "workflow": {
+    "panelTitle": "Waiting at the previous step",
+    "panelHint": "These orders have not reached this screen yet; they arrive once the previous step is done.",
+    "buttonLabel": "Previous step",
+    "empty": "No orders waiting at the previous step.",
+    "loadError": "Previous step could not be loaded.",
+    "currentStep": "Now waiting for",
+    "notHere": "{{no}} is not on this screen: {{reason}}.",
+    "notHereDone": "{{no}} is not on this screen: the order is closed ({{stage}}).",
+    "notFound": "Order {{no}} was not found.",
+    "steps": {
+      "temsilciDuzeltme": "Waiting for the sales rep to revise (rejected)",
+      "kontrolOnayi": "Waiting for control approval",
+      "siparisCevirme": "Waiting for the sales rep to convert the quote to an order",
+      "cariOnay": "Waiting for accounting account approval (1st down payment)",
+      "uretimeAlma": "Waiting for the factory to start production",
+      "uretim": "In production — waiting for \"Ready\"",
+      "lojistikOnay": "Waiting for accounting logistics approval (2nd down payment)",
+      "sevkiyat": "Waiting for logistics to request shipment",
+      "teslimat": "Waiting for logistics delivery",
+      "kapanis": "Waiting for accounting closing (3rd down payment)"
+    },
+    "departments": {
+      "Satis": "Sales",
+      "Kontrol": "Control",
+      "Muhasebe": "Accounting",
+      "Fabrika": "Factory",
+      "Lojistik": "Logistics"
+    }
+  },
+  "guide": {
+    "button": "Guide",
+    "title": "User Guide",
+    "sections": "Sections",
+    "steps": "How to",
+    "tips": "Tips",
+    "goToScreen": "Go to screen",
+    "fullPage": "Open full page",
+    "print": "Print",
+    "hint": "The section for the screen you are on is open; other sections are in the list.",
+    "pageDescription": "A short how-to for each screen. Open it as a panel with the Guide button at the top or Shift+F1."
+  },
+  "whatsNew": {
+    "title": "What’s New",
+    "missed_one": "{{count}} version has been released since your last sign-in.",
+    "missed_other": "{{count}} versions have been released since your last sign-in.",
+    "allVersions": "All versions",
+    "openGuide": "Open guide",
+    "gotIt": "Got it",
+    "currentVersion": "Current version: v{{version}}",
+    "legacyTitle": "Earlier development phases",
+    "legacyHint": "old numbering"
   }
 }

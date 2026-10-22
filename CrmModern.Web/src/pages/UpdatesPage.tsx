@@ -1,45 +1,43 @@
-import { Sparkles } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/PageHeader'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CHANGELOG, CURRENT_VERSION } from '@/data/changelog'
+import { Card, CardContent } from '@/components/ui/card'
+import { CollapsibleSection } from '@/components/ui/accordion'
+import { ReleaseNoteBody } from '@/components/ReleaseNoteBody'
+import { LEGACY_CHANGELOG, RELEASE_NOTES } from '@/data/changelog'
+import { APP_VERSION, compareVersions } from '@/lib/releaseNotes'
+import { cn } from '@/lib/utils'
 
 /**
- * Faz 7 — "Neler Yeni" sayfası.
- * WinForms Yenilik.cs formunun modern UI karşılığı; içerik statik
- * `data/changelog.ts` dosyasından okunur.
+ * "Neler Yeni" geçmişi — tüm sürüm notları (yeniden eskiye), güncel sürüm
+ * vurgulu; eski "Faz" kayıtları ayrı, kapalı bölümde. Veri: data/changelog.ts.
  */
 export function UpdatesPage() {
+  const { t, i18n } = useTranslation()
+  // Henüz yayınlanmamış (uygulama sürümünden yeni) notlar geçmişte gösterilmez.
+  const notes = RELEASE_NOTES.filter((n) => compareVersions(n.versiyon, APP_VERSION) <= 0)
   return (
     <div>
-      <PageHeader
-        title="Neler Yeni"
-        description={`Şu anki sürüm: v${CURRENT_VERSION}`}
-      />
-      <div className="p-6 space-y-4 max-w-3xl">
-        {CHANGELOG.map((entry) => {
-          const isCurrent = entry.versiyon === CURRENT_VERSION
-          return (
-            <Card key={entry.versiyon} className={isCurrent ? 'border-amber-300 dark:border-amber-700' : ''}>
-              <CardHeader>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {isCurrent && <Sparkles className="h-4 w-4 text-amber-500" />}
-                  <CardTitle className="text-base">{entry.baslik}</CardTitle>
-                  <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                    v{entry.versiyon}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{entry.tarih}</span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <ul className="list-disc pl-5 text-sm space-y-1">
-                  {entry.maddeler.map((m, i) => (
-                    <li key={i}>{m}</li>
-                  ))}
+      <PageHeader title={t('updates.title')} description={t('whatsNew.currentVersion', { version: APP_VERSION })} />
+      <div className="max-w-3xl space-y-3 p-4 lg:p-6">
+        {notes.map((n) => (
+          <Card key={n.versiyon} className={cn(n.versiyon === APP_VERSION && 'border-warning/60')}>
+            <CardContent className="pt-4">
+              <ReleaseNoteBody note={n} lang={i18n.language} />
+            </CardContent>
+          </Card>
+        ))}
+        <CollapsibleSection title={t('whatsNew.legacyTitle')} summary={t('whatsNew.legacyHint')}>
+          <div className="space-y-4 px-3 pb-3">
+            {LEGACY_CHANGELOG.map((e) => (
+              <section key={e.versiyon} className="space-y-1">
+                <h3 className="text-sm font-semibold">{e.baslik} <span className="text-xs font-normal text-muted-foreground">· {e.tarih}</span></h3>
+                <ul className="list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
+                  {e.maddeler.map((m, i) => <li key={i}>{m}</li>)}
                 </ul>
-              </CardContent>
-            </Card>
-          )
-        })}
+              </section>
+            ))}
+          </div>
+        </CollapsibleSection>
       </div>
     </div>
   )

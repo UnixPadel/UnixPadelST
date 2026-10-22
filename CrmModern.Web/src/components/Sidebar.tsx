@@ -1,77 +1,36 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import {
-  LayoutDashboard, ShoppingCart, CheckSquare, Factory, Truck,
-  Calculator, FileText, Users, UserPlus, Search, LogOut, ChevronRight, Sparkles, X, BarChart3,
-} from 'lucide-react'
+import { LogOut, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { isSuperAdmin } from '@/lib/permissions'
 import { logout as apiLogout } from '@/api/auth'
+import {
+  NAV_GROUPS, activeNavPath, shortNavLabel, visibleNavItems,
+} from '@/lib/navigation'
+import { useNavCounts } from '@/hooks/useNavCounts'
 
 interface SidebarProps {
   isOpen: boolean
   onClose: () => void
 }
 
-interface NavItem {
-  path: string
-  i18nKey: string
-  icon: React.ReactNode
-  roles?: string[]
-  usernames?: string[]   // rol VEYA kullanıcı adı — birden fazla varsa OR
-}
-
-const navItems: NavItem[] = [
-  { path: '/dashboard',       i18nKey: 'nav.dashboard',         icon: <LayoutDashboard className="h-4 w-4" /> },
-  // PROMPT-v3 §1 — sipariş/teklif oluşturma yalnız Temsilci'ye açık.
-  // İstisna: elshan.rasulov (kullanıcı adı bazlı).
-  { path: '/orders/new',      i18nKey: 'nav.createOrderQuote',  icon: <ShoppingCart className="h-4 w-4" />, roles: ['Temsilci'], usernames: ['elshan.rasulov'] },
-  // PROMPT-v4 §6.2 — elshan.rasulov tüm siparişleri Siparişlerim'den izler.
-  { path: '/orders/mine',     i18nKey: 'nav.myOrders',          icon: <ShoppingCart className="h-4 w-4" />, roles: ['Yonetici','Temsilci','Gozlemci'], usernames: ['elshan.rasulov'] },
-  // PROMPT-v4 §1 — Kontrol yalnız elshan.rasulov (kullanıcı adı bazlı; rol yok).
-  { path: '/quality-control', i18nKey: 'nav.qualityControl',    icon: <CheckSquare className="h-4 w-4" />, usernames: ['elshan.rasulov'] },
-  { path: '/factory',         i18nKey: 'nav.factory',           icon: <Factory className="h-4 w-4" />,   roles: ['Yonetici', 'Fabrika', 'Gozlemci'] },
-  { path: '/logistics/ready',     i18nKey: 'nav.logisticsReady',     icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
-  { path: '/logistics/offers',    i18nKey: 'nav.logisticsOffers',    icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik'] },
-  { path: '/logistics/history',   i18nKey: 'nav.logisticsHistory',   icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
-  { path: '/logistics/carriers',  i18nKey: 'nav.logisticsCarriers',  icon: <Truck className="h-4 w-4" />, roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
-  { path: '/accounting',         i18nKey: 'nav.accounting',                       icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },
-  { path: '/accounting/orders',  i18nKey: 'nav.accountingOrders',                 icon: <FileText className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },
-  // PROMPT-v6 §1 — Burcu onay ekranı yalnız burcu.karaman (kullanıcı adı bazlı; rol yok).
-  { path: '/accounting/approval', i18nKey: 'nav.accountingApproval',              icon: <CheckSquare className="h-4 w-4" />, usernames: ['burcu.karaman'] },
-  { path: '/accounting/history', i18nKey: 'nav.accountingHistory',                icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe', 'Gozlemci'] },
-  { path: '/accounting/balance', i18nKey: 'nav.accountingBalance',                icon: <Calculator className="h-4 w-4" />, roles: ['Yonetici', 'Muhasebe'] },
-  { path: '/purchase/new',     i18nKey: 'nav.purchaseNew',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Lojistik','Fabrika','Gozlemci','Temsilci'] },
-  { path: '/purchase/mine',    i18nKey: 'nav.purchaseMine',  icon: <FileText className="h-4 w-4" /> },
-  { path: '/purchase/all',     i18nKey: 'nav.purchaseAll',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici','Gozlemci','Muhasebe'], usernames: ['elshan.rasulov'] },
-  { path: '/approval/payment', i18nKey: 'nav.approvalPayment', icon: <FileText className="h-4 w-4" />, roles: ['Muhasebe'] },
-  { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: <FileText className="h-4 w-4" />, roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
-  { path: '/customers',       i18nKey: 'nav.customers',       icon: <UserPlus className="h-4 w-4" />,roles: ['Yonetici','Temsilci','Gozlemci','Muhasebe','Lojistik'] },
-  { path: '/users',           i18nKey: 'nav.users',           icon: <Users className="h-4 w-4" />,   roles: ['Yonetici'] },
-  // Round-8 §13 — Temsilci performans raporu yalnız Yonetici.
-  { path: '/reporting/representatives', i18nKey: 'nav.reporting', icon: <BarChart3 className="h-4 w-4" />, roles: ['Yonetici'] },
-  { path: '/search',          i18nKey: 'nav.search',          icon: <Search className="h-4 w-4" /> },
-  { path: '/updates',         i18nKey: 'nav.updates',         icon: <Sparkles className="h-4 w-4" /> },
-]
-
+/**
+ * QW-10 / SR-10 — gruplu menü (LOGO modül menüsü: Satış / Operasyon / Lojistik /
+ * Muhasebe / Satın Alma / Yönetim), benzersiz ikonlar, alt rotalarda da aktif
+ * vurgu (en uzun önek), kuyruk sayaç rozetleri. Masaüstünde kapalıyken tamamen
+ * gizlenmek yerine ikon rayına (w-14, tooltip'li) daralır.
+ */
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { getUser, logout } = useAuth()
   const user = getUser()
+  const counts = useNavCounts()
 
-  const visibleItems = navItems.filter((item) => {
-    if (!item.roles && !item.usernames) return true
-    if (!user) return false
-    // PROMPT-v7 §1 — merkezi bypass: elshan.rasulov TÜM nav kayıtlarını görür.
-    // §24 — Admin (süper-admin) da tüm menüleri (gizli dahil) görür.
-    if (user.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user)) return true
-    const roleOk = item.roles?.includes(user.yetkiTuru) ?? false
-    const userOk = item.usernames?.includes(user.kullaniciAdi) ?? false
-    return roleOk || userOk
-  })
+  const items = visibleNavItems(user)
+  const active = activeNavPath(location.pathname, items)
+  const rail = !isOpen
 
   // HashRouter altında window.location.href = '/login' yanlış URL üretir.
   // navigate(..., { replace: true }) hem doğru hash route'una gider hem de
@@ -94,22 +53,22 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       )}
 
       <aside
+        aria-label={t('nav.menu')}
         className={cn(
-          'flex h-screen flex-col border-r bg-card transition-all duration-300 ease-in-out overflow-hidden',
-          // Geniş ekran: in-flow, genişlik 0/240
+          'flex h-screen flex-col border-r bg-card transition-all duration-200 ease-in-out overflow-hidden',
           'lg:relative lg:translate-x-0',
-          isOpen ? 'lg:w-60' : 'lg:w-0',
+          isOpen ? 'lg:w-60' : 'lg:w-14',
           // Mobil: fixed overlay, slayt animasyonu
           'fixed inset-y-0 left-0 z-40 w-60',
           isOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         {/* Logo + mobil kapat */}
-        <div className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
+        <div className={cn('flex h-14 shrink-0 items-center gap-2 border-b', rail ? 'lg:justify-center lg:px-0 px-4' : 'px-4')}>
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-sm font-bold">
             UP
           </div>
-          <div className="flex-1">
+          <div className={cn('flex-1', rail && 'lg:hidden')}>
             <p className="text-sm font-semibold">Unix Padel</p>
             <p className="text-xs text-muted-foreground">CRM</p>
           </div>
@@ -123,45 +82,82 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
-          {visibleItems.map((item) => {
-            const active = location.pathname === item.path
+        <nav className={cn('flex-1 overflow-y-auto py-2', rail ? 'lg:px-1.5 px-3' : 'px-3')}>
+          {NAV_GROUPS.map((group) => {
+            const groupItems = items.filter((i) => i.group === group)
+            if (groupItems.length === 0) return null
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors',
-                  active
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+              <div key={group} className="mb-2">
+                {group !== 'general' && (
+                  <p className={cn('px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80', rail && 'lg:hidden')}>
+                    {t(`nav.groups.${group}`)}
+                  </p>
                 )}
-              >
-                {item.icon}
-                <span className="flex-1">{t(item.i18nKey)}</span>
-                {active && <ChevronRight className="h-3 w-3" />}
-              </Link>
+                {rail && group !== 'general' && <div className="mx-2 my-1 hidden h-px bg-border lg:block" />}
+                <div className="space-y-0.5">
+                  {groupItems.map((item) => {
+                    const isActive = item.path === active
+                    const label = t(item.i18nKey)
+                    const count = item.countField ? counts?.[item.countField] : undefined
+                    const Icon = item.icon
+                    return (
+                      <Link
+                        key={item.path}
+                        to={item.path}
+                        title={rail ? `${label} (${item.code})` : undefined}
+                        aria-current={isActive ? 'page' : undefined}
+                        onClick={() => { if (window.innerWidth < 1024) onClose() }}
+                        className={cn(
+                          'relative flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                          rail && 'lg:justify-center lg:px-0 lg:py-2',
+                          isActive
+                            ? 'bg-primary text-primary-foreground'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                        )}
+                      >
+                        <Icon className="h-4 w-4 shrink-0" />
+                        <span className={cn('flex-1 truncate', rail && 'lg:hidden')}>
+                          {group === 'general' ? label : shortNavLabel(label)}
+                        </span>
+                        {typeof count === 'number' && count > 0 && (
+                          <span
+                            className={cn(
+                              'min-w-[1.25rem] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums',
+                              isActive ? 'bg-primary-foreground/20' : 'bg-warning-soft text-warning-soft-foreground',
+                              rail && 'lg:absolute lg:-right-0.5 lg:-top-0.5 lg:min-w-0 lg:px-1 lg:text-[10px]',
+                            )}
+                            aria-label={t('nav.pendingCount', { count })}
+                          >
+                            {count > 99 ? '99+' : count}
+                          </span>
+                        )}
+                      </Link>
+                    )
+                  })}
+                </div>
+              </div>
             )
           })}
         </nav>
 
         {/* User */}
-        <div className="border-t p-3 shrink-0">
+        <div className={cn('border-t p-3 shrink-0', rail && 'lg:p-1.5')}>
           {user && (
-            <div className="mb-2 rounded-md bg-muted px-3 py-2">
-              <p className="text-xs font-medium">{user.kullaniciAdi}</p>
+            <div className={cn('mb-2 rounded-md bg-muted px-3 py-2', rail && 'lg:hidden')}>
+              <p className="text-xs font-medium truncate">{user.kullaniciAdi}</p>
               <p className="text-xs text-muted-foreground">{user.yetkiTuru}</p>
             </div>
           )}
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+            title={rail ? t('common.logout') : undefined}
+            className={cn('flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors', rail && 'lg:justify-center lg:px-0')}
           >
-            <LogOut className="h-4 w-4" />
-            {t('common.logout')}
+            <LogOut className="h-4 w-4 shrink-0" />
+            <span className={cn(rail && 'lg:hidden')}>{t('common.logout')}</span>
           </button>
           {/* Sol alt köşe — güncel sürüm (package.json'dan derleme anında gömülür). */}
-          <p className="mt-2 px-3 text-center text-[10px] text-muted-foreground/70">
+          <p className={cn('mt-2 px-3 text-center text-[10px] text-muted-foreground/70', rail && 'lg:hidden')}>
             v{__APP_VERSION__}
           </p>
         </div>

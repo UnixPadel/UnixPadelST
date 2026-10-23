@@ -11,6 +11,24 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.6',
+    tarih:    '2026-10-23',
+    baslik: {
+      tr: 'Arayüz ölçeği üst çubukta',
+      en: 'Interface scale in the top bar',
+    },
+    maddeler: {
+      tr: [
+        'Masaüstü uygulamasında üst çubuğun sağında − ve + düğmeleriyle arayüzü küçültüp büyütebilirsin; aradaki yüzde güncel ölçeği gösterir.',
+        'Yüzdeye tıklayınca ölçek otomatiğe (ekrana göre) döner; Ctrl+ / Ctrl- / Ctrl+0 ve Tercihlerim’deki ayar aynı şekilde çalışmaya devam ediyor.',
+      ],
+      en: [
+        'In the desktop app, use the − and + buttons on the right of the top bar to make the interface smaller or larger; the percentage between them shows the current scale.',
+        'Click the percentage to return to automatic scale (fits screen); Ctrl+ / Ctrl- / Ctrl+0 and the setting in Preferences keep working as before.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.5',
     tarih:    '2026-10-23',
     baslik: {

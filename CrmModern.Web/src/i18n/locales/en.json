@@ -164,6 +164,10 @@
   "topbar": {
     "toggleMenu": "Toggle menu",
     "language": "Language",
+    "zoom": "Interface scale",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "zoomReset": "Back to automatic scale",
     "search": "Search…",
     "searchMinChars": "Type at least 2 characters…"
   },

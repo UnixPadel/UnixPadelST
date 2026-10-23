@@ -7,6 +7,7 @@ import { Sidebar } from './Sidebar'
 import { CommandPalette } from './CommandPalette'
 import { UpdatesModal } from './UpdatesModal'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { ZoomControl } from './ZoomControl'
 import { PageLoader } from './PageLoader'
 import { StatusBar } from './StatusBar'
 import { ShortcutHelpDialog } from './ShortcutHelpDialog'
@@ -101,6 +102,7 @@ export function Layout() {
             <Button size="xs" variant="ghost" onClick={() => openGuide()} title={`${t('guide.title')} (Shift+F1)`}>
               <BookOpen className="h-4 w-4" /> <span className="hidden sm:inline">{t('guide.button')}</span>
             </Button>
+            <ZoomControl />
             <LanguageSwitcher />
           </div>
         </header>

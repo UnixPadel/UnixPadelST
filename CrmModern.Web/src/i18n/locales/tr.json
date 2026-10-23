@@ -164,6 +164,10 @@
   "topbar": {
     "toggleMenu": "Menüyü aç/kapat",
     "language": "Dil",
+    "zoom": "Arayüz ölçeği",
+    "zoomIn": "Büyüt",
+    "zoomOut": "Küçült",
+    "zoomReset": "Otomatik ölçeğe dön",
     "search": "Ara…",
     "searchMinChars": "En az 2 harf yaz…"
   },

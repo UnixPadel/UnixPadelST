@@ -10,7 +10,7 @@ import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { visibleNavItems } from '@/lib/navigation'
 import { DEFAULT_PREFERENCES, setPreferences, usePreferences } from '@/lib/preferences'
-import { desktop, useDesktopZoom } from '@/lib/desktop'
+import { desktop, useDesktopZoom, ZOOM_STEPS } from '@/lib/desktop'
 
 /**
  * E-13 — Tercihlerim (SAP kullanıcı parametreleri / LOGO kullanıcı tercihleri).
@@ -18,7 +18,6 @@ import { desktop, useDesktopZoom } from '@/lib/desktop'
  */
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk']
 const PARA_TIPLERI = ['Euro', 'Dolar', 'TL', 'Sterlin']
-const UI_SCALES = [0.8, 0.85, 0.9, 1, 1.1, 1.25]
 
 export function PreferencesPage() {
   const { t } = useTranslation()
@@ -94,7 +93,7 @@ export function PreferencesPage() {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="auto">{t('preferences.uiScaleAuto')}</SelectItem>
-                  {UI_SCALES.map((s) => <SelectItem key={s} value={String(s)}>%{Math.round(s * 100)}</SelectItem>)}
+                  {ZOOM_STEPS.map((s) => <SelectItem key={s} value={String(s)}>%{Math.round(s * 100)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </FormField>

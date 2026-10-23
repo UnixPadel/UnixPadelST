@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, ChevronsUpDown, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Popover } from '@/components/ui/popover'
+import { fieldStateClasses } from '@/components/ui/input'
 
 /**
  * SR-3 / E-4 — aranabilir seçim kutusu (Radix Select yerine uzun listeler için:
@@ -95,8 +96,9 @@ export const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(functi
         placeholder={placeholder ?? t('combobox.placeholder')}
         value={display}
         className={cn(
-          'flex w-full rounded-md border border-input bg-background pl-3 pr-8 text-sm ring-offset-background placeholder:text-muted-foreground',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
+          'flex w-full rounded-md border border-input bg-field pl-3 pr-8 text-sm ring-offset-background placeholder:text-field-placeholder',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed',
+          fieldStateClasses,
           'aria-[invalid=true]:border-destructive',
           inputSize === 'sm' ? 'h-8 text-xs' : 'h-10',
         )}

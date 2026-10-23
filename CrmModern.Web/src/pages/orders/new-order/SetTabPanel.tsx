@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AlertTriangle, Search, Trash2, Wand2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Input, fieldStateClasses } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Combobox, trLower, type ComboOption } from '@/components/ui/combobox'
 import { FormField } from '@/components/ui/form-field'
@@ -51,7 +51,7 @@ export function SetTabPanel({
   return (
     <div className="space-y-3">
       {/* Scaling Faz 3 — pencereye değil orta kolonun genişliğine göre (NewOrderPage `cq`). */}
-      <div className="grid grid-cols-1 gap-2 cq-md:grid-cols-[minmax(0,1fr)_140px_90px_auto] cq-md:items-end">
+      <div className="grid grid-cols-1 gap-x-2 gap-y-3 cq-md:grid-cols-[minmax(0,1fr)_140px_90px_auto] cq-md:items-end">
         <FormField label={t('orders.form.anaUrun')} id={`${fieldPrefix}-cat`}>
           <Combobox
             options={categoryOptions}
@@ -86,7 +86,7 @@ export function SetTabPanel({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-muted/40 px-3 py-2 text-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted px-3 py-2 text-sm">
         <span className="text-muted-foreground">{t('orders.form.setFiyati')}</span>
         <span className="font-semibold tabular-nums">{formatNumberTR(tab.kategoriFiyat * tab.adet)} {sym}</span>
         {createdNo && tab.kategoriID != null && (
@@ -100,7 +100,7 @@ export function SetTabPanel({
       {/* PROMPT-v3 §2.2: bileşen checklist'i — aranabilir. İşaretlemek tabloya
           ekler, kaldırmak siler. */}
       <div className="rounded-md border">
-        <div className="flex items-center gap-2 border-b px-2 py-1.5">
+        <div className="flex items-center gap-2 rounded-t-md border-b bg-muted/50 px-2 py-1.5">
           <Search className="h-3.5 w-3.5 text-muted-foreground" />
           <input
             value={checkFilter}
@@ -108,7 +108,7 @@ export function SetTabPanel({
             placeholder={t('orders.form.bilesenAra')}
             aria-label={t('orders.form.bilesenAra')}
             data-enter-skip
-            className="flex-1 bg-transparent text-xs outline-none"
+            className={`h-7 min-w-0 flex-1 rounded-md border border-input bg-field px-2 text-xs placeholder:text-field-placeholder focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed ${fieldStateClasses}`}
             disabled={tab.checklist.length === 0}
           />
           {tab.checklist.length > 0 && (
@@ -121,7 +121,7 @@ export function SetTabPanel({
                 {tab.kategoriID ? t('orders.form.bilesenlerYukleniyor') : t('orders.form.anaUrunSecHint')}
               </p>
             : visibleChecklist.map((c) => (
-              <label key={c.bilesenID} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-muted/40">
+              <label key={c.bilesenID} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 text-xs hover:bg-muted/60 has-[:checked]:bg-primary/5">
                 <Checkbox
                   checked={c.checked}
                   onCheckedChange={(v) => onToggleComponent(c.bilesenID, v)}
@@ -138,7 +138,7 @@ export function SetTabPanel({
       <div className="max-h-72 overflow-auto rounded-md border">
         <table className="w-full text-xs">
           <thead className="sticky top-0 z-10 bg-muted">
-            <tr>
+            <tr className="shadow-[inset_0_-1px_0_hsl(var(--border-strong))]">
               <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.bilesenAdiLabel')}</th>
               <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.oznitelik')}</th>
               <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.birim')}</th>
@@ -149,7 +149,7 @@ export function SetTabPanel({
               </th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="[&>tr:nth-child(even)]:bg-muted/40">
             {tab.components.length === 0
               ? <tr><td colSpan={6} className="px-2 py-6 text-center text-muted-foreground">
                   {tab.kategoriID ? t('orders.form.listedenSecin') : t('orders.form.onceAnaUrun')}
@@ -168,7 +168,7 @@ export function SetTabPanel({
                           value={cmp.oznitelikSecili}
                           onChange={(e) => onUpdateComponent(k, { oznitelikSecili: e.target.value })}
                           aria-label={t('orders.form.oznitelik')}
-                          className="h-7 w-full rounded-md border border-input bg-background px-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className={`h-7 w-full rounded-md border border-input bg-field px-1 text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${fieldStateClasses}`}
                         >
                           <option value=""></option>
                           {cmp.oznitelikSecenekler.map((o) => <option key={o} value={o}>{o}</option>)}

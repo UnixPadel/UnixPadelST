@@ -449,7 +449,7 @@ export function QualityControlPage() {
         className="flex items-stretch gap-2 px-4 py-1.5"
         collapsed={
           // Katlıyken tek satır: seçili sipariş + karar butonları (tablo ana odak).
-          <div className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+          <div className="flex items-center gap-2 rounded-md border bg-card px-2 py-1 text-xs">
             <span className="text-muted-foreground">{t('qc.fields.siparisNo')}:</span>
             <span className="font-mono">{selected ?? '—'}</span>
             {selectedRow && <span className="truncate text-muted-foreground">· {selectedRow.musteriAd}</span>}
@@ -470,7 +470,7 @@ export function QualityControlPage() {
             yalnız iki kart kalır: Detay (genişler) | Kontrol (~300px). */}
 
         {/* 1 — Detay sekmeleri (legacy tab sırası) — doğal yükseklik, iç scroll yok */}
-        <div className="flex min-w-0 flex-1 flex-col rounded-md border p-2">
+        <div className="flex min-w-0 flex-1 flex-col rounded-md border bg-card p-2">
           <Tabs defaultValue="cari" className="flex flex-1 flex-col">
             <TabsList className="h-8 w-full shrink-0 justify-start overflow-x-auto">
               <TabsTrigger className="px-2 py-1 text-xs" value="cari">{t('qc.tabs.cari')}</TabsTrigger>
@@ -632,7 +632,7 @@ export function QualityControlPage() {
         {/* 3 — Kontrol (Sipariş No + Not + 2×3 aksiyon grid'i) */}
         {/* Scaling Faz 1 — iki iç kolon: solda Sipariş No + Not (kalan yükseklik),
             sağda aksiyonlar. Dikey yerine yatay yayılır → kart ~155px'e iner. */}
-        <div className="flex w-[490px] shrink-0 gap-2 rounded-md border p-2">
+        <div className="flex w-[490px] shrink-0 gap-2 rounded-md border bg-card p-2">
           <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <div className="flex items-center gap-1.5 text-xs">
             <span className="text-[11px] font-medium text-muted-foreground">{t('qc.fields.siparisNo')}</span>

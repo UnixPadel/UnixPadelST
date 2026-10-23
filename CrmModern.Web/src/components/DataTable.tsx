@@ -343,7 +343,7 @@ export function DataTable<T extends Record<string, unknown>>({
         </div>
       )}
 
-      <div className={cn('rounded-md border overflow-hidden', fill && 'flex min-h-0 flex-1 flex-col')}>
+      <div className={cn('rounded-md border bg-card overflow-hidden', fill && 'flex min-h-0 flex-1 flex-col')}>
         {/* Round-11 §2 — fit-first: tablo viewport'a sığsın diye w-full; sütunlar
             daralır, başlıklar gerekirse sarar. maxHeight verilirse dikey kaydırma
             bu kapta olur ve başlık yapışkan kalır. */}

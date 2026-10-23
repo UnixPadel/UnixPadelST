@@ -193,7 +193,7 @@ export function CustomerBalancePage() {
                 <section key={cur} className="space-y-2">
                   <SectionTitle>{t('statement.movementsIn', { currency: cur })}</SectionTitle>
                   {/* Scaling Faz 2 — uzun ekstre kendi kabında kayar, başlık yapışık kalır. */}
-                  <div className="max-h-[calc(100vh-12rem)] overflow-auto rounded-md border">
+                  <div className="max-h-[calc(100vh-12rem)] overflow-auto rounded-md border bg-card">
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 z-10 bg-muted">
                         <tr className="text-xs text-muted-foreground">

@@ -106,7 +106,8 @@ export function Layout() {
         </header>
         {/* PROMPT-v6 §6 — sayfa düzeyinde yatay scrollbar üretilmez; geniş
              tablolar kendi sarmalayıcılarında (overflow-x-auto) kayar. */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden">
+        {/* 0.3.4 — gri zemin: beyaz kartlar/alanlar zeminden ayrışır. */}
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-canvas">
           <Suspense fallback={<PageLoader />}>
             <Outlet />
           </Suspense>

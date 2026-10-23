@@ -295,7 +295,7 @@ export function AccountingPage() {
             stable
             className="px-3 pt-2"
             collapsed={
-              <div className="flex items-center gap-2 rounded-md border px-3 py-1 text-xs">
+              <div className="flex items-center gap-2 rounded-md border bg-card px-3 py-1 text-xs">
                 <span className="text-muted-foreground">{t('common.orderNo')}:</span>
                 <span className="font-mono font-semibold">{selectedNo}</span>
                 {selectedRow && <span className="truncate text-muted-foreground">· {selectedRow.musteriAd}</span>}

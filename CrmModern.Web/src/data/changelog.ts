@@ -11,6 +11,30 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.5',
+    tarih:    '2026-10-23',
+    baslik: {
+      tr: 'Alanlar daha kolay ayırt ediliyor',
+      en: 'Fields are easier to tell apart',
+    },
+    maddeler: {
+      tr: [
+        'Sayfa zemini açık gri, bölümler beyaz kartlarda; Yeni Sipariş / Teklif’te Müşteri, setler, Teslimat ve Montaj ile Cari Bilgiler birbirinden net ayrılıyor.',
+        'Alan çerçeveleri koyulaştı, etiketler daha okunur; üzerine gelince çerçeve belirginleşiyor, yazdığın alan açık maviyle vurgulanıyor.',
+        'Kullanılamayan alanlar gri zeminli ve kesik çizgili; boş bir alanla karışmıyor.',
+        'Açık olan set sekmesinin altı çizili; işaretli parçalar ve şartlar renkli satırla gösteriliyor, parça ve ek kalem tablolarında satırlar dönüşümlü renkli.',
+        'Aynı görünüm tüm ekranlardaki formlara, filtrelere ve sekmelere de uygulandı; yazılar ve iş akışı değişmedi.',
+      ],
+      en: [
+        'The page background is light grey and sections sit on white cards; in New Order / Quote, Customer, the sets, Delivery and Installation and Account Details are clearly separated.',
+        'Field borders are darker and labels easier to read; borders get stronger on hover and the field you are typing in is highlighted in light blue.',
+        'Unavailable fields have a grey background and a dashed border, so they no longer look like empty fields.',
+        'The open set tab is underlined; checked parts and terms are shown on a tinted row, and rows alternate in colour in the parts and extra item tables.',
+        'The same look applies to forms, filters and tabs on every screen; wording and workflows are unchanged.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.4',
     tarih:    '2026-10-23',
     baslik: {

@@ -14,16 +14,32 @@
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
+    /* Ayırt edilebilirlik (0.3.4) — muted/accent beyaz kart üstünde seçilsin
+       (tablo başlığı, sekme şeridi, hover, aktif satır); ikincil metin ≈6:1. */
+    --muted: 214 32% 92.5%;
+    --muted-foreground: 215 19% 40%;
+    --accent: 214 40% 91%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
+    --border: 214 24% 85%;
+    --border-strong: 214 18% 72%;
+    /* Alan çerçevesi beyaz/zemin üstünde ≥3:1 (WCAG 1.4.11); önceden ~1.2:1. */
+    --input: 215 16% 53%;
     --ring: 221.2 83.2% 53.3%;
     --radius: 0.5rem;
+
+    /* Sayfa zemini: kartlar/alanlar beyaz kalır, zemin açık gri → bölümler ayrışır. */
+    --canvas: 214 30% 94%;
+
+    /* Form alanı durumları (Input/Textarea/Select/Combobox). Odak zemini mavi:
+       sarı uyarı tonuyla (warning-soft) karışmasın. */
+    --field: 0 0% 100%;
+    --field-hover: 215 22% 40%;
+    --field-label: 215 28% 25%;
+    --field-placeholder: 215 16% 47%;
+    --field-readonly: 214 25% 95%;
+    --field-focus: 214 100% 97%;
 
     /* QW-1 — semantik durum tonları. Soft zeminler legacy WinForms/Excel
        hücre renkleridir (#C6EFCE / #FFEB9C / #FFC7CE / #DDEBF7); operatör
@@ -66,8 +82,17 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
+    --border-strong: 217 25% 30%;
+    --input: 215 20% 45%;
     --ring: 224.3 76.3% 48%;
+
+    --canvas: 222 47% 7%;
+    --field: 222.2 84% 4.9%;
+    --field-hover: 215 25% 65%;
+    --field-label: 214 32% 85%;
+    --field-placeholder: 215 20.2% 65.1%;
+    --field-readonly: 217 33% 12%;
+    --field-focus: 217 50% 14%;
 
     --success: 142 60% 50%;
     --success-soft: 142 40% 17%;

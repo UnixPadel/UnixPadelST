@@ -14,7 +14,9 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1',
+      'flex h-10 w-full items-center justify-between rounded-md border border-input bg-field px-3 py-2 text-sm ring-offset-background data-[placeholder]:text-field-placeholder focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed [&>span]:line-clamp-1',
+      // 0.3.4 — Input ile aynı durum dili (bkz. fieldStateClasses); tetik `focus:` kullanır.
+      'enabled:hover:border-field-hover focus:border-primary focus:bg-field-focus disabled:border-dashed disabled:bg-field-readonly disabled:text-muted-foreground',
       className
     )}
     {...props}

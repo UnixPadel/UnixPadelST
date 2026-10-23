@@ -830,7 +830,7 @@ export function NewOrderPage() {
 
         {/* Temsilci devri — YALNIZ elshan.rasulov, revize/düzenleme modunda. */}
         {(isReviseMode || isAmendMode) && canReassign && (
-          <div className="space-y-1 rounded-md border px-4 py-3 text-sm">
+          <div className="space-y-1 rounded-md border bg-card px-4 py-3 text-sm">
             <FormField label={t('orderDetail.temsilci')} hint={t('orders.repReassignHint')}>
               <Select value={selectedRepId || undefined} onValueChange={setSelectedRepId}>
                 <SelectTrigger className="w-64"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
@@ -845,7 +845,7 @@ export function NewOrderPage() {
         )}
 
         {/* Bölüm gezintisi (Fiori Object Page çapa çubuğu) — durum işaretli. */}
-        <nav aria-label={t('orders.nav.label')} className="sticky top-0 z-20 -mx-4 flex gap-1 overflow-x-auto border-b bg-background/95 px-4 py-1.5 backdrop-blur lg:-mx-6 lg:px-6">
+        <nav aria-label={t('orders.nav.label')} className="sticky top-0 z-20 -mx-4 flex gap-1 overflow-x-auto border-b bg-card/95 px-4 py-1.5 backdrop-blur lg:-mx-6 lg:px-6">
           {sectionNav.map((s, i) => (
             <a
               key={s.id}
@@ -872,8 +872,8 @@ export function NewOrderPage() {
           {/* `cq`: 2 kolonlu düzende bu kolon geniş (≥640px) → bölüm alanları yan
               yana dizilir (müşteri 3, temsilci 2–4 kolon); 3 kolonlu düzende 300px'te alt alta. */}
           <div className="cq grid min-w-0 content-start gap-4 cq-lg:col-start-1 cq-lg:row-start-1">
-            <section id="sec-customer" className="scroll-mt-14 space-y-2 rounded-md border bg-card p-3 cq-md:grid cq-md:grid-cols-3 cq-md:items-start cq-md:gap-x-3 cq-md:gap-y-2 cq-md:space-y-0">
-              <SectionTitle className="cq-md:col-span-3" actions={
+            <section id="sec-customer" className="scroll-mt-14 space-y-3 rounded-md border bg-card p-3 cq-md:grid cq-md:grid-cols-3 cq-md:items-start cq-md:gap-x-3 cq-md:gap-y-3 cq-md:space-y-0">
+              <SectionTitle className="border-b pb-2 cq-md:col-span-3" actions={
                 <Button type="button" variant="ghost" size="xs" onClick={() => nav('/customers/new')} title={t('orders.form.musteriEkle')}>
                   <UserPlus className="h-3.5 w-3.5" /> {t('common.add')}
                 </Button>
@@ -921,8 +921,8 @@ export function NewOrderPage() {
               </FormField>
             </section>
 
-            <section className="space-y-2 rounded-md border bg-card p-3 cq-md:grid cq-md:grid-cols-2 cq-md:items-start cq-md:gap-x-3 cq-md:gap-y-2 cq-md:space-y-0 cq-lg:grid-cols-4">
-              <SectionTitle className="cq-md:col-span-full">{t('orders.sections.temsilci')}</SectionTitle>
+            <section className="space-y-3 rounded-md border bg-card p-3 cq-md:grid cq-md:grid-cols-2 cq-md:items-start cq-md:gap-x-3 cq-md:gap-y-3 cq-md:space-y-0 cq-lg:grid-cols-4">
+              <SectionTitle className="border-b pb-2 cq-md:col-span-full">{t('orders.sections.temsilci')}</SectionTitle>
               <FormField label={t('orders.form.temsilciIsmi')}>
                 <Input value={temsilciAdSoyad} readOnly disabled data-enter-skip />
               </FormField>
@@ -976,13 +976,14 @@ export function NewOrderPage() {
           <div className="cq min-w-0 space-y-4 cq-lg:col-start-1 cq-lg:row-start-2 cq-2xl:col-start-2 cq-2xl:row-start-1">
             <section id="order-sets" className="scroll-mt-14 rounded-md border bg-card">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <div className="flex items-center gap-2 border-b px-2">
+                {/* 0.3.4 — sekme şeridi gri bant; aktif set beyaz + birincil alt çizgi. */}
+                <div className="flex items-center gap-2 rounded-t-md border-b bg-muted/60 px-2">
                   <TabsList className="h-auto flex-wrap justify-start bg-transparent py-1">
                     {Array.from({ length: visibleTabCount }, (_, i) => {
                       const tb = setTabs[i]
                       const filled = tb.kategoriID != null
                       return (
-                        <TabsTrigger key={i} value={`set-${i}`} className="gap-1.5 px-2.5 py-1 text-xs">
+                        <TabsTrigger key={i} value={`set-${i}`} className="gap-1.5 px-2.5 py-1 text-xs data-[state=inactive]:hover:bg-background/60 data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
                           {filled ? (
                             <>
                               <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
@@ -1098,8 +1099,8 @@ export function NewOrderPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2 border-t pt-3">
-                  <div className="grid gap-2 cq-sm:grid-cols-[1fr_120px]">
+                <div className="space-y-3 border-t pt-3">
+                  <div className="grid gap-x-2 gap-y-3 cq-sm:grid-cols-[1fr_120px]">
                     <FormField label={t('orders.form.teslimAlanAdi')}>
                       <Combobox
                         options={deliveryOptions}
@@ -1130,7 +1131,7 @@ export function NewOrderPage() {
                       {t('orders.form.sameAsCustomer')}
                     </Button>
                   </div>
-                  <div className="grid gap-2 cq-md:grid-cols-3">
+                  <div className="grid gap-x-2 gap-y-3 cq-md:grid-cols-3">
                     <FormField label={t('orders.form.ulke')}>
                       <Combobox options={countryOptions} value={form.tUlke ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, tUlke: v }))} placeholder={t('orders.form.ulkeSec')} />
                     </FormField>
@@ -1156,7 +1157,7 @@ export function NewOrderPage() {
                 </div>
 
                 {/* Ekstra maliyet — her kalem proformaya ayrı satır olur ve toplama eklenir. */}
-                <div className="space-y-2 border-t pt-3">
+                <div className="space-y-3 border-t pt-3">
                   <SectionTitle as="h4" actions={
                     <Button type="button" size="xs" variant="outline"
                       onClick={() => setForm((f) => ({ ...f, extraCosts: [...(f.extraCosts ?? []), { aciklama: '', tutar: 0 }] }))}>
@@ -1211,7 +1212,7 @@ export function NewOrderPage() {
             />
 
             <section id="sec-cari" className="scroll-mt-14 space-y-3 rounded-md border bg-card p-3">
-              <SectionTitle>{t('orders.sections.cariBilgi')}</SectionTitle>
+              <SectionTitle className="border-b pb-2">{t('orders.sections.cariBilgi')}</SectionTitle>
               {/* Kur çevirici — seçim siparişin Para Tipi'dir; bileşen fiyatları bu birime çevrilir. */}
               <div className="space-y-1.5">
                 <div className="grid grid-cols-4 gap-1" role="radiogroup" aria-label={t('orders.form.paraTipi')}>
@@ -1247,7 +1248,7 @@ export function NewOrderPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-x-2 gap-y-3">
                 {/* PROMPT-v2 §3: boş → null (display blank); coercion yalnız hesapta. */}
                 <FormField label={t('orders.form.indirim').replace(' %', '')} suffix="%">
                   <DecimalInput value={form.indirim ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, indirim: v === '' ? null : v }))} />
@@ -1301,7 +1302,7 @@ export function NewOrderPage() {
                   <Checkbox
                     key={clause}
                     label={clause}
-                    labelClassName="items-start text-sm [&>input]:mt-0.5"
+                    labelClassName="flex items-start rounded px-1 py-0.5 text-sm hover:bg-muted/60 has-[:checked]:bg-primary/5 [&>input]:mt-0.5"
                     checked={(form.details ?? []).includes(clause)}
                     onCheckedChange={(c) => toggleClause(clause, c)}
                     data-enter-skip
@@ -1340,7 +1341,7 @@ export function NewOrderPage() {
         </CollapsibleSection>
 
         {/* ── Yapışkan aksiyon çubuğu (dar ekranda toplam burada görünür) ── */}
-        <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-2 border-t bg-background/95 px-4 py-2.5 backdrop-blur lg:-mx-6 lg:px-6">
+        <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-2 border-t bg-card/95 px-4 py-2.5 backdrop-blur lg:-mx-6 lg:px-6">
           <div className="mr-auto flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
             <span>{t('orders.form.toplamFiyatLabel')}: <strong className="tabular-nums">{formatNumberTR(totals.toplam)} {sym}</strong></span>
             <span className="text-muted-foreground">{t('orders.form.kaporaMiktari')}: <span className="tabular-nums">{formatNumberTR(totals.kapora)} {sym}</span></span>

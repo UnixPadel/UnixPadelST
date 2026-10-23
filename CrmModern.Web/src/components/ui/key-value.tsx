@@ -24,7 +24,7 @@ export function ReadOnlyField({
       <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
       <div
         className={cn(
-          'rounded border bg-muted/40 px-1.5 py-1 text-xs min-h-[1.625rem]',
+          'rounded border bg-field-readonly px-1.5 py-1 text-xs min-h-[1.625rem]',
           multiline ? 'whitespace-pre-wrap break-words' : 'truncate',
           mono && 'font-mono',
           align === 'right' && 'text-right tabular-nums',

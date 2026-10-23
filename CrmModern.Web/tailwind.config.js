@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: ['class'],
+  // hover: sınıfları yalnız @media (hover: hover) altında — dokunmatikte "yapışkan hover" olmaz.
+  future: { hoverOnlyWhenSupported: true },
   content: [
     './pages/**/*.{ts,tsx}',
     './components/**/*.{ts,tsx}',
@@ -15,8 +17,21 @@ export default {
     },
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
+        border: {
+          DEFAULT: 'hsl(var(--border))',
+          strong: 'hsl(var(--border-strong))',
+        },
         input: 'hsl(var(--input))',
+        canvas: 'hsl(var(--canvas))',
+        // Form alanı durumları (index.css "Form alanı durumları").
+        field: {
+          DEFAULT: 'hsl(var(--field))',
+          hover: 'hsl(var(--field-hover))',
+          label: 'hsl(var(--field-label))',
+          placeholder: 'hsl(var(--field-placeholder))',
+          readonly: 'hsl(var(--field-readonly))',
+          focus: 'hsl(var(--field-focus))',
+        },
         ring: 'hsl(var(--ring))',
         background: 'hsl(var(--background))',
         foreground: 'hsl(var(--foreground))',

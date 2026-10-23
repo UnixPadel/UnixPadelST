@@ -26,7 +26,7 @@ export function CollapsibleSection({
   const contentId = React.useId()
   return (
     <section id={id} className={cn('rounded-md border bg-card scroll-mt-16', className)}>
-      <div className="flex items-center gap-2 px-3 py-2">
+      <div className={cn('flex items-center gap-2 rounded-t-md bg-muted/50 px-3 py-2', !open && 'rounded-b-md')}>
         <button
           type="button"
           className="flex flex-1 items-center gap-2 text-left text-sm font-semibold"

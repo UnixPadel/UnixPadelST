@@ -58,7 +58,7 @@ export function FreeItemsSection({
 
   return (
     <section className="space-y-2 rounded-md border bg-card p-3">
-      <SectionTitle actions={
+      <SectionTitle className="border-b pb-2" actions={
         <Button type="button" variant="outline" size="xs" onClick={() => openDialog()}>
           <Plus className="h-3.5 w-3.5" /> {t('orders.form.ozelKalemEkle')}
         </Button>
@@ -69,7 +69,7 @@ export function FreeItemsSection({
         <div className="max-h-48 overflow-auto rounded-md border">
           <table className="w-full text-xs">
             <thead className="bg-muted">
-              <tr>
+              <tr className="shadow-[inset_0_-1px_0_hsl(var(--border-strong))]">
                 <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.bilesenAdiLabel')}</th>
                 <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.oznitelik')}</th>
                 <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.birim')}</th>
@@ -79,7 +79,7 @@ export function FreeItemsSection({
                 <th className="w-16 px-2 py-1.5"><span className="sr-only">{t('common.actions')}</span></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="[&>tr:nth-child(even)]:bg-muted/40">
               {items.map((fi, idx) => (
                 <tr key={idx} className="border-t">
                   <td className="px-2 py-1">

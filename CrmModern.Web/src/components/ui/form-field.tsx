@@ -43,7 +43,7 @@ export function FormField({
   } as Record<string, unknown>)
 
   const labelEl = (
-    <Label htmlFor={id} className={cn('text-xs font-medium text-muted-foreground', layout === 'inline' && 'w-28 shrink-0 pt-2', labelClassName)}>
+    <Label htmlFor={id} className={cn('text-xs font-medium text-field-label', layout === 'inline' && 'w-28 shrink-0 pt-2', labelClassName)}>
       {label}{required && <span className="text-destructive" aria-hidden> *</span>}
     </Label>
   )

@@ -6,6 +6,7 @@ import { CheckCheck, Factory } from 'lucide-react'
 import { getFactoryOrders, moveToProduction, markReady, type FactoryFilter } from '@/api/factory'
 import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { FilterBar, FilterField, ALL, useFilterState, useDefaultView } from '@/components/FilterBar'
@@ -165,8 +166,8 @@ export function FactoryPage() {
   }
 
   const columns: Column<Row>[] = [
-    { key: 'siparisNo',         header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
-    { key: 'musteriAd',         header: t('common.customer'), sortable: true },
+    { key: 'siparisNo', pin: 'left', header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
+    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'), sortable: true },
     { key: 'mUlke',             header: t('common.country'),  sortable: true },
     // 2.2 — legacy "Temsilci" (CONCAT(Ad, Soyad)) sütunu
     { key: 'kullanici',         header: t('factory.temsilci'), sortable: true, render: (r) => (r.kullanici as string) ?? '—' },
@@ -177,7 +178,7 @@ export function FactoryPage() {
     { key: 'cariOnayTarih',     header: t('factory.cariOnayTarih'), sortable: true, type: 'date', render: (r) => r.cariOnayTarih ? formatDate(r.cariOnayTarih as string) : '—' },
     { key: 'tarih',             header: t('common.date'),     sortable: true, type: 'date', render: (r) => formatDate(r.tarih as string) },
     {
-      key: 'actions',
+      key: 'actions', pin: 'right',
       header: t('common.actions'),
       hideable: false,
       exportValue: false,
@@ -205,9 +206,11 @@ export function FactoryPage() {
   ])
 
   return (
-    <div>
-      <PageHeader title={t('factory.title')} description={t('factory.description')} />
-      <div className="space-y-3 p-4 lg:p-6">
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact" actions={<WaitingUpstreamPanel screen="factory" variant="button" />} title={t('factory.title')} description={t('factory.description')} />
+      <div className="space-y-2 px-4 pt-2">
         {/* Filter grid — Fabrika.cs araButtonInTab port'u */}
         <FilterBar onReset={reset} tableId="factory" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
           <FilterField label={t('common.orderNo')}>
@@ -246,13 +249,12 @@ export function FactoryPage() {
             <Input inputSize="sm" type="date" value={f.bitisTarih} onChange={(e) => set('bitisTarih', e.target.value)} />
           </FilterField>
         </FilterBar>
-
-        {/* İç denetim — henüz Planlama'ya düşmemiş: Muhasebe cari onayı bekleyenler. */}
-        <WaitingUpstreamPanel screen="factory" />
-
+      </div>
+      <FillRegion className="pt-2">
         {/* E-9 — satır seçilince sağda detay (aşama geçmişi + belge akışı dahil). */}
-        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)} factoryView>
+        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} factoryView>
           <DataTable
+            fill
             tableId="factory"
             exportFileName="fabrika"
             columns={columns}
@@ -289,7 +291,7 @@ export function FactoryPage() {
             ]}
           />
         </MasterDetailLayout>
-      </div>
+      </FillRegion>
 
       <Dialog open={productionTargets.length > 0} onOpenChange={(o) => { if (!o) setProductionTargets([]) }}>
         <DialogContent>
@@ -322,6 +324,6 @@ export function FactoryPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </FillPage>
   )
 }

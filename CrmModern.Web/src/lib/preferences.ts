@@ -22,7 +22,8 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   defaultParaTipi: 'Euro',
   defaultOdemeSekli: '',
   defaultPesinYuzde: null,
-  tableDensity: 'normal',
+  // Scaling Faz 1 — yoğun ERP ekranları için varsayılan compact (kayıtlı tercih korunur).
+  tableDensity: 'compact',
   startPage: '/dashboard',
   showShortcutHints: true,
   enterNavigation: true,

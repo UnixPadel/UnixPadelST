@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import type { OrderDetail } from '@/types'
 
 /**
- * E-8 — SAP "Belge Akışı" / LOGO "bağlantılı belgeler": siparişin tüm hayatı tek
+ * E-8 — "Sipariş Geçmişi" sekmesi (SAP "Belge Akışı" / LOGO "bağlantılı belgeler" esinli): siparişin tüm hayatı tek
  * dikey akışta. Veri mevcut uçlardan birleştirilir (yeni backend gerekmez):
  *   getOrderDetail (Teklif/Sipariş, kontrol, fabrika tarihleri, aşama)
  *   getApprovals (onay geçmişi) · getTransactionsForOrder (tahsilatlar, iptaller dahil)

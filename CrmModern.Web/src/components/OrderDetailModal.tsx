@@ -8,7 +8,7 @@ import { getUsersLookup } from '@/api/users'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { formatCurrency, formatDate } from '@/lib/utils'
+import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { resolveClause, isFreeNote } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -54,7 +54,8 @@ export function OrderDetailModal({ siparisNo, onClose, ...rest }: Props) {
   return (
     <Dialog open={!!siparisNo} onOpenChange={(o) => { if (!o) onClose() }}>
       <DialogContent size="xl" className="max-h-[90vh]">
-        <DialogHeader className="pr-8">
+        {/* Başlık kayar; yerine sekme çubuğu yapışık kalır (Scaling Faz 2). */}
+        <DialogHeader className="static pr-8">
           <DialogTitle>{t('orderDetail.title', { no: siparisNo })}</DialogTitle>
         </DialogHeader>
         {siparisNo && <OrderDetailPanel siparisNo={siparisNo} {...rest} />}
@@ -66,7 +67,7 @@ export function OrderDetailModal({ siparisNo, onClose, ...rest }: Props) {
 /**
  * E-9 / E-8 — sipariş detayının gövdesi; hem modalda hem master-detail sağ
  * panelinde kullanılır. Sekmeler (Fiori Object Page çapa çubuğu):
- *   Genel · Kalemler · Belge Akışı · Notlar
+ *   Genel · Kalemler · Sipariş Geçmişi · Notlar
  */
 export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView = false, factoryView = false, embedded = false }: PanelProps) {
   const { t } = useTranslation()
@@ -185,7 +186,9 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
       )}
 
       <Tabs defaultValue="general">
-        <TabsList className="h-9">
+        {/* Sekme çubuğu yapışık; gölge, kabın üst dolgusunu (modal p-6 / panel p-3)
+            zemin rengiyle örter → kayan içerik çubuğun üstünde görünmez. */}
+        <TabsList className={cn('sticky top-0 z-10 h-9', embedded ? 'shadow-[0_-12px_0_0_hsl(var(--card))]' : 'shadow-[0_-24px_0_0_hsl(var(--background))]')}>
           <TabsTrigger value="general" className="text-xs">{t('orderDetail.tabs.general')}</TabsTrigger>
           <TabsTrigger value="items" className="text-xs">
             {t('orderDetail.tabs.items')} <span className="ml-1 text-muted-foreground">({order.items?.length ?? 0})</span>

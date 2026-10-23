@@ -132,12 +132,12 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
     {
         gerekce = string.IsNullOrWhiteSpace(gerekce) ? null : gerekce.Trim();
         if (gerekce?.Length > 500)
-            throw new BusinessException("İptal gerekçesi en fazla 500 karakter olabilir.");
+            throw new BusinessException("İptal sebebi en fazla 500 karakter olabilir.", "cancelReasonTooLong");
 
         var tx = await uow.Accounting.GetForUpdateAsync(transactionId)
             ?? throw new NotFoundException("Tahsilat", transactionId);
         if (tx.Iptal)
-            throw new BusinessException("Bu tahsilat zaten iptal edilmiş.");
+            throw new BusinessException("Bu tahsilat zaten iptal edilmiş.", "paymentAlreadyVoided");
 
         var order = await uow.Orders.GetByNoAsync(tx.SiparisNo)
             ?? throw new NotFoundException("Order", tx.SiparisNo);
@@ -177,7 +177,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
     public async Task<AccountingTransactionDto> AddTransactionAsync(AddTransactionDto dto, int currentUserId)
     {
         if (dto.OdenenMiktar <= 0)
-            throw new BusinessException("Tutar 0'dan büyük olmalı.");
+            throw new BusinessException("Tutar 0'dan büyük olmalı.", "amountMustBePositive");
 
         var order = await uow.Orders.GetByNoAsync(NormalizeNo(dto.SiparisNo))
             ?? throw new NotFoundException("Order", dto.SiparisNo);
@@ -422,7 +422,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
     public async Task SubmitMaliyetTalepAsync(string siparisNo, SubmitMaliyetTalepDto dto, string currentUserName)
     {
         if (dto.Maliyet < 0m)
-            throw new BusinessException("Maliyet 0'dan küçük olamaz.");
+            throw new BusinessException("Maliyet 0'dan küçük olamaz.", "costNegative");
 
         // Sipariş gerçekten var mı? (Hatalı SiparisNo'larda NotFound vermek
         // ileride duplicate Muhasebe satırı oluşmasından çok daha güvenli.)
@@ -491,7 +491,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         decimal? pesinat = null, DateTime? pesinatTarihi = null)
     {
         if (pesinat is < 0m)
-            throw new BusinessException("Peşinat negatif olamaz.");
+            throw new BusinessException("Peşinat eksi olamaz.", "downPaymentNegative");
 
         var no = NormalizeNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
@@ -499,8 +499,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
 
         // Legacy Muhasebe.cs 2229-2245: aşama gates.
         if (order.Kontrol != "Onay")
-            throw new BusinessException(
-                "Sipariş henüz Kontrol onayı almamış. Önce Kontrol aşamasında onaylanmalı.");
+            throw new BusinessException("Sipariş henüz Sipariş Kontrolü'nden onay almadı.", "reviewNotApproved");
 
         // İdempotent no-op: zaten Planlama'daysa ikinci tık zararsız.
         // Peşinat da yazılmaz — çift tıkta duplicate tahsilat oluşmasın.
@@ -508,9 +507,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
             return;
 
         if (order.SiparisMiTeklifMi != "Siparis")
-            throw new BusinessException(
-                $"Sipariş zaten '{order.SiparisMiTeklifMi}' aşamasında. " +
-                "Muhasebe onayı yalnız 'Siparis' aşamasındaki kayıtlara uygulanır.");
+            throw new BusinessException($"Sipariş şu an {order.SiparisMiTeklifMi} aşamasında. Cari onay yalnız Sipariş aşamasında verilebilir.", "accountApprovalWrongStage", new { stage = order.SiparisMiTeklifMi });
 
         // 1. Peşinat (varsa) → aynı izlenen order üzerinde HAZIRLA (tek atomik
         // SaveChanges). SatinAlmaTalep.Maliyet'e DOKUNMAZ (peşinat ödemedir, maliyet değil).
@@ -542,16 +539,14 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         decimal? pesinat = null, DateTime? pesinatTarihi = null)
     {
         if (pesinat is < 0m)
-            throw new BusinessException("Peşinat negatif olamaz.");
+            throw new BusinessException("Peşinat eksi olamaz.", "downPaymentNegative");
 
         var no = NormalizeNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
 
         if (order.SiparisMiTeklifMi != "Hazir")
-            throw new BusinessException(
-                $"Sipariş '{order.SiparisMiTeklifMi}' aşamasında. " +
-                "Lojistik onayı yalnız 'Hazir' aşamasındaki kayıtlara uygulanır.");
+            throw new BusinessException($"Sipariş şu an {order.SiparisMiTeklifMi} aşamasında. Lojistik onayı yalnız Hazır aşamasında verilebilir.", "logisticsApprovalWrongStage", new { stage = order.SiparisMiTeklifMi });
 
         // İdempotent no-op: zaten onaylıysa (veya NULL = gate'siz eski kayıt)
         // ikinci tık zararsız. Peşinat da yazılmaz — duplicate tahsilat olmasın.
@@ -579,18 +574,16 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         int currentUserId, string currentUserName)
     {
         if (dto.FinalMaliyet < 0m)
-            throw new BusinessException("Final maliyet 0'dan küçük olamaz.");
+            throw new BusinessException("Son maliyet 0'dan küçük olamaz.", "finalCostNegative");
         if (dto.Pesinat is < 0m)
-            throw new BusinessException("Peşinat negatif olamaz.");
+            throw new BusinessException("Peşinat eksi olamaz.", "downPaymentNegative");
 
         var no = NormalizeNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
 
         if (order.SiparisMiTeklifMi != "TamamlanmaBekliyor")
-            throw new BusinessException(
-                $"Sipariş '{order.SiparisMiTeklifMi}' aşamasında. Finalize yalnız " +
-                "'TamamlanmaBekliyor' aşamasındaki siparişlere uygulanır.");
+            throw new BusinessException($"Sipariş şu an {order.SiparisMiTeklifMi} aşamasında. Yalnız kapanış bekleyen sipariş kapatılabilir.", "closeWrongStage", new { stage = order.SiparisMiTeklifMi });
 
         // 1) 3. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + OdenenMiktar/OdemeDurum.
         if (dto.Pesinat is > 0m)
@@ -609,8 +602,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         // 3) Aşama: TamamlanmaBekliyor → Tamamlandi.
         int rows = await uow.Orders.FinalizeCompletionAsync(no);
         if (rows == 0)
-            throw new BusinessException(
-                $"'{no}' 'TamamlanmaBekliyor' aşamasında değil — tamamlanamaz.");
+            throw new BusinessException($"{no} kapanış beklemiyor, kapatılamaz.", "closeNotPending", new { no });
 
         // 4) TamamlandiTablo + SiparisOnaylari audit (CompleteShipment'tan ertelendi).
         await uow.CompletedOrders.AddAsync(new CompletedOrder
@@ -680,13 +672,13 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
             ?? throw new NotFoundException("Order", siparisNo);
 
         if (!CanEditExtras(order))
-            throw new BusinessException("Bu aşamada ekstra maliyet eklenemez (yalnız cari/lojistik onay penceresinde).");
+            throw new BusinessException("Bu aşamada ek maliyet eklenemez (yalnız cari ya da lojistik onayı sırasında).", "extraCostLockedAdd");
 
         var aciklama = (dto.Aciklama ?? string.Empty).Trim();
         if (aciklama.Length == 0)
-            throw new BusinessException("Açıklama zorunludur.");
+            throw new BusinessException("Açıklama gerekli.", "descriptionRequired");
         if (dto.Tutar <= 0)
-            throw new BusinessException("Tutar 0'dan büyük olmalı.");
+            throw new BusinessException("Tutar 0'dan büyük olmalı.", "amountMustBePositive");
 
         var cost = new OrderExtraCost
         {
@@ -719,7 +711,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
             ?? throw new NotFoundException("Order", cost.SiparisAlID);
 
         if (!CanEditExtras(order))
-            throw new BusinessException("Bu aşamada ekstra maliyet silinemez (yalnız cari/lojistik onay penceresinde).");
+            throw new BusinessException("Bu aşamada ek maliyet silinemez (yalnız cari ya da lojistik onayı sırasında).", "extraCostLockedDelete");
 
         uow.Orders.RemoveExtraCost(cost);
 

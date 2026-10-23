@@ -263,8 +263,9 @@ export function DashboardPage() {
       />
 
       {/* ── KPI cards ──────────────────────────────────────────────────── */}
+      {/* Scaling Faz 3 — kart sayısı pencereye değil alana göre (auto-fill). */}
       {layout.kpis.length > 0 && (
-        <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+        <div className="p-6 grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
           {layout.kpis.map(renderKpi)}
         </div>
       )}
@@ -275,7 +276,7 @@ export function DashboardPage() {
           <p className="text-xs uppercase text-muted-foreground font-medium mb-2 flex items-center gap-1">
             <Clock className="h-3 w-3" /> {t('dashboard.revenue')}
           </p>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
             <KPICard baslik="Euro"    deger={formatCiro(kpis.son30GunCiroEuro,    'Euro')}    />
             <KPICard baslik="Dolar"   deger={formatCiro(kpis.son30GunCiroDolar,   'Dolar')}   />
             <KPICard baslik="TL"      deger={formatCiro(kpis.son30GunCiroTL,      'TL')}      />
@@ -286,7 +287,7 @@ export function DashboardPage() {
 
       {/* ── Charts ─────────────────────────────────────────────────────── */}
       {hasCharts && (
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="p-6 grid grid-cols-[repeat(auto-fit,minmax(28rem,1fr))] gap-4">
           {needsTrend && <OrderTrendChart data={trend} />}
           {layout.charts.includes('stage') && <StageDistributionChart data={stages} />}
           {needsTop && top.length > 0 && (
@@ -301,7 +302,7 @@ export function DashboardPage() {
       {tiles.length > 0 && (
         <div className="px-6 pb-6">
           <p className="text-xs uppercase text-muted-foreground font-medium mb-2">{t('dashboard.modules')}</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
             {tiles.map((m) => (
               <Link key={m.path} to={m.path} className="rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                 <Card className="h-full cursor-pointer transition-shadow hover:shadow-md">

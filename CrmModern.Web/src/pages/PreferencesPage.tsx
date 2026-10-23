@@ -10,6 +10,7 @@ import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { visibleNavItems } from '@/lib/navigation'
 import { DEFAULT_PREFERENCES, setPreferences, usePreferences } from '@/lib/preferences'
+import { desktop, useDesktopZoom } from '@/lib/desktop'
 
 /**
  * E-13 — Tercihlerim (SAP kullanıcı parametreleri / LOGO kullanıcı tercihleri).
@@ -17,12 +18,14 @@ import { DEFAULT_PREFERENCES, setPreferences, usePreferences } from '@/lib/prefe
  */
 const SIRKETLER = ['Unixpadel', 'ArsSport', 'AselCocuk']
 const PARA_TIPLERI = ['Euro', 'Dolar', 'TL', 'Sterlin']
+const UI_SCALES = [0.8, 0.85, 0.9, 1, 1.1, 1.25]
 
 export function PreferencesPage() {
   const { t } = useTranslation()
   const { toast } = useToast()
   const { getUser } = useAuth()
   const prefs = usePreferences()
+  const zoom = useDesktopZoom()
   const startOptions = visibleNavItems(getUser()).filter((n) => n.path !== '/preferences')
   const save = (patch: Parameters<typeof setPreferences>[0]) => {
     setPreferences(patch)
@@ -81,6 +84,21 @@ export function PreferencesPage() {
               </SelectContent>
             </Select>
           </FormField>
+          {/* Scaling Faz 1 — yalnız masaüstü uygulamasında (Electron zoomFactor). */}
+          {desktop && (
+            <FormField label={t('preferences.uiScale')} hint={t('preferences.uiScaleHint', { pct: Math.round((zoom?.factor ?? 1) * 100) })}>
+              <Select
+                value={zoom ? String(zoom.setting) : 'auto'}
+                onValueChange={(v) => { void desktop!.setZoom(v === 'auto' ? 'auto' : Number(v)); toast({ title: t('preferences.saved'), variant: 'success' }) }}
+              >
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="auto">{t('preferences.uiScaleAuto')}</SelectItem>
+                  {UI_SCALES.map((s) => <SelectItem key={s} value={String(s)}>%{Math.round(s * 100)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </FormField>
+          )}
           <Checkbox
             label={t('preferences.enterNavigation')}
             checked={prefs.enterNavigation}

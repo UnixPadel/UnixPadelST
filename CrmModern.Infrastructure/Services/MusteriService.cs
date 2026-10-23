@@ -33,7 +33,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
     {
         // Replicates: SELECT COUNT(*) FROM MusteriBilgileri WHERE MusteriAd = @MusteriAd
         if (await unitOfWork.Musteriler.MusteriAdExistsAsync(dto.MusteriAd))
-            throw new BusinessException("Bu müşteri adı zaten mevcut.");
+            throw new BusinessException("Bu müşteri adı zaten var.", "customerExists");
 
         var ulke = await unitOfWork.Ulkeler.GetByIdAsync(dto.UlkelerID)
             ?? throw new NotFoundException(nameof(Ulke), dto.UlkelerID);
@@ -66,7 +66,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
         // İsim değiştiyse uniqueness kontrolü (WinForms davranışıyla aynı çatı altında)
         if (!string.Equals(musteri.MusteriAd, dto.MusteriAd, StringComparison.Ordinal)
             && await unitOfWork.Musteriler.MusteriAdExistsAsync(dto.MusteriAd))
-            throw new BusinessException("Bu müşteri adı zaten mevcut.");
+            throw new BusinessException("Bu müşteri adı zaten var.", "customerExists");
 
         var ulke = await unitOfWork.Ulkeler.GetByIdAsync(dto.UlkelerID)
             ?? throw new NotFoundException(nameof(Ulke), dto.UlkelerID);
@@ -93,8 +93,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
         // Round-8 §10 — siparişi olan müşteri silinemez (yetim sipariş riski).
         bool hasOrders = await unitOfWork.Orders.AnyByCustomerAsync(musteri.MusteriID, musteri.MusteriAd);
         if (hasOrders)
-            throw new BusinessException(
-                "Bu müşterinin siparişleri/teklifleri olduğu için silinemez.");
+            throw new BusinessException("Bu müşterinin sipariş ya da teklifleri var, silinemez.", "customerHasOrders");
 
         unitOfWork.Musteriler.Remove(musteri);
         await unitOfWork.SaveChangesAsync();
@@ -112,7 +111,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
     {
         // Replicates: INSERT ... WHERE NOT EXISTS (SELECT 1 ... WHERE UlkeAdi = @UlkeAdi)
         if (await unitOfWork.Ulkeler.UlkeAdExistsAsync(dto.UlkeAdi))
-            throw new BusinessException("Bu ülke zaten mevcut, ekleme yapılmadı.");
+            throw new BusinessException("Bu ülke zaten var.", "countryExists");
 
         var ulke = new Ulke
         {

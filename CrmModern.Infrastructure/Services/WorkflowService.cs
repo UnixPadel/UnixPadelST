@@ -16,7 +16,7 @@ internal sealed class WorkflowService(IUnitOfWork uow) : IWorkflowService
     public async Task<IReadOnlyList<WaitingOrderDto>> GetWaitingAsync(string screen, int? onlyKullaniciId)
     {
         if (!OrderWorkflow.Screens.TryGetValue(screen, out var def))
-            throw new BusinessException($"Bilinmeyen ekran: {screen}");
+            throw new BusinessException($"Bilinmeyen ekran: {screen}.", "unknownScreen", new { screen });
 
         var step   = def.Upstream;
         var orders = await uow.Orders.GetWorkflowHeadersAsync(step.Predicate, def.Narrow, onlyKullaniciId);

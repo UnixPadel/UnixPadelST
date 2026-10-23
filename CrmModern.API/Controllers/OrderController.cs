@@ -406,7 +406,7 @@ public sealed class OrderController(
     public async Task<IActionResult> UploadAttachment(string no, [FromQuery] string type, IFormFile file)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Fail("Dosya boş."));
+            return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
@@ -422,7 +422,7 @@ public sealed class OrderController(
     {
         var data = await orderService.GetAttachmentAsync(no, type);
         if (data is null || data.Length == 0)
-            return NotFound(ApiResponse<object>.Fail("Ek bulunamadı."));
+            return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
 
         var filename = $"{type}_{no}.bin";
         return File(data, "application/octet-stream", filename);

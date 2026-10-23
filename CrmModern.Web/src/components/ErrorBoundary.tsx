@@ -1,5 +1,6 @@
 import { Component, type ReactNode } from 'react'
 import { AlertOctagon } from 'lucide-react'
+import i18n from '@/i18n/i18n'
 
 /**
  * Faz 8.10 — Global hata sınırı. Bir render hatası tüm uygulamayı çökertmesin;
@@ -27,6 +28,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   render() {
     if (!this.state.error) return this.props.children
+    // Sınıf bileşeni: hook yok, metinler doğrudan i18n örneğinden.
+    const t = i18n.t.bind(i18n)
 
     return (
       <div className="flex items-center justify-center min-h-screen p-6 bg-background">
@@ -34,12 +37,8 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
           <div className="flex justify-center text-destructive">
             <AlertOctagon className="h-12 w-12" />
           </div>
-          <h1 className="text-2xl font-semibold">Beklenmeyen bir hata oluştu</h1>
-          <p className="text-sm text-muted-foreground">
-            Hata kaydı geliştiriciye bildirildi. Sayfayı yeniden yüklemeyi
-            deneyebilir veya bu ekrandan "Yeniden Dene" ile tekrar render
-            edebilirsiniz.
-          </p>
+          <h1 className="text-2xl font-semibold">{t('errorPage.title')}</h1>
+          <p className="text-sm text-muted-foreground">{t('errorPage.description')}</p>
           <pre className="text-xs text-left bg-muted rounded p-3 overflow-x-auto max-h-40">
             {this.state.error.message}
           </pre>
@@ -48,13 +47,14 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
               onClick={this.reset}
               className="px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-sm hover:opacity-90"
             >
-              Yeniden Dene
+              {t('errorPage.retry')}
             </button>
             <button
-              onClick={() => (window.location.href = '/dashboard')}
+              // HashRouter: '/dashboard' adresi uygulamanın dışına çıkıyordu.
+              onClick={() => { window.location.hash = '#/dashboard'; this.reset() }}
               className="px-3 py-1.5 rounded-md border text-sm hover:bg-accent"
             >
-              Ana Panel
+              {t('errorPage.home')}
             </button>
           </div>
         </div>

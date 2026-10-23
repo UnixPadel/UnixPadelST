@@ -26,11 +26,13 @@ export interface AutocompleteInputProps {
   disabled?: boolean
   /** Max items to show in the popover (default 50). */
   maxItems?: number
+  /** Yoğun filtre çubukları için 'sm' (Input ile aynı). */
+  inputSize?: 'default' | 'sm'
 }
 
 export function AutocompleteInput({
   value, onChange, options,
-  placeholder, className, disabled, maxItems = 50,
+  placeholder, className, disabled, maxItems = 50, inputSize,
 }: AutocompleteInputProps) {
   const [open, setOpen] = useState(false)
   const [hover, setHover] = useState(0)
@@ -86,6 +88,7 @@ export function AutocompleteInput({
         aria-autocomplete="list"
         aria-activedescendant={open && filtered.length > 0 ? `${listId}-${hover}` : undefined}
         autoComplete="off"
+        inputSize={inputSize}
         value={value}
         placeholder={placeholder}
         disabled={disabled}

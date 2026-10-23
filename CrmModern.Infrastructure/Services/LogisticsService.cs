@@ -69,17 +69,14 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             ?? throw new NotFoundException("Order", siparisNo);
 
         if (existing.SiparisMiTeklifMi != "Hazir")
-            throw new BusinessException(
-                $"'{siparisNo}' 'Hazir' aşamasında değil — sevk oluşturulamaz.");
+            throw new BusinessException($"{siparisNo} Hazır aşamasında değil, sevkiyat oluşturulamaz.", "notReadyToShip", new { no = siparisNo });
 
         // İç denetim — liste onaysız siparişi gizliyordu ama API doğrudan çağrılınca
         // gate yoktu. Kural OrderWorkflow.Sevkiyat ile aynı (tek tanım).
         if (existing.LojistikOnay == "Bekliyor")
-            throw new BusinessException(
-                $"'{siparisNo}' için muhasebe lojistik onayı (2. peşinat) bekleniyor — sevk oluşturulamaz.");
+            throw new BusinessException($"{siparisNo} için muhasebenin lojistik onayı (2. peşinat) bekleniyor, sevkiyat oluşturulamaz.", "waitingLogisticsApproval", new { no = siparisNo });
         if (!OrderWorkflow.Sevkiyat.Matches(existing))
-            throw new BusinessException(
-                $"'{siparisNo}' sevke hazır değil (Kontrol: {existing.Kontrol}, Lojistik onay: {existing.LojistikOnay ?? "-"}) — sevk oluşturulamaz.");
+            throw new BusinessException($"{siparisNo} sevkiyata hazır değil (kontrol: {existing.Kontrol}, lojistik onayı: {existing.LojistikOnay ?? "-"}).", "notReadyToShipDetail", new { no = siparisNo, kontrol = existing.Kontrol, lojistik = existing.LojistikOnay ?? "-" });
 
         // 1) LojistikTablo INSERT
         var entry = new LogisticsEntry
@@ -98,8 +95,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         // SaveChanges'ten önce hata, LojistikTablo satırı yazılmaz.
         int rows = await uow.Orders.MoveToLogisticsAsync(siparisNo, dto.STarih, dto.LojistikNot);
         if (rows == 0)
-            throw new BusinessException(
-                $"'{siparisNo}' sevk sırasında durum değişti — sevk oluşturulamadı, listeyi yenileyin.");
+            throw new BusinessException($"{siparisNo} bu sırada değişti, sevkiyat oluşturulamadı. Listeyi yenile.", "shipmentStateChanged", new { no = siparisNo });
 
         // 3) SiparisOnaylari UPSERT (Paket 2 audit).
         var note = string.IsNullOrWhiteSpace(dto.LojistikNot) ? "Sevkiyat oluşturuldu." : dto.LojistikNot;
@@ -123,8 +119,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             var exists = await uow.Orders.GetByNoAsync(sevk.SiparisNo);
             if (exists is null)
                 throw new NotFoundException("Order", sevk.SiparisNo);
-            throw new BusinessException(
-                $"'{sevk.SiparisNo}' 'Lojistik' aşamasında değil — tamamlanamaz.");
+            throw new BusinessException($"{sevk.SiparisNo} Lojistik aşamasında değil, tamamlanamaz.", "shipmentNotInLogistics", new { no = sevk.SiparisNo });
         }
 
         // SiparisOnaylari audit (Paket 2 — UPSERT)
@@ -140,7 +135,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
     public async Task CancelShipmentAsync(int sevkId, int currentUserId, string sebep)
     {
         if (string.IsNullOrWhiteSpace(sebep))
-            throw new BusinessException("İptal gerekçesi zorunlu.");
+            throw new BusinessException("İptal sebebi gerekli.", "cancelReasonRequired");
 
         var sevk = await uow.LogisticsEntries.GetByIdAsync(sevkId)
             ?? throw new NotFoundException("LogisticsEntry", sevkId);
@@ -178,8 +173,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             if (exists is null)
                 throw new NotFoundException("Order", siparisNo);
 
-            throw new BusinessException(
-                $"Order '{siparisNo}' is not in 'Lojistik' stage and cannot be completed.");
+            throw new BusinessException($"{siparisNo} Lojistik aşamasında değil, tamamlanamaz.", "shipmentNotInLogistics", new { no = siparisNo });
         }
     }
 
@@ -255,16 +249,15 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
     public async Task SubmitOfferAsync(string siparisNo, int kullaniciId, SubmitLogisticsOfferRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.FirmaAdi))
-            throw new BusinessException("Firma adı zorunlu.");
+            throw new BusinessException("Nakliye firması gerekli.", "carrierRequired");
         if (string.IsNullOrWhiteSpace(req.LojistikCesit))
-            throw new BusinessException("Taşıma türü zorunlu.");
+            throw new BusinessException("Taşıma türü gerekli.", "transportModeRequired");
 
         var order = await uow.Orders.GetByNoAsync(siparisNo)
             ?? throw new NotFoundException("Order", siparisNo);
 
         if (!OfferQueueStages.Contains(order.SiparisMiTeklifMi))
-            throw new BusinessException(
-                $"'{siparisNo}' lojistik teklif aşamasında değil (aşama: {order.SiparisMiTeklifMi}).");
+            throw new BusinessException($"{siparisNo} nakliye teklifi aşamasında değil ({order.SiparisMiTeklifMi}).", "notInShippingQuoteStage", new { no = siparisNo, stage = order.SiparisMiTeklifMi });
 
         await uow.LogisticsOffers.AddAsync(new LogisticsOffer
         {
@@ -323,7 +316,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
             ?? throw new NotFoundException("LogisticsOffer", teklifId);
 
         if (offer.Durum != "Onaylandi")
-            throw new BusinessException("Teklif onaylı değil — iptal edilecek onay yok.");
+            throw new BusinessException("Teklif onaylı değil; geri alınacak onay yok.", "quoteNotApproved");
 
         offer.Durum           = "Beklemede";
         offer.OnayKullaniciID = null;
@@ -340,7 +333,7 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
     public async Task RejectOfferAsync(int teklifId, int yoneticiId, string redNotu)
     {
         if (string.IsNullOrWhiteSpace(redNotu))
-            throw new BusinessException("Red açıklaması zorunlu.");
+            throw new BusinessException("Red sebebi gerekli.", "rejectReasonRequired");
 
         var offer = await uow.LogisticsOffers.GetByIdAsync(teklifId)
             ?? throw new NotFoundException("LogisticsOffer", teklifId);

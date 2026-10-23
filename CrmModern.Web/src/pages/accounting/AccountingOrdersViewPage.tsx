@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { FileSpreadsheet, FileText, Eye } from 'lucide-react'
 import { getOrders, downloadExcel, downloadPdf } from '@/api/orders'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { MasterDetailLayout } from '@/components/MasterDetailLayout'
@@ -14,7 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/components/ToastProvider'
 import { toastApiError } from '@/lib/apiError'
 import { formatCurrency, formatDateShort } from '@/lib/utils'
-import { sumByCurrency } from '@/lib/export'
+import { sumOf } from '@/lib/export'
+import { PARA_TIPLERI } from '@/lib/orderForm'
 import { statusLabel } from '@/lib/status'
 import { trLower } from '@/components/ui/combobox'
 import type { OrderListDto } from '@/types'
@@ -66,19 +68,20 @@ export function AccountingOrdersViewPage() {
   }
 
   const cols: Column<Row>[] = [
-    { key: 'no', header: t('common.orderNo'), sortable: true, hideable: false, sortValue: (r) => no(r), exportValue: (r) => no(r),
+    { key: 'no', pin: 'left', header: t('common.orderNo'), sortable: true, hideable: false, sortValue: (r) => no(r), exportValue: (r) => no(r),
       render: (r) => <span className="font-mono">{no(r)}</span> },
-    { key: 'musteriAd', header: t('common.customer'), sortable: true },
+    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'), sortable: true },
     { key: 'mUlke', header: t('common.country'), sortable: true, render: (r) => (r.mUlke as string) ?? '—' },
     { key: 'siparisMiTeklifMi', header: t('accountingFull.cols.asama'), sortable: true,
       render: (r) => <StatusBadge value={r.siparisMiTeklifMi} context="stage" /> },
     { key: 'paraTipi', header: t('common.currency'), sortable: true },
     { key: 'toplamFiyat', header: t('common.totalAmount'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.toplamFiyat ?? 0, r.paraTipi),
-      footer: (rs) => sumByCurrency(rs, (x) => x.toplamFiyat, (x) => x.paraTipi).map(([c, v]) => formatCurrency(v, c)).join(' · ') },
+      // Döviz başına ayrı alt toplam satırı (footerGroups).
+      footer: (rs) => formatCurrency(sumOf(rs, (x) => x.toplamFiyat), rs[0]?.paraTipi) },
     { key: 'tarih', header: t('common.date'), sortable: true, type: 'date', render: (r) => formatDateShort(r.tarih ?? '-') },
     {
-      key: 'actions', header: t('common.actions'), hideable: false, exportValue: false,
+      key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
       render: (r) => {
         const n = no(r)
         return (
@@ -94,9 +97,11 @@ export function AccountingOrdersViewPage() {
   ]
 
   return (
-    <div>
-      <PageHeader title={t('nav.accountingOrders')} description={t('accounting.ordersViewDescription')} />
-      <div className="space-y-2 p-3">
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact" title={t('nav.accountingOrders')} description={t('accounting.ordersViewDescription')} />
+      <div className="space-y-2 px-4 pt-2">
         <FilterBar onReset={reset} tableId="accounting-orders-view" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
           <FilterField label={t('accounting.filter.search')}>
             <Input inputSize="sm" placeholder={t('common.quickFilter')} value={f.q} onChange={(e) => set('q', e.target.value)} />
@@ -120,8 +125,11 @@ export function AccountingOrdersViewPage() {
             </Select>
           </FilterField>
         </FilterBar>
-        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)}>
+      </div>
+      <FillRegion className="pt-2">
+        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)}>
           <DataTable
+            fill
             tableId="accounting-orders-view"
             exportFileName="teklif-siparis"
             columns={cols}
@@ -132,6 +140,7 @@ export function AccountingOrdersViewPage() {
             density="compact"
             pageSize={100}
             showFooter
+            footerGroups={{ by: (r) => r.paraTipi, order: PARA_TIPLERI }}
             activeRowKey={rows.find((r) => no(r) === activeNo)?.siparisAlID ?? null}
             onActiveRowChange={(r) => setActiveNo(no(r))}
             rowActions={[
@@ -141,7 +150,7 @@ export function AccountingOrdersViewPage() {
             ]}
           />
         </MasterDetailLayout>
-      </div>
-    </div>
+      </FillRegion>
+    </FillPage>
   )
 }

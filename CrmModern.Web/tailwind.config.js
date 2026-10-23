@@ -92,5 +92,15 @@ export default {
       },
     },
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+    require('tailwindcss-animate'),
+    // Scaling Faz 3 — konteyner sorguları (ek bağımlılık yok). Breakpoint'ler
+    // pencereye bakar; içerik genişliği ise sidebar/zoom'a göre değişir. Kapsayıcıya
+    // `cq` verilir, çocuklar `cq-md:` / `cq-lg:` … ile kabın genişliğine göre dizilir.
+    function ({ addUtilities, addVariant }) {
+      addUtilities({ '.cq': { 'container-type': 'inline-size' } })
+      const sizes = { sm: '30rem', md: '40rem', lg: '56rem', xl: '72rem', '2xl': '86rem' }
+      for (const [name, min] of Object.entries(sizes)) addVariant(`cq-${name}`, `@container (min-width: ${min})`)
+    },
+  ],
 }

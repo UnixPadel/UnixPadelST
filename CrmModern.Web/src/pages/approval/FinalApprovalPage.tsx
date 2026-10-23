@@ -7,6 +7,7 @@ import {
   getPendingFinal, getPurchaseById, finalApprovePurchase, finalRejectPurchase,
 } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
@@ -102,7 +103,7 @@ export function FinalApprovalPage() {
   }
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
+    { key: 'talepID', pin: 'left', header: t('purchase.cols.id'), sortable: true },
     { key: 'urunAdi',       header: t('purchase.cols.urun') },
     ...(!hideMoney ? [
       { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
@@ -118,7 +119,7 @@ export function FinalApprovalPage() {
       </span>
     ) },
     {
-      key: 'actions', header: t('purchase.cols.islem'), hideable: false, exportValue: false,
+      key: 'actions', pin: 'right', header: t('purchase.cols.islem'), hideable: false, exportValue: false,
       render: (r) => (
         <Button size="xs" variant="outline" onClick={() => setDetailId(r.talepID as number)}>
           {t('purchase.final.reviewApprove')}
@@ -128,12 +129,13 @@ export function FinalApprovalPage() {
   ]
 
   return (
-    <div>
-      <PageHeader title={t('approval.finalTitle')} />
-      <div className="space-y-3 p-6">
-        {/* İç denetim — sipariş maliyet talebi kapanışta açılır: Muhasebe kapanışı (3. peşinat) bekleyenler. */}
-        <WaitingUpstreamPanel screen="final-approval" />
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact" actions={<WaitingUpstreamPanel screen="final-approval" variant="button" />} title={t('approval.finalTitle')} />
+      <FillRegion className="pt-2">
         <DataTable
+          fill
           tableId="final-approval"
           exportFileName="nihai-onay"
           columns={cols}
@@ -150,7 +152,7 @@ export function FinalApprovalPage() {
             </Button>
           )}
         />
-      </div>
+      </FillRegion>
 
       {/* Detail + onay panel */}
       <Dialog open={!!detailId} onOpenChange={(o) => { if (!o) setDetailId(null) }}>
@@ -242,7 +244,7 @@ export function FinalApprovalPage() {
         </DialogContent>
       </Dialog>
 
-    </div>
+    </FillPage>
   )
 }
 

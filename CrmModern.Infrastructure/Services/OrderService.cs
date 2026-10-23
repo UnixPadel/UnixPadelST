@@ -126,19 +126,19 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     private static void GuardEditable(Order o, int kullaniciID, bool isManagerOrElshan)
     {
         if (o.Silindi)
-            throw new BusinessException("Bu sipariş zaten silinmiş.");
+            throw new BusinessException("Bu sipariş zaten silinmiş.", "orderAlreadyDeleted");
         if (o.Kontrol == "Onay")
-            throw new BusinessException("Onaylanmış sipariş düzenlenemez veya silinemez.");
+            throw new BusinessException("Onaylanan sipariş düzenlenemez ya da silinemez.", "approvedOrderLocked");
         bool isOwner = o.KullaniciID == kullaniciID;
         if (!isOwner && !isManagerOrElshan)
-            throw new BusinessException("Bu işlem için yetkiniz yok.");
+            throw new BusinessException("Bunu yapmaya yetkin yok.", "forbidden");
     }
 
     public async Task<string> AmendOrderAsync(int kullaniciID, string no, CreateOrderDto dto,
         string gerekce, bool isManagerOrElshan)
     {
         if (string.IsNullOrWhiteSpace(gerekce))
-            throw new BusinessException("Değişiklik gerekçesi zorunludur.");
+            throw new BusinessException("Değişiklik sebebi gerekli.", "editReasonRequired");
 
         var existing = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
             ?? throw new NotFoundException("Order", no);
@@ -157,7 +157,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     public async Task SoftDeleteOrderAsync(int kullaniciID, string no, string gerekce, bool isManagerOrElshan)
     {
         if (string.IsNullOrWhiteSpace(gerekce))
-            throw new BusinessException("Silme gerekçesi zorunludur.");
+            throw new BusinessException("Silme sebebi gerekli.", "deleteReasonRequired");
 
         var existing = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
             ?? throw new NotFoundException("Order", no);
@@ -199,8 +199,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             ?? throw new NotFoundException("Quote", teklifNo);
 
         if (order.SiparisMiTeklifMi != "Teklif")
-            throw new BusinessException(
-                $"Only quotes can be converted to orders. Current stage: {order.SiparisMiTeklifMi}");
+            throw new BusinessException($"Yalnız teklifler siparişe çevrilebilir. Şu anki aşama: {order.SiparisMiTeklifMi}.", "onlyQuotesConvert", new { stage = order.SiparisMiTeklifMi });
 
         order.SiparisMiTeklifMi = "Siparis";
         uow.Orders.Update(order);
@@ -842,7 +841,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         // AND SiparisMiTeklifMi IN ('Teklif','Siparis') birebir):
         if (order.Kontrol == "Onay" ||
             order.SiparisMiTeklifMi is not ("Teklif" or "Siparis"))
-            throw new BusinessException("Kayıt bulunamadı veya zaten Onay durumunda.");
+            throw new BusinessException("Sipariş bulunamadı ya da zaten onaylı.", "approveNotAllowed");
 
         // PROMPT-v6 §1.1 — v4 §5.1 sapması geri alındı: onay yalnız Kontrol='Onay'
         // yazar, aşama (Teklif/Siparis) DEĞİŞMEZ. Onaylı bir 'Siparis' Burcu'nun
@@ -859,7 +858,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     public async Task RejectOrderAsync(string siparisNo, int kullaniciID, string aciklama)
     {
         if (string.IsNullOrWhiteSpace(aciklama))
-            throw new BusinessException("Red gerekçesi zorunludur.");
+            throw new BusinessException("Red sebebi gerekli.", "rejectReasonRequired");
 
         var no = NormalizeToSiparisNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
@@ -869,8 +868,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         // SiparisMiTeklifMi IN ('Teklif','Siparis')); 0 satır = iş hatası.
         if (order.Kontrol == "Onay" ||
             order.SiparisMiTeklifMi is not ("Teklif" or "Siparis"))
-            throw new BusinessException(
-                "İşlem yapılamadı! Sipariş zaten Onay durumunda olabilir veya Teklif/Sipariş değil.");
+            throw new BusinessException("Reddedilemedi. Sipariş zaten onaylı olabilir ya da teklif/sipariş değil.", "rejectNotAllowed");
 
         // BIREBIR WinForms KontrolRed: Kontrol="Reddet" + Red kolonu
         order.Kontrol = "Reddet";
@@ -889,7 +887,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     {
         // Legacy button2_Click_2: UPDATE SiparisAlTablo SET OdenenMiktar=@x WHERE SiparisNo=@no
         if (odenenMiktar < 0)
-            throw new BusinessException("Geçerli bir ödenen bakiye girin.");
+            throw new BusinessException("Geçerli bir ödenen tutar gir.", "invalidPaidAmount");
 
         var order = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(siparisNo))
             ?? throw new NotFoundException("Order", siparisNo);
@@ -903,7 +901,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     {
         // Legacy fabrikaButton_Click_1: aşama + kontrol + STarih + KontrolNot tek UPDATE.
         if (string.IsNullOrWhiteSpace(dto.Asama))
-            throw new BusinessException("Aşama boş olamaz.");
+            throw new BusinessException("Aşama boş olamaz.", "stageRequired");
 
         var order = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(siparisNo))
             ?? throw new NotFoundException("Order", siparisNo);
@@ -974,7 +972,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     {
         // SiparisForm "Reçeteden Aç": kategorinin BoM'unu okur, SiparisIslemTablo'ya
         // bir kategori satırı + N bileşen satırı yazar (mevcut SaveAsync ile aynı şekil).
-        if (adet < 1) throw new BusinessException("Adet en az 1 olmalı.");
+        if (adet < 1) throw new BusinessException("Adet en az 1 olmalı.", "qtyMin1");
 
         var no = NormalizeToSiparisNo(siparisNo);
         var order = await uow.Orders.GetByNoAsync(no)
@@ -1063,7 +1061,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         {
             case "ek":         order.Ek         = data; break;
             case "muhasebeek": order.MuhasebeEk = data; break;   // Faz 5'te açıldı
-            default:           throw new BusinessException($"Geçersiz ek tipi: {type}. (ek|muhasebeek)");
+            default:           throw new BusinessException($"Geçersiz ek türü: {type}.", "invalidAttachmentType", new { type });
         }
 
         uow.Orders.Update(order);
@@ -1080,7 +1078,7 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         {
             "ek"         => order.Ek,
             "muhasebeek" => order.MuhasebeEk,
-            _            => throw new BusinessException($"Geçersiz ek tipi: {type}. (ek|muhasebeek)")
+            _            => throw new BusinessException($"Geçersiz ek türü: {type}.", "invalidAttachmentType", new { type })
         };
     }
 

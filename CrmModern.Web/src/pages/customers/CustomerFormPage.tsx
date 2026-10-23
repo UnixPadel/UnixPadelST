@@ -218,7 +218,8 @@ export function CustomerFormPage() {
           </div>
         </div>
 
-        <div className="flex gap-2 pt-2">
+        {/* Scaling Faz 3 — kısa pencerede Kaydet görünür kalsın: alta yapışık çubuk. */}
+        <div className="sticky bottom-0 -mx-6 flex gap-2 border-t bg-background/95 px-6 py-2.5 backdrop-blur">
           <Button variant="outline" onClick={() => nav(-1)}>{t('common.cancel')}</Button>
           <Button disabled={saveMut.isPending} onClick={onSubmit}>
             {saveMut.isPending ? t('common.saving') : (isEdit ? t('common.save') : t('common.add'))}

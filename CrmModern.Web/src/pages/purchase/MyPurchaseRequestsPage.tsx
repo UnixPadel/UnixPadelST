@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { getMyPurchaseRequests } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
@@ -40,14 +41,16 @@ export function MyPurchaseRequestsPage() {
   ]
 
   return (
-    <div>
-      <PageHeader
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact"
         title={t('purchase.mineTitle')}
         actions={canCreate ? <Button onClick={() => nav('/purchase/new')}>{t('common.add')}</Button> : undefined}
       />
-      <div className="p-6">
-        <DataTable columns={cols} data={data as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
-      </div>
-    </div>
+      <FillRegion className="pt-2">
+        <DataTable fill columns={cols} data={data as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
+      </FillRegion>
+    </FillPage>
   )
 }

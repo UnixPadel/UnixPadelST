@@ -57,7 +57,7 @@ builder.Services.Configure<Microsoft.AspNetCore.Mvc.ApiBehaviorOptions>(options 
             .ToArray();
 
         var body = CrmModern.Core.DTOs.Common.ApiResponse<object>
-            .Fail("Doğrulama hatası.", errors);
+            .FailCode("validationFailed", "Bazı alanlar hatalı.", null, errors);
 
         return new Microsoft.AspNetCore.Mvc.BadRequestObjectResult(body);
     };

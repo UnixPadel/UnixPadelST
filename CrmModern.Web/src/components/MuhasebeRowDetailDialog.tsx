@@ -71,7 +71,7 @@ export function MuhasebeRowDetailDialog({ row: rowProp, onClose }: Props) {
       <DialogContent className="max-w-lg">
         <DialogHeader><DialogTitle>{t('accounting.rowDetailTitle')}</DialogTitle></DialogHeader>
         {row && (
-          <div className="space-y-1 max-h-[60vh] overflow-y-auto">
+          <div className="space-y-1">
             <Row label={t('common.orderNo')}            value={row.siparisNo} />
             <Row label={t('qc.grid.musteriAd')}         value={row.musteriAd} />
             <Row label={t('common.country')}            value={row.mUlke ?? '—'} />

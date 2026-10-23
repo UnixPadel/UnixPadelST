@@ -169,7 +169,7 @@ export function NewPurchaseRequestPage() {
   return (
     <div>
       <PageHeader title={t('purchase.newTitle')} />
-      <div className="p-4 lg:p-6 max-w-5xl space-y-4" onKeyDown={enterNavigation ? onEnterNav : undefined}>
+      <div className="p-4 lg:p-6 max-w-7xl space-y-4" onKeyDown={enterNavigation ? onEnterNav : undefined}>
 
         {/* Para birimi (belge düzeyinde, tek) */}
         <div className="flex flex-wrap items-end gap-3">
@@ -191,19 +191,22 @@ export function NewPurchaseRequestPage() {
             <h3 className="text-sm font-semibold">{t('purchase.lines.title')}</h3>
             <Button size="sm" variant="outline" onClick={addRow}>{t('purchase.lines.ekle')}</Button>
           </div>
+          {/* Scaling Faz 3 — kolonlar daraltıldı (toplam ~1040 → ~880px) ve kap
+              max-w-7xl: 1536px pencerede yatay kaydırma yok; daha darda tablo
+              kendi içinde kayar. */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 text-xs uppercase">
                 <tr>
-                  <th className="px-2 py-2 text-left min-w-44">{t('purchase.lines.urunAdi')} *</th>
-                  <th className="px-2 py-2 text-left w-32">{t('purchase.lines.birim')} *</th>
-                  <th className="px-2 py-2 text-right w-24">{t('purchase.lines.miktar')} *</th>
-                  <th className="px-2 py-2 text-right w-32">{t('purchase.lines.birimFiyat')} *</th>
+                  <th className="px-2 py-2 text-left min-w-40">{t('purchase.lines.urunAdi')} *</th>
+                  <th className="px-2 py-2 text-left w-28">{t('purchase.lines.birim')} *</th>
+                  <th className="px-2 py-2 text-right w-20">{t('purchase.lines.miktar')} *</th>
+                  <th className="px-2 py-2 text-right w-28">{t('purchase.lines.birimFiyat')} *</th>
                   <th className="px-2 py-2 text-left w-24">{t('purchase.lines.indirimTipi')}</th>
-                  <th className="px-2 py-2 text-right w-28">{t('purchase.lines.indirim')}</th>
-                  <th className="px-2 py-2 text-right w-32">{t('purchase.lines.araToplam')}</th>
-                  <th className="px-2 py-2 text-right w-32">{t('purchase.lines.satirToplam')}</th>
-                  <th className="px-2 py-2 w-12"></th>
+                  <th className="px-2 py-2 text-right w-24">{t('purchase.lines.indirim')}</th>
+                  <th className="px-2 py-2 text-right w-28">{t('purchase.lines.araToplam')}</th>
+                  <th className="px-2 py-2 text-right w-28">{t('purchase.lines.satirToplam')}</th>
+                  <th className="px-2 py-2 w-10"></th>
                 </tr>
               </thead>
               <tbody>

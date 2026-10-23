@@ -31,8 +31,9 @@ export function KPICard({ baslik, deger, altMetin, ikon, renk, vurgu = 'normal',
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground">{baslik}</p>
-            <p className="mt-1 truncate text-2xl font-bold tabular-nums">{deger}</p>
+            <p className="truncate text-xs font-medium uppercase tracking-wide text-muted-foreground" title={baslik}>{baslik}</p>
+            {/* Scaling Faz 3 — dar kartta büyük tutar kesilirse tam değer üzerine gelince görünür. */}
+            <p className="mt-1 truncate text-xl font-bold tabular-nums 2xl:text-2xl" title={String(deger)}>{deger}</p>
             {altMetin && <p className="mt-1 truncate text-xs text-muted-foreground">{altMetin}</p>}
           </div>
           {ikon && <div className={cn(renk ?? 'text-muted-foreground', vurgu === 'uyari' && 'text-warning')}>{ikon}</div>}

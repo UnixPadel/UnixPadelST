@@ -179,7 +179,9 @@ export function RepPerformancePage() {
             </div>
 
             {/* KPI kartları */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+            {/* Scaling Faz 3 — kolon sayısı pencereye değil alana göre (auto-fill): çok
+                dövizli ciro kartı ~130px'e sıkışıp uzamaz. */}
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] gap-3">
               <Kpi icon={<ShoppingCart className="h-4 w-4" />} label={t('reporting.detail.orders')} value={detail.siparisSayisi} />
               <Kpi icon={<FileText className="h-4 w-4" />} label={t('reporting.detail.quotations')} value={detail.teklifSayisi} />
               <Kpi icon={<Package className="h-4 w-4" />} label={t('reporting.detail.quantity')} value={detail.toplamAdet} />
@@ -203,8 +205,9 @@ export function RepPerformancePage() {
                       <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
                         <XAxis dataKey="ay" fontSize={12} />
-                        <YAxis fontSize={12} width={70}
-                          tickFormatter={(v) => formatCurrency(Number(v), cur)} />
+                        {/* Kısa eksen etiketi (1,2 Mn) — tam tutar tooltip'te; büyük tutarlar kesilmez. */}
+                        <YAxis fontSize={12} width={56}
+                          tickFormatter={(v) => COMPACT.format(Number(v))} />
                         <Tooltip formatter={(v) => formatCurrency(Number(v), cur)} />
                         <Bar dataKey="ciro" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -290,6 +293,8 @@ export function RepPerformancePage() {
     </div>
   )
 }
+
+const COMPACT = new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 })
 
 function Kpi({ icon, label, value, small }: { icon: React.ReactNode; label: string; value: React.ReactNode; small?: boolean }) {
   return (

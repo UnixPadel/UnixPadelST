@@ -61,7 +61,7 @@ const DialogContent = React.forwardRef<
     >
       {description != null && <DialogDescription className="sr-only">{description}</DialogDescription>}
       {children}
-      <DialogClose className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+      <DialogClose className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-4 w-4" />
         <span className="sr-only">{t('common.close')}</span>
       </DialogClose>
@@ -71,13 +71,16 @@ const DialogContent = React.forwardRef<
 })
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
+// Scaling Faz 2 — içerik uzunsa DialogContent kayar; başlık üstte, footer (aksiyon
+// butonları) altta yapışık kalır → kısa pencerede Kaydet/Onayla görünmez olmaz.
+// -top-6/-bottom-6 + negatif margin: p-6 dolgu şeridini de örter (içerik arkadan görünmez).
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col space-y-1.5 text-center sm:text-left', className)} {...props} />
+  <div className={cn('sticky -top-6 z-10 -mx-6 -mt-6 flex flex-col space-y-1.5 bg-background px-6 pb-1 pr-10 pt-6 text-center sm:text-left', className)} {...props} />
 )
 DialogHeader.displayName = 'DialogHeader'
 
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2', className)} {...props} />
+  <div className={cn('sticky -bottom-6 z-10 -mx-6 -mb-6 flex flex-col-reverse bg-background px-6 pb-6 pt-2 sm:flex-row sm:justify-end sm:space-x-2', className)} {...props} />
 )
 DialogFooter.displayName = 'DialogFooter'
 

@@ -3,11 +3,12 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getAllPurchaseRequests, overrideApprovePurchase, type PurchaseFilter } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
+import { FilterBar, FilterField } from '@/components/FilterBar'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useAppMutation } from '@/hooks/useAppMutation'
@@ -73,7 +74,7 @@ export function AllPurchaseRequestsPage() {
   }
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',               header: t('purchase.cols.id'), sortable: true, type: 'number' },
+    { key: 'talepID', pin: 'left', header: t('purchase.cols.id'), sortable: true, type: 'number' },
     { key: 'urunAdi',               header: t('purchase.cols.urun'), sortable: true },
     ...(!hideMoney ? [
       { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => (r.paraBirimi as string) ?? '—' },
@@ -87,7 +88,7 @@ export function AllPurchaseRequestsPage() {
     { key: 'talepTarihi',           header: t('purchase.cols.tarih'), sortable: true, type: 'date', render: (r) => formatDate(r.talepTarihi as string) },
     // PROMPT-v7 §2: override aksiyon kolonu — yalnız elshan.rasulov'a render.
     ...(isOverrideUser ? [{
-      key: 'override',
+      key: 'override', pin: 'right',
       header: t('purchase.actionCol'),
       render: (r: PurchaseRequestListDto & Record<string, unknown>) =>
         FINAL_DURUMLAR.includes(r.durum as string) ? null : (
@@ -106,60 +107,64 @@ export function AllPurchaseRequestsPage() {
     setFilter((f) => ({ ...f, [k]: v, page: 1 }))
 
   return (
-    <div>
-      <PageHeader title={t('purchase.allTitle')} />
-      <div className="p-6 space-y-4">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-md border bg-card p-3">
-          <div className="space-y-1"><Label>{t('purchase.filter.talepEden')}</Label><Input value={filter.talepEden ?? ''} onChange={(e) => update('talepEden', e.target.value || undefined)} /></div>
-          <div className="space-y-1">
-            <Label>{t('purchase.filter.departman')}</Label>
+    // Scaling Faz 2 — FillPage + ortak FilterBar (tek satır, sığdığı kadar yan
+    // yana); tablo kalan yüksekliği doldurur, sayfalama altta hep görünür.
+    <FillPage>
+      <PageHeader density="compact" title={t('purchase.allTitle')} />
+      <div className="px-4 pt-2">
+        <FilterBar onReset={() => setFilter({ page: 1, pageSize: 50 })}>
+          <FilterField label={t('purchase.filter.talepEden')}>
+            <Input inputSize="sm" value={filter.talepEden ?? ''} onChange={(e) => update('talepEden', e.target.value || undefined)} />
+          </FilterField>
+          <FilterField label={t('purchase.filter.departman')}>
             <Select value={filter.departman ?? 'all'} onValueChange={(v) => update('departman', v === 'all' ? undefined : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
                 {DEPARTMANLAR.map((d) => <SelectItem key={d} value={d}>{t(`roles.${d}`, { defaultValue: d })}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>{t('purchase.filter.durum')}</Label>
+          </FilterField>
+          <FilterField label={t('purchase.filter.durum')}>
             <Select value={filter.durum ?? 'all'} onValueChange={(v) => update('durum', v === 'all' ? undefined : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
                 {DURUMLAR.map((d) => <SelectItem key={d} value={d}>{purchaseStatusLabel(t, d)}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>{t('purchase.filter.tip')}</Label>
+          </FilterField>
+          <FilterField label={t('purchase.filter.tip')}>
             <Select value={filter.talepTipi ?? 'all'} onValueChange={(v) => update('talepTipi', v === 'all' ? undefined : v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
                 {TIPLER.map((tp) => <SelectItem key={tp} value={tp}>{t(`purchase.tipLabel.${tp}`, { defaultValue: tp })}</SelectItem>)}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-1"><Label>{t('purchase.filter.baslangic')}</Label><Input type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => update('baslangicTarih', e.target.value || undefined)} /></div>
-          <div className="space-y-1"><Label>{t('purchase.filter.bitis')}</Label><Input type="date" value={filter.bitisTarih ?? ''} onChange={(e) => update('bitisTarih', e.target.value || undefined)} /></div>
-          <div className="space-y-1 flex items-end col-span-2 md:col-span-2">
-            <Button variant="outline" onClick={() => setFilter({ page: 1, pageSize: 50 })}>{t('common.clear')}</Button>
+          </FilterField>
+          <FilterField label={t('purchase.filter.baslangic')}>
+            <Input inputSize="sm" type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => update('baslangicTarih', e.target.value || undefined)} />
+          </FilterField>
+          <FilterField label={t('purchase.filter.bitis')}>
+            <Input inputSize="sm" type="date" value={filter.bitisTarih ?? ''} onChange={(e) => update('bitisTarih', e.target.value || undefined)} />
+          </FilterField>
+        </FilterBar>
+      </div>
+
+      <FillRegion className="pt-2">
+        <DataTable fill tableId="purchase-all" exportFileName="satin-alma-talepleri" columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} error={isError} density="compact" />
+      </FillRegion>
+
+      {page && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 pb-2 text-xs">
+          <span className="text-muted-foreground">{t('purchase.pager', { total: page.totalCount, page: page.page })}</span>
+          <div className="flex flex-wrap gap-2">
+            <Button size="xs" variant="outline" disabled={(filter.page ?? 1) <= 1} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}>{t('common.previous')}</Button>
+            <Button size="xs" variant="outline" disabled={page.items.length < (filter.pageSize ?? 50)} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}>{t('common.next')}</Button>
           </div>
         </div>
-
-        <DataTable tableId="purchase-all" exportFileName="satin-alma-talepleri" columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} error={isError} density="compact" />
-
-        {page && (
-          <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-            <span className="text-muted-foreground">{t('purchase.pager', { total: page.totalCount, page: page.page })}</span>
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" disabled={(filter.page ?? 1) <= 1} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}>{t('common.previous')}</Button>
-              <Button size="sm" variant="outline" disabled={page.items.length < (filter.pageSize ?? 50)} onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}>{t('common.next')}</Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+      )}
+    </FillPage>
   )
 }

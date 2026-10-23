@@ -34,7 +34,7 @@ public sealed class AuthController(IAuthService authService) : ControllerBase
     {
         var idStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
         if (!int.TryParse(idStr, out var id))
-            return Unauthorized(ApiResponse<object>.Fail("Geçersiz token."));
+            return Unauthorized(ApiResponse<object>.FailCode("sessionInvalid", "Oturumun geçersiz. Tekrar giriş yap.", null));
 
         var result = await authService.GetMeAsync(id);
         return Ok(ApiResponse<LoginResponseDto>.Ok(result));

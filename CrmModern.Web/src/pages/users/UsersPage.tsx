@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { getUsers, createUser, updateUser, deleteUser, changeUserPassword } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
@@ -74,7 +75,7 @@ export function UsersPage() {
     { key: 'yetkiTuru',    header: t('users.columns.yetki'),        sortable: true },
     { key: 'durum',        header: t('users.columns.durum'),        render: (r) => <StatusBadge value={r.durum as string} /> },
     {
-      key: 'actions',
+      key: 'actions', pin: 'right',
       header: t('common.actions'),
       render: (r) => (
         <div className="flex gap-2">
@@ -111,8 +112,10 @@ export function UsersPage() {
   }
 
   return (
-    <div>
-      <PageHeader
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact"
         title={t('users.title')}
         description={t('users.subtitle')}
         actions={
@@ -130,9 +133,9 @@ export function UsersPage() {
           </div>
         }
       />
-      <div className="p-6">
-        <DataTable columns={columns} data={visibleData as (UserListDto & Record<string, unknown>)[]} keyField="kullaniciID" loading={isLoading} />
-      </div>
+      <FillRegion className="pt-2">
+        <DataTable fill columns={columns} data={visibleData as (UserListDto & Record<string, unknown>)[]} keyField="kullaniciID" loading={isLoading} />
+      </FillRegion>
 
       {/* Create */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
@@ -224,6 +227,6 @@ export function UsersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </FillPage>
   )
 }

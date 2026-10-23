@@ -70,7 +70,7 @@ internal sealed class FactoryService(IUnitOfWork uow) : IFactoryService
     public async Task MoveToProductionAsync(string siparisNo, DateTime stTarih, string fabrikaNot)
     {
         if (string.IsNullOrWhiteSpace(fabrikaNot))
-            throw new BusinessException("FabrikaNot cannot be empty.");
+            throw new BusinessException("Fabrika notu gerekli.", "factoryNoteRequired");
 
         int rows = await uow.Orders.MoveToProductionAsync(siparisNo, stTarih, fabrikaNot);
 
@@ -81,8 +81,7 @@ internal sealed class FactoryService(IUnitOfWork uow) : IFactoryService
                 throw new NotFoundException("Order", siparisNo);
 
             // İç denetim — repository UPDATE'i yalnız Planlama'yı eşler; mesaj kullanıcıya (toast) gider.
-            throw new BusinessException(
-                $"'{siparisNo}' Planlama aşamasında değil ({exists.SiparisMiTeklifMi}) — üretime alınamaz.");
+            throw new BusinessException($"{siparisNo} Planlama aşamasında değil ({exists.SiparisMiTeklifMi}), üretime alınamaz.", "notInPlanning", new { no = siparisNo, stage = exists.SiparisMiTeklifMi });
         }
     }
 
@@ -96,8 +95,7 @@ internal sealed class FactoryService(IUnitOfWork uow) : IFactoryService
             if (exists is null)
                 throw new NotFoundException("Order", siparisNo);
 
-            throw new BusinessException(
-                $"Order '{siparisNo}' is not in 'Uretim' stage and cannot be marked as ready.");
+            throw new BusinessException($"{siparisNo} Üretim aşamasında değil, Hazır yapılamaz.", "notInProduction", new { no = siparisNo });
         }
     }
 }

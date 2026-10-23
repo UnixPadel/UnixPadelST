@@ -14,6 +14,7 @@ import {
 import { getOrderDetail } from '@/api/orders'
 import { getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion, ResizableTop } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { FilterBar, FilterField, ALL, useFilterState } from '@/components/FilterBar'
@@ -33,7 +34,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAppMutation } from '@/hooks/useAppMutation'
 import { isAccountingApprover } from '@/lib/permissions'
 import { formatDate, formatDateShort, formatCurrency, formatPhone, cn } from '@/lib/utils'
-import { sumByCurrency } from '@/lib/export'
+import { sumOf } from '@/lib/export'
+import { PARA_TIPLERI } from '@/lib/orderForm'
 import { trLower } from '@/components/ui/combobox'
 import { useToast } from '@/components/ToastProvider'
 import { useConfirm } from '@/components/ui/confirm-dialog'
@@ -51,7 +53,7 @@ import { localDateInput } from '@/lib/date'
  * Bu turdaki iyileştirmeler:
  *  • SR-5 — etiketli, URL'de kalıcı filtre çubuğu (ham <select> kalktı).
  *  • E-7 — para kolonlarında döviz bazlı alt toplam, görünüm dışa aktarma,
- *    sağ tık menüsü (Detay / Tahsilat / Muhasebe Ek / Belge Akışı).
+ *    sağ tık menüsü (Detay / Tahsilat / Muhasebe Ek / Sipariş Geçmişi).
  *  • Tahsilat penceresi: Enter kaydeder, "Kaydet ve kapat", bakiye kutusu canlı.
  *  • QW-12 — sekmelerdeki sabit Türkçe etiketler ve "BLOB" teknik notu i18n'e alındı.
  */
@@ -217,12 +219,13 @@ export function AccountingPage() {
     })
   }, [orders, f])
 
+  // Alt toplam döviz başına ayrı satırda (footerGroups) → her hücre tek döviz, tek satır.
   const money = (key: keyof AccountingOrderListDto) => (rows: Row[]) =>
-    sumByCurrency(rows, (r) => r[key] as number, (r) => r.paraTipi).map(([c, v]) => formatCurrency(v, c)).join(' · ')
+    formatCurrency(sumOf(rows, (r) => r[key] as number), rows[0]?.paraTipi)
 
   const cols: Column<Row>[] = [
-    { key: 'siparisNo',     header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono">{r.siparisNo}</span> },
-    { key: 'musteriAd',     header: t('common.customer'), sortable: true },
+    { key: 'siparisNo', pin: 'left', header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono">{r.siparisNo}</span> },
+    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'), sortable: true },
     { key: 'mUlke',         header: t('common.country'),  sortable: true },
     { key: 'sirket',        header: t('accountingFull.cols.sirket'), sortable: true, render: (r) => (r.sirket as string) ?? '—' },
     { key: 'paraTipi',      header: t('common.currency'), sortable: true },
@@ -245,7 +248,7 @@ export function AccountingPage() {
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)
     { key: 'tarih',         header: t('common.date'), sortable: true, type: 'date', render: (r) => formatDateShort(r.tarih ?? '-') },
     {
-      key: 'actions', header: t('common.actions'), hideable: false, exportValue: false,
+      key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
       // Round-Next §12 — ikon butonlar (17 kolon ekrana sığsın); açıklayıcı başlıklar.
       render: (r) => (
         <div className="flex gap-1">
@@ -263,11 +266,16 @@ export function AccountingPage() {
     { keys: '↑↓', label: t('shortcuts.moveRow') },
     { keys: 'Enter', label: t('accounting.tahsilat.add') },
     { keys: 'Shift+F10', label: t('shortcuts.rowMenu') },
+    ...(selectedNo ? [{ keys: 'F7', label: t('shortcuts.togglePanel') }] : []),
   ])
 
   return (
-    <div>
+    // Scaling Faz 1 — FillPage: sayfa kaymaz, grid kalan yüksekliği alır. Seçili
+    // satırın detay paneli sabit yükseklikli ResizableTop'ta (satır değişince grid
+    // zıplamaz; sürüklenebilir/katlanabilir, konumu hatırlanır).
+    <FillPage>
       <PageHeader
+        density="compact"
         title={t('accounting.title')}
         actions={
           <Button variant="outline" size="sm" loading={excelBusy} title={t('accounting.historyExcelHint')} onClick={async () => {
@@ -280,11 +288,25 @@ export function AccountingPage() {
       />
 
       {/* Round-11 §7 + Round-Next §12 — yoğun grid için dar sayfa dolgusu. */}
-      <div className="space-y-2 p-3">
         {/* ── ÜST FORM (yalnız seçili satır varken) ─────────────────── */}
         {selectedNo && (
+          <ResizableTop
+            pageId="accounting"
+            stable
+            className="px-3 pt-2"
+            collapsed={
+              <div className="flex items-center gap-2 rounded-md border px-3 py-1 text-xs">
+                <span className="text-muted-foreground">{t('common.orderNo')}:</span>
+                <span className="font-mono font-semibold">{selectedNo}</span>
+                {selectedRow && <span className="truncate text-muted-foreground">· {selectedRow.musteriAd}</span>}
+                {selectedRow && (
+                  <Button size="xs" className="ml-auto" onClick={() => openTx(selectedRow)}><Wallet className="h-3.5 w-3.5" /> {t('accounting.tahsilat.add')}</Button>
+                )}
+              </div>
+            }
+          >
           <div className="rounded-md border bg-card">
-            <div className="flex items-center justify-between border-b px-4 py-2">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b bg-card px-4 py-2">
               <div className="flex items-center gap-2 text-sm">
                 <span className="text-muted-foreground">{t('common.orderNo')}:</span>
                 <span className="font-mono font-semibold">{selectedNo}</span>
@@ -436,8 +458,10 @@ export function AccountingPage() {
               </TabsContent>
             </Tabs>
           </div>
+          </ResizableTop>
         )}
 
+        <div className="px-3 pt-2">
         <FilterBar onReset={reset} tableId="accounting" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
           <FilterField label={t('accounting.filter.search')}>
             <Input inputSize="sm" placeholder={t('common.quickFilter')} value={f.q} onChange={(e) => set('q', e.target.value)} />
@@ -468,8 +492,11 @@ export function AccountingPage() {
             <Input inputSize="sm" type="date" value={f.to} onChange={(e) => set('to', e.target.value)} />
           </FilterField>
         </FilterBar>
+        </div>
 
+        <FillRegion className="px-3 pt-2">
         <DataTable
+          fill
           tableId="accounting"
           exportFileName="muhasebe-tahsilat"
           columns={cols}
@@ -481,6 +508,7 @@ export function AccountingPage() {
           // Sidebar açıkken yatay alan daralınca bir sipariş tek satırda kalsın.
           singleLineRows
           showFooter
+          footerGroups={{ by: (r) => r.paraTipi, order: PARA_TIPLERI }}
           activeRowKey={selectedNo}
           onActiveRowChange={(r) => setSelectedNo(r.siparisNo)}
           onRowActivate={(r) => openTx(r)}
@@ -492,7 +520,7 @@ export function AccountingPage() {
             { key: 'ek', label: t('accounting.tahsilat.ekUpload'), icon: <Upload className="h-3.5 w-3.5" />, separatorBefore: true, onSelect: (r) => setEkTarget(r.siparisNo) },
           ]}
         />
-      </div>
+        </FillRegion>
 
       {/* Tahsilat Ekle — form: Enter kaydeder (açık kalır, bir sonraki tutar için),
           "Kaydet ve kapat" ayrı; bakiye kutusu güncel satırdan okunur. */}
@@ -575,7 +603,7 @@ export function AccountingPage() {
 
       <MuhasebeRowDetailDialog row={doubleClickRow} onClose={() => setDoubleClickRow(null)} />
       <CancelTransactionDialog target={cancelTx} onClose={() => setCancelTx(null)} />
-    </div>
+    </FillPage>
   )
 }
 

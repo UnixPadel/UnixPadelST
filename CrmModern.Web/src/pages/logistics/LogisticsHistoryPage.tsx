@@ -6,6 +6,7 @@ import { getLogisticsHistory, completeShipment, cancelShipment } from '@/api/log
 import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { LogisticsStatusBadge } from '@/components/LogisticsStatusBadge'
 import { FilterBar, FilterField, useFilterState } from '@/components/FilterBar'
@@ -19,7 +20,7 @@ import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { describeApiError } from '@/lib/axios'
 import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { formatCurrency } from '@/lib/utils'
-import { sumByCurrency } from '@/lib/export'
+import { sumOf } from '@/lib/export'
 import type { LogisticsHistoryDto } from '@/types'
 
 type Row = LogisticsHistoryDto & Record<string, unknown>
@@ -104,22 +105,22 @@ export function LogisticsHistoryPage() {
   }
 
   const cols: Column<Row>[] = [
-    { key: 'siparisNo',    header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
-    { key: 'firmaAdi',     header: t('logistics.history.firma'), sortable: true },
+    { key: 'siparisNo', pin: 'left', header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
+    { key: 'firmaAdi', truncate: '16rem', header: t('logistics.history.firma'), sortable: true },
     { key: 'lojistikCesit',header: t('logistics.history.tur'),   sortable: true },
     // PROMPT.md OBSERVER #18: operatör Ad Soyad kolonu.
     { key: 'kullaniciAdSoyad', header: t('logistics.history.operator'), sortable: true,
       render: (r) => (r.kullaniciAdSoyad as string) || '—' },
     ...(!hideMoney ? [
       { key: 'fiyat', header: t('common.amount'), sortable: true, type: 'money', render: (r) => formatCurrency((r.fiyat as number) ?? 0),
-        footer: (rows) => sumByCurrency(rows, (x) => x.fiyat as number, () => 'Euro').map(([c, v]) => formatCurrency(v, c)).join(' · ') },
+        footer: (rows) => formatCurrency(sumOf(rows, (x) => x.fiyat as number)) },
     ] satisfies Column<Row>[] : []),
     { key: 'siparisMiTeklifMi', header: t('common.status'), sortable: true,
       render: (r) => <LogisticsStatusBadge value={(r.siparisMiTeklifMi as string) ?? ''} /> },
-    { key: 'lNot',         header: t('common.note'), render: (r) => <span className="text-muted-foreground">{(r.lNot as string) ?? '—'}</span> },
+    { key: 'lNot', truncate: '16rem', header: t('common.note'), render: (r) => <span className="text-muted-foreground">{(r.lNot as string) ?? '—'}</span> },
     { key: 'id',           header: t('logistics.history.shipmentId'), sortable: true, type: 'number', defaultHidden: true },
     {
-      key: 'actions', header: t('common.actions'), hideable: false, exportValue: false,
+      key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
       render: (r) => {
         if (!canMutate) return null
         // Paket 3: sadece "Sevk Yolda" (Order=Lojistik) satırlarda Tamamla/İptal gösterilir.
@@ -139,9 +140,11 @@ export function LogisticsHistoryPage() {
   ]
 
   return (
-    <div>
-      <PageHeader title={t('logistics.historyTitle')} />
-      <div className="space-y-3 p-4 lg:p-6">
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact" title={t('logistics.historyTitle')} />
+      <div className="space-y-2 px-4 pt-2">
         <FilterBar onReset={reset} tableId="logistics-history" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
           <FilterField label={t('common.orderNo')}>
             <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
@@ -150,8 +153,11 @@ export function LogisticsHistoryPage() {
             <Input inputSize="sm" placeholder={t('logistics.history.firmaPlaceholder')} value={f.firmaAdi} onChange={(e) => set('firmaAdi', e.target.value)} />
           </FilterField>
         </FilterBar>
-        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
+      </div>
+      <FillRegion className="pt-2">
+        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
           <DataTable
+            fill
             tableId="logistics-history"
             exportFileName="lojistik-gecmis"
             columns={cols}
@@ -178,7 +184,7 @@ export function LogisticsHistoryPage() {
             ]}
           />
         </MasterDetailLayout>
-      </div>
-    </div>
+      </FillRegion>
+    </FillPage>
   )
 }

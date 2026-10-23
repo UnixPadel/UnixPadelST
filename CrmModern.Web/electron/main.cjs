@@ -1,5 +1,6 @@
-const { app, BrowserWindow, Menu, dialog } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain, screen } = require('electron');
 const path = require('path');
+const fs = require('fs');
 const { autoUpdater } = require('electron-updater');
 
 // UnixPadelST masaüstü istemcisi.
@@ -78,13 +79,86 @@ function setupAutoUpdater() {
   }, UPDATE_CHECK_INTERVAL_MS);
 }
 
+// ── Pencere durumu + arayüz ölçeği (scaling Faz 1) ─────────────────────────
+// Windows %125/%150 ölçekte CSS viewport küçülür (1920×1080@125% ≈ 1536×790);
+// web ölçeğindeki arayüz tabloya yer bırakmaz. Ölçek 'auto' iken çalışma alanı
+// yüksekliğine göre küçültülür; kullanıcı Ctrl+= / Ctrl+- / Ctrl+0, Ctrl+tekerlek
+// veya Tercihlerim → Arayüz ölçeği ile seçerse o değer kalıcı olur.
+// Boyut/konum/maximize da hatırlanır; ilk açılış maximize.
+const STATE_FILE = path.join(app.getPath('userData'), 'window-state.json');
+const ZOOM_STEPS = [0.8, 0.85, 0.9, 1, 1.1, 1.25];
+
+function readState() {
+  try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch { return {}; }
+}
+
+function writeState(patch) {
+  try { fs.writeFileSync(STATE_FILE, JSON.stringify({ ...readState(), ...patch })); } catch { /* yoksay */ }
+}
+
+function autoZoomFor(win) {
+  const h = screen.getDisplayMatching(win.getBounds()).workAreaSize.height;
+  if (h < 720) return 0.85;
+  if (h < 860) return 0.9;
+  return 1;
+}
+
+/** Kayıtlı ayar ('auto' | sayı) → uygulanacak zoomFactor. */
+function effectiveZoom(win) {
+  const z = readState().zoom;
+  return typeof z === 'number' ? z : autoZoomFor(win);
+}
+
+function applyZoom(win) {
+  if (!win || win.isDestroyed()) return;
+  const factor = effectiveZoom(win);
+  win.webContents.setZoomFactor(factor);
+  win.webContents.send('desktop:zoom-changed', { setting: readState().zoom ?? 'auto', factor });
+}
+
+function setZoomSetting(win, setting) {
+  writeState({ zoom: setting === 'auto' ? 'auto' : Math.min(Math.max(Number(setting) || 1, 0.5), 2) });
+  applyZoom(win);
+}
+
+function stepZoom(win, dir) {
+  const cur = win.webContents.getZoomFactor();
+  const next = dir > 0
+    ? ZOOM_STEPS.find((s) => s > cur + 0.001) ?? ZOOM_STEPS[ZOOM_STEPS.length - 1]
+    : [...ZOOM_STEPS].reverse().find((s) => s < cur - 0.001) ?? ZOOM_STEPS[0];
+  setZoomSetting(win, next);
+}
+
+/** Kayıtlı sınırlar hâlâ bağlı bir ekranın içindeyse kullan (çıkarılmış monitör). */
+function restoredBounds() {
+  const b = readState().bounds;
+  if (!b) return null;
+  const visible = screen.getAllDisplays().some(({ workArea: a }) =>
+    b.x < a.x + a.width - 100 && b.x + b.width > a.x + 100 && b.y >= a.y - 20 && b.y < a.y + a.height - 100);
+  return visible ? b : null;
+}
+
+ipcMain.handle('desktop:get-zoom', (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  return { setting: readState().zoom ?? 'auto', factor: win ? win.webContents.getZoomFactor() : 1 };
+});
+ipcMain.handle('desktop:set-zoom', (e, setting) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (win) setZoomSetting(win, setting);
+});
+
 async function createWindow() {
   // Kurumsal kullanım için menü barını tamamen gizle.
   Menu.setApplicationMenu(null);
 
+  const saved = readState();
+  const bounds = restoredBounds();
+
   mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: bounds?.width ?? 1280,
+    height: bounds?.height ?? 800,
+    ...(bounds ? { x: bounds.x, y: bounds.y } : {}),
+    show: false,
     // §32 — minWidth 1280/minHeight 720 idi; DPI ölçeklemeli (125%/150%) veya küçük
     // dizüstü/harici monitörlerde MANTIKSAL çözünürlük bunun altına düşünce pencere
     // ekrana SIĞMIYOR → içerik taşıyor/kesiliyor. Layout zaten responsive (içerik
@@ -97,15 +171,40 @@ async function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   });
 
+  // İlk açılış (kayıt yok) veya son kapanışta maximize ise maximize aç.
+  if (!bounds || saved.maximized !== false) mainWindow.maximize();
+  mainWindow.show();
+
+  const saveBounds = () => {
+    if (mainWindow.isDestroyed() || mainWindow.isMinimized()) return;
+    writeState({ maximized: mainWindow.isMaximized(), ...(mainWindow.isMaximized() ? {} : { bounds: mainWindow.getBounds() }) });
+  };
+  mainWindow.on('close', saveBounds);
+  mainWindow.on('resized', saveBounds);
+  mainWindow.on('moved', () => { saveBounds(); applyZoom(mainWindow); });
+  mainWindow.webContents.on('did-finish-load', () => applyZoom(mainWindow));
+  screen.on('display-metrics-changed', () => applyZoom(mainWindow));
+
+  // Ctrl+tekerlek → bir adım büyüt/küçült (kalıcı).
+  mainWindow.webContents.on('zoom-changed', (_e, dir) => stepZoom(mainWindow, dir === 'in' ? 1 : -1));
+
   // F12 ile DevTools toggle — menü kaldırıldığı için (Menu.setApplicationMenu(null))
   // default accelerator çalışmıyor; manuel olarak before-input-event ile bind ediyoruz.
-  mainWindow.webContents.on('before-input-event', (_event, input) => {
-    if (input.type === 'keyDown' && input.key === 'F12') {
+  // Aynı sebeple zoom kısayolları da (Ctrl+= / Ctrl+- / Ctrl+0) burada bağlanır.
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'F12') {
       mainWindow.webContents.toggleDevTools();
+      return;
     }
+    if (!(input.control || input.meta) || input.alt) return;
+    if (input.key === '=' || input.key === '+' || input.code === 'NumpadAdd') { event.preventDefault(); stepZoom(mainWindow, 1); }
+    else if (input.key === '-' || input.code === 'NumpadSubtract') { event.preventDefault(); stepZoom(mainWindow, -1); }
+    else if (input.key === '0' || input.code === 'Numpad0') { event.preventDefault(); setZoomSetting(mainWindow, 'auto'); }
   });
 
   if (app.isPackaged) {

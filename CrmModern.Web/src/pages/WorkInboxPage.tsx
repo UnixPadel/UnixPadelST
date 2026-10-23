@@ -23,7 +23,7 @@ import { getMyOrders } from '@/api/orders'
  * yalnız kullanıcının ilgili ekrana erişimi varsa yüklenir (menü kuralıyla aynı).
  * Her kalemde yaş ("3 gün", AgeChip) — eşik aşılınca uyarı tonu — ve satır içi birincil
  * aksiyon: ilgili ekranı o kayıt seçili olarak açar (?sel=NO) ya da detayı
- * (Belge Akışı dahil) bulunduğu yerde gösterir (?order=NO).
+ * (Sipariş Geçmişi dahil) bulunduğu yerde gösterir (?order=NO).
  */
 interface InboxItem {
   key: string

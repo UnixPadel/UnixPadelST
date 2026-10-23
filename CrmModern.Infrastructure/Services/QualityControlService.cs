@@ -41,7 +41,7 @@ internal sealed class QualityControlService(IUnitOfWork uow, IOrderService order
     public Task RejectAsync(string siparisNo, int currentUserId, string red)
     {
         if (string.IsNullOrWhiteSpace(red))
-            throw new BusinessException("Red gerekçesi zorunlu.");
+            throw new BusinessException("Red sebebi gerekli.", "rejectReasonRequired");
 
         // Order.Kontrol='Reddet' + Red kolonu + SiparisOnaylari audit;
         // PROMPT-v4 §5.2 guard'ları OrderService.RejectOrderAsync içinde.

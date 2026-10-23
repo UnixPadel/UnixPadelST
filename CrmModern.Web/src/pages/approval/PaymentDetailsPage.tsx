@@ -7,6 +7,7 @@ import {
   type SetPaymentDetailsRequest,
 } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
@@ -64,7 +65,7 @@ export function PaymentDetailsPage() {
   })
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
-    { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
+    { key: 'talepID', pin: 'left', header: t('purchase.cols.id'), sortable: true },
     { key: 'urunAdi',       header: t('purchase.cols.urun') },
     { key: 'urunMaliyeti',  header: t('purchase.cols.maliyet'), type: 'money', sortable: true, render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
     { key: 'departman',     header: t('purchase.cols.departman'), render: (r) => r.departman ? t(`roles.${r.departman as string}`, { defaultValue: r.departman as string }) : '—' },
@@ -72,7 +73,7 @@ export function PaymentDetailsPage() {
     { key: 'talepTarihi',   header: t('purchase.cols.tarih'), render: (r) => formatDate(r.talepTarihi as string) },
     { key: 'durum',         header: t('purchase.cols.durum'), render: (r) => <PurchaseStatusBadge value={r.durum as string} /> },
     {
-      key: 'actions', header: t('purchase.cols.islem'),
+      key: 'actions', pin: 'right', header: t('purchase.cols.islem'),
       render: (r) => (
         <Button size="xs" onClick={() => { setTarget(r.talepID as number); setForm(buildEmpty()) }}>
           {t('purchase.payment.enter')}
@@ -82,10 +83,13 @@ export function PaymentDetailsPage() {
   ]
 
   return (
-    <div>
-      <PageHeader title={t('purchase.payment.pageTitle')} />
-      <div className="p-6">
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact" title={t('purchase.payment.pageTitle')} />
+      <FillRegion className="pt-2">
         <DataTable
+          fill
           tableId="payment-details"
           exportFileName="odeme-detay"
           columns={cols}
@@ -94,7 +98,7 @@ export function PaymentDetailsPage() {
           loading={isLoading}
           onRowActivate={(r) => { setTarget(r.talepID as number); setForm(buildEmpty()) }}
         />
-      </div>
+      </FillRegion>
 
       <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null) }}>
         <DialogContent size="lg">
@@ -144,6 +148,6 @@ export function PaymentDetailsPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </FillPage>
   )
 }

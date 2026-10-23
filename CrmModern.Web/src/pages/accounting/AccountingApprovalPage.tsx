@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { useToast } from '@/components/ToastProvider'
 import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion, ResizableTop } from '@/components/FillPage'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { ReadOnlyField } from '@/components/ui/key-value'
@@ -30,7 +31,8 @@ import { useNotHereHint } from '@/hooks/useNotHereHint'
 import { ACCOUNTING_VIEW_SCREEN } from '@/lib/workflow'
 import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { toastApiError } from '@/lib/apiError'
-import { sumByCurrency } from '@/lib/export'
+import { sumOf } from '@/lib/export'
+import { PARA_TIPLERI } from '@/lib/orderForm'
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { formatDate, formatDateShort, formatCurrency, cn } from '@/lib/utils'
 import { resolveClause } from '@/lib/clauses'
@@ -343,8 +345,9 @@ export function AccountingApprovalPage() {
   const nextPesinatNo = transactions.filter((tx) => !tx.iptal).length + 1
 
   // ── Master grid kolonları ───────────────────────────────────────────────
+  // Alt toplam döviz başına ayrı satırda (footerGroups) → her hücre tek döviz, tek satır.
   const moneyFooter = (key: keyof AccountingOrderListDto) => (rs: (AccountingOrderListDto & Record<string, unknown>)[]) =>
-    sumByCurrency(rs, (r) => r[key] as number, (r) => r.paraTipi).map(([c, v]) => formatCurrency(v, c)).join(' · ')
+    formatCurrency(sumOf(rs, (r) => r[key] as number), rs[0]?.paraTipi as string)
   const queueLabel = (o: AccountingOrderListDto) =>
     matchesView(o, 'cariQueue') ? t('accApproval.queueBadge.cari')
       : matchesView(o, 'lojistikQueue') ? t('accApproval.queueBadge.lojistik')
@@ -354,9 +357,9 @@ export function AccountingApprovalPage() {
     { keys: 'Enter', label: t('accApproval.shortcut.form') },
   ])
   const columns: Column<AccountingOrderListDto & Record<string, unknown>>[] = [
-    { key: 'siparisNo', header: t('qc.grid.siparisNo'), sortable: true,
+    { key: 'siparisNo', pin: 'left', header: t('qc.grid.siparisNo'), sortable: true,
       render: (r) => <span className="font-mono text-xs">{r.siparisNo as string}</span> },
-    { key: 'musteriAd', header: t('qc.grid.musteriAd'), sortable: true },
+    { key: 'musteriAd', truncate: '16rem', header: t('qc.grid.musteriAd'), sortable: true },
     { key: 'mUlke', header: t('qc.grid.ulke'), sortable: true },
     { key: 'toplamFiyat', header: t('qc.grid.toplamSiparis'), sortable: true, type: 'money',
       render: (r) => formatCurrency((r.toplamFiyat as number) ?? 0, r.paraTipi as string), footer: moneyFooter('toplamFiyat') },
@@ -397,9 +400,11 @@ export function AccountingApprovalPage() {
   )
 
   return (
-    <div className="flex h-full flex-col">
+    // Scaling Faz 1 — FillPage: sayfa kaymaz; üst kartlar ResizableTop içinde
+    // (varsayılan en çok %40, sürüklenebilir/katlanabilir), grid kalan yüksekliği alır.
+    <FillPage>
       {/* ── Kompakt başlık ─────────────────────────────────────────────── */}
-      <div className="shrink-0">
+      <div>
         <PageHeader
           density="compact"
           title={t('accApproval.title')}
@@ -413,11 +418,25 @@ export function AccountingApprovalPage() {
         />
       </div>
 
-      {/* ── Üst bölge: detay sekmeleri + Özet + Cari (scroll'suz, doğal yükseklik) ── */}
-      <div className="flex shrink-0 flex-wrap gap-2 px-4 py-2 xl:flex-nowrap">
+      {/* ── Üst bölge: detay sekmeleri + Özet + Cari ──────────────────────
+           Kartlar kısıtlı yüksekliğe uzar ve kendi içinde kayar; onay
+           aksiyonu kartın altına yapışık kalır. */}
+      <ResizableTop
+        pageId="acc-approval"
+        defaultShare={0.4}
+        className="flex flex-wrap gap-2 px-4 py-2 xl:flex-nowrap"
+        collapsed={
+          <div className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+            <span className="text-muted-foreground">{t('qc.fields.siparisNo')}:</span>
+            <span className="font-mono">{selected ?? '—'}</span>
+            {selectedRow && <span className="truncate text-muted-foreground">· {selectedRow.musteriAd}</span>}
+            {selectedRow && <span className="ml-auto tabular-nums">{t('qc.grid.kalanBakiye')}: {formatCurrency(selectedRow.kalanBakiye ?? 0, pt)}</span>}
+          </div>
+        }
+      >
 
         {/* 1 — Detay sekmeleri (legacy tabControl2 sırası) */}
-        <div className="flex min-w-0 flex-1 basis-full flex-col rounded-md border p-2 xl:basis-auto">
+        <div className="flex min-h-0 min-w-0 flex-1 basis-full flex-col overflow-y-auto rounded-md border p-2 xl:basis-auto">
           <Tabs defaultValue="muhasebe" className="flex flex-1 flex-col">
             <TabsList className="h-8 w-full shrink-0 justify-start overflow-x-auto">
               <TabsTrigger className="px-2 py-1 text-xs" value="muhasebe">{t('qc.tabs.muhasebeGecmisi')}</TabsTrigger>
@@ -571,7 +590,7 @@ export function AccountingApprovalPage() {
         </div>
 
         {/* 2 — Özet kartı (legacy ozetTabPage) */}
-        <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-md border p-2 sm:w-[300px]">
+        <div className="flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-y-auto rounded-md border p-2 sm:w-[300px]">
           <p className="text-sm font-semibold text-center">{t('accApproval.blocks.ozet')}</p>
           <div className="grid grid-cols-2 gap-1.5">
             <ROField label={t('qc.fields.siparisNo')} value={selected} />
@@ -595,7 +614,7 @@ export function AccountingApprovalPage() {
             <span>{t('qc.fields.teslimatFiyati')}: {d ? formatCurrency(d.teslimatFiyat ?? 0, pt) : '—'}</span>
           </div>
           <ROField label={t('accApproval.fields.siparisNotu')} value={d?.siparisNotu} multiline />
-          <div className="mt-auto grid grid-cols-2 gap-1.5 pt-1">
+          <div className="sticky bottom-0 mt-auto grid grid-cols-2 gap-1.5 bg-background pt-1">
             <Button size="xs" variant="outline" disabled={!selected}
               onClick={() => { if (requireSelection()) setFormNo(selected) }}>
               {t('qc.actions.formGetir')}
@@ -617,7 +636,7 @@ export function AccountingApprovalPage() {
         </div>
 
         {/* 3 — Cari kartı (legacy tabPage5 "Cari") + onay aksiyonları */}
-        <div className="flex w-full shrink-0 flex-col gap-1.5 rounded-md border p-2 sm:w-[320px]">
+        <div className="flex min-h-0 w-full shrink-0 flex-col gap-1.5 overflow-y-auto rounded-md border p-2 sm:w-[300px]">
           <p className="text-sm font-semibold text-center">{t('qc.blocks.cariBilgiler')}</p>
           <CariRow label={t('qc.fields.siparisToplam')}>
             <CariValue value={selectedRow ? formatCurrency(toplam, pt) : ''} />
@@ -703,7 +722,7 @@ export function AccountingApprovalPage() {
             </>
           )}
           {/* Kuyruğa göre bağlamsal onay aksiyonu */}
-          <div className="mt-auto space-y-1 pt-1">
+          <div className="sticky bottom-0 mt-auto space-y-1 bg-background pt-1">
             {canFinalize ? (
               <>
               {(finalizeForm.finalMaliyet ?? -1) < 0 && (
@@ -740,10 +759,10 @@ export function AccountingApprovalPage() {
             )}
           </div>
         </div>
-      </div>
+      </ResizableTop>
 
       {/* ── Alt bölge: kuyruk seçici + filtreler + master grid ──────────── */}
-      <div className="min-h-0 flex-1 space-y-2 px-4 pb-2">
+      <div className="px-4 py-2">
         <div className="flex flex-wrap items-end gap-2">
           {/* Kuyruk seçici + legacy hızlı filtre üçlüsü */}
           <div className="flex flex-wrap gap-1">
@@ -763,15 +782,18 @@ export function AccountingApprovalPage() {
               lojistik ← Üretim, tamamlanma ← Lojistik teslimat). */}
           <WaitingUpstreamPanel screen={ACCOUNTING_VIEW_SCREEN[view]} variant="button" />
           <Input inputSize="sm" placeholder={t('common.quickFilter')} aria-label={t('common.quickFilter')} value={search}
-            onChange={(e) => setSearch(e.target.value)} className="h-7 max-w-[200px]" />
+            onChange={(e) => setSearch(e.target.value)} className="h-7 min-w-0 max-w-[200px] flex-1 basis-32" />
           <div className="flex items-center gap-1">
             <Input inputSize="sm" type="date" aria-label={t('common.startDate')} value={from} onChange={(e) => setFrom(e.target.value)} className="h-7 w-32" />
             <span className="text-muted-foreground text-xs">—</span>
             <Input inputSize="sm" type="date" aria-label={t('common.endDate')} value={to} onChange={(e) => setTo(e.target.value)} className="h-7 w-32" />
           </div>
         </div>
+      </div>
 
+      <FillRegion>
         <DataTable
+          fill
           tableId="acc-approval"
           exportFileName="muhasebe-onay"
           columns={columns}
@@ -780,7 +802,10 @@ export function AccountingApprovalPage() {
           loading={isLoading}
           emptyMessage={notHere}
           density="compact"
+          // Scaling Faz 1 — tek satır: satır yüksekliği ~45 → ~34px.
+          singleLineRows
           showFooter
+          footerGroups={{ by: (r) => r.paraTipi as string, order: PARA_TIPLERI }}
           // v5 §5 kararı: satır renklendirmesi yok — yalnız seçili (etkin) satır vurgusu.
           activeRowKey={selected}
           onActiveRowChange={(r) => setSelected((r as AccountingOrderListDto).siparisNo)}
@@ -790,7 +815,7 @@ export function AccountingApprovalPage() {
             { key: 'ek', label: t('qc.actions.muhasebeEk'), onSelect: (r) => setEkTarget((r as AccountingOrderListDto).siparisNo) },
           ]}
         />
-      </div>
+      </FillRegion>
 
       {/* MuhasebeEk uploader (AccountingPage kalıbı) */}
       <Dialog open={!!ekTarget} onOpenChange={(o) => { if (!o) setEkTarget(null) }}>
@@ -812,6 +837,6 @@ export function AccountingApprovalPage() {
 
       {/* Form'u getir — salt-okunur sipariş formu */}
       <OrderDetailModal siparisNo={formNo} onClose={() => setFormNo(null)} />
-    </div>
+    </FillPage>
   )
 }

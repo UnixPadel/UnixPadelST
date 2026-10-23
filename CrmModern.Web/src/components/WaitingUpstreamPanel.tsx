@@ -116,7 +116,7 @@ function WaitingList({ rows, loading, error, className, onOpenOrder }: {
 }) {
   const { t } = useTranslation()
   const [, setParams] = useSearchParams()
-  // Global sipariş detayı (Layout ?order=NO) — Belge Akışı dahil, ekrandan ayrılmadan.
+  // Global sipariş detayı (Layout ?order=NO) — Sipariş Geçmişi dahil, ekrandan ayrılmadan.
   const openOrder = (no: string) => {
     onOpenOrder?.()
     setParams((p) => { const np = new URLSearchParams(p); np.set('order', no); return np })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -21,6 +21,7 @@ import { Combobox } from '@/components/ui/combobox'
 import { ReadOnlyField } from '@/components/ui/key-value'
 import { FieldError } from '@/components/FieldError'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion, ResizableTop } from '@/components/FillPage'
 import { StatusBadge } from '@/components/StatusBadge'
 import { FilterBar, FilterField } from '@/components/FilterBar'
 import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
@@ -227,31 +228,6 @@ export function QualityControlPage() {
   // SR-8 — opsiyonel onay notu (api approveQC kontrolNot kabul ediyor).
   const [onayNotu, setOnayNotu] = useState('')
 
-  // Round-Next §11 — splitter ARTIK ÜST bölgenin yüksekliğini ayarlar (eskiden
-  // grid'i sabitliyordu; üst h-auto + sayfa scroll'u yüzünden tablo yalnız aşağı
-  // uzuyor, yukarı çıkmıyordu). topH=null → üst doğal yükseklik, grid flex-1 kalanı
-  // doldurur. Sürüklenince üst sabitlenir; yukarı çekince üst küçülür, grid yukarı
-  // çıkar ve satır sayısı artar (boş alan kalmaz; container overflow-hidden).
-  const [topH, setTopH] = useState<number | null>(null)
-  const topRef = useRef<HTMLDivElement>(null)
-
-  const startSplitterDrag = (e: React.PointerEvent) => {
-    e.preventDefault()
-    const startY = e.clientY
-    const startH = topRef.current?.getBoundingClientRect().height ?? 240
-    const onMove = (ev: PointerEvent) => {
-      // Yukarı çekilince (dy<0) üst küçülür → grid büyür ve yukarı çıkar.
-      const dy = ev.clientY - startY
-      setTopH(Math.min(Math.max(startH + dy, 72), window.innerHeight - 220))
-    }
-    const onUp = () => {
-      window.removeEventListener('pointermove', onMove)
-      window.removeEventListener('pointerup', onUp)
-    }
-    window.addEventListener('pointermove', onMove)
-    window.addEventListener('pointerup', onUp)
-  }
-
   // Detay yüklenince cari alanını doldur
   useEffect(() => {
     setOdenenInput(detail?.odenenMiktar ?? '')
@@ -380,9 +356,9 @@ export function QualityControlPage() {
 
   // ── Master grid kolonları (legacy başlıklar birebir) ────────────────────
   const columns: Column<KontrolRow>[] = [
-    { key: 'siparisNo', header: t('qc.grid.siparisNo'), sortable: true,
+    { key: 'siparisNo', pin: 'left', header: t('qc.grid.siparisNo'), sortable: true,
       render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
-    { key: 'musteriAd', header: t('qc.grid.musteriAd'), sortable: true },
+    { key: 'musteriAd', truncate: '16rem', header: t('qc.grid.musteriAd'), sortable: true },
     { key: 'mUlke', header: t('qc.grid.ulke'), sortable: true },
     { key: 'toplamFiyat', header: t('qc.grid.toplamSiparis'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.toplamFiyat ?? 0, r.paraTipi) },
@@ -431,6 +407,7 @@ export function QualityControlPage() {
     { keys: 'O', label: t('shortcuts.qcApprove') },
     { keys: 'R', label: t('shortcuts.qcReject') },
     { keys: 'Enter', label: t('shortcuts.openRow') },
+    { keys: 'F7', label: t('shortcuts.togglePanel') },
   ])
   const customerOptions = useMemo(
     () => [{ value: 'all', label: t('common.all') }, ...[...customers].sort((a, b) => a.musteriAd.localeCompare(b.musteriAd, 'tr')).map((m) => ({ value: m.musteriAd, label: m.musteriAd, description: m.ulkeAdi }))],
@@ -439,12 +416,12 @@ export function QualityControlPage() {
   const submitSearch = () => { setSubmitted({ ...filters }); setSelected(null) }
 
   return (
-    // Round-Next §11 — sabit-viewport bölünmüş düzen: container overflow-hidden;
-    // üst bölge (topH, kendi içinde kayar) ile grid (flex-1) viewport'u paylaşır,
-    // sayfa dikeyde kaymaz. Splitter yukarı çekilince grid gerçekten yukarı çıkar.
-    <div className="flex h-full flex-col overflow-hidden">
+    // Scaling Faz 1 — FillPage: sayfa dikeyde kaymaz; üst panel (ResizableTop,
+    // varsayılan en çok %35, sürüklenebilir/katlanabilir, konumu hatırlanır) ile
+    // grid (FillRegion, kalan yükseklik) viewport'u paylaşır.
+    <FillPage>
       {/* ── Kompakt başlık (QW-4: ortak PageHeader) ─────────────────────── */}
-      <div className="shrink-0">
+      <div>
         <PageHeader
           density="compact"
           title={t('qc.title')}
@@ -467,10 +444,25 @@ export function QualityControlPage() {
            Bölge aktif sekmenin doğal yüksekliğine oturur (h-auto, iç scroll
            yok). Paneller seçim olmasa da hep görünür; alanlar '—' gösterir,
            aksiyonlar select-first toast'ını atar. */}
-      <div
-        ref={topRef}
-        className="flex shrink-0 items-stretch gap-2 overflow-y-auto px-4 py-1.5"
-        style={topH !== null ? { height: topH } : undefined}
+      <ResizableTop
+        pageId="qc"
+        className="flex items-stretch gap-2 px-4 py-1.5"
+        collapsed={
+          // Katlıyken tek satır: seçili sipariş + karar butonları (tablo ana odak).
+          <div className="flex items-center gap-2 rounded-md border px-2 py-1 text-xs">
+            <span className="text-muted-foreground">{t('qc.fields.siparisNo')}:</span>
+            <span className="font-mono">{selected ?? '—'}</span>
+            {selectedRow && <span className="truncate text-muted-foreground">· {selectedRow.musteriAd}</span>}
+            <div className="ml-auto flex gap-1.5">
+              <Button size="xs" loading={approveMut.isPending} disabled={!!approveBlocked} title={approveBlocked ?? `${t('qc.actions.onayla')} (O)`} onClick={handleApprove}>
+                {t('qc.actions.onayla')}
+              </Button>
+              <Button size="xs" variant="destructive" disabled={!selected} title={`${t('qc.actions.reddet')} (R)`} onClick={handleRejectOpen}>
+                {t('qc.actions.reddet')}
+              </Button>
+            </div>
+          </div>
+        }
       >
 
         {/* PROMPT-v7 §4 — Filtreme dikey kartı kaldırıldı; filtreler gridin
@@ -491,38 +483,41 @@ export function QualityControlPage() {
 
             {/* Cari — Cari Bilgiler + Cari Güncelle / Revize Et */}
             <TabsContent value="cari">
-              <div className="mx-auto max-w-md space-y-1.5 pt-1">
-                <p className="text-sm font-semibold text-center">{t('qc.blocks.cariBilgiler')}</p>
-                <CariRow label={t('qc.fields.siparisToplam')}>
-                  <CariValue value={d ? formatCurrency(toplam, d.paraTipi) : ''} />
-                </CariRow>
-                <CariRow label={t('qc.fields.paraBirimi')}>
-                  <CariValue value={d?.paraTipi} />
-                </CariRow>
-                {/* Legacy iki parçalı alan: %PesinYuzde + kaparo tutarı */}
-                <CariRow label={t('qc.fields.kaparoBakiye')}>
-                  <div className="flex gap-1">
-                    <div className="w-14 rounded border bg-muted/40 px-1.5 py-1 text-center text-xs min-h-[1.6rem]">
-                      {d ? `%${d.pesinYuzde}` : '—'}
+              {/* Scaling Faz 1 — iki sütun: 5 satır + 2 buton yerine 3 satır (~150px). */}
+              <div className="mx-auto max-w-3xl space-y-1.5 pt-1">
+                <p className="text-xs font-semibold text-center">{t('qc.blocks.cariBilgiler')}</p>
+                <div className="grid gap-x-4 gap-y-1.5 lg:grid-cols-2">
+                  <CariRow label={t('qc.fields.siparisToplam')}>
+                    <CariValue value={d ? formatCurrency(toplam, d.paraTipi) : ''} />
+                  </CariRow>
+                  <CariRow label={t('qc.fields.paraBirimi')}>
+                    <CariValue value={d?.paraTipi} />
+                  </CariRow>
+                  {/* Legacy iki parçalı alan: %PesinYuzde + kaparo tutarı */}
+                  <CariRow label={t('qc.fields.kaparoBakiye')}>
+                    <div className="flex gap-1">
+                      <div className="w-14 rounded border bg-muted/40 px-1.5 py-1 text-center text-xs min-h-[1.6rem]">
+                        {d ? `%${d.pesinYuzde}` : '—'}
+                      </div>
+                      <div className="min-w-0 flex-1 rounded border bg-muted/40 px-1.5 py-1 text-xs min-h-[1.6rem] truncate">
+                        {d ? formatCurrency(brutKaparo, d.paraTipi) : '—'}
+                      </div>
                     </div>
-                    <div className="min-w-0 flex-1 rounded border bg-muted/40 px-1.5 py-1 text-xs min-h-[1.6rem] truncate">
-                      {d ? formatCurrency(brutKaparo, d.paraTipi) : '—'}
-                    </div>
+                  </CariRow>
+                  <CariRow label={t('qc.fields.siparisBakiye')}>
+                    <CariValue value={d ? formatCurrency(siparisBakiye, d.paraTipi) : ''} />
+                  </CariRow>
+                  <CariRow label={t('qc.fields.odenenBakiye')}>
+                    <DecimalInput inputSize="sm" className="h-7" value={odenenInput} onValueChange={setOdenenInput} disabled={!selected} />
+                  </CariRow>
+                  <div className="grid grid-cols-2 gap-1.5 lg:pl-[118px]">
+                    <Button size="xs" loading={cariMut.isPending} disabled={!selected} onClick={handleCari}>
+                      {t('qc.actions.cariGuncelle')}
+                    </Button>
+                    <Button size="xs" variant="outline" disabled={!selected} onClick={handleRevise}>
+                      {t('qc.actions.revizeEt')}
+                    </Button>
                   </div>
-                </CariRow>
-                <CariRow label={t('qc.fields.siparisBakiye')}>
-                  <CariValue value={d ? formatCurrency(siparisBakiye, d.paraTipi) : ''} />
-                </CariRow>
-                <CariRow label={t('qc.fields.odenenBakiye')}>
-                  <DecimalInput inputSize="sm" className="h-7" value={odenenInput} onValueChange={setOdenenInput} disabled={!selected} />
-                </CariRow>
-                <div className="mx-auto flex w-full max-w-[220px] flex-col gap-1.5 pt-2">
-                  <Button size="xs" loading={cariMut.isPending} disabled={!selected} onClick={handleCari}>
-                    {t('qc.actions.cariGuncelle')}
-                  </Button>
-                  <Button size="xs" variant="outline" disabled={!selected} onClick={handleRevise}>
-                    {t('qc.actions.revizeEt')}
-                  </Button>
                 </div>
               </div>
             </TabsContent>
@@ -635,20 +630,27 @@ export function QualityControlPage() {
         </div>
 
         {/* 3 — Kontrol (Sipariş No + Not + 2×3 aksiyon grid'i) */}
-        <div className="flex w-[300px] shrink-0 flex-col gap-1.5 rounded-md border p-2">
-          <div className="flex items-center justify-between gap-2">
-            <ROField className="flex-1" mono label={t('qc.fields.siparisNo')} value={selected} />
+        {/* Scaling Faz 1 — iki iç kolon: solda Sipariş No + Not (kalan yükseklik),
+            sağda aksiyonlar. Dikey yerine yatay yayılır → kart ~155px'e iner. */}
+        <div className="flex w-[490px] shrink-0 gap-2 rounded-md border p-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-[11px] font-medium text-muted-foreground">{t('qc.fields.siparisNo')}</span>
+            <span className="min-w-0 flex-1 truncate rounded border bg-muted/40 px-1.5 py-0.5 font-mono">{selected ?? '—'}</span>
             {selected && detailLoading && <span className="text-[11px] text-muted-foreground">{t('common.loading')}</span>}
           </div>
-          <div className="flex flex-1 flex-col space-y-0.5">
+          <div className="flex min-h-0 flex-1 flex-col space-y-0.5">
             <p className="text-[11px] font-medium text-muted-foreground">{t('qc.fields.not')}</p>
-            {/* Sipariş notu serbest metin — yalnız bu kutu max-h ile sınırlı. */}
-            <div className="min-h-[3.5rem] max-h-24 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
+            {/* Sipariş notu serbest metin — kalan yükseklikte kendi içinde kayar. */}
+            <div className="min-h-[2.25rem] flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded border bg-muted/40 px-1.5 py-1 text-xs">
               {d?.siparisNotu || '—'}
             </div>
           </div>
-          {/* İkincil aksiyonlar — küçük, eş ağırlıklı. */}
-          <div className="grid shrink-0 grid-cols-3 gap-1">
+          </div>
+          <div className="flex w-[290px] shrink-0 flex-col gap-1.5">
+          {/* İkincil aksiyonlar — üstte 3 eş buton, altta proforma ikilisi (Excel/PDF)
+              yarım genişlikte: "Proforma (Excel)" etiketi sığsın. */}
+          <div className="grid shrink-0 grid-cols-6 gap-1 [&>*]:col-span-2 [&>*]:px-1.5 [&>*:nth-child(n+4)]:col-span-3">
             <Button size="xs" variant="outline" disabled={!selected} onClick={() => handleAttachment('ek')}>
               {t('qc.actions.saticiEk')}
             </Button>
@@ -662,11 +664,11 @@ export function QualityControlPage() {
               {t('qc.actions.excelYaz')}
             </Button>
             <Button size="xs" variant="outline" disabled={!selected} onClick={handlePdf}>
-              PDF
+              Proforma (PDF)
             </Button>
           </div>
           {/* Karar — birincil aksiyonlar ayrı ve belirgin (Round-8 §3: Onayla solda). */}
-          <div className="space-y-1.5 border-t pt-1.5">
+          <div className="mt-auto space-y-1.5">
             <Input
               inputSize="sm"
               value={onayNotu}
@@ -676,45 +678,29 @@ export function QualityControlPage() {
               disabled={!!approveBlocked}
             />
             <div className="grid grid-cols-2 gap-1.5">
-              <Button size="sm" loading={approveMut.isPending} disabled={!!approveBlocked} title={approveBlocked ?? `${t('qc.actions.onayla')} (O)`} onClick={handleApprove}>
+              <Button size="sm" className="h-8" loading={approveMut.isPending} disabled={!!approveBlocked} title={approveBlocked ?? `${t('qc.actions.onayla')} (O) — ${t('qc.nextHint')}`} onClick={handleApprove}>
                 {t('qc.actions.onayla')}
               </Button>
-              <Button size="sm" variant="destructive" disabled={!selected} title={!selected ? t('qc.selectFirst') : `${t('qc.actions.reddet')} (R)`} onClick={handleRejectOpen}>
+              <Button size="sm" className="h-8" variant="destructive" disabled={!selected} title={!selected ? t('qc.selectFirst') : `${t('qc.actions.reddet')} (R)`} onClick={handleRejectOpen}>
                 {t('qc.actions.reddet')}
               </Button>
             </div>
-            <p className="text-center text-[10px] text-muted-foreground">{t('qc.nextHint')}</p>
+          </div>
           </div>
         </div>
-      </div>
-
-      {/* ── Splitter (PROMPT-v6 §2) — sürükleyince grid yüksekliği değişir ── */}
-      <div
-        role="separator"
-        aria-orientation="horizontal"
-        aria-label={t('qc.splitter')}
-        tabIndex={0}
-        className="mx-4 flex h-2 shrink-0 cursor-row-resize items-center justify-center rounded bg-border/60 hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        onPointerDown={startSplitterDrag}
-        onKeyDown={(e) => {
-          // Klavye ile de ayarlanabilir (↑/↓ 24px).
-          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return
-          e.preventDefault()
-          const cur = topRef.current?.getBoundingClientRect().height ?? 240
-          setTopH(Math.min(Math.max(cur + (e.key === 'ArrowDown' ? 24 : -24), 72), window.innerHeight - 220))
-        }}
-      >
-        <div className="h-0.5 w-10 rounded bg-muted-foreground/40" />
-      </div>
+      </ResizableTop>
 
       {/* ── Filtre barı (PROMPT-v7 §4) — gridin hemen üstünde kompakt yatay
            bar; sol dikey Filtreme kartının yerini aldı. Alan seti ve davranış
            (Sipariş No diğerlerini ezer, default Kontrol, Ara/Reset) AYNEN. */}
-      <div className="shrink-0 px-4 pb-2">
+      <div className="px-4 py-2">
         {/* SR-5 — ortak FilterBar: Enter/F8 arar, Sıfırla legacy resetButton_Click. */}
         <FilterBar
           onSubmit={submitSearch}
           submitLabel={t('qc.filter.ara')}
+          // Scaling Faz 1 — dar ekranda filtreler gizlenip tabloya yer açılabilir.
+          collapsible
+          activeCount={(Object.keys(filters) as (keyof Filters)[]).filter((k) => filters[k] !== defaultFilters()[k]).length}
           onReset={() => {
             // Legacy resetButton_Click → DataGrid(): defaultlar + pending listesi + detay temizliği
             setFilters(defaultFilters())
@@ -782,9 +768,9 @@ export function QualityControlPage() {
       </div>
 
       {/* ── Alt bölge: master grid (tam genişlik, iç scroll) ───────────── */}
-      <div className="flex-1 min-h-0 px-4 pb-2">
-        <div className="h-full overflow-auto rounded-md">
+      <FillRegion>
           <DataTable
+            fill
             tableId="qc"
             exportFileName="kontrol"
             columns={columns}
@@ -793,6 +779,8 @@ export function QualityControlPage() {
             loading={loading}
             error={submitted !== null ? searchError : pendingError}
             density="compact"
+            // Scaling Faz 1 — tek satır: satır yüksekliği ~45 → ~34px.
+            singleLineRows
             emptyMessage={submitted !== null ? t('qc.noResults') : t('qc.noPending')}
             activeRowKey={selected}
             onActiveRowChange={(r) => setSelected(r.siparisNo)}
@@ -814,11 +802,11 @@ export function QualityControlPage() {
             ]}
             rowClassName={(r) => cn(
               // Onaylı satırlar hafif yeşil zemin — bekleyenlerden ayırt için (lejant üstte).
-              r.kontrol === 'Onay' && 'bg-success-soft/50',
+              // --pin-tint: sabit Sipariş No hücresi de aynı tonu alsın (DataTable PIN_BG).
+              r.kontrol === 'Onay' && 'bg-success-soft/50 [--pin-tint:hsl(var(--success-soft)/0.5)]',
             )}
           />
-        </div>
-      </div>
+      </FillRegion>
 
       {/* ── Reddet dialog'u (legacy KontrolRed formu) ──────────────────── */}
       <Dialog open={rejectOpen} onOpenChange={(o) => { if (!o) { setRejectOpen(false); setRedNotu('') } }}>
@@ -861,6 +849,6 @@ export function QualityControlPage() {
 
       {/* ── Form'u getir — salt-okunur sipariş formu (legacy buttonFormGetir) ── */}
       <OrderDetailModal siparisNo={formNo} onClose={() => setFormNo(null)} />
-    </div>
+    </FillPage>
   )
 }

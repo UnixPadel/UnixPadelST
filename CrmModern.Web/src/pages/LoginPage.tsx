@@ -3,6 +3,7 @@ import { useNavigate, Navigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { login } from '@/api/auth'
+import { describeApiError } from '@/lib/axios'
 import { useAuth } from '@/hooks/useAuth'
 import { getRememberedLogin, saveRememberedLogin, clearRememberedLogin } from '@/lib/authStore'
 import { useToast } from '@/components/ToastProvider'
@@ -39,8 +40,10 @@ export function LoginPage() {
       else clearRememberedLogin()
       navigate('/dashboard', { replace: true })
     },
-    onError: () => {
-      toast({ title: t('common.error'), description: t('login.invalidCredentials'), variant: 'destructive' })
+    // Sunucunun söylediğini göster (hatalı şifre, pasif hesap, sunucuya ulaşılamıyor…);
+    // önceden her hata "şifre hatalı" görünüyordu.
+    onError: (e) => {
+      toast({ title: t('common.error'), description: describeApiError(e) || t('login.invalidCredentials'), variant: 'destructive' })
     },
   })
 

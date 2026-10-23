@@ -50,7 +50,8 @@ export function SetTabPanel({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_140px_90px_auto] md:items-end">
+      {/* Scaling Faz 3 — pencereye değil orta kolonun genişliğine göre (NewOrderPage `cq`). */}
+      <div className="grid grid-cols-1 gap-2 cq-md:grid-cols-[minmax(0,1fr)_140px_90px_auto] cq-md:items-end">
         <FormField label={t('orders.form.anaUrun')} id={`${fieldPrefix}-cat`}>
           <Combobox
             options={categoryOptions}
@@ -141,9 +142,9 @@ export function SetTabPanel({
               <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.bilesenAdiLabel')}</th>
               <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.oznitelik')}</th>
               <th className="px-2 py-1.5 text-left font-medium text-muted-foreground">{t('orders.form.birim')}</th>
-              <th className="w-20 px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orders.form.adet')}</th>
-              <th className="w-28 px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orders.form.birimFiyat')} ({isoSymbol(viewIso)})</th>
-              <th className="w-28 px-2 py-1.5 text-right font-medium text-muted-foreground" title={t('orders.form.infoOnlyHint')}>
+              <th className="w-16 px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orders.form.adet')}</th>
+              <th className="w-24 px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orders.form.birimFiyat')} ({isoSymbol(viewIso)})</th>
+              <th className="w-24 px-2 py-1.5 text-right font-medium text-muted-foreground" title={t('orders.form.infoOnlyHint')}>
                 {t('orders.form.toplam')} <span className="font-normal">({t('orders.form.infoOnly')})</span>
               </th>
             </tr>

@@ -6,6 +6,7 @@ import { getCustomers, deleteCustomer } from '@/api/customers'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdmin } from '@/lib/permissions'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,7 +88,7 @@ export function CustomersPage() {
     { key: 'bolge',       header: t('customers.fields.bolge'), render: (r) => (r.bolge as string) ?? '—' },
     // Round-8 §10 — Sil aksiyonu yalnız elshan.rasulov'a render edilir.
     ...(canDelete ? [{
-      key: 'actions',
+      key: 'actions', pin: 'right',
       header: t('common.actions'),
       render: (r: Musteri & Record<string, unknown>) => (
         <Button size="xs" variant="destructive"
@@ -99,12 +100,14 @@ export function CustomersPage() {
   ]
 
   return (
-    <div>
-      <PageHeader
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact"
         title={t('customers.title')}
         actions={canAdd ? <Button onClick={() => nav('/customers/new')}>{t('common.add')}</Button> : undefined}
       />
-      <div className="p-6 space-y-3">
+      <div className="space-y-2 px-4 pt-2">
         <div className="max-w-md">
           <Input
             placeholder={t('customers.searchPlaceholder')}
@@ -112,7 +115,10 @@ export function CustomersPage() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
+      </div>
+      <FillRegion className="pt-2">
         <DataTable
+          fill
           columns={cols}
           data={filtered as (Musteri & Record<string, unknown>)[]}
           keyField="musteriID"
@@ -120,7 +126,7 @@ export function CustomersPage() {
           density="compact"
           onRowClick={canEdit ? (r) => nav(`/customers/${(r as Musteri).musteriID}/edit`) : undefined}
         />
-      </div>
+      </FillRegion>
 
       {/* Round-8 §10 — elshan-only silme onayı */}
       <Dialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null) }}>
@@ -136,6 +142,6 @@ export function CustomersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </FillPage>
   )
 }

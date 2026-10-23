@@ -37,3 +37,11 @@ export function sumByCurrency<T>(rows: T[], amount: (r: T) => number | null | un
   }
   return [...map.entries()]
 }
+
+/** Tek döviz grubunun toplamı (DataTable footerGroups ile: footer zaten grup satırlarıyla çağrılır). */
+export function sumOf<T>(rows: T[], amount: (r: T) => number | null | undefined): number {
+  return rows.reduce((acc, r) => {
+    const a = Number(amount(r))
+    return Number.isFinite(a) ? acc + a : acc
+  }, 0)
+}

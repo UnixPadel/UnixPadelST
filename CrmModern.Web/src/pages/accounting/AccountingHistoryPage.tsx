@@ -8,14 +8,14 @@ import {
 import { getCustomers, getUlkeler } from '@/api/customers'
 import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
+import { FilterBar, FilterField } from '@/components/FilterBar'
 import { DataTable, type Column } from '@/components/DataTable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AutocompleteInput } from '@/components/AutocompleteInput'
 import { DecimalInput } from '@/components/DecimalInput'
-import { KPICard } from '@/components/KPICard'
 import { CancelTransactionDialog, CancelTxButton, type CancelTxTarget } from '@/components/CancelTransactionDialog'
 import { useToast } from '@/components/ToastProvider'
 import { useAuth } from '@/hooks/useAuth'
@@ -171,113 +171,97 @@ export function AccountingHistoryPage() {
   const totals = page?.currencyTotals ?? { Euro: 0, Dolar: 0, TL: 0, Sterlin: 0 }
 
   return (
-    <div>
+    // Scaling Faz 2 — FillPage: filtreler ortak FilterBar'da (tek satır), döviz
+    // toplamları KPI kartları yerine tek satır şerit; tablo kalan yüksekliği
+    // doldurur (başlık yapışık), sayfalama altta hep görünür.
+    <FillPage>
       <PageHeader
+        density="compact"
         title={t('accounting.historyTitle')}
         actions={hideMoney ? undefined : <Button variant="outline" size="sm" loading={exporting} title={t('accounting.history.excelHint')} onClick={onExport}>{t('common.excel')}</Button>}
       />
 
-      <div className="p-6 space-y-4">
+      <div className="space-y-2 px-4 pt-2">
+        <FilterBar onReset={reset}>
+          <FilterField label={t('common.orderNo')}>
+            <Input inputSize="sm" value={filter.siparisNo ?? ''} onChange={(e) => update('siparisNo', e.target.value || undefined)} />
+          </FilterField>
+          <FilterField label={t('common.customer')}>
+            <AutocompleteInput
+              inputSize="sm"
+              value={filter.musteriAd ?? ''}
+              onChange={(v) => update('musteriAd', v.trim() ? v : undefined)}
+              options={musteriOptions}
+              placeholder={t('accounting.filter.musteriPlaceholder')}
+            />
+          </FilterField>
+          <FilterField label={t('accounting.filter.ulke')}>
+            <Select
+              value={filter.mUlke ?? SENTINEL_ALL}
+              onValueChange={(v) => update('mUlke', v === SENTINEL_ALL ? undefined : v)}
+            >
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
+                {ulkeler.map((u) => (
+                  <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <FilterField label={t('common.representative')}>
+            <Select
+              value={filter.kullaniciID ? String(filter.kullaniciID) : SENTINEL_ALL}
+              onValueChange={(v) => update('kullaniciID', v === SENTINEL_ALL ? undefined : Number(v))}
+            >
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
+                {temsilciUsers.map((u) => (
+                  <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
+                    {`${u.ad} ${u.soyad}`.trim()}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </FilterField>
+          <FilterField label={t('accounting.filter.odemeDurumu')}>
+            <DecimalInput
+              inputSize="sm"
+              value={filter.odenenMiktar ?? ''}
+              onValueChange={(v) => update('odenenMiktar', v === '' ? undefined : v)}
+              placeholder={t('accounting.filter.odemePlaceholder')}
+            />
+          </FilterField>
+          <FilterField label={t('common.startDate')}>
+            <Input inputSize="sm" type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => update('baslangicTarih', e.target.value || undefined)} />
+          </FilterField>
+          <FilterField label={t('common.endDate')}>
+            <Input inputSize="sm" type="date" value={filter.bitisTarih ?? ''} onChange={(e) => update('bitisTarih', e.target.value || undefined)} />
+          </FilterField>
+        </FilterBar>
 
-        {/* Filter strip */}
-        <div className="rounded-md border bg-card p-3 space-y-3">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1">
-              <Label>{t('common.orderNo')}</Label>
-              <Input value={filter.siparisNo ?? ''} onChange={(e) => update('siparisNo', e.target.value || undefined)} />
-            </div>
-
-            <div className="space-y-1">
-              <Label>{t('common.customer')}</Label>
-              <AutocompleteInput
-                value={filter.musteriAd ?? ''}
-                onChange={(v) => update('musteriAd', v.trim() ? v : undefined)}
-                options={musteriOptions}
-                placeholder={t('accounting.filter.musteriPlaceholder')}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>{t('accounting.filter.ulke')}</Label>
-              <Select
-                value={filter.mUlke ?? SENTINEL_ALL}
-                onValueChange={(v) => update('mUlke', v === SENTINEL_ALL ? undefined : v)}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
-                  {ulkeler.map((u) => (
-                    <SelectItem key={u.ulkelerID} value={u.ulkeAdi}>{u.ulkeAdi}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label>{t('common.representative')}</Label>
-              <Select
-                value={filter.kullaniciID ? String(filter.kullaniciID) : SENTINEL_ALL}
-                onValueChange={(v) => update('kullaniciID', v === SENTINEL_ALL ? undefined : Number(v))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
-                  {temsilciUsers.map((u) => (
-                    <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
-                      {`${u.ad} ${u.soyad}`.trim()}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label>{t('accounting.filter.odemeDurumu')}</Label>
-              <DecimalInput
-                value={filter.odenenMiktar ?? ''}
-                onValueChange={(v) => update('odenenMiktar', v === '' ? undefined : v)}
-                placeholder={t('accounting.filter.odemePlaceholder')}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>{t('common.startDate')}</Label>
-              <Input type="date" value={filter.baslangicTarih ?? ''} onChange={(e) => update('baslangicTarih', e.target.value || undefined)} />
-            </div>
-            <div className="space-y-1">
-              <Label>{t('common.endDate')}</Label>
-              <Input type="date" value={filter.bitisTarih ?? ''} onChange={(e) => update('bitisTarih', e.target.value || undefined)} />
-            </div>
-
-            <div className="space-y-1 flex items-end">
-              <Button variant="outline" className="w-full" onClick={reset}>
-                {t('accounting.filter.reset')}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Currency totals strip — Round-11 §3: omur.caliskan için gizli (para birimi toplamları). */}
-        {!hideMoney && (
-          <div>
-            <p className="text-xs uppercase text-muted-foreground font-medium mb-2">
-              {t('accounting.filter.totalsLabel')}
-            </p>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {/* Sonuç sayısı + döviz toplamları — Round-11 §3: omur.caliskan için toplamlar gizli. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            {t('accounting.filter.rowCount')}: <span className="font-semibold text-foreground">{page?.totalCount ?? 0}</span>
+            {isFetching && !isLoading && <span className="ml-2 animate-pulse">{t('table.refreshing')}</span>}
+          </span>
+          {!hideMoney && (
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="font-medium uppercase">{t('accounting.filter.totalsLabel')}:</span>
               {/* Yüklenirken 0 yerine "…" — sıfır sanılmasın. */}
               {(['Euro', 'Dolar', 'TL', 'Sterlin'] as const).map((c) => (
-                <KPICard key={c} baslik={c} deger={isLoading ? '…' : formatCurrency(totals[c] ?? 0, c)} />
+                <span key={c} className="rounded border bg-card px-2 py-0.5">
+                  {c} <span className="font-semibold tabular-nums text-foreground">{isLoading ? '…' : formatCurrency(totals[c] ?? 0, c)}</span>
+                </span>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Result count */}
-        <div className="text-sm text-muted-foreground">
-          {t('accounting.filter.rowCount')}: <span className="font-semibold text-foreground">{page?.totalCount ?? 0}</span>
-          {isFetching && !isLoading && <span className="ml-2 animate-pulse">{t('table.refreshing')}</span>}
+            </span>
+          )}
         </div>
+      </div>
 
+      <FillRegion className="pt-2">
         {/* Installment-grouped view (Yonetici + Muhasebe) */}
         {showInstallments ? (
           <InstallmentTable
@@ -292,28 +276,30 @@ export function AccountingHistoryPage() {
           />
         ) : (
           <DataTable
+            fill
             columns={legacyCols}
             data={(page?.items ?? []) as unknown as LegacyRow[]}
             keyField="id"
             loading={isLoading}
           />
         )}
+      </FillRegion>
 
         {/* Pagination — only meaningful in the legacy per-transaction view.
             Installment view loads up to 200 per page; pagination still works
             but a SiparisNo may straddle pages (acceptable v1 limitation). */}
         {page && (
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex items-center justify-between px-4 pb-2 text-xs">
             <span className="text-muted-foreground">
               {t('common.total')}: {page.totalCount} • {t('table.pageOf', { page: page.page, count: Math.max(1, Math.ceil(page.totalCount / (page.pageSize || DEFAULT_PAGE_SIZE))) })}
             </span>
             <div className="flex gap-2">
-              <Button size="sm" variant="outline"
+              <Button size="xs" variant="outline"
                 disabled={(filter.page ?? 1) <= 1}
                 onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) - 1 }))}>
                 {t('common.previous')}
               </Button>
-              <Button size="sm" variant="outline"
+              <Button size="xs" variant="outline"
                 disabled={page.items.length < (filter.pageSize ?? DEFAULT_PAGE_SIZE)}
                 onClick={() => setFilter((f) => ({ ...f, page: (f.page ?? 1) + 1 }))}>
                 {t('common.next')}
@@ -321,10 +307,9 @@ export function AccountingHistoryPage() {
             </div>
           </div>
         )}
-      </div>
 
       <CancelTransactionDialog target={cancelTarget} onClose={() => setCancelTarget(null)} />
-    </div>
+    </FillPage>
   )
 }
 
@@ -354,9 +339,9 @@ function InstallmentTable({
   )
 
   return (
-    <div className="rounded-md border bg-card overflow-x-auto">
+    <div className="h-full overflow-auto rounded-md border bg-card">
       <table className="w-full text-sm">
-        <thead className="bg-muted/30 text-xs uppercase">
+        <thead className="sticky top-0 z-10 bg-muted text-xs uppercase">
           <tr>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.siparisNo')}</th>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.musteri')}</th>

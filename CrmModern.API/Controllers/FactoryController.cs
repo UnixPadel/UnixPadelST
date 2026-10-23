@@ -108,7 +108,7 @@ public sealed class FactoryController(
     {
         var data = await orderService.GetAttachmentAsync(siparisNo, type);
         if (data is null || data.Length == 0)
-            return NotFound(ApiResponse<object>.Fail("Ek bulunamadı."));
+            return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
         return File(data, "application/octet-stream", $"{type}_{siparisNo}.bin");
     }
 }

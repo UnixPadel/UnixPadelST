@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { Copy, Eye, FileCheck2, MessageSquareWarning, PencilLine, Pencil, Plus, Trash2 } from 'lucide-react'
 import { getMyOrders, convertToOrder, getRejectionNote, deleteOrder } from '@/api/orders'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column, type RowAction } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { OrderKontrolBadge } from '@/components/OrderKontrolBadge'
@@ -147,7 +148,7 @@ export function MyOrdersPage() {
   ]
 
   const cols: Column<Row>[] = [
-    { key: 'numara', header: t('myOrders.cols.numara'), sortable: true, hideable: false, sortValue: (r) => rowNo(r), exportValue: (r) => rowNo(r),
+    { key: 'numara', pin: 'left', header: t('myOrders.cols.numara'), sortable: true, hideable: false, sortValue: (r) => rowNo(r), exportValue: (r) => rowNo(r),
       render: (r) => (
         <span className="flex items-center gap-1.5">
           <span className={`font-mono ${r.silindi ? 'text-muted-foreground line-through' : ''}`}>{rowNo(r)}</span>
@@ -155,7 +156,7 @@ export function MyOrdersPage() {
           {!r.silindi && r.guncellendi && <Badge variant="warning" title={r.degisiklikGerekce ?? undefined}>{t('myOrders.badge.guncellendi')}</Badge>}
         </span>
       ) },
-    { key: 'musteriAd', header: t('myOrders.cols.musteriAd'), sortable: true },
+    { key: 'musteriAd', truncate: '16rem', header: t('myOrders.cols.musteriAd'), sortable: true },
     // PROMPT-v4 §6.2 — sahip kolonu yalnız elshan görünümünde
     ...(isGlobalViewer ? [{
       key: 'kullaniciAdSoyad', header: t('myOrders.cols.temsilci'), sortable: true,
@@ -168,7 +169,7 @@ export function MyOrdersPage() {
     { key: 'tarih', header: t('myOrders.cols.tarih'), sortable: true, type: 'date',
       render: (r) => formatDate(r.tarih) },
     {
-      key: 'actions', header: t('myOrders.cols.actions'), hideable: false, exportValue: false,
+      key: 'actions', pin: 'right', header: t('myOrders.cols.actions'), hideable: false, exportValue: false,
       render: (r) => (
         <div className="flex items-center gap-1">
           <Button size="xs" variant="outline" onClick={() => setActiveNo(rowNo(r))}>{t('myOrders.actions.formGoster')}</Button>
@@ -189,12 +190,14 @@ export function MyOrdersPage() {
   ]
 
   return (
-    <div>
-      <PageHeader
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact"
         title={t('myOrders.title')}
         actions={<Button size="sm" onClick={() => nav('/orders/new')}><Plus className="h-4 w-4" /> {t('myOrders.newOrder')}</Button>}
       />
-      <div className="space-y-3 p-4 lg:p-6">
+      <div className="space-y-2 px-4 pt-2">
         <FilterBar onReset={reset} tableId="my-orders" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
           {isGlobalViewer && (
             <FilterField label={t('common.representative')}>
@@ -247,10 +250,12 @@ export function MyOrdersPage() {
             <Input inputSize="sm" type="date" value={f.to} onChange={(e) => set('to', e.target.value)} />
           </FilterField>
         </FilterBar>
-
+      </div>
+      <FillRegion className="pt-2">
         {/* §22 — Siparişlerim'de Notlar bölümü gizli (hideNotes). */}
-        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)} hideNotes>
+        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} hideNotes>
           <DataTable
+            fill
             tableId="my-orders"
             exportFileName="siparislerim"
             columns={cols}
@@ -263,7 +268,7 @@ export function MyOrdersPage() {
             rowActions={actions}
           />
         </MasterDetailLayout>
-      </div>
+      </FillRegion>
 
       {/* Red Notu — inline dialog (legacy MessageBox replacement) */}
       <Dialog open={!!redTarget} onOpenChange={(o) => { if (!o) setRedTarget(null) }}>
@@ -286,6 +291,6 @@ export function MyOrdersPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </FillPage>
   )
 }

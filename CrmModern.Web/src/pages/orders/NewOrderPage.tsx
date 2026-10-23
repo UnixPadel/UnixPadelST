@@ -765,7 +765,8 @@ export function NewOrderPage() {
         ) : undefined}
       />
 
-      <div className="space-y-4 p-4 lg:p-6">
+      {/* Scaling Faz 3 — `cq`: kolon düzeni pencereye değil bu kabın genişliğine göre. */}
+      <div className="cq space-y-4 p-4 lg:p-6">
         {/* Kayıt sonrası başarı paneli — önceden butonlar sessizce kilitleniyordu. */}
         {createdNo && (
           <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-success/40 bg-success-soft px-4 py-3 text-success-soft-foreground">
@@ -860,19 +861,24 @@ export function NewOrderPage() {
           ))}
         </nav>
 
+        {/* Scaling Faz 3 — kab ≥86rem: 3 kolon (müşteri | setler | özet); 56–86rem:
+            2 kolon (müşteri + setler alt alta | özet) → 1280–1536px pencerede orta
+            kolon ~320px'e sıkışmaz; daha dar: tek kolon. */}
         <div
-          className="grid grid-cols-1 gap-4 xl:grid-cols-[300px_minmax(0,1fr)_340px]"
+          className="grid grid-cols-1 gap-4 cq-lg:grid-cols-[minmax(0,1fr)_300px] cq-2xl:grid-cols-[300px_minmax(0,1fr)_340px]"
           onKeyDown={prefs.enterNavigation ? onEnterNav : undefined}
         >
           {/* ── SOL: MÜŞTERİ + TEMSİLCİ ─────────────────────────────────── */}
-          <div className="min-w-0 space-y-4">
-            <section id="sec-customer" className="scroll-mt-14 space-y-2 rounded-md border bg-card p-3">
-              <SectionTitle actions={
+          {/* `cq`: 2 kolonlu düzende bu kolon geniş (≥640px) → bölüm alanları yan
+              yana dizilir (müşteri 3, temsilci 2–4 kolon); 3 kolonlu düzende 300px'te alt alta. */}
+          <div className="cq grid min-w-0 content-start gap-4 cq-lg:col-start-1 cq-lg:row-start-1">
+            <section id="sec-customer" className="scroll-mt-14 space-y-2 rounded-md border bg-card p-3 cq-md:grid cq-md:grid-cols-3 cq-md:items-start cq-md:gap-x-3 cq-md:gap-y-2 cq-md:space-y-0">
+              <SectionTitle className="cq-md:col-span-3" actions={
                 <Button type="button" variant="ghost" size="xs" onClick={() => nav('/customers/new')} title={t('orders.form.musteriEkle')}>
                   <UserPlus className="h-3.5 w-3.5" /> {t('common.add')}
                 </Button>
               }>{t('orders.sections.musteri')}</SectionTitle>
-              <FormField label={t('orders.form.musteri')} hint={t('orders.form.musteriHint')}>
+              <FormField className="cq-md:col-span-2" label={t('orders.form.musteri')} hint={t('orders.form.musteriHint')}>
                 <Combobox
                   options={customerOptions}
                   value={effectiveCustomerId ? String(effectiveCustomerId) : ''}
@@ -884,7 +890,7 @@ export function NewOrderPage() {
               </FormField>
               {/* E-16 — açık bakiye (bilgilendirici, engellemez). */}
               {openLines.length > 0 && (
-                <div className="rounded-md border border-warning/40 bg-warning-soft px-2 py-1.5 text-xs text-warning-soft-foreground">
+                <div className="rounded-md border border-warning/40 bg-warning-soft px-2 py-1.5 text-xs text-warning-soft-foreground cq-md:col-span-3">
                   <span className="font-medium">{t('orders.form.openBalance')}:</span>{' '}
                   {openLines.map((l) => formatMoney(l.kalan, l.paraTipi)).join(' · ')}
                 </div>
@@ -910,13 +916,13 @@ export function NewOrderPage() {
               <FormField label={t('orders.form.vat')}>
                 <Input value={form.mVATNumarasi ?? ''} onChange={(e) => setForm((f) => ({ ...f, mVATNumarasi: e.target.value }))} />
               </FormField>
-              <FormField label={t('orders.form.adres')}>
+              <FormField className="cq-md:col-span-2" label={t('orders.form.adres')}>
                 <Textarea rows={3} value={form.mAdres ?? ''} onChange={(e) => setForm((f) => ({ ...f, mAdres: e.target.value }))} />
               </FormField>
             </section>
 
-            <section className="space-y-2 rounded-md border bg-card p-3">
-              <SectionTitle>{t('orders.sections.temsilci')}</SectionTitle>
+            <section className="space-y-2 rounded-md border bg-card p-3 cq-md:grid cq-md:grid-cols-2 cq-md:items-start cq-md:gap-x-3 cq-md:gap-y-2 cq-md:space-y-0 cq-lg:grid-cols-4">
+              <SectionTitle className="cq-md:col-span-full">{t('orders.sections.temsilci')}</SectionTitle>
               <FormField label={t('orders.form.temsilciIsmi')}>
                 <Input value={temsilciAdSoyad} readOnly disabled data-enter-skip />
               </FormField>
@@ -967,7 +973,7 @@ export function NewOrderPage() {
           </div>
 
           {/* ── ORTA: SETLER + SERBEST KALEMLER + TESLİMAT ──────────────── */}
-          <div className="min-w-0 space-y-4">
+          <div className="cq min-w-0 space-y-4 cq-lg:col-start-1 cq-lg:row-start-2 cq-2xl:col-start-2 cq-2xl:row-start-1">
             <section id="order-sets" className="scroll-mt-14 rounded-md border bg-card">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <div className="flex items-center gap-2 border-b px-2">
@@ -1063,8 +1069,8 @@ export function NewOrderPage() {
                   />
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="grid grid-cols-[1fr_80px_auto] items-end gap-2">
+                <div className="grid gap-3 cq-md:grid-cols-2">
+                  <div className="grid grid-cols-[minmax(7rem,1fr)_4.5rem_auto] items-end gap-2">
                     <FormField label={t('orders.form.montajFiyat')} prefix={sym}>
                       <DecimalInput value={form.montajFiyat} disabled={!form.montajVar}
                         onValueChange={(v) => setForm((f) => ({ ...f, montajFiyat: v === '' ? 0 : v }))} />
@@ -1077,7 +1083,7 @@ export function NewOrderPage() {
                       {t('orders.form.carp')}
                     </Button>
                   </div>
-                  <div className="grid grid-cols-[1fr_80px_auto] items-end gap-2">
+                  <div className="grid grid-cols-[minmax(7rem,1fr)_4.5rem_auto] items-end gap-2">
                     <FormField label={t('orders.form.teslimatFiyat')} prefix={sym}>
                       <DecimalInput value={form.teslimatFiyat} disabled={!form.teslimatVar}
                         onValueChange={(v) => setForm((f) => ({ ...f, teslimatFiyat: v === '' ? 0 : v }))} />
@@ -1093,7 +1099,7 @@ export function NewOrderPage() {
                 </div>
 
                 <div className="space-y-2 border-t pt-3">
-                  <div className="grid gap-2 md:grid-cols-[1fr_120px]">
+                  <div className="grid gap-2 cq-sm:grid-cols-[1fr_120px]">
                     <FormField label={t('orders.form.teslimAlanAdi')}>
                       <Combobox
                         options={deliveryOptions}
@@ -1124,7 +1130,7 @@ export function NewOrderPage() {
                       {t('orders.form.sameAsCustomer')}
                     </Button>
                   </div>
-                  <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2 cq-md:grid-cols-3">
                     <FormField label={t('orders.form.ulke')}>
                       <Combobox options={countryOptions} value={form.tUlke ?? ''} onValueChange={(v) => setForm((f) => ({ ...f, tUlke: v }))} placeholder={t('orders.form.ulkeSec')} />
                     </FormField>
@@ -1189,7 +1195,9 @@ export function NewOrderPage() {
           </div>
 
           {/* ── SAĞ: ÖZET (yapışkan) + CARİ BİLGİ ──────────────────────── */}
-          <div className="min-w-0 space-y-4 xl:sticky xl:top-12 xl:max-h-[calc(100vh-9rem)] xl:self-start xl:overflow-y-auto">
+          {/* Yapışkan ray yüksekliği gerçek kabuktan: topbar 56 + durum çubuğu 28 +
+              bölüm çubuğu (top-12) 48 + alt aksiyon çubuğu ~64 → 100vh − 12.5rem. */}
+          <div className="min-w-0 space-y-4 cq-lg:sticky cq-lg:top-12 cq-lg:col-start-2 cq-lg:row-span-2 cq-lg:row-start-1 cq-lg:max-h-[calc(100vh-12.5rem)] cq-lg:self-start cq-lg:overflow-y-auto cq-2xl:col-start-3 cq-2xl:row-span-1">
             <OrderSummaryRail
               totals={totals}
               sym={sym}

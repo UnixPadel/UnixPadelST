@@ -7,6 +7,7 @@ import { getReadyForShipment, createShipment } from '@/api/logistics'
 import { INCOTERMS } from '@/lib/constants'
 import { stageLabel } from '@/lib/status'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -107,8 +108,8 @@ export function LogisticsReadyPage() {
   // Round-8 §12 — müşteri Peşin/Vadeli kolonu kaldırıldı; taşıyıcı anlaşması
   // sevkiyat oluşturulurken girilir.
   const cols: Column<Row>[] = [
-    { key: 'siparisNo',         header: t('common.orderNo'), sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
-    { key: 'musteriAd',         header: t('common.customer'), sortable: true },
+    { key: 'siparisNo', pin: 'left', header: t('common.orderNo'), sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
+    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'), sortable: true },
     { key: 'mUlke',             header: t('common.country'), sortable: true },
     { key: 'siparisMiTeklifMi', header: t('common.stage'), sortable: true, render: (r) => (
       // Üretimdeki sipariş lojistikte "Hazırlanıyor" olarak yansır (gerçek aşama 'Uretim').
@@ -119,7 +120,7 @@ export function LogisticsReadyPage() {
     { key: 'onayliFirma',       header: t('logistics.approvedOffer'), render: (r) => r.onayliFirma ? `${r.onayliFirma}${r.onayliCesit ? ` · ${r.onayliCesit}` : ''}` : '—' },
     { key: 'tarih',             header: t('common.date'), sortable: true, type: 'date', render: (r) => formatDate((r.tarih as string) ?? '-') },
     {
-      key: 'actions', header: t('common.actions'), hideable: false, exportValue: false,
+      key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
       render: (r) => {
         // Sevk yalnız 'Hazir' aşamasında yapılabilir; 'Hazırlanıyor' (Uretim) için pasif.
         const canShip = r.siparisMiTeklifMi === 'Hazir'
@@ -138,9 +139,11 @@ export function LogisticsReadyPage() {
   ])
 
   return (
-    <div>
-      <PageHeader title={t('logistics.readyTitle')} description={t('logistics.readyDescription')} />
-      <div className="space-y-3 p-4 lg:p-6">
+    // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
+    // (başlık + araç çubuğu yerinde kalır).
+    <FillPage>
+      <PageHeader density="compact" actions={<WaitingUpstreamPanel screen="logistics-ready" variant="button" />} title={t('logistics.readyTitle')} description={t('logistics.readyDescription')} />
+      <div className="space-y-2 px-4 pt-2">
         <FilterBar onReset={reset} tableId="logistics-ready" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
           <FilterField label={t('common.orderNo')}>
             <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
@@ -158,12 +161,11 @@ export function LogisticsReadyPage() {
             </Select>
           </FilterField>
         </FilterBar>
-
-        {/* İç denetim — Hazır ama sevke açılmamış: Muhasebe lojistik onayı (2. peşinat) bekleyenler. */}
-        <WaitingUpstreamPanel screen="logistics-ready" />
-
-        <MasterDetailLayout siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
+      </div>
+      <FillRegion className="pt-2">
+        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
           <DataTable
+            fill
             tableId="logistics-ready"
             exportFileName="lojistik-hazir"
             columns={cols}
@@ -181,7 +183,7 @@ export function LogisticsReadyPage() {
             ]}
           />
         </MasterDetailLayout>
-      </div>
+      </FillRegion>
 
       <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null) }}>
         <DialogContent size="md">
@@ -226,6 +228,6 @@ export function LogisticsReadyPage() {
           </form>
         </DialogContent>
       </Dialog>
-    </div>
+    </FillPage>
   )
 }

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PanelRightClose, Maximize2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,24 +8,28 @@ import { cn } from '@/lib/utils'
 /**
  * E-9 — Fiori Flexible Column Layout: liste solda, sipariş detayı sağda.
  * Detay için modal açıp kapamak yerine ↑/↓ ile satır değiştikçe sağ panel
- * güncellenir. Dar ekranlarda (<1280px) aynı detay modal olarak açılır.
- * Panel genişliği kullanıcı tercihi olarak hatırlanır.
+ * güncellenir. Dar alanda aynı detay modal olarak açılır.
+ * Scaling Faz 2 — "dar/geniş" kararı pencereye değil kabın kendi genişliğine
+ * göre (sidebar açık/kapalı, zoom fark etmez). `fill` → FillRegion içinde liste
+ * ve panel kalan yüksekliği doldurur, ikisi de kendi içinde kayar.
  */
-const WIDE = '(min-width: 1280px)'
+const WIDE_MIN = 960
 
-function useIsWide() {
-  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(WIDE).matches)
+function useElementWidth(ref: React.RefObject<HTMLElement>) {
+  const [w, setW] = useState(0)
   useEffect(() => {
-    const mq = window.matchMedia(WIDE)
-    const on = () => setWide(mq.matches)
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
-  }, [])
-  return wide
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setW(el.clientWidth))
+    ro.observe(el)
+    setW(el.clientWidth)
+    return () => ro.disconnect()
+  }, [ref])
+  return w
 }
 
 export function MasterDetailLayout({
-  children, siparisNo, onClose, factoryView, logisticsView, hideNotes, className,
+  children, siparisNo, onClose, factoryView, logisticsView, hideNotes, className, fill,
 }: {
   children: React.ReactNode
   siparisNo: string | null
@@ -34,28 +38,33 @@ export function MasterDetailLayout({
   logisticsView?: boolean
   hideNotes?: boolean
   className?: string
+  fill?: boolean
 }) {
   const { t } = useTranslation()
-  const wide = useIsWide()
+  const ref = useRef<HTMLDivElement>(null)
+  const width = useElementWidth(ref)
+  const wide = width >= WIDE_MIN
   const [modalNo, setModalNo] = useState<string | null>(null)
   const viewProps = { factoryView, logisticsView, hideNotes }
-
-  if (!wide) {
-    return (
-      <>
-        {children}
-        <OrderDetailModal siparisNo={siparisNo} onClose={onClose} {...viewProps} />
-      </>
-    )
-  }
+  const side = wide && !!siparisNo
 
   return (
-    <div className={cn('grid gap-4', siparisNo ? 'grid-cols-[minmax(0,1fr)_minmax(420px,38%)]' : 'grid-cols-1', className)}>
-      <div className="min-w-0">{children}</div>
-      {siparisNo && (
+    <div
+      ref={ref}
+      className={cn(
+        side ? 'grid grid-cols-[minmax(0,1fr)_minmax(360px,32%)] gap-4' : 'grid grid-cols-1',
+        fill && 'h-full min-h-0 grid-rows-[minmax(0,1fr)]',
+        className,
+      )}
+    >
+      <div className={cn('min-w-0', fill && 'min-h-0')}>{children}</div>
+      {side && (
         <aside
           aria-label={t('orderDetail.title', { no: siparisNo })}
-          className="sticky top-2 max-h-[calc(100vh-8rem)] min-w-0 self-start overflow-y-auto rounded-md border bg-card p-3 shadow-sm"
+          className={cn(
+            'min-w-0 overflow-y-auto rounded-md border bg-card p-3 shadow-sm',
+            fill ? 'min-h-0' : 'sticky top-2 max-h-[calc(100vh-8rem)] self-start',
+          )}
         >
           <div className="mb-2 flex items-center justify-end gap-1">
             <Button size="icon-sm" variant="ghost" aria-label={t('masterDetail.expand')} title={t('masterDetail.expand')} onClick={() => setModalNo(siparisNo)}>
@@ -68,7 +77,8 @@ export function MasterDetailLayout({
           <OrderDetailPanel siparisNo={siparisNo} embedded {...viewProps} />
         </aside>
       )}
-      <OrderDetailModal siparisNo={modalNo} onClose={() => setModalNo(null)} {...viewProps} />
+      {/* Dar alanda detay modalda; genişte "büyüt" düğmesi aynı modalı açar. */}
+      <OrderDetailModal siparisNo={side ? modalNo : (width ? siparisNo : null)} onClose={side ? () => setModalNo(null) : onClose} {...viewProps} />
     </div>
   )
 }

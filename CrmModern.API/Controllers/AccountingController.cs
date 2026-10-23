@@ -247,7 +247,7 @@ public sealed class AccountingController(IAccountingService accountingService) :
     public async Task<IActionResult> UploadMuhasebeEk(string siparisNo, IFormFile file)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Fail("Dosya boş."));
+            return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         await accountingService.UploadMuhasebeEkAsync(siparisNo, ms.ToArray(), CurrentUserId);

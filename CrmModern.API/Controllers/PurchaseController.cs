@@ -148,7 +148,7 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     {
         var data = await purchaseService.GetAttachmentAsync(talepId);
         if (data is null || data.Veri.Length == 0)
-            return NotFound(ApiResponse<object>.Fail("Ek bulunamadı."));
+            return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
         var tip = string.IsNullOrWhiteSpace(data.Tip) ? "application/octet-stream" : data.Tip;
         return File(data.Veri, tip, data.Ad);
     }
@@ -159,13 +159,13 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     public async Task<IActionResult> UploadAttachment(int talepId, IFormFile file)
     {
         if (file is null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Fail("Dosya boş."));
+            return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
         if (file.Length > MaxEkBytes)
-            return BadRequest(ApiResponse<object>.Fail("Dosya 25 MB sınırını aşıyor."));
+            return BadRequest(ApiResponse<object>.FailCode("fileTooLarge", "Dosya 25 MB'tan büyük.", null));
 
         var ext = Path.GetExtension(file.FileName);
         if (string.IsNullOrWhiteSpace(ext) || !AllowedEkUzantilar.Contains(ext))
-            return BadRequest(ApiResponse<object>.Fail("Desteklenmeyen dosya türü."));
+            return BadRequest(ApiResponse<object>.FailCode("unsupportedFileType", "Bu dosya türü yüklenemez.", null));
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);

@@ -53,7 +53,7 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
     {
         bool exists = await uow.Kullanicilar.KullaniciAdiExistsAsync(dto.KullaniciAdi);
         if (exists)
-            throw new BusinessException($"Bu kullanıcı adı zaten kayıtlı: '{dto.KullaniciAdi}'.");
+            throw new BusinessException($"Bu kullanıcı adı zaten var: {dto.KullaniciAdi}.", "usernameExists", new { username = dto.KullaniciAdi });
 
         var entity = new Kullanici
         {

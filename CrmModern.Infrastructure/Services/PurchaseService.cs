@@ -202,15 +202,15 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         var entity = await GetForStage(talepId, new[] { "Bekliyor", "Ön Onaylandı", "Onay Bekliyor" });
 
         if (!string.IsNullOrEmpty(entity.OdemeTuru))
-            throw new BusinessException($"Talep #{talepId} için ödeme detayı zaten girilmiş.");
+            throw new BusinessException($"#{talepId} talebinin ödeme bilgisi zaten girilmiş.", "paymentDetailsExist", new { id = talepId });
 
         if (!ValidOdemeTuru.Contains(dto.OdemeTuru))
-            throw new BusinessException($"Geçersiz OdemeTuru: '{dto.OdemeTuru}'. Geçerli: {string.Join(", ", ValidOdemeTuru)}");
+            throw new BusinessException($"Geçersiz ödeme türü: {dto.OdemeTuru}.", "invalidPaymentType", new { type = dto.OdemeTuru });
 
         // Negatif tutar yasak
         decimal[] tutarlar = { dto.OdenenTutar ?? 0, dto.OdemeTutari ?? 0, dto.OdemeVadeTutari ?? 0 };
         if (tutarlar.Any(t => t < 0))
-            throw new BusinessException("Negatif tutar girilemez.");
+            throw new BusinessException("Tutar eksi olamaz.", "negativeAmount");
 
         // Tür-bazlı alt-alanlar artık zorunlu değil; girilen değerler olduğu gibi kaydedilir.
 
@@ -247,9 +247,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         // RULE 4: SatinAlma tipinde OdemeTuru IS NULL → BLOK
         var tipi = string.IsNullOrEmpty(entity.TalepTipi) ? "SatinAlma" : entity.TalepTipi;
         if (tipi == "SatinAlma" && string.IsNullOrWhiteSpace(entity.OdemeTuru))
-            throw new BusinessException(
-                "Satın Alma tipi talepler için ödeme bilgisi zorunludur. " +
-                "Lütfen önce Muhasebe bölümü ödeme detayını girsin.");
+            throw new BusinessException("Satın alma talepleri için önce muhasebenin ödeme bilgisini girmesi gerekiyor.", "paymentDetailsRequired");
 
         entity.Durum               = "Onaylandı";
         entity.IslemYapanKullanici = currentUserName;
@@ -262,7 +260,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
     public async Task FinalRejectAsync(int talepId, string currentUserName, string redNotu)
     {
         if (string.IsNullOrWhiteSpace(redNotu))
-            throw new BusinessException("Red gerekçesi zorunlu.");
+            throw new BusinessException("Red sebebi gerekli.", "rejectReasonRequired");
 
         var entity = await GetForStage(
             talepId,
@@ -290,8 +288,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
 
         // Reddedilmiş talep override edilemez — talep sahibi yeniden göndermeli.
         if (entity.Durum == "Reddedildi")
-            throw new BusinessException(
-                "Reddedilmiş talep override edilemez — talep sahibi yeniden göndermeli.");
+            throw new BusinessException("Reddedilen talep doğrudan onaylanamaz; talep sahibi tekrar göndermeli.", "rejectedCannotOverride");
 
         // Ara aşamaların hepsinden (Bekliyor/Onay Bekliyor/Ön Onaylandı/Muhasebe Tamamlandı)
         // doğrudan nihai onaya kısa devre. Ara alanlar (OdemeTuru vb.) NULL kalabilir.
@@ -343,19 +340,19 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         {
             var exists = await uow.PurchaseRequests.GetByIdAsync(talepId);
             if (exists is null) throw new NotFoundException("PurchaseRequest", talepId);
-            throw new BusinessException($"Request {talepId} is not pending and cannot be approved.");
+            throw new BusinessException($"#{talepId} talebi onay beklemiyor, onaylanamaz.", "requestNotPendingApprove", new { id = talepId });
         }
     }
 
     public async Task RejectAsync(int talepId, string redNotu, string islemYapanKullanici)
     {
-        if (string.IsNullOrWhiteSpace(redNotu)) throw new BusinessException("RedNotu cannot be empty.");
+        if (string.IsNullOrWhiteSpace(redNotu)) throw new BusinessException("Red sebebi gerekli.", "rejectReasonRequired");
         int rows = await uow.PurchaseRequests.RejectAsync(talepId, redNotu, islemYapanKullanici, DateTime.Now);
         if (rows == 0)
         {
             var exists = await uow.PurchaseRequests.GetByIdAsync(talepId);
             if (exists is null) throw new NotFoundException("PurchaseRequest", talepId);
-            throw new BusinessException($"Request {talepId} is not pending and cannot be rejected.");
+            throw new BusinessException($"#{talepId} talebi onay beklemiyor, reddedilemez.", "requestNotPendingReject", new { id = talepId });
         }
     }
 
@@ -367,9 +364,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
             ?? throw new NotFoundException("PurchaseRequest", talepId);
 
         if (!allowedStatuses.Contains(entity.Durum))
-            throw new BusinessException(
-                $"Talep #{talepId} bu aşamada işlenemez (mevcut durum: '{entity.Durum}', " +
-                $"beklenen: {string.Join('/', allowedStatuses)}).");
+            throw new BusinessException($"#{talepId} talebi bu aşamada işlenemez (şu anki durum: {entity.Durum}).", "requestWrongStatus", new { id = talepId, status = entity.Durum });
 
         return entity;
     }

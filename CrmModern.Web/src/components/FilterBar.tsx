@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Bookmark, Check, RotateCcw, Star, Trash2 } from 'lucide-react'
+import { Bookmark, Check, ChevronDown, ChevronUp, Filter, RotateCcw, Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Popover } from '@/components/ui/popover'
@@ -54,7 +54,7 @@ export function useFilterState<F extends Record<string, string>>(defaults: F, pr
 }
 
 export function FilterBar({
-  children, onReset, onSubmit, submitLabel, actions, className, tableId, values, onApplyView,
+  children, onReset, onSubmit, submitLabel, actions, className, tableId, values, onApplyView, collapsible, activeCount = 0,
 }: {
   children: React.ReactNode
   onReset?: () => void
@@ -67,8 +67,12 @@ export function FilterBar({
   tableId?: string
   values?: Record<string, string>
   onApplyView?: (filters: Record<string, string>) => void
+  /** Scaling Faz 1 — gizlenebilir: kapalıyken tek satır "Filtreler (n aktif)" özeti. */
+  collapsible?: boolean
+  activeCount?: number
 }) {
   const { t } = useTranslation()
+  const [hidden, setHidden] = React.useState(false)
   return (
     <form
       role="search"
@@ -76,10 +80,20 @@ export function FilterBar({
       onSubmit={(e) => { e.preventDefault(); onSubmit?.() }}
     >
       <div className="flex flex-wrap items-end gap-2">
-        <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+        {collapsible && (
+          <Button type="button" size="xs" variant="ghost" className="self-center" onClick={() => setHidden((h) => !h)}
+            aria-expanded={!hidden} title={hidden ? t('filter.show') : t('filter.hide')}>
+            <Filter className="h-3.5 w-3.5" />
+            {hidden && <>{t('filter.title')}{activeCount > 0 && <span className="text-primary">· {t('filter.active', { count: activeCount })}</span>}</>}
+            {hidden ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
+          </Button>
+        )}
+        {/* Scaling Faz 1 — kolon sayısı viewport'a değil kabın genişliğine göre
+            (auto-fill): sidebar açık/kapalı fark etmeksizin sığan kadar alan yan yana. */}
+        <div className={cn('grid min-w-0 flex-1 grid-cols-[repeat(auto-fill,minmax(9rem,1fr))] gap-2', hidden && 'hidden')}>
           {children}
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className={cn('flex flex-wrap items-center gap-1.5', hidden && 'ml-auto')}>
           {tableId && values && onApplyView && <ViewMenu tableId={tableId} values={values} onApply={onApplyView} />}
           {onReset && (
             <Button type="button" size="xs" variant="ghost" onClick={onReset} title={t('filter.reset')}>

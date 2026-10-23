@@ -192,9 +192,10 @@ export function CustomerBalancePage() {
               return (
                 <section key={cur} className="space-y-2">
                   <SectionTitle>{t('statement.movementsIn', { currency: cur })}</SectionTitle>
-                  <div className="overflow-auto rounded-md border">
+                  {/* Scaling Faz 2 — uzun ekstre kendi kabında kayar, başlık yapışık kalır. */}
+                  <div className="max-h-[calc(100vh-12rem)] overflow-auto rounded-md border">
                     <table className="w-full text-sm">
-                      <thead className="bg-muted">
+                      <thead className="sticky top-0 z-10 bg-muted">
                         <tr className="text-xs text-muted-foreground">
                           <th className="px-3 py-2 text-left font-medium">{t('common.date')}</th>
                           <th className="px-3 py-2 text-left font-medium">{t('common.orderNo')}</th>

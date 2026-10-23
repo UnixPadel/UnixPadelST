@@ -175,8 +175,8 @@ export const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(functi
             >
               <Check className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', o.value === value ? 'opacity-100' : 'opacity-0')} />
               <span className="min-w-0">
-                <span className="block truncate">{o.label}</span>
-                {o.description && <span className="block truncate text-xs text-muted-foreground">{o.description}</span>}
+                <span className="block truncate" title={o.label}>{o.label}</span>
+                {o.description && <span className="block truncate text-xs text-muted-foreground" title={o.description}>{o.description}</span>}
               </span>
             </li>
           ))}

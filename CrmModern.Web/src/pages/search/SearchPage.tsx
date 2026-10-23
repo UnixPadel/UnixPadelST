@@ -3,13 +3,12 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { searchOrders } from '@/api/search'
 import { PageHeader } from '@/components/PageHeader'
+import { FillPage, FillRegion } from '@/components/FillPage'
+import { FilterBar, FilterField } from '@/components/FilterBar'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Card, CardContent } from '@/components/ui/card'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
 import { statusLabel } from '@/lib/status'
 import { useAuth } from '@/hooks/useAuth'
@@ -55,9 +54,9 @@ export function SearchPage() {
   })
 
   const columns: Column<SearchResultDto & Record<string, unknown>>[] = [
-    { key: 'siparisNo',         header: t('common.orderNo'),    sortable: true },
+    { key: 'siparisNo', pin: 'left', header: t('common.orderNo'),    sortable: true },
     { key: 'teklifNo',          header: t('common.quoteNo'),    sortable: true },
-    { key: 'musteriAd',         header: t('common.customer'),   sortable: true },
+    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'),   sortable: true },
     // Siparişi oluşturan kullanıcı (legacy Ara formu KullaniciBilgileri join'i).
     { key: 'kullaniciAdi',      header: t('common.createdBy'),  sortable: true, render: (r) => (r.kullaniciAdi as string) ?? '—' },
     { key: 'mUlke',             header: t('common.country'),    sortable: true },
@@ -78,69 +77,59 @@ export function SearchPage() {
   const set = (key: keyof Filters) => (val: string) => setFilters((f) => ({ ...f, [key]: val }))
 
   return (
-    <div>
-      <PageHeader title={t('search.title')} description={t('search.subtitle')} />
-      <div className="p-6 space-y-4">
-        <Card>
-          <CardContent className="pt-5">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <div className="space-y-1">
-                <Label>{t('common.orderNo')} / {t('common.quoteNo')}</Label>
-                <Input value={filters.siparisNo} onChange={(e) => set('siparisNo')(e.target.value)} placeholder="S-001..." />
-              </div>
-              <div className="space-y-1">
-                <Label>{t('common.customer')}</Label>
-                <Input value={filters.musteriAd} onChange={(e) => set('musteriAd')(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>{t('common.country')}</Label>
-                <Input value={filters.ulke} onChange={(e) => set('ulke')(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>{t('common.stage')}</Label>
-                <Select value={filters.asama} onValueChange={set('asama')}>
-                  <SelectTrigger><SelectValue placeholder={t('common.all')} /></SelectTrigger>
-                  <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s === 'all' ? t('common.all') : statusLabel(t, s)}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>{t('common.control')}</Label>
-                <Select value={filters.kontrol} onValueChange={set('kontrol')}>
-                  <SelectTrigger><SelectValue placeholder={t('common.all')} /></SelectTrigger>
-                  <SelectContent>{CONTROLS.map((c) => <SelectItem key={c} value={c}>{c === 'all' ? t('common.all') : statusLabel(t, c)}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <Label>{t('common.startDate')}</Label>
-                <Input type="date" value={filters.baslangic} onChange={(e) => set('baslangic')(e.target.value)} />
-              </div>
-              <div className="space-y-1">
-                <Label>{t('common.endDate')}</Label>
-                <Input type="date" value={filters.bitis} onChange={(e) => set('bitis')(e.target.value)} />
-              </div>
-              <div className="flex items-end gap-2">
-                <Button onClick={() => setSubmitted({ ...filters })} disabled={isLoading} className="flex-1">
-                  {isLoading ? `${t('common.loading')}` : t('common.search')}
-                </Button>
-                <Button variant="outline" onClick={() => { setFilters(empty()); setSubmitted(null) }}>{t('common.clear')}</Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {submitted !== null && (
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">{data.length}</p>
-            <DataTable
-              columns={columns}
-              data={data as (SearchResultDto & Record<string, unknown>)[]}
-              keyField="siparisNo"
-              loading={isLoading}
-              density="compact"
-            />
-          </div>
-        )}
+    // Scaling Faz 2 — FillPage + ortak FilterBar (Enter/F8 arar); sonuç tablosu
+    // kalan yüksekliği doldurur, başlığı kaydırmada yerinde kalır.
+    <FillPage>
+      <PageHeader density="compact" title={t('search.title')} description={t('search.subtitle')} />
+      <div className="px-4 pt-2">
+        <FilterBar
+          onSubmit={() => setSubmitted({ ...filters })}
+          submitLabel={isLoading ? t('common.loading') : t('common.search')}
+          onReset={() => { setFilters(empty()); setSubmitted(null) }}
+        >
+          <FilterField label={`${t('common.orderNo')} / ${t('common.quoteNo')}`}>
+            <Input inputSize="sm" value={filters.siparisNo} onChange={(e) => set('siparisNo')(e.target.value)} placeholder="S-001..." />
+          </FilterField>
+          <FilterField label={t('common.customer')}>
+            <Input inputSize="sm" value={filters.musteriAd} onChange={(e) => set('musteriAd')(e.target.value)} />
+          </FilterField>
+          <FilterField label={t('common.country')}>
+            <Input inputSize="sm" value={filters.ulke} onChange={(e) => set('ulke')(e.target.value)} />
+          </FilterField>
+          <FilterField label={t('common.stage')}>
+            <Select value={filters.asama} onValueChange={set('asama')}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t('common.all')} /></SelectTrigger>
+              <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s === 'all' ? t('common.all') : statusLabel(t, s)}</SelectItem>)}</SelectContent>
+            </Select>
+          </FilterField>
+          <FilterField label={t('common.control')}>
+            <Select value={filters.kontrol} onValueChange={set('kontrol')}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t('common.all')} /></SelectTrigger>
+              <SelectContent>{CONTROLS.map((c) => <SelectItem key={c} value={c}>{c === 'all' ? t('common.all') : statusLabel(t, c)}</SelectItem>)}</SelectContent>
+            </Select>
+          </FilterField>
+          <FilterField label={t('common.startDate')}>
+            <Input inputSize="sm" type="date" value={filters.baslangic} onChange={(e) => set('baslangic')(e.target.value)} />
+          </FilterField>
+          <FilterField label={t('common.endDate')}>
+            <Input inputSize="sm" type="date" value={filters.bitis} onChange={(e) => set('bitis')(e.target.value)} />
+          </FilterField>
+        </FilterBar>
       </div>
-    </div>
+
+      {submitted !== null && (
+        <FillRegion className="pt-2">
+          <DataTable
+            fill
+            tableId="search"
+            columns={columns}
+            data={data as (SearchResultDto & Record<string, unknown>)[]}
+            keyField="siparisNo"
+            loading={isLoading}
+            density="compact"
+          />
+        </FillRegion>
+      )}
+    </FillPage>
   )
 }

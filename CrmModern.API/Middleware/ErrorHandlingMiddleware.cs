@@ -42,12 +42,14 @@ public sealed class ErrorHandlingMiddleware(
     {
         context.Response.ContentType = "application/json";
 
-        (int statusCode, string message) = exception switch
+        // Code/Args: istemci mesajı kendi dilinde gösterir (CrmModern.Web apiErrors.*);
+        // Message Türkçe yedek ve günlük metnidir.
+        (int statusCode, string message, string? code, object? args) = exception switch
         {
-            NotFoundException     ex => ((int)HttpStatusCode.NotFound,            ex.Message),
-            UnauthorizedException ex => ((int)HttpStatusCode.Unauthorized,         ex.Message),
-            BusinessException     ex => ((int)HttpStatusCode.BadRequest,           ex.Message),
-            _                        => ((int)HttpStatusCode.InternalServerError,  "Beklenmeyen bir hata oluştu.")
+            NotFoundException     ex => ((int)HttpStatusCode.NotFound,            ex.Message, ex.Code, ex.Args),
+            UnauthorizedException ex => ((int)HttpStatusCode.Unauthorized,         ex.Message, ex.Code, (object?)null),
+            BusinessException     ex => ((int)HttpStatusCode.BadRequest,           ex.Message, ex.Code, ex.Args),
+            _                        => ((int)HttpStatusCode.InternalServerError,  "Bir şeyler ters gitti. Tekrar dene.", "unknown", (object?)null)
         };
 
         context.Response.StatusCode = statusCode;
@@ -73,7 +75,9 @@ public sealed class ErrorHandlingMiddleware(
                 errors.Add("stack: " + st.Replace("\r\n", " | ").Replace("\n", " | "));
         }
 
-        var body = ApiResponse<object>.Fail(message, errors.ToArray());
+        var body = code is null
+            ? ApiResponse<object>.Fail(message, errors.ToArray())
+            : ApiResponse<object>.FailCode(code, message, args, errors.ToArray());
         await context.Response.WriteAsync(JsonSerializer.Serialize(body, _jsonOptions));
     }
 }

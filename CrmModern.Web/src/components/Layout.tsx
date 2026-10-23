@@ -75,7 +75,7 @@ export function Layout() {
   if (!isLoggedIn()) return <Navigate to="/login" replace />
   if (!bootstrapped) return <PageLoader />
 
-  // E-1 / E-8 — "?order=NO" her ekranda sipariş detayını (Belge Akışı dahil) açar
+  // E-1 / E-8 — "?order=NO" her ekranda sipariş detayını (Sipariş Geçmişi dahil) açar
   // (Komut Paleti "SP <no>", Bekleyen İşler ve bağlam menüleri bunu kullanır).
   const orderParam = params.get('order')
   const closeOrder = () => setParams((p) => { const np = new URLSearchParams(p); np.delete('order'); return np }, { replace: true })

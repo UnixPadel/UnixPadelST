@@ -51,7 +51,7 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
         // bcrypt'e taşınması yalnız bilinçli "şifre değiştir" aksiyonunda
         // (UserService.ChangePasswordAsync) veya admin/script üzerinden yapılır.
         var kullanici = await unitOfWork.Kullanicilar.GetByKullaniciAdiAsync(request.KullaniciAdi)
-            ?? throw new UnauthorizedException("Kullanıcı adı veya şifre hatalı.");
+            ?? throw new UnauthorizedException("Kullanıcı adı veya şifre hatalı.", "invalidCredentials");
 
         bool isBcrypt = !string.IsNullOrEmpty(kullanici.Sifre) && kullanici.Sifre.StartsWith("$2");
         bool ok;
@@ -66,11 +66,11 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
         }
 
         if (!ok)
-            throw new UnauthorizedException("Kullanıcı adı veya şifre hatalı.");
+            throw new UnauthorizedException("Kullanıcı adı veya şifre hatalı.", "invalidCredentials");
 
         // Replicates original: if (durum == "Aktif") { ... } else { MessageBox.Show("Hesabınız pasif durumda.") }
         if (!kullanici.Durum.Equals("Aktif", StringComparison.OrdinalIgnoreCase))
-            throw new UnauthorizedException("Hesabınız pasif durumda.");
+            throw new UnauthorizedException("Hesabın pasif. Yöneticine sor.", "accountInactive");
 
         var token = GenerateJwtToken(kullanici, request.RememberMe);
 
@@ -89,7 +89,7 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
     public async Task<LoginResponseDto> GetMeAsync(int kullaniciId)
     {
         var kullanici = await unitOfWork.Kullanicilar.GetByIdAsync(kullaniciId)
-            ?? throw new UnauthorizedException("Kullanıcı bulunamadı.");
+            ?? throw new UnauthorizedException("Kullanıcı bulunamadı.", "userNotFound");
 
         return new LoginResponseDto(
             KullaniciID            : kullanici.KullaniciID,

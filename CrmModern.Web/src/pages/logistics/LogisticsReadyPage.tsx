@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Truck } from 'lucide-react'
+import { Eye, Truck } from 'lucide-react'
 import { getReadyForShipment, createShipment } from '@/api/logistics'
 import { INCOTERMS } from '@/lib/constants'
 import { stageLabel } from '@/lib/status'
@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CarrierPicker } from '@/components/CarrierPicker'
 import { FilterBar, FilterField, ALL, useFilterState } from '@/components/FilterBar'
-import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
 import { useNotHereHint } from '@/hooks/useNotHereHint'
 import { useShortcutHints } from '@/components/StatusBar'
@@ -45,7 +45,7 @@ const FILTER_DEFAULTS = { siparisNo: '', musteri: '', asama: ALL }
 /**
  * Lojistik — Hazır. Sevk talebi penceresi artık bir form (Enter ilerler/gönderir),
  * taşıyıcı ortak CarrierPicker ile yazarak seçilir, fiyat 0 iken uyarı verilir;
- * detay sağ panelde (E-9); filtreler URL'de kalıcı.
+ * "Siparişi Aç" / satıra tıklama Sipariş Detayı penceresini açar; filtreler URL'de kalıcı.
  */
 export function LogisticsReadyPage() {
   const { t } = useTranslation()
@@ -125,9 +125,14 @@ export function LogisticsReadyPage() {
         // Sevk yalnız 'Hazir' aşamasında yapılabilir; 'Hazırlanıyor' (Uretim) için pasif.
         const canShip = r.siparisMiTeklifMi === 'Hazir'
         return (
-          <Button size="xs" disabled={!canShip} title={canShip ? undefined : t('logistics.preparingHint')} onClick={() => openShipment(r)}>
-            <Truck className="h-3.5 w-3.5" /> {t('logistics.createShipment')}
-          </Button>
+          <div className="flex flex-wrap gap-1.5">
+            <Button size="xs" variant="outline" onClick={() => setActiveNo(r.siparisNo)}>
+              <Eye className="h-3.5 w-3.5" /> {t('common.openOrder')}
+            </Button>
+            <Button size="xs" disabled={!canShip} title={canShip ? undefined : t('logistics.preparingHint')} onClick={() => openShipment(r)}>
+              <Truck className="h-3.5 w-3.5" /> {t('logistics.createShipment')}
+            </Button>
+          </div>
         )
       },
     },
@@ -163,27 +168,28 @@ export function LogisticsReadyPage() {
         </FilterBar>
       </div>
       <FillRegion className="pt-2">
-        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
-          <DataTable
-            fill
-            tableId="logistics-ready"
-            exportFileName="lojistik-hazir"
-            columns={cols}
-            data={filtered as Row[]}
-            keyField="siparisNo"
-            loading={isLoading}
-            error={isError}
-            emptyMessage={notHere}
-            density="compact"
-            activeRowKey={activeNo}
-            onActiveRowChange={(r) => setActiveNo(r.siparisNo)}
-            rowActions={[
-              { key: 'detail', label: t('common.details'), shortcut: 'Enter', onSelect: (r) => setActiveNo(r.siparisNo) },
-              { key: 'ship', label: t('logistics.createShipment'), disabled: (r) => r.siparisMiTeklifMi !== 'Hazir', onSelect: (r) => openShipment(r) },
-            ]}
-          />
-        </MasterDetailLayout>
+        <DataTable
+          fill
+          tableId="logistics-ready"
+          exportFileName="lojistik-hazir"
+          columns={cols}
+          data={filtered as Row[]}
+          keyField="siparisNo"
+          loading={isLoading}
+          error={isError}
+          emptyMessage={notHere}
+          density="compact"
+          activeRowKey={activeNo}
+          // Satıra tıklama (ve Enter) "Siparişi Aç" ile aynı: Sipariş Detayı penceresi.
+          onRowClick={(r) => setActiveNo(r.siparisNo)}
+          rowActions={[
+            { key: 'detail', label: t('common.openOrder'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(r.siparisNo) },
+            { key: 'ship', label: t('logistics.createShipment'), disabled: (r) => r.siparisMiTeklifMi !== 'Hazir', onSelect: (r) => openShipment(r) },
+          ]}
+        />
       </FillRegion>
+
+      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView />
 
       <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null) }}>
         <DialogContent size="md">

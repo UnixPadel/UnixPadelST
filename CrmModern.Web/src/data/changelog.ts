@@ -11,6 +11,26 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.4',
+    tarih:    '2026-10-23',
+    baslik: {
+      tr: 'Fabrika, Lojistik ve Muhasebe: "Siparişi Aç"',
+      en: 'Factory, Logistics and Accounting: "Open Order"',
+    },
+    maddeler: {
+      tr: [
+        'Fabrika / Üretim, Sevkiyata Hazır, Sevkiyat Geçmişi ve Teklif ve Siparişler ekranlarında sağdaki detay paneli kaldırıldı; liste tam genişlikte.',
+        'Her satırda işlem butonlarının solunda "Siparişi Aç" var; Sipariş Detayı penceresini açar.',
+        'Satıra tıklayarak veya Enter ile de siparişi açabilirsin.',
+      ],
+      en: [
+        'On Factory / Production, Ready to Ship, Shipment History and Quotes & Orders, the side detail panel is gone and the list uses the full width.',
+        'Each row has an "Open Order" button to the left of its actions; it opens the Order Detail window.',
+        'You can also open an order by clicking its row or pressing Enter.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.3',
     tarih:    '2026-10-23',
     baslik: {

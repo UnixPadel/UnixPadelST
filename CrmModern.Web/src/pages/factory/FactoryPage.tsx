@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { CheckCheck, Factory } from 'lucide-react'
+import { CheckCheck, Eye, Factory } from 'lucide-react'
 import { getFactoryOrders, moveToProduction, markReady, type FactoryFilter } from '@/api/factory'
 import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
@@ -10,7 +10,7 @@ import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { FilterBar, FilterField, ALL, useFilterState, useDefaultView } from '@/components/FilterBar'
-import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
 import { useNotHereHint } from '@/hooks/useNotHereHint'
 import { useShortcutHints } from '@/components/StatusBar'
@@ -47,7 +47,7 @@ const FILTER_DEFAULTS = {
  * Fabrika / Üretim. Bu turdaki iyileştirmeler:
  *  • SR-5/QW-15 — ortak FilterBar, URL'de kalıcı filtreler, 300 ms debounce,
  *    yenilemede tablo boşalmaz (keepPreviousData), kayıtlı görünümler (E-6).
- *  • E-9 — satır seçilince sağda sipariş detayı (liste görünür kalır).
+ *  • "Siparişi Aç" / satıra tıklama / Enter → Sipariş Detayı penceresi.
  *  • E-17 — toplu "Üretime Al" (tek tarih + not) ve toplu "Hazır"; sonuç özeti.
  *  • F0-6 — üretim tarihi yerel saat ve pencere her açılışta "şimdi"ye sıfırlanır.
  *  • SR-7 — satır bazlı bekleme (yalnız tıklanan satırın butonu döner).
@@ -184,6 +184,9 @@ export function FactoryPage() {
       exportValue: false,
       render: (r) => (
         <div className="flex flex-wrap gap-1.5">
+          <Button size="xs" variant="outline" onClick={() => setActiveNo(r.siparisNo)}>
+            <Eye className="h-3.5 w-3.5" /> {t('common.openOrder')}
+          </Button>
           {isFactoryUser && r.siparisMiTeklifMi === 'Planlama' && (
             <Button size="xs" onClick={() => openProduction([r.siparisNo])}>
               <Factory className="h-3.5 w-3.5" /> {t('factory.moveToProduction')}
@@ -251,47 +254,48 @@ export function FactoryPage() {
         </FilterBar>
       </div>
       <FillRegion className="pt-2">
-        {/* E-9 — satır seçilince sağda detay (aşama geçmişi + belge akışı dahil). */}
-        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} factoryView>
-          <DataTable
-            fill
-            tableId="factory"
-            exportFileName="fabrika"
-            columns={columns}
-            data={data as Row[]}
-            keyField="siparisNo"
-            loading={isLoading}
-            error={isError}
-            emptyMessage={notHere}
-            density="compact"
-            toolbar={isFetching && !isLoading ? <span className="animate-pulse">{t('table.refreshing')}</span> : null}
-            activeRowKey={activeNo}
-            onActiveRowChange={(r) => setActiveNo(r.siparisNo)}
-            selectable={isFactoryUser ? (r) => r.siparisMiTeklifMi === 'Planlama' || r.siparisMiTeklifMi === 'Uretim' : false}
-            selectedKeys={selection}
-            onSelectionChange={setSelection}
-            bulkActions={(rows) => {
-              const planning = rows.filter((r) => r.siparisMiTeklifMi === 'Planlama').map((r) => r.siparisNo)
-              const inProd = rows.filter((r) => r.siparisMiTeklifMi === 'Uretim').map((r) => r.siparisNo)
-              return (
-                <>
-                  <Button size="xs" disabled={!planning.length || bulkRunning} loading={bulkRunning} onClick={() => openProduction(planning)}>
-                    <Factory className="h-3.5 w-3.5" /> {t('factory.bulkProduction', { count: planning.length })}
-                  </Button>
-                  <Button size="xs" variant="secondary" disabled={!inProd.length || bulkRunning} onClick={() => askReady(inProd)}>
-                    <CheckCheck className="h-3.5 w-3.5" /> {t('factory.bulkReady', { count: inProd.length })}
-                  </Button>
-                </>
-              )
-            }}
-            rowActions={[
-              { key: 'detail', label: t('common.details'), shortcut: 'Enter', onSelect: (r) => setActiveNo(r.siparisNo) },
-              { key: 'prod', label: t('factory.moveToProduction'), hidden: (r) => !isFactoryUser || r.siparisMiTeklifMi !== 'Planlama', onSelect: (r) => openProduction([r.siparisNo]) },
-              { key: 'ready', label: t('factory.ready'), hidden: (r) => !isFactoryUser || r.siparisMiTeklifMi !== 'Uretim', onSelect: (r) => askReady([r.siparisNo]) },
-            ]}
-          />
-        </MasterDetailLayout>
+        <DataTable
+          fill
+          tableId="factory"
+          exportFileName="fabrika"
+          columns={columns}
+          data={data as Row[]}
+          keyField="siparisNo"
+          loading={isLoading}
+          error={isError}
+          emptyMessage={notHere}
+          density="compact"
+          toolbar={isFetching && !isLoading ? <span className="animate-pulse">{t('table.refreshing')}</span> : null}
+          activeRowKey={activeNo}
+          // Satıra tıklama (ve Enter) "Siparişi Aç" ile aynı: Sipariş Detayı penceresi.
+          onRowClick={(r) => setActiveNo(r.siparisNo)}
+          selectable={isFactoryUser ? (r) => r.siparisMiTeklifMi === 'Planlama' || r.siparisMiTeklifMi === 'Uretim' : false}
+          selectedKeys={selection}
+          onSelectionChange={setSelection}
+          bulkActions={(rows) => {
+            const planning = rows.filter((r) => r.siparisMiTeklifMi === 'Planlama').map((r) => r.siparisNo)
+            const inProd = rows.filter((r) => r.siparisMiTeklifMi === 'Uretim').map((r) => r.siparisNo)
+            return (
+              <>
+                <Button size="xs" disabled={!planning.length || bulkRunning} loading={bulkRunning} onClick={() => openProduction(planning)}>
+                  <Factory className="h-3.5 w-3.5" /> {t('factory.bulkProduction', { count: planning.length })}
+                </Button>
+                <Button size="xs" variant="secondary" disabled={!inProd.length || bulkRunning} onClick={() => askReady(inProd)}>
+                  <CheckCheck className="h-3.5 w-3.5" /> {t('factory.bulkReady', { count: inProd.length })}
+                </Button>
+              </>
+            )
+          }}
+          rowActions={[
+            { key: 'detail', label: t('common.openOrder'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(r.siparisNo) },
+            { key: 'prod', label: t('factory.moveToProduction'), hidden: (r) => !isFactoryUser || r.siparisMiTeklifMi !== 'Planlama', onSelect: (r) => openProduction([r.siparisNo]) },
+            { key: 'ready', label: t('factory.ready'), hidden: (r) => !isFactoryUser || r.siparisMiTeklifMi !== 'Uretim', onSelect: (r) => askReady([r.siparisNo]) },
+          ]}
+        />
       </FillRegion>
+
+      {/* Sipariş Detayı penceresi (aşama geçmişi + belge akışı dahil). */}
+      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} factoryView />
 
       <Dialog open={productionTargets.length > 0} onOpenChange={(o) => { if (!o) setProductionTargets([]) }}>
         <DialogContent>

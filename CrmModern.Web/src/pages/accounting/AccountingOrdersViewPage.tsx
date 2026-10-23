@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/PageHeader'
 import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
-import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { FilterBar, FilterField, ALL, useFilterState } from '@/components/FilterBar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -29,7 +29,8 @@ const FILTER_DEFAULTS = { q: '', asama: ALL, paraTipi: ALL }
  * Tüm teklif + siparişler; proforma (Excel/PDF) açılabilir; revize YOK; silinenler gizli.
  * Bu turda: hesaplanan "No" kolonu artık sıralanıyor (sortValue), 1000 satır
  * istemci tarafında sayfalanıyor, indirmeler bekleme/hata geri bildirimi veriyor,
- * detay sağ panelde, döviz bazlı alt toplam ve görünüm dışa aktarma.
+ * "Siparişi Aç" / satıra tıklama Sipariş Detayı penceresini açar, döviz bazlı
+ * alt toplam ve görünüm dışa aktarma.
  */
 export function AccountingOrdersViewPage() {
   const { t } = useTranslation()
@@ -86,6 +87,9 @@ export function AccountingOrdersViewPage() {
         const n = no(r)
         return (
           <div className="flex gap-1">
+            <Button size="xs" variant="outline" onClick={() => setActiveNo(n)}>
+              <Eye className="h-3.5 w-3.5" /> {t('common.openOrder')}
+            </Button>
             <Button size="icon-sm" variant="outline" title={t('common.excel')} aria-label={t('common.excel')}
               loading={busy === 'excel' + n} onClick={() => download('excel', n)}>{busy !== 'excel' + n && <FileSpreadsheet className="h-3.5 w-3.5" />}</Button>
             <Button size="icon-sm" variant="outline" title="PDF" aria-label="PDF"
@@ -127,30 +131,31 @@ export function AccountingOrdersViewPage() {
         </FilterBar>
       </div>
       <FillRegion className="pt-2">
-        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)}>
-          <DataTable
-            fill
-            tableId="accounting-orders-view"
-            exportFileName="teklif-siparis"
-            columns={cols}
-            data={rows as Row[]}
-            keyField="siparisAlID"
-            loading={isLoading}
-            error={isError}
-            density="compact"
-            pageSize={100}
-            showFooter
-            footerGroups={{ by: (r) => r.paraTipi, order: PARA_TIPLERI }}
-            activeRowKey={rows.find((r) => no(r) === activeNo)?.siparisAlID ?? null}
-            onActiveRowChange={(r) => setActiveNo(no(r))}
-            rowActions={[
-              { key: 'detail', label: t('common.details'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(no(r)) },
-              { key: 'excel', label: t('common.excel'), icon: <FileSpreadsheet className="h-3.5 w-3.5" />, onSelect: (r) => download('excel', no(r)) },
-              { key: 'pdf', label: 'PDF', icon: <FileText className="h-3.5 w-3.5" />, onSelect: (r) => download('pdf', no(r)) },
-            ]}
-          />
-        </MasterDetailLayout>
+        <DataTable
+          fill
+          tableId="accounting-orders-view"
+          exportFileName="teklif-siparis"
+          columns={cols}
+          data={rows as Row[]}
+          keyField="siparisAlID"
+          loading={isLoading}
+          error={isError}
+          density="compact"
+          pageSize={100}
+          showFooter
+          footerGroups={{ by: (r) => r.paraTipi, order: PARA_TIPLERI }}
+          activeRowKey={rows.find((r) => no(r) === activeNo)?.siparisAlID ?? null}
+          // Satıra tıklama (ve Enter) "Siparişi Aç" ile aynı: Sipariş Detayı penceresi.
+          onRowClick={(r) => setActiveNo(no(r))}
+          rowActions={[
+            { key: 'detail', label: t('common.openOrder'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(no(r)) },
+            { key: 'excel', label: t('common.excel'), icon: <FileSpreadsheet className="h-3.5 w-3.5" />, onSelect: (r) => download('excel', no(r)) },
+            { key: 'pdf', label: 'PDF', icon: <FileText className="h-3.5 w-3.5" />, onSelect: (r) => download('pdf', no(r)) },
+          ]}
+        />
       </FillRegion>
+
+      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} />
     </FillPage>
   )
 }

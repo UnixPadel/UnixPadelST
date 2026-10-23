@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { CheckCheck, XCircle } from 'lucide-react'
+import { CheckCheck, Eye, XCircle } from 'lucide-react'
 import { getLogisticsHistory, completeShipment, cancelShipment } from '@/api/logistics'
 import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
@@ -10,7 +10,7 @@ import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { LogisticsStatusBadge } from '@/components/LogisticsStatusBadge'
 import { FilterBar, FilterField, useFilterState } from '@/components/FilterBar'
-import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/components/ToastProvider'
@@ -30,7 +30,7 @@ const FILTER_DEFAULTS = { siparisNo: '', firmaAdi: '' }
  * Lojistik — Geçmiş. Bu turda: etiketli FilterBar + debounce (her tuşta sorgu
  * yoktu artık), Tamamla onaylı ve isteğe bağlı teslim notuyla (API `not` kabul
  * ediyor), İptal zorunlu gerekçeyle (window.prompt yerine), satır bazlı bekleme,
- * toplu Tamamla (E-17), detay sağ panelde (E-9).
+ * toplu Tamamla (E-17); "Siparişi Aç" / satıra tıklama Sipariş Detayı penceresini açar.
  */
 export function LogisticsHistoryPage() {
   const qc = useQueryClient()
@@ -121,21 +121,24 @@ export function LogisticsHistoryPage() {
     { key: 'id',           header: t('logistics.history.shipmentId'), sortable: true, type: 'number', defaultHidden: true },
     {
       key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
-      render: (r) => {
-        if (!canMutate) return null
-        // Paket 3: sadece "Sevk Yolda" (Order=Lojistik) satırlarda Tamamla/İptal gösterilir.
-        if (r.siparisMiTeklifMi !== 'Lojistik') return <span className="text-xs text-muted-foreground">—</span>
-        return (
-          <div className="flex flex-wrap gap-1.5">
-            <Button size="xs" loading={completeMut.isPendingFor((v) => v.id === r.id)} onClick={() => askComplete([r])}>
-              <CheckCheck className="h-3.5 w-3.5" /> {t('logistics.history.complete')}
-            </Button>
-            <Button size="xs" variant="outline" className="text-destructive" loading={cancelMut.isPendingFor((v) => v.id === r.id)} onClick={() => askCancel(r)}>
-              <XCircle className="h-3.5 w-3.5" /> {t('common.cancel')}
-            </Button>
-          </div>
-        )
-      },
+      render: (r) => (
+        <div className="flex flex-wrap gap-1.5">
+          <Button size="xs" variant="outline" onClick={() => setActiveNo(r.siparisNo)}>
+            <Eye className="h-3.5 w-3.5" /> {t('common.openOrder')}
+          </Button>
+          {/* Paket 3: sadece "Sevk Yolda" (Order=Lojistik) satırlarda Tamamla/İptal gösterilir. */}
+          {canMutate && r.siparisMiTeklifMi === 'Lojistik' && (
+            <>
+              <Button size="xs" loading={completeMut.isPendingFor((v) => v.id === r.id)} onClick={() => askComplete([r])}>
+                <CheckCheck className="h-3.5 w-3.5" /> {t('logistics.history.complete')}
+              </Button>
+              <Button size="xs" variant="outline" className="text-destructive" loading={cancelMut.isPendingFor((v) => v.id === r.id)} onClick={() => askCancel(r)}>
+                <XCircle className="h-3.5 w-3.5" /> {t('common.cancel')}
+              </Button>
+            </>
+          )}
+        </div>
+      ),
     },
   ]
 
@@ -155,36 +158,37 @@ export function LogisticsHistoryPage() {
         </FilterBar>
       </div>
       <FillRegion className="pt-2">
-        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView>
-          <DataTable
-            fill
-            tableId="logistics-history"
-            exportFileName="lojistik-gecmis"
-            columns={cols}
-            data={data as Row[]}
-            keyField="id"
-            loading={isLoading}
-            error={isError}
-            density="compact"
-            showFooter={!hideMoney}
-            activeRowKey={data.find((r) => r.siparisNo === activeNo)?.id ?? null}
-            onActiveRowChange={(r) => setActiveNo(r.siparisNo)}
-            selectable={canMutate ? (r) => r.siparisMiTeklifMi === 'Lojistik' : false}
-            selectedKeys={selection}
-            onSelectionChange={setSelection}
-            bulkActions={(rows) => (
-              <Button size="xs" loading={bulkRunning} onClick={() => askComplete(rows)}>
-                <CheckCheck className="h-3.5 w-3.5" /> {t('logistics.history.bulkComplete', { count: rows.length })}
-              </Button>
-            )}
-            rowActions={[
-              { key: 'detail', label: t('common.details'), shortcut: 'Enter', onSelect: (r) => setActiveNo(r.siparisNo) },
-              { key: 'complete', label: t('logistics.history.complete'), hidden: (r) => !canMutate || r.siparisMiTeklifMi !== 'Lojistik', onSelect: (r) => askComplete([r]) },
-              { key: 'cancel', label: t('common.cancel'), destructive: true, hidden: (r) => !canMutate || r.siparisMiTeklifMi !== 'Lojistik', onSelect: (r) => askCancel(r) },
-            ]}
-          />
-        </MasterDetailLayout>
+        <DataTable
+          fill
+          tableId="logistics-history"
+          exportFileName="lojistik-gecmis"
+          columns={cols}
+          data={data as Row[]}
+          keyField="id"
+          loading={isLoading}
+          error={isError}
+          density="compact"
+          showFooter={!hideMoney}
+          activeRowKey={data.find((r) => r.siparisNo === activeNo)?.id ?? null}
+          // Satıra tıklama (ve Enter) "Siparişi Aç" ile aynı: Sipariş Detayı penceresi.
+          onRowClick={(r) => setActiveNo(r.siparisNo)}
+          selectable={canMutate ? (r) => r.siparisMiTeklifMi === 'Lojistik' : false}
+          selectedKeys={selection}
+          onSelectionChange={setSelection}
+          bulkActions={(rows) => (
+            <Button size="xs" loading={bulkRunning} onClick={() => askComplete(rows)}>
+              <CheckCheck className="h-3.5 w-3.5" /> {t('logistics.history.bulkComplete', { count: rows.length })}
+            </Button>
+          )}
+          rowActions={[
+            { key: 'detail', label: t('common.openOrder'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(r.siparisNo) },
+            { key: 'complete', label: t('logistics.history.complete'), hidden: (r) => !canMutate || r.siparisMiTeklifMi !== 'Lojistik', onSelect: (r) => askComplete([r]) },
+            { key: 'cancel', label: t('common.cancel'), destructive: true, hidden: (r) => !canMutate || r.siparisMiTeklifMi !== 'Lojistik', onSelect: (r) => askCancel(r) },
+          ]}
+        />
       </FillRegion>
+
+      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView />
     </FillPage>
   )
 }

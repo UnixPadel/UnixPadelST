@@ -1290,6 +1290,7 @@
     "copyHint": "Opens a new form with this order's details",
     "copyAsNew": "Copy to new",
     "legacyTimelines": "Stages and approvals",
+    "sections": "Sections",
     "tabs": {
       "general": "General",
       "items": "Items",

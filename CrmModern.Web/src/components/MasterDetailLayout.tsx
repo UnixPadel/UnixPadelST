@@ -61,12 +61,13 @@ export function MasterDetailLayout({
       {side && (
         <aside
           aria-label={t('orderDetail.title', { no: siparisNo })}
+          // Panel kendi gövdesini kaydırır (başlık + bölüm çapaları sabit) → aside flex sütunu.
           className={cn(
-            'min-w-0 overflow-y-auto rounded-md border bg-card p-3 shadow-sm',
+            'flex min-w-0 flex-col overflow-hidden rounded-md border bg-card shadow-sm',
             fill ? 'min-h-0' : 'sticky top-2 max-h-[calc(100vh-8rem)] self-start',
           )}
         >
-          <div className="mb-2 flex items-center justify-end gap-1">
+          <div className="flex shrink-0 items-center justify-end gap-1 px-3 pb-2 pt-3">
             <Button size="icon-sm" variant="ghost" aria-label={t('masterDetail.expand')} title={t('masterDetail.expand')} onClick={() => setModalNo(siparisNo)}>
               <Maximize2 className="h-4 w-4" />
             </Button>
@@ -74,7 +75,7 @@ export function MasterDetailLayout({
               <PanelRightClose className="h-4 w-4" />
             </Button>
           </div>
-          <OrderDetailPanel siparisNo={siparisNo} embedded {...viewProps} />
+          <OrderDetailPanel key={siparisNo} siparisNo={siparisNo} embedded {...viewProps} />
         </aside>
       )}
       {/* Dar alanda detay modalda; genişte "büyüt" düğmesi aynı modalı açar. */}

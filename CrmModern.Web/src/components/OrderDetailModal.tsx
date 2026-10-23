@@ -1,13 +1,12 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Copy, Download, FileText } from 'lucide-react'
 import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative } from '@/api/orders'
 import { getUsersLookup } from '@/api/users'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { resolveClause, isFreeNote } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
@@ -53,21 +52,30 @@ export function OrderDetailModal({ siparisNo, onClose, ...rest }: Props) {
   const { t } = useTranslation()
   return (
     <Dialog open={!!siparisNo} onOpenChange={(o) => { if (!o) onClose() }}>
-      <DialogContent size="xl" className="max-h-[90vh]">
-        {/* Başlık kayar; yerine sekme çubuğu yapışık kalır (Scaling Faz 2). */}
-        <DialogHeader className="static pr-8">
+      {/* Sabit boyut (içeriğe göre büyüyüp küçülmez); rem tabanlı olduğu için
+          arayüz ölçeğiyle (Electron zoomFactor) birlikte ölçeklenir, kısa ekranda
+          90vh ile sınırlanır. Kayan yalnız paneldeki gövdedir. */}
+      <DialogContent size="xl" className="flex h-[min(42rem,90vh)] flex-col gap-0 overflow-hidden p-0">
+        <div className="shrink-0 px-6 pb-3 pr-12 pt-6">
           <DialogTitle>{t('orderDetail.title', { no: siparisNo })}</DialogTitle>
-        </DialogHeader>
-        {siparisNo && <OrderDetailPanel siparisNo={siparisNo} {...rest} />}
+        </div>
+        {siparisNo && <OrderDetailPanel key={siparisNo} siparisNo={siparisNo} {...rest} />}
       </DialogContent>
     </Dialog>
   )
 }
 
+type SectionId = 'general' | 'items' | 'flow' | 'notes'
+/** Çapa tıklanınca bölüm başlığının gövde üstünden bırakacağı boşluk (px). */
+const SECTION_OFFSET = 12
+
 /**
  * E-9 / E-8 — sipariş detayının gövdesi; hem modalda hem master-detail sağ
- * panelinde kullanılır. Sekmeler (Fiori Object Page çapa çubuğu):
+ * panelinde kullanılır. Fiori Object Page: üstte sabit başlık şeridi + çapa
+ * çubuğu, altında tek kayan gövdede alt alta bölümler:
  *   Genel · Kalemler · Sipariş Geçmişi · Notlar
+ * Çapa butonu ilgili bölüme kaydırır; kaydırdıkça etkin buton güncellenir.
+ * Kap (modal / aside) sınırlı yükseklikte bir flex sütunu olmalıdır.
  */
 export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView = false, factoryView = false, embedded = false }: PanelProps) {
   const { t } = useTranslation()
@@ -86,6 +94,14 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
   const canCreateOrders = !!user && (user.yetkiTuru === 'Temsilci' || user.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user))
   const [showOfferForm, setShowOfferForm] = useState(false)
   const [downloading, setDownloading] = useState<'excel' | 'pdf' | null>(null)
+  const padX = embedded ? 'px-3' : 'px-6'
+
+  // Çapa çubuğu ↔ bölümler. Tıklamadaki yumuşak kaydırma bitene dek kaydırma
+  // takibi durur (yoksa kısa son bölümlerde vurgu "sona" atlar).
+  const bodyRef = useRef<HTMLDivElement>(null)
+  const sectionEls = useRef<Partial<Record<SectionId, HTMLElement | null>>>({})
+  const spyPausedUntil = useRef(0)
+  const [activeSection, setActiveSection] = useState<SectionId>('general')
 
   const { data: order, isLoading, isError } = useQuery({
     queryKey: ['order-detail', siparisNo],
@@ -136,68 +152,124 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
 
   if (isLoading) {
     return (
-      <div className="space-y-3 py-2" aria-busy>
+      <div className={cn('space-y-3 py-2', padX)} aria-busy>
         {Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-16 animate-pulse rounded-md bg-muted" />)}
       </div>
     )
   }
   if (isError || !order) {
-    return <p className="py-8 text-center text-sm text-destructive">{t('orderDetail.loadError')}</p>
+    return <p className={cn('py-8 text-center text-sm text-destructive', padX)}>{t('orderDetail.loadError')}</p>
   }
 
   const notes = factoryView ? (order.details ?? []).filter(isFreeNote) : order.details
   const showNotes = !hideNotes && !!notes && notes.length > 0
+  const itemCount = order.items?.length ?? 0
+  const sections: { id: SectionId; label: string; count?: number }[] = [
+    { id: 'general', label: t('orderDetail.tabs.general') },
+    { id: 'items', label: t('orderDetail.tabs.items'), count: itemCount },
+    { id: 'flow', label: t('orderDetail.tabs.flow') },
+    ...(showNotes ? [{ id: 'notes' as const, label: t('orderDetail.tabs.notes') }] : []),
+  ]
+
+  const goToSection = (id: SectionId) => {
+    const body = bodyRef.current, el = sectionEls.current[id]
+    if (!body || !el) return
+    setActiveSection(id)
+    spyPausedUntil.current = Date.now() + 900
+    const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    body.scrollTo({ top: Math.max(0, el.offsetTop - SECTION_OFFSET), behavior: smooth ? 'smooth' : 'auto' })
+  }
+  const onBodyScroll = () => {
+    const body = bodyRef.current
+    if (!body || Date.now() < spyPausedUntil.current) return
+    let current: SectionId = sections[0].id
+    if (body.scrollTop + body.clientHeight >= body.scrollHeight - 2) current = sections[sections.length - 1].id
+    else for (const s of sections) {
+      const el = sectionEls.current[s.id]
+      if (el && el.offsetTop - body.scrollTop <= SECTION_OFFSET * 2) current = s.id
+    }
+    setActiveSection(current)
+  }
+  const sectionProps = (id: SectionId) => ({
+    ref: (el: HTMLElement | null) => { sectionEls.current[id] = el },
+    'aria-labelledby': `od-${id}`,
+    className: 'space-y-3',
+  })
+  const sectionHeading = (id: SectionId) => {
+    const s = sections.find((x) => x.id === id)!
+    return (
+      <h3 id={`od-${id}`} className="border-b pb-1 text-base font-semibold">
+        {s.label}{s.count != null && <span className="ml-1 font-normal text-muted-foreground">({s.count})</span>}
+      </h3>
+    )
+  }
 
   return (
-    <div className="space-y-3 text-sm">
-      {/* Başlık şeridi: durum + tarih + aksiyonlar */}
-      <div className="flex flex-wrap items-center gap-2">
-        {embedded && <span className="font-mono text-sm font-semibold">{siparisNo}</span>}
-        <StatusBadge value={order.siparisMiTeklifMi} context="stage" />
-        <StatusBadge value={order.kontrol} context="kontrol" />
-        {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
-        {order.sirket && <span className="text-muted-foreground">· {order.sirket}</span>}
-        <div className="ml-auto flex flex-wrap gap-1.5">
-          {canCreateOrders && (
-            <Button size="xs" variant="outline" title={t('orderDetail.copyHint')}
-              onClick={() => nav(`/orders/new?copyFrom=${encodeURIComponent(order.siparisNo)}`)}>
-              <Copy className="h-3.5 w-3.5" /> {t('orderDetail.copyAsNew')}
-            </Button>
-          )}
-          {!hideMoney && (
-            <>
-              <Button size="xs" variant="outline" loading={downloading === 'excel'} onClick={() => handleDownload('excel')}>
-                <Download className="h-3.5 w-3.5" /> {t('common.excel')}
+    <div className="flex min-h-0 flex-1 flex-col text-sm">
+      {/* Sabit üst kısım (kaymaz): durum şeridi + bölüm çapaları. */}
+      <div className={cn('shrink-0 space-y-2 border-b pb-2', padX)}>
+        {/* Başlık şeridi: durum + tarih + aksiyonlar */}
+        <div className="flex flex-wrap items-center gap-2">
+          {embedded && <span className="font-mono text-sm font-semibold">{siparisNo}</span>}
+          <StatusBadge value={order.siparisMiTeklifMi} context="stage" />
+          <StatusBadge value={order.kontrol} context="kontrol" />
+          {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
+          {order.sirket && <span className="text-muted-foreground">· {order.sirket}</span>}
+          <div className="ml-auto flex flex-wrap gap-1.5">
+            {canCreateOrders && (
+              <Button size="xs" variant="outline" title={t('orderDetail.copyHint')}
+                onClick={() => nav(`/orders/new?copyFrom=${encodeURIComponent(order.siparisNo)}`)}>
+                <Copy className="h-3.5 w-3.5" /> {t('orderDetail.copyAsNew')}
               </Button>
-              <Button size="xs" variant="outline" loading={downloading === 'pdf'} onClick={() => handleDownload('pdf')}>
-                <FileText className="h-3.5 w-3.5" /> PDF
-              </Button>
-            </>
-          )}
+            )}
+            {!hideMoney && (
+              <>
+                <Button size="xs" variant="outline" loading={downloading === 'excel'} onClick={() => handleDownload('excel')}>
+                  <Download className="h-3.5 w-3.5" /> {t('common.excel')}
+                </Button>
+                <Button size="xs" variant="outline" loading={downloading === 'pdf'} onClick={() => handleDownload('pdf')}>
+                  <FileText className="h-3.5 w-3.5" /> PDF
+                </Button>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Bölüm çapaları — sekme görünümünde ama sayfa değiştirmez, kaydırır. */}
+        <nav aria-label={t('orderDetail.sections')} className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-md bg-muted p-1 text-muted-foreground">
+          {sections.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              aria-current={activeSection === s.id || undefined}
+              onClick={() => goToSection(s.id)}
+              className={cn(
+                'inline-flex items-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                activeSection === s.id ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground',
+              )}
+            >
+              {s.label}{s.count != null && <span className="ml-1 text-muted-foreground">({s.count})</span>}
+            </button>
+          ))}
+        </nav>
       </div>
 
-      {/* Rejection note — her sekmede görünür kalsın diye başlığın altında. */}
-      {order.kontrol === 'Reddet' && order.red && (
-        <div role="alert" className="rounded-md border border-danger/40 bg-danger-soft p-3 text-danger-soft-foreground">
-          <p className="font-semibold">{t('orderDetail.redNotu')}</p>
-          <p>{order.red}</p>
-        </div>
-      )}
+      {/* Tek kayan gövde (sağda kaydırma çubuğu); bölümler alt alta. */}
+      <div
+        ref={bodyRef}
+        onScroll={onBodyScroll}
+        className={cn('relative min-h-0 flex-1 space-y-6 overflow-y-auto pt-3 [scrollbar-gutter:stable]', padX, embedded ? 'pb-3' : 'pb-6')}
+      >
+        <section {...sectionProps('general')}>
+          {sectionHeading('general')}
+          {/* Red notu — Genel'in en üstünde. */}
+          {order.kontrol === 'Reddet' && order.red && (
+            <div role="alert" className="rounded-md border border-danger/40 bg-danger-soft p-3 text-danger-soft-foreground">
+              <p className="font-semibold">{t('orderDetail.redNotu')}</p>
+              <p>{order.red}</p>
+            </div>
+          )}
 
-      <Tabs defaultValue="general">
-        {/* Sekme çubuğu yapışık; gölge, kabın üst dolgusunu (modal p-6 / panel p-3)
-            zemin rengiyle örter → kayan içerik çubuğun üstünde görünmez. */}
-        <TabsList className={cn('sticky top-0 z-10 h-9', embedded ? 'shadow-[0_-12px_0_0_hsl(var(--card))]' : 'shadow-[0_-24px_0_0_hsl(var(--background))]')}>
-          <TabsTrigger value="general" className="text-xs">{t('orderDetail.tabs.general')}</TabsTrigger>
-          <TabsTrigger value="items" className="text-xs">
-            {t('orderDetail.tabs.items')} <span className="ml-1 text-muted-foreground">({order.items?.length ?? 0})</span>
-          </TabsTrigger>
-          <TabsTrigger value="flow" className="text-xs">{t('orderDetail.tabs.flow')}</TabsTrigger>
-          {showNotes && <TabsTrigger value="notes" className="text-xs">{t('orderDetail.tabs.notes')}</TabsTrigger>}
-        </TabsList>
-
-        <TabsContent value="general" className="space-y-4">
           {/* Temsilci devri — YALNIZ elshan.rasulov (ControlUser) / süper-admin.
               Diğer kullanıcılar bu bloğu hiç görmez; backend gate ayrıca 403 döner. */}
           {canReassign && (
@@ -293,9 +365,10 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
               {order.lojistikNot && <p><span className="font-semibold">{t('orderDetail.lojistikNot')}:</span> {order.lojistikNot}</p>}
             </div>
           )}
-        </TabsContent>
+        </section>
 
-        <TabsContent value="items">
+        <section {...sectionProps('items')}>
+          {sectionHeading('items')}
           {order.items && order.items.length > 0 ? (
             <div className="overflow-auto rounded-md border">
               <table className="w-full text-xs">
@@ -335,9 +408,10 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
               </table>
             </div>
           ) : <p className="py-6 text-center text-muted-foreground">{t('common.noData')}</p>}
-        </TabsContent>
+        </section>
 
-        <TabsContent value="flow" className="space-y-4">
+        <section {...sectionProps('flow')}>
+          {sectionHeading('flow')}
           <DocumentFlow order={order} />
           <details className="rounded-md border p-3">
             <summary className="cursor-pointer text-xs font-medium text-muted-foreground">{t('orderDetail.legacyTimelines')}</summary>
@@ -346,18 +420,19 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
               <OrderApprovalTimeline siparisNo={siparisNo} />
             </div>
           </details>
-        </TabsContent>
+        </section>
 
         {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes).
             Fabrika görünümünde yalnız serbest (custom) notlar gösterilir. */}
         {showNotes && (
-          <TabsContent value="notes">
+          <section {...sectionProps('notes')}>
+            {sectionHeading('notes')}
             <ul className="space-y-1 rounded-md border p-3 text-muted-foreground">
               {notes!.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
             </ul>
-          </TabsContent>
+          </section>
         )}
-      </Tabs>
+      </div>
     </div>
   )
 }

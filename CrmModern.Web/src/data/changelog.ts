@@ -11,6 +11,28 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.3',
+    tarih:    '2026-10-23',
+    baslik: {
+      tr: 'Sipariş detayı tek sayfada',
+      en: 'Order details on one page',
+    },
+    maddeler: {
+      tr: [
+        'Sipariş Detayı’nda Genel, Kalemler ve Sipariş Geçmişi artık alt alta, tek sayfada; üstteki butona tıklayınca ilgili bölüme kayar.',
+        'Durum etiketleri ve Excel/PDF butonları pencerenin üstünde sabit kalıyor, artık yarım görünmüyor.',
+        'Pencere sabit boyutta açılıyor, arayüz ölçeğiyle birlikte büyüyüp küçülüyor; sağdaki kaydırma çubuğuyla gezinebilirsin.',
+        'Muhasebe, Fabrika ve Lojistik ekranlarındaki yan detay paneli de aynı düzende.',
+      ],
+      en: [
+        'In Order Detail, General, Items and Order History are now on one page, one below the other; the buttons at the top scroll to each section.',
+        'Status labels and the Excel/PDF buttons stay fixed at the top of the window and are no longer cut off.',
+        'The window opens at a fixed size and follows the interface scale; use the scrollbar on the right to move through it.',
+        'The side detail panel on the Accounting, Factory and Logistics screens uses the same layout.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.2',
     tarih:    '2026-10-23',
     baslik: {

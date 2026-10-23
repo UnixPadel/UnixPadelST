@@ -11,6 +11,24 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.2',
+    tarih:    '2026-10-23',
+    baslik: {
+      tr: 'Siparişlerim: sipariş detayı pencerede açılıyor',
+      en: 'My Orders: order details open in a window',
+    },
+    maddeler: {
+      tr: [
+        'Siparişlerim’de "Siparişi Aç" artık Sipariş Detayı penceresini doğrudan açıyor; sağdaki detay paneli kaldırıldı, liste tam genişlikte.',
+        'Satıra çift tıklayarak veya Enter ile de siparişi açabilirsin.',
+      ],
+      en: [
+        'In My Orders, "Open Order" now opens the Order Detail window directly; the side panel is gone and the list uses the full width.',
+        'You can also open an order by double-clicking its row or pressing Enter.',
+      ],
+    },
+  },
+  {
     // Hazır bekleyen not: package.json 0.3.1'e geçince gösterilir (≤ güncel sürüm kuralı).
     versiyon: '0.3.1',
     tarih:    '2026-10-23',

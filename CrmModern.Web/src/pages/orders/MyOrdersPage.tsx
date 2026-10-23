@@ -9,7 +9,7 @@ import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column, type RowAction } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { OrderKontrolBadge } from '@/components/OrderKontrolBadge'
-import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
 import { RowActionsMenu } from '@/components/RowActionsMenu'
 import { FilterBar, FilterField, ALL, useFilterState, useDefaultView } from '@/components/FilterBar'
 import { Badge } from '@/components/ui/badge'
@@ -38,7 +38,7 @@ type Row = OrderListDto & Record<string, unknown>
  * PROMPT.md #20: Siparişlerim ekranı — port of legacy Siparislerim.cs.
  *
  * Satır aksiyonları legacy CellContentClick kurallarını korur:
- *   Form Göster    — her zaman (artık sağ panelde; liste görünür kalır).
+ *   Form Göster    — her zaman; Sipariş Detayı penceresinde açılır (Enter / çift tık da).
  *   Siparişe Çevir — Teklif ve kontrol !== 'Reddet' (onaylı pencere).
  *   Red Notu       — kontrol === 'Reddet'.
  *   Revize         — Teklif/Sipariş ve kontrol !== 'Onay'.
@@ -252,23 +252,24 @@ export function MyOrdersPage() {
         </FilterBar>
       </div>
       <FillRegion className="pt-2">
-        {/* §22 — Siparişlerim'de Notlar bölümü gizli (hideNotes). */}
-        <MasterDetailLayout fill siparisNo={activeNo} onClose={() => setActiveNo(null)} hideNotes>
-          <DataTable
-            fill
-            tableId="my-orders"
-            exportFileName="siparislerim"
-            columns={cols}
-            data={filtered as Row[]}
-            keyField="siparisAlID"
-            loading={isLoading}
-            error={isError}
-            activeRowKey={filtered.find((o) => rowNo(o) === activeNo)?.siparisAlID ?? null}
-            onActiveRowChange={(r) => setActiveNo(rowNo(r))}
-            rowActions={actions}
-          />
-        </MasterDetailLayout>
+        <DataTable
+          fill
+          tableId="my-orders"
+          exportFileName="siparislerim"
+          columns={cols}
+          data={filtered as Row[]}
+          keyField="siparisAlID"
+          loading={isLoading}
+          error={isError}
+          activeRowKey={filtered.find((o) => rowNo(o) === activeNo)?.siparisAlID ?? null}
+          onRowActivate={(r) => setActiveNo(rowNo(r))}
+          onRowDoubleClick={(r) => setActiveNo(rowNo(r))}
+          rowActions={actions}
+        />
       </FillRegion>
+
+      {/* Sipariş Detayı penceresi — §22: Siparişlerim'de Notlar bölümü gizli (hideNotes). */}
+      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} hideNotes />
 
       {/* Red Notu — inline dialog (legacy MessageBox replacement) */}
       <Dialog open={!!redTarget} onOpenChange={(o) => { if (!o) setRedTarget(null) }}>

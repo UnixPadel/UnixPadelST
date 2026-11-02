@@ -7,6 +7,7 @@ using CrmModern.Core.Entities;
 using CrmModern.Core.Interfaces;
 using CrmModern.Core.Interfaces.Services;
 using CrmModern.Core.Proforma;
+using CrmModern.Core.Workflow;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace CrmModern.Infrastructure.Services;
@@ -767,7 +768,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             .ToDictionary(g => g.Key, g => g.ToList());
 
         static decimal CiroOf(IEnumerable<Order> rows, string para) =>
-            rows.Where(o => o.ParaTipi == para).Sum(o => o.ToplamFiyat ?? 0m);
+            rows.Where(o => o.ParaTipi == para && OrderWorkflow.IsCiroEligible(o)).Sum(o => o.ToplamFiyat ?? 0m);
 
         return temsilciler
             .Select(u =>
@@ -775,7 +776,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                 var g = byRep.TryGetValue(u.KullaniciID, out var rows) ? rows : new List<Order>();
                 int olusturulan = g.Count;
                 int teklif      = g.Count(o => o.SiparisMiTeklifMi == "Teklif");
-                int siparis     = g.Count(o => o.SiparisMiTeklifMi != "Teklif" && o.SiparisMiTeklifMi != "Iptal");
+                int siparis     = g.Count(OrderWorkflow.IsCiroEligible);
                 return new RepPerformanceDto(
                     KullaniciID:  u.KullaniciID,
                     AdSoyad:      $"{u.Ad} {u.Soyad}".Trim(),
@@ -808,7 +809,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
 
         // Satış = gerçek sipariş (Teklif/Iptal dışı). Ciro/ülke/ürün bunlardan türetilir.
         var sales = orders
-            .Where(o => o.SiparisMiTeklifMi != "Teklif" && o.SiparisMiTeklifMi != "Iptal")
+            .Where(OrderWorkflow.IsCiroEligible)
             .ToList();
 
         // Kalemler: satış siparişlerinin SiparisNo ∪ TeklifNo anahtarlarıyla toplu çek.

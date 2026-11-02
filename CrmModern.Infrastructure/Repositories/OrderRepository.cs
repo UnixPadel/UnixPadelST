@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
 using CrmModern.Core.Interfaces.Repositories;
+using CrmModern.Core.Workflow;
 using CrmModern.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -365,7 +366,8 @@ internal sealed class OrderRepository(AppDbContext context)
         var cutoff = DateTime.Now.AddDays(-days);
         return await _context.SiparisAlTablo
             .AsNoTracking()
-            .CountAsync(o => o.SiparisMiTeklifMi != "Teklif" && o.Tarih >= cutoff);
+            .Where(OrderWorkflow.CiroPredicate)
+            .CountAsync(o => o.Tarih >= cutoff);
     }
 
     public async Task<IReadOnlyDictionary<string, decimal>> SumCiroByCurrencyInLastDaysAsync(int days)
@@ -373,7 +375,8 @@ internal sealed class OrderRepository(AppDbContext context)
         var cutoff = DateTime.Now.AddDays(-days);
         var rows = await _context.SiparisAlTablo
             .AsNoTracking()
-            .Where(o => o.SiparisMiTeklifMi != "Teklif" && o.Tarih >= cutoff)
+            .Where(OrderWorkflow.CiroPredicate)
+            .Where(o => o.Tarih >= cutoff)
             .GroupBy(o => o.ParaTipi)
             .Select(g => new { ParaTipi = g.Key, Toplam = g.Sum(x => x.ToplamFiyat ?? 0m) })
             .ToListAsync();
@@ -412,7 +415,8 @@ internal sealed class OrderRepository(AppDbContext context)
         // Group by Year/Month + ParaTipi to keep currency split intact
         var raw = await _context.SiparisAlTablo
             .AsNoTracking()
-            .Where(o => o.SiparisMiTeklifMi != "Teklif" && o.Tarih >= cutoff)
+            .Where(OrderWorkflow.CiroPredicate)
+            .Where(o => o.Tarih >= cutoff)
             .GroupBy(o => new { o.Tarih.Year, o.Tarih.Month, o.ParaTipi })
             .Select(g => new
             {
@@ -441,6 +445,7 @@ internal sealed class OrderRepository(AppDbContext context)
     {
         var rows = await _context.SiparisAlTablo
             .AsNoTracking()
+            .Where(o => !o.Silindi)
             .GroupBy(o => o.SiparisMiTeklifMi)
             .Select(g => new StageDistributionDto(g.Key, g.Count()))
             .ToListAsync();
@@ -455,7 +460,8 @@ internal sealed class OrderRepository(AppDbContext context)
         // limit'i client-side uygula.
         var rows = await _context.SiparisAlTablo
             .AsNoTracking()
-            .Where(o => o.SiparisMiTeklifMi != "Teklif" && o.Tarih >= cutoff)
+            .Where(OrderWorkflow.CiroPredicate)
+            .Where(o => o.Tarih >= cutoff)
             .GroupBy(o => new { o.MusteriAd, o.ParaTipi })
             .Select(g => new
             {
@@ -478,7 +484,8 @@ internal sealed class OrderRepository(AppDbContext context)
         var cutoff = DateTime.Now.AddDays(-days);
         var rows = await _context.SiparisAlTablo
             .AsNoTracking()
-            .Where(o => o.SiparisMiTeklifMi != "Teklif" && o.Tarih >= cutoff)
+            .Where(OrderWorkflow.CiroPredicate)
+            .Where(o => o.Tarih >= cutoff)
             .GroupBy(o => o.ParaTipi)
             .Select(g => new CurrencyDistributionDto(
                 g.Key,

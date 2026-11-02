@@ -112,4 +112,22 @@ public static class OrderWorkflow
 
     /// <summary>Siparişin şu an beklediği adım; terminal / silinmiş ise null.</summary>
     public static WorkflowStep? CurrentStep(Order o) => Steps.FirstOrDefault(s => s.Matches(o));
+
+    /// <summary>
+    /// Bir siparişin toplam ciroya ve dashboard para metriklerine eklenme kriteri:
+    /// 1) Silinmemiş ve iptal edilmemiş olmalı,
+    /// 2) Teklif olmamalı,
+    /// 3) Peşinatı girilmiş olmalı (OdenenMiktar > 0) VEYA Kalite Kontrol onayından geçip
+    ///    Cari Onay tamamlanarak Planlama/üretim/tamamlanma aşamasına geçmiş olmalı.
+    /// (Kalite kontrolde bekleyen veya QC'den yeni geçip peşinatı ödenmemiş ham siparişler ciroya girmez).
+    /// </summary>
+    public static readonly Expression<Func<Order, bool>> CiroPredicate = o =>
+        !o.Silindi
+        && o.SiparisMiTeklifMi != "Teklif"
+        && o.SiparisMiTeklifMi != "Iptal"
+        && ((o.OdenenMiktar != null && o.OdenenMiktar > 0m)
+            || (o.SiparisMiTeklifMi != "Siparis" && o.Kontrol == "Onay"));
+
+    private static Func<Order, bool>? _ciroCompiled;
+    public static bool IsCiroEligible(Order o) => (_ciroCompiled ??= CiroPredicate.Compile())(o);
 }

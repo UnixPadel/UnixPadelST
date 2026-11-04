@@ -2,20 +2,19 @@ import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Copy, Download, FileText } from 'lucide-react'
+import { Check, Copy, Download, FileText } from 'lucide-react'
 import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative } from '@/api/orders'
 import { getUsersLookup } from '@/api/users'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
-import { resolveClause, isFreeNote } from '@/lib/clauses'
+import { resolveClause, isFreeNote, isClauseCode, getProductDetails, detectOrderCategory } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SectionTitle } from '@/components/ui/section-title'
 import { KeyValue } from '@/components/ui/key-value'
-import { OrderApprovalTimeline } from '@/components/OrderApprovalTimeline'
-import { OrderStageTimeline } from '@/components/OrderStageTimeline'
+import { CollapsibleSection } from '@/components/ui/accordion'
 import { LogisticsOfferForm } from '@/components/LogisticsOfferForm'
 import { DocumentFlow } from '@/components/order/DocumentFlow'
 import { useToast } from '@/components/ToastProvider'
@@ -65,7 +64,7 @@ export function OrderDetailModal({ siparisNo, onClose, ...rest }: Props) {
   )
 }
 
-type SectionId = 'general' | 'items' | 'flow' | 'notes'
+type SectionId = 'general' | 'items' | 'details' | 'flow'
 /** Çapa tıklanınca bölüm başlığının gövde üstünden bırakacağı boşluk (px). */
 const SECTION_OFFSET = 12
 
@@ -73,7 +72,7 @@ const SECTION_OFFSET = 12
  * E-9 / E-8 — sipariş detayının gövdesi; hem modalda hem master-detail sağ
  * panelinde kullanılır. Fiori Object Page: üstte sabit başlık şeridi + çapa
  * çubuğu, altında tek kayan gövdede alt alta bölümler:
- *   Genel · Kalemler · Sipariş Geçmişi · Notlar
+ *   Genel · Kalemler · Detaylar · Sipariş Geçmişi
  * Çapa butonu ilgili bölüme kaydırır; kaydırdıkça etkin buton güncellenir.
  * Kap (modal / aside) sınırlı yükseklikte bir flex sütunu olmalıdır.
  */
@@ -94,6 +93,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
   const canCreateOrders = !!user && (user.yetkiTuru === 'Temsilci' || user.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(user))
   const [showOfferForm, setShowOfferForm] = useState(false)
   const [downloading, setDownloading] = useState<'excel' | 'pdf' | null>(null)
+  const [detailsOpen, setDetailsOpen] = useState(false)
   const padX = embedded ? 'px-3' : 'px-6'
 
   // Çapa çubuğu ↔ bölümler. Tıklamadaki yumuşak kaydırma bitene dek kaydırma
@@ -161,23 +161,47 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
     return <p className={cn('py-8 text-center text-sm text-destructive', padX)}>{t('orderDetail.loadError')}</p>
   }
 
-  const notes = factoryView ? (order.details ?? []).filter(isFreeNote) : order.details
-  const showNotes = !hideNotes && !!notes && notes.length > 0
+  const detectedCategory = detectOrderCategory(order)
+  const productDetailsList = getProductDetails(detectedCategory)
+
+  const rawDetails = order.details ?? []
+  const isClauseSelected = (clause: string) =>
+    rawDetails.some((d) => {
+      const dl = d.trim().toLowerCase()
+      const cl = clause.trim().toLowerCase()
+      if (dl === cl) return true
+      if (cl.includes('12mm') && cl.includes('glass') && dl.includes('12mm') && dl.includes('glass')) return true
+      return false
+    })
+
+  const selectedStandardCount = productDetailsList.filter(isClauseSelected).length
+  const clauseNotes = rawDetails.filter(isClauseCode)
+  const freeNotes = rawDetails.filter(isFreeNote)
+  const allFreeNotes = [
+    ...(order.siparisNotu ? [order.siparisNotu] : []),
+    ...freeNotes,
+  ]
+
   const itemCount = order.items?.length ?? 0
   const sections: { id: SectionId; label: string; count?: number }[] = [
     { id: 'general', label: t('orderDetail.tabs.general') },
     { id: 'items', label: t('orderDetail.tabs.items'), count: itemCount },
+    { id: 'details', label: factoryView ? t('orderDetail.tabs.notes') : t('orderDetail.tabs.details') },
     { id: 'flow', label: t('orderDetail.tabs.flow') },
-    ...(showNotes ? [{ id: 'notes' as const, label: t('orderDetail.tabs.notes') }] : []),
   ]
 
   const goToSection = (id: SectionId) => {
-    const body = bodyRef.current, el = sectionEls.current[id]
-    if (!body || !el) return
+    if (id === 'details' && !detailsOpen) {
+      setDetailsOpen(true)
+    }
     setActiveSection(id)
     spyPausedUntil.current = Date.now() + 900
     const smooth = !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    body.scrollTo({ top: Math.max(0, el.offsetTop - SECTION_OFFSET), behavior: smooth ? 'smooth' : 'auto' })
+    requestAnimationFrame(() => {
+      const body = bodyRef.current, el = sectionEls.current[id]
+      if (!body || !el) return
+      body.scrollTo({ top: Math.max(0, el.offsetTop - SECTION_OFFSET), behavior: smooth ? 'smooth' : 'auto' })
+    })
   }
   const onBodyScroll = () => {
     const body = bodyRef.current
@@ -410,28 +434,97 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
           ) : <p className="py-6 text-center text-muted-foreground">{t('common.noData')}</p>}
         </section>
 
+        {/* Detaylar ve Notlar — Sipariş Geçmişi'nin üstünde açılır/kapanır akordiyon */}
+        <div
+          ref={(el) => { sectionEls.current['details'] = el }}
+          id="od-details"
+          className="space-y-2"
+        >
+          <CollapsibleSection
+            id="sec-details"
+            open={detailsOpen}
+            onOpenChange={setDetailsOpen}
+            title={factoryView ? t('orderDetail.tabs.notes') : t('orders.form.details')}
+            summary={
+              factoryView
+                ? `${allFreeNotes.length} ${t('orders.form.freeNotes').toLowerCase()}`
+                : t('orders.form.termsSummary', {
+                    checked: selectedStandardCount,
+                    total: productDetailsList.length,
+                    notes: allFreeNotes.length,
+                  })
+            }
+          >
+            <div className="space-y-4 p-4 text-xs">
+              {/* Standart Şartlar — fabrika rolü için gizli */}
+              {!factoryView && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">{t('orders.form.standardTerms')}</p>
+                  <div className="grid gap-x-6 gap-y-1 rounded-md border p-3 sm:grid-cols-2 bg-muted/20">
+                    {productDetailsList.map((clause) => {
+                      const isSelected = isClauseSelected(clause)
+                      return (
+                        <div
+                          key={clause}
+                          className={cn(
+                            'flex items-start gap-2 rounded px-2 py-1 text-xs transition-colors',
+                            isSelected ? 'bg-primary/5 text-foreground font-medium' : 'text-muted-foreground/50',
+                          )}
+                        >
+                          {isSelected ? (
+                            <Check className="h-3.5 w-3.5 text-primary shrink-0 mt-0.5" />
+                          ) : (
+                            <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-muted-foreground/30 mt-0.5" />
+                          )}
+                          <span className={cn(!isSelected && 'opacity-60')}>{clause}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Otomatik Sözleşme Şartları (@@ODEME, @@TESLIMAT vb.) */}
+              {!factoryView && clauseNotes.length > 0 && (
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">{t('orders.form.previewSartlar')}</p>
+                  <ul className="space-y-1 rounded-md border p-2.5 text-xs text-muted-foreground bg-muted/10">
+                    {clauseNotes.map((d, i) => (
+                      <li key={i} className="flex items-start gap-2">
+                        <span className="text-primary font-bold">•</span>
+                        <span className="text-foreground">{resolveClause(t, d)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Ek Notlar */}
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium text-muted-foreground">{t('orders.form.freeNotes')}</p>
+                {allFreeNotes.length > 0 ? (
+                  <ul className="space-y-1 rounded-md border p-2.5 text-xs bg-muted/10">
+                    {allFreeNotes.map((d, i) => (
+                      <li key={i} className="flex items-start gap-2 text-foreground">
+                        <span className="text-primary font-bold shrink-0">•</span>
+                        <span className="whitespace-pre-wrap">{d}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="rounded-md border border-dashed p-2.5 text-center text-xs text-muted-foreground italic">
+                    {t('common.noData')}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CollapsibleSection>
+        </div>
+
         <section {...sectionProps('flow')}>
           {sectionHeading('flow')}
           <DocumentFlow order={order} />
-          <details className="rounded-md border p-3">
-            <summary className="cursor-pointer text-xs font-medium text-muted-foreground">{t('orderDetail.legacyTimelines')}</summary>
-            <div className="mt-3 space-y-4">
-              <OrderStageTimeline tarih={order.tarih} sTarih={order.sTarih} currentStage={order.siparisMiTeklifMi} />
-              <OrderApprovalTimeline siparisNo={siparisNo} />
-            </div>
-          </details>
         </section>
-
-        {/* Details / Notes — §22: Siparişlerim'de gizlenir (hideNotes).
-            Fabrika görünümünde yalnız serbest (custom) notlar gösterilir. */}
-        {showNotes && (
-          <section {...sectionProps('notes')}>
-            {sectionHeading('notes')}
-            <ul className="space-y-1 rounded-md border p-3 text-muted-foreground">
-              {notes!.map((d, i) => <li key={i}>• {resolveClause(t, d)}</li>)}
-            </ul>
-          </section>
-        )}
       </div>
     </div>
   )

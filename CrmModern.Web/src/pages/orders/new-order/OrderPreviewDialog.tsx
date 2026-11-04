@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { KeyValue } from '@/components/ui/key-value'
 import { SectionTitle } from '@/components/ui/section-title'
-import { STANDART_DETAY_SARTLARI, isFreeNote } from '@/lib/clauses'
+import { isStandardDetay, isFreeNote } from '@/lib/clauses'
 import { formatNumberTR } from '@/lib/number'
 import type { OrderTotals, SetTabState } from '@/lib/orderForm'
 import type { CreateOrderDto } from '@/types'
@@ -26,7 +26,7 @@ export function OrderPreviewDialog({
   const { t } = useTranslation()
   const m = (n: number) => `${formatNumberTR(n)} ${sym}`
   const sets = tabs.filter((tb) => tb.kategoriID)
-  const sartlar = (form.details ?? []).filter((d) => STANDART_DETAY_SARTLARI.includes(d) || isFreeNote(d))
+  const sartlar = (form.details ?? []).filter((d) => isStandardDetay(d) || isFreeNote(d))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

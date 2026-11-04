@@ -338,9 +338,9 @@
       "temsilciIsmi": "Satış temsilcisi",
       "ek": "Ek",
       "ekHint": "Yalnız ZIP ya da RAR dosyası ekleyebilirsin.",
-      "standardTerms": "Standart şartlar",
+      "standardTerms": "Detaylar",
       "autoTerms": "Otomatik şartlar (teslimat, ödeme, montaj)",
-      "freeNotes": "Notlar (her satır bir not)",
+      "freeNotes": "Ek notlar",
       "toplamFiyatLabel": "Toplam fiyat",
       "kaporaMiktari": "Peşinat tutarı",
       "diger": "Diğer",
@@ -412,8 +412,8 @@
       "carpHint": "Fiyat × miktarı fiyat alanına yazar, miktarı 1 yapar.",
       "iliskilendirHint": "Müşterinin adres ve iletişim bilgilerini teslimat alanlarına kopyalar.",
       "sameAsCustomer": "Müşteriyle aynı",
-      "termsSummary": "{{checked}}/{{total}} standart şart · {{notes}} not",
-      "freeNotePlaceholder": "Not yaz, Enter'a bas"
+      "termsSummary": "{{checked}}/{{total}} detay · {{notes}} ek not",
+      "freeNotePlaceholder": "Ek not yaz, Enter'a bas"
     },
     "subtitle": "Müşteriyi, ürünleri, teslimatı ve cari bilgileri doldur. Ctrl+S ile kontrol edip kaydet.",
     "sections": {
@@ -1255,7 +1255,7 @@
     "teslimatAddr": "Teslimat adresi",
     "pricing": "Fiyat",
     "products": "Ürünler ve parçalar",
-    "notes": "Notlar",
+    "notes": "Ek notlar",
     "musteri": "Müşteri",
     "ulke": "Ülke",
     "telefon": "Telefon",
@@ -1299,8 +1299,9 @@
     "tabs": {
       "general": "Genel",
       "items": "Kalemler",
+      "details": "Detaylar",
       "flow": "Sipariş Geçmişi",
-      "notes": "Notlar"
+      "notes": "Ek Notlar"
     }
   },
   "approval": {

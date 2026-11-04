@@ -11,6 +11,22 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.7',
+    tarih:    '2026-11-04',
+    baslik: {
+      tr: 'Sipariş detayları ve ürün bazlı şartlar',
+      en: 'Order details and product-specific terms',
+    },
+    maddeler: {
+      tr: [
+        'Sipariş detayında Detaylar ve Ek Notlar açılır/kapanır alanda Sipariş Geçmişi üzerine taşındı; Full Panoramic Court detayları eklendi.',
+      ],
+      en: [
+        'Details and Additional Notes moved above Order History in a collapsible section; Full Panoramic Court details added.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.6',
     tarih:    '2026-10-23',
     baslik: {

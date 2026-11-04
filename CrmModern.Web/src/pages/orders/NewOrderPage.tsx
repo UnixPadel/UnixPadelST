@@ -54,7 +54,7 @@ import { formatNumberTR } from '@/lib/number'
 import { INCOTERMS } from '@/lib/constants'
 // Round-8 §4/§5 — standart şartlar yapılandırılmış KOD olarak saklanır.
 import {
-  STANDART_DETAY_SARTLARI, CLAUSE, ODEME_PREFIX, TESLIMAT_PREFIX,
+  getProductDetails, STANDART_DETAY_SARTLARI, CLAUSE, ODEME_PREFIX, TESLIMAT_PREFIX,
   teslimatCode, odemeCode, upsertClause, parseOdemeFromDetails, isFreeNote,
 } from '@/lib/clauses'
 import {
@@ -133,6 +133,11 @@ export function NewOrderPage() {
   const isAmendMode = !!amendFrom
   const mode: 'new' | 'revise' | 'amend' = isAmendMode ? 'amend' : isReviseMode ? 'revise' : 'new'
   const sourceNo = reviseFrom ?? amendFrom
+
+  const activeProductDetails = useMemo(() => {
+    const cat = setTabs.find((t) => t.kategoriAdi)?.kategoriAdi
+    return getProductDetails(cat)
+  }, [setTabs])
 
   // ── Kur çevirici (TCMB, TL bazlı) ──────────────────────────────────────
   const { data: tcmb, dataUpdatedAt: kurZamani } = useQuery({
@@ -407,6 +412,19 @@ export function NewOrderPage() {
     }))) return
     const cat = categories.find((c) => c.kategoriID === kategoriID)
     const kategoriAdi = cat?.kategoriAdi ?? ''
+    // Ürün değiştiğinde detay şartları varsayılandaysa yeni ürünün detaylarına geçir
+    if (idx === 0 && tab.kategoriAdi !== kategoriAdi) {
+      const prevDetails = getProductDetails(tab.kategoriAdi)
+      const nextDetails = getProductDetails(kategoriAdi)
+      setForm((f) => {
+        const isDefault = (f.details ?? []).length === prevDetails.length &&
+          prevDetails.every((d) => (f.details ?? []).includes(d))
+        if (isDefault) {
+          return { ...f, details: [...nextDetails] }
+        }
+        return f
+      })
+    }
     // Katalog set fiyatı (UrunKategorileri.Fiyat) Euro bazlıdır; siparişin birimine çevrilir.
     const kategoriFiyat = priceIn(cat?.fiyat ?? 0, 'EUR')
     updateTab(idx, { kategoriID, kategoriAdi, kategoriFiyat, checklist: [], components: [] })
@@ -1278,13 +1296,13 @@ export function NewOrderPage() {
           </div>
         </div>
 
-        {/* §31 — DETAYLAR: 17 standart şart + serbest notlar. Varsayılan kapalı (özetle). */}
+        {/* §31 — DETAYLAR: Ürüne göre detaylar + ek notlar. Varsayılan kapalı (özetle). */}
         <CollapsibleSection
           id="sec-terms"
           title={t('orders.form.details')}
           summary={t('orders.form.termsSummary', {
-            checked: (form.details ?? []).filter((d) => STANDART_DETAY_SARTLARI.includes(d)).length,
-            total: STANDART_DETAY_SARTLARI.length,
+            checked: (form.details ?? []).filter((d) => activeProductDetails.includes(d)).length,
+            total: activeProductDetails.length,
             notes: (form.details ?? []).filter(isFreeNote).length,
           })}
         >
@@ -1293,12 +1311,12 @@ export function NewOrderPage() {
               <div className="flex items-center justify-between">
                 <p className="text-xs font-medium text-muted-foreground">{t('orders.form.standardTerms')}</p>
                 <div className="flex gap-1">
-                  <Button type="button" size="xs" variant="ghost" onClick={() => STANDART_DETAY_SARTLARI.forEach((c) => toggleClause(c, true))}>{t('table.selectAll')}</Button>
-                  <Button type="button" size="xs" variant="ghost" onClick={() => STANDART_DETAY_SARTLARI.forEach((c) => toggleClause(c, false))}>{t('common.clear')}</Button>
+                  <Button type="button" size="xs" variant="ghost" onClick={() => activeProductDetails.forEach((c) => toggleClause(c, true))}>{t('table.selectAll')}</Button>
+                  <Button type="button" size="xs" variant="ghost" onClick={() => activeProductDetails.forEach((c) => toggleClause(c, false))}>{t('common.clear')}</Button>
                 </div>
               </div>
               <div className="grid gap-x-6 gap-y-1 rounded-md border p-3 sm:grid-cols-2">
-                {STANDART_DETAY_SARTLARI.map((clause) => (
+                {activeProductDetails.map((clause) => (
                   <Checkbox
                     key={clause}
                     label={clause}

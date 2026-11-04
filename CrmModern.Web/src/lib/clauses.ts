@@ -20,14 +20,9 @@ export const STANDART_SART_KODLARI: readonly string[] = [
   CLAUSE.FIYAT, CLAUSE.KDV, CLAUSE.KARGO, CLAUSE.MONTAJ, CLAUSE.HAKLAR,
 ]
 
-// "OFFER INCLUDE BELOW DETAILS" — eski CRM (WindowsFormsApp1 / SiparisForm.cs,
-// satır 598-614) standart şart listesi: 17 önceden tanımlı İngilizce şart.
-// Eski sistemde yeni siparişte hepsi İŞARETLİ (checkbox) gelir; kullanıcı
-// istemediğini kaldırır, yalnız işaretliler DetayTablo'ya yazılır ve proformada
-// #DETAY altında listelenir. Metinler ORİJİNALE BİREBİR korunur (yazım dahil) —
-// çeviri YOK: literal metin ClauseText.Resolve'dan olduğu gibi geçer, böylece TR
-// ve EN proformada aynı İngilizce çıkar (eski CRM davranışı). Yeni şart EKLENMEZ.
-export const STANDART_DETAY_SARTLARI: readonly string[] = [
+// "OFFER INCLUDE BELOW DETAILS" — eski CRM (WindowsFormsApp1 / SiparisForm.cs, satır 598-614)
+// Standart Padel Court için 17 önceden tanımlı İngilizce şart listesi.
+export const STANDARD_PADEL_DETAY_SARTLARI: readonly string[] = [
   'Include all necessary Standard padel structure',
   '80x60x3mm electro static powder paint structure',
   'Galvanized 50x50x4mm fence with powder paint',
@@ -47,12 +42,74 @@ export const STANDART_DETAY_SARTLARI: readonly string[] = [
   'Buyer will provide installation helper on side in ...',
 ]
 
-const STANDART_DETAY_SET = new Set<string>(STANDART_DETAY_SARTLARI)
+// Geriye dönük uyumluluk için alias
+export const STANDART_DETAY_SARTLARI = STANDARD_PADEL_DETAY_SARTLARI
 
-/** Satır eski CRM'in 17 önceden tanımlı standart şartından biri mi? */
-export const isStandardDetay = (line: string): boolean => STANDART_DETAY_SET.has(line.trim())
+// Full Panoramic Court için detay şartları listesi
+export const FULL_PANORAMIC_DETAY_SARTLARI: readonly string[] = [
+  'Include all Full Panoramic side equipment and material',
+  '100x50x3mm Electro static powder coating steel structure',
+  'Galvanized 50x50x4mm fence with powder paint',
+  'FIP approved 9000dtex blue padel grass',
+  '12mm Temperred Glass with EN and CE certificiate',
+  'Glass waranty againts Temperred broken by producer',
+  'Transport not include the offer',
+  'Transport delivered to ...',
+  'Metallic structure under unixpadel warranty 10 years',
+  'Padel grass under unixpadel 5 years warranty',
+  'Led light 200 w 2 years warranty under producer',
+  'Proffesional padel net and pole with standard',
+  'Instllation will make by Unixpadel team and buyer',
+  'Unixpadel responsiable untill loading from Factory',
+  'Loading the goods under unixpadel responsiable',
+  'Unloading the goods under Buyer responsiable',
+  'Buyer will provide all necessary machinery',
+  'Buyer will provide installation helper on side in ...',
+]
 
-/** Ne @@kod ne de önceden tanımlı 17 şart → kullanıcının serbest (custom) notu. */
+/**
+ * Ürün kategorisine göre detay şartları listesini döner.
+ * Yeni ürünler eklendikçe buraya eklenir.
+ */
+export function getProductDetails(kategoriAdi?: string | null): readonly string[] {
+  const norm = (kategoriAdi ?? '').trim().toLowerCase()
+  if (norm.includes('full panoramic')) {
+    return FULL_PANORAMIC_DETAY_SARTLARI
+  }
+  return STANDARD_PADEL_DETAY_SARTLARI
+}
+
+/**
+ * Siparişin kalemlerine ya da mevcut detaylarına bakarak ürün kategorisini tespit eder.
+ */
+export function detectOrderCategory(order: { items?: { kategoriAdi?: string }[]; details?: string[] }): string {
+  const itemCat = order.items?.find((i) => i.kategoriAdi)?.kategoriAdi
+  if (itemCat && itemCat.trim()) return itemCat
+  const rawDetails = order.details ?? []
+  if (rawDetails.some((d) => d.toLowerCase().includes('full panoramic'))) {
+    return 'Full Panoramic Court'
+  }
+  return 'Standard Padel Court'
+}
+
+const ALL_PRODUCT_DETAILS_SET = new Set<string>([
+  ...STANDARD_PADEL_DETAY_SARTLARI.map((s) => s.trim().toLowerCase()),
+  ...FULL_PANORAMIC_DETAY_SARTLARI.map((s) => s.trim().toLowerCase()),
+  '12mm temperred glass with en and ce certificiate',
+  '12mm temperred glass with en and ce certifiate',
+  '12mm temperred glass with en and ce certificate',
+  '12mm tempered glass with en and ce certificate',
+])
+
+/** Satır herhangi bir ürünün önceden tanımlı standart detay şartlarından biri mi? */
+export const isStandardDetay = (line: string): boolean => {
+  const norm = line.trim().toLowerCase()
+  if (ALL_PRODUCT_DETAILS_SET.has(norm)) return true
+  if (norm.includes('12mm') && norm.includes('glass') && (norm.includes('ce') || norm.includes('en'))) return true
+  return false
+}
+
+/** Ne @@kod ne de önceden tanımlı standart şart → kullanıcının serbest (ek) notu. */
 export const isFreeNote = (line: string): boolean =>
   !isClauseCode(line) && !isStandardDetay(line)
 

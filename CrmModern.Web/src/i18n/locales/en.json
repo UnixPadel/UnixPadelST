@@ -338,9 +338,9 @@
       "temsilciIsmi": "Sales rep",
       "ek": "Attachment",
       "ekHint": "You can only attach ZIP or RAR files.",
-      "standardTerms": "Standard terms",
+      "standardTerms": "Details",
       "autoTerms": "Automatic terms (delivery, payment, installation)",
-      "freeNotes": "Notes (one per line)",
+      "freeNotes": "Additional notes",
       "toplamFiyatLabel": "Total price",
       "kaporaMiktari": "Down payment",
       "diger": "Other",
@@ -412,8 +412,8 @@
       "carpHint": "Puts price × quantity into the price field and sets quantity to 1.",
       "iliskilendirHint": "Copies the customer's address and contact details into the delivery fields.",
       "sameAsCustomer": "Same as customer",
-      "termsSummary": "{{checked}}/{{total}} standard terms · {{notes}} notes",
-      "freeNotePlaceholder": "Type a note and press Enter"
+      "termsSummary": "{{checked}}/{{total}} details · {{notes}} additional notes",
+      "freeNotePlaceholder": "Write an additional note, press Enter"
     },
     "subtitle": "Fill in the customer, products, delivery and account details. Press Ctrl+S to review and save.",
     "sections": {
@@ -1255,7 +1255,7 @@
     "teslimatAddr": "Delivery address",
     "pricing": "Price",
     "products": "Products and parts",
-    "notes": "Notes",
+    "notes": "Additional notes",
     "musteri": "Customer",
     "ulke": "Country",
     "telefon": "Phone",
@@ -1299,8 +1299,9 @@
     "tabs": {
       "general": "General",
       "items": "Items",
+      "details": "Details",
       "flow": "Order History",
-      "notes": "Notes"
+      "notes": "Additional Notes"
     }
   },
   "approval": {

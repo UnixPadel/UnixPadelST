@@ -268,8 +268,8 @@ export function MyOrdersPage() {
         />
       </FillRegion>
 
-      {/* Sipariş Detayı penceresi — §22: Siparişlerim'de Notlar bölümü gizli (hideNotes). */}
-      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} hideNotes />
+      {/* Sipariş Detayı penceresi */}
+      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} />
 
       {/* Red Notu — inline dialog (legacy MessageBox replacement) */}
       <Dialog open={!!redTarget} onOpenChange={(o) => { if (!o) setRedTarget(null) }}>

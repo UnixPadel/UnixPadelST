@@ -11,6 +11,24 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.8',
+    tarih:    '2026-11-05',
+    baslik: {
+      tr: 'Yetkili kullanıcılar için sipariş doğrudan tamamlama',
+      en: 'Direct order completion for authorized users',
+    },
+    maddeler: {
+      tr: [
+        'Burcu, Elshan ve Admin kullanıcıları için Sipariş ve sonraki aşamalardaki siparişleri doğrudan Tamamlandı statüsüne alma yetkisi eklendi.',
+        'Kritik işlem göstergesi olarak Siparişi Tamamla butonu kırmızı ve keskin köşeli yapıldı; doğrudan kapatma uyarıları ve sipariş detay bildirimleri güncellendi.',
+      ],
+      en: [
+        'Added direct completion permission for Burcu, Elshan, and Admin users from Order and subsequent stages.',
+        'Updated Complete Order action to red with sharp corners to reflect critical operation; updated direct completion warning and order summary notifications.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.7',
     tarih:    '2026-11-04',
     baslik: {

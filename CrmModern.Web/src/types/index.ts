@@ -76,6 +76,8 @@ export interface OrderListDto {
   silindi?: boolean
   guncellendi?: boolean
   degisiklikGerekce?: string
+  tamamlayanAdSoyad?: string | null
+  tamamlanmaTarihi?: string | null
 }
 
 export interface OrderDetail {
@@ -144,6 +146,14 @@ export interface OrderDetail {
   kontrolNot?: string
   // Teslimat/Montaj altı ekstra maliyetler — revize/amend'de forma yüklenir.
   extraCosts?: OrderExtraCostView[]
+  silindi?: boolean
+  // Kapanış Bilgileri (Tamamlandı)
+  tamamlayanKullaniciID?: number | null
+  tamamlayanAdSoyad?: string | null
+  tamamlayanKullaniciAdi?: string | null
+  tamamlanmaTarihi?: string | null
+  tamamlanmaOncekiAsama?: string | null
+  tamamlanmaNotu?: string | null
 }
 
 export interface OrderExtraCostView {
@@ -420,6 +430,8 @@ export interface AccountingOrderListDto {
   onayliLojistikFirma?: string | null
   onayliLojistikFiyat?: number | null
   onayliLojistikParaBirimi?: string | null
+  tamamlayanAdSoyad?: string | null
+  tamamlanmaTarihi?: string | null
 }
 
 export interface AccountingTransactionDto {

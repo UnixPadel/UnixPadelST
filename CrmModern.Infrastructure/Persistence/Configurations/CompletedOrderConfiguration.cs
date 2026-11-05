@@ -16,5 +16,7 @@ internal sealed class CompletedOrderConfiguration : IEntityTypeConfiguration<Com
         // DB kolonu "KullaniciAdi" ama tipi int — int FK olarak property'ye bind ediyoruz
         builder.Property(c => c.KullaniciID).HasColumnName("KullaniciAdi");
         builder.Property(c => c.Tarih).HasColumnName("Tarih");
+        builder.Property(c => c.OncekiAsama).HasColumnName("OncekiAsama").HasMaxLength(30);
+        builder.Property(c => c.Aciklama).HasColumnName("Aciklama").HasMaxLength(500);
     }
 }

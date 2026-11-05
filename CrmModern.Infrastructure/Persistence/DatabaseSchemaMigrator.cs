@@ -127,6 +127,14 @@ public static class DatabaseSchemaMigrator
         // Şema: Fiyat int → decimal(10,2), Birim ENUM +Paket/Rulo.
         await EnsurePanoramicBomSeedAsync(ctx, logger);
         await EnsureOtherExcelBomSeedsAsync(ctx, logger);
+
+        // 14) TamamlandiTablo: Kapanış aşaması ve kapanış notu alanları.
+        await EnsureColumnAsync(ctx, logger,
+            table: "TamamlandiTablo", column: "OncekiAsama",
+            ddl: "ALTER TABLE TamamlandiTablo ADD COLUMN OncekiAsama VARCHAR(30) NULL");
+        await EnsureColumnAsync(ctx, logger,
+            table: "TamamlandiTablo", column: "Aciklama",
+            ddl: "ALTER TABLE TamamlandiTablo ADD COLUMN Aciklama VARCHAR(500) NULL");
     }
 
     /// <summary>

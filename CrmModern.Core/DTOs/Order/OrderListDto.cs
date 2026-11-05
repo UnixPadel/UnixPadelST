@@ -27,5 +27,7 @@ public sealed record OrderListDto(
     // Round-8 §7 — düzenleme/silme rozetleri (Siparişlerim).
     bool     Silindi           = false,
     bool     Guncellendi       = false,
-    string?  DegisiklikGerekce = null
+    string?  DegisiklikGerekce = null,
+    string?  TamamlayanAdSoyad = null,
+    DateTime? TamamlanmaTarihi = null
 );

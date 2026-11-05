@@ -207,8 +207,9 @@ export const approveLogistics = (siparisNo: string, dto: ApprovalPesinatRequest 
 export interface FinalizeCompletionRequest {
   pesinat?: number
   pesinatTarihi?: string
-  finalMaliyet: number
+  finalMaliyet?: number
   maliyetDetayi?: string
+  kapanisNotu?: string
 }
 
 /** Round-9 §19 — Burcu finalize: peşinat (tahsilat) + final maliyet → Tamamlandı. */

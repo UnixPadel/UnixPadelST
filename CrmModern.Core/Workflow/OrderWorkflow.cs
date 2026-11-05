@@ -35,7 +35,7 @@ public static class OrderWorkflow
 {
     public static readonly WorkflowStep TemsilciDuzeltme = new(
         "temsilciDuzeltme", "Satis",
-        o => !o.Silindi && o.Kontrol == "Reddet",
+        o => !o.Silindi && o.Kontrol == "Reddet" && o.SiparisMiTeklifMi != "Tamamlandi" && o.SiparisMiTeklifMi != "Iptal",
         SinceApproval: "Reddedildi");
 
     public static readonly WorkflowStep KontrolOnayi = new(

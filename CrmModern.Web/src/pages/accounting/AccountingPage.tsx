@@ -242,7 +242,17 @@ export function AccountingPage() {
     { key: 'kar',           header: t('accountingFull.cols.kar'), sortable: true, type: 'money',
       render: (r) => r.kar != null ? formatCurrency(r.kar, r.paraTipi) : '—' },
     { key: 'teslimatCesiti',header: t('accountingFull.cols.teslimatCesiti'), render: (r) => (r.teslimatCesiti as string) ?? '—' },
-    { key: 'siparisMiTeklifMi', header: t('accountingFull.cols.asama'), sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi} context="stage" /> },
+    { key: 'siparisMiTeklifMi', header: t('accountingFull.cols.asama'), sortable: true,
+      render: (r) => (
+        <div className="flex flex-col gap-0.5">
+          <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
+          {r.siparisMiTeklifMi === 'Tamamlandi' && r.tamamlayanAdSoyad && (
+            <span className="text-[10px] text-muted-foreground truncate" title={`${r.tamamlayanAdSoyad} tarafından tamamlandı${r.tamamlanmaTarihi ? ` (${formatDate(r.tamamlanmaTarihi)})` : ''}`}>
+              {r.tamamlayanAdSoyad}
+            </span>
+          )}
+        </div>
+      ) },
     { key: 'odemeDurum',    header: t('common.status'), sortable: true, render: (r) => <StatusBadge value={r.odemeDurum} context="odeme" /> },
     { key: 'muhasebeDurumu',header: t('accountingFull.cols.muhasebeDurum'), sortable: true, render: (r) => r.muhasebeDurumu ? <StatusBadge value={r.muhasebeDurumu} context="purchase" /> : '—' },
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)

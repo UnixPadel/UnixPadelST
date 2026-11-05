@@ -5,4 +5,5 @@ namespace CrmModern.Core.Interfaces.Repositories;
 public interface ICompletedOrderRepository : IBaseRepository<CompletedOrder>
 {
     Task<CompletedOrder?> GetBySiparisNoAsync(string siparisNo);
+    Task<IReadOnlyDictionary<string, CompletedOrder>> GetLatestBySiparisNolarAsync(IReadOnlyCollection<string> siparisNolar);
 }

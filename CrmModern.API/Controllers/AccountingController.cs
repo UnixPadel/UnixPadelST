@@ -29,7 +29,7 @@ public sealed class AccountingController(IAccountingService accountingService) :
     // PROMPT-v6 §1 — Burcu onay ekranı: Cari onay + Lojistik onay mutasyonları
     // kullanıcı adına açık (rol değil; Yonetici dahil giremez).
     // PROMPT-v7 §1/§3 — elshan.rasulov merkezi bypass: o da onaylayabilir.
-    private static readonly string[] AccountingApprovers = { "burcu.karaman", "elshan.rasulov" };
+    private static readonly string[] AccountingApprovers = { "burcu.karaman", "elshan.rasulov", "admin" };
 
     // §24 — Admin de Burcu'nun cari/lojistik onay mutasyonlarını yapabilir.
     private bool IsAccountingApprover => AccountingApprovers.Contains(CurrentUserName) || User.IsSuperAdmin();

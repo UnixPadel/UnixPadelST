@@ -279,6 +279,10 @@ internal sealed class LogisticsService(IUnitOfWork uow) : ILogisticsService
         var offer = await uow.LogisticsOffers.GetByIdAsync(teklifId)
             ?? throw new NotFoundException("LogisticsOffer", teklifId);
 
+        var order = await uow.Orders.GetByNoAsync(offer.SiparisNo);
+        if (order != null && (order.SiparisMiTeklifMi == "Tamamlandi" || order.SiparisMiTeklifMi == "Iptal" || order.Silindi))
+            throw new BusinessException("Tamamlanmış veya iptal edilmiş siparişe ait teklif onaylanamaz.", "orderAlreadyClosed");
+
         // Tracked çek — aynı siparişteki tüm teklifler (chosen EF identity map ile aynı instance).
         var siblings = await uow.LogisticsOffers.GetTrackedByOrderAsync(offer.SiparisNo);
         LogisticsOffer? chosen = null;

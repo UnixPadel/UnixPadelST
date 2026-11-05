@@ -1,8 +1,9 @@
+import { CompleteOrderModal } from '@/components/order/CompleteOrderModal'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { Copy, Eye, FileCheck2, MessageSquareWarning, PencilLine, Pencil, Plus, Trash2 } from 'lucide-react'
+import { CheckCircle2, AlertTriangle, Copy, Eye, FileCheck2, MessageSquareWarning, PencilLine, Pencil, Plus, Trash2 } from 'lucide-react'
 import { getMyOrders, convertToOrder, getRejectionNote, deleteOrder } from '@/api/orders'
 import { PageHeader } from '@/components/PageHeader'
 import { FillPage, FillRegion } from '@/components/FillPage'
@@ -20,7 +21,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useConfirm } from '@/components/ui/confirm-dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppMutation } from '@/hooks/useAppMutation'
-import { isSuperAdmin } from '@/lib/permissions'
+import { isSuperAdmin, isAccountingApprover } from '@/lib/permissions'
 import { formatDate } from '@/lib/utils'
 import { stageLabel, kontrolLabel, statusLabel } from '@/lib/status'
 import { trLower } from '@/components/ui/combobox'
@@ -57,6 +58,7 @@ export function MyOrdersPage() {
   const { t } = useTranslation()
   const { confirm, askReason } = useConfirm()
   const { getUser } = useAuth()
+  const user = getUser()
   // PROMPT-v4 §6.2 — elshan.rasulov tüm sistemi izler; sahip (Temsilci) kolonu
   // yalnız ona görünür (backend /my zaten tüm satırları döner).
   const isGlobalViewer = getUser()?.kullaniciAdi === 'elshan.rasulov' || isSuperAdmin(getUser())
@@ -96,6 +98,7 @@ export function MyOrdersPage() {
   }, [orders, isGlobalViewer, f])
 
   const [activeNo, setActiveNo] = useState<string | null>(null)
+  const [completeTarget, setCompleteTarget] = useState<OrderListDto | null>(null)
   const [redTarget, setRedTarget] = useState<string | null>(null)
   const { data: redData, isLoading: redLoading } = useQuery({
     queryKey: ['order-rejection-note', redTarget],
@@ -121,7 +124,8 @@ export function MyOrdersPage() {
   const canRevise = (r: OrderListDto) =>
     (r.siparisMiTeklifMi === 'Teklif' || r.siparisMiTeklifMi === 'Siparis') && r.kontrol !== 'Onay'
   // §7 — Kontrol onayı öncesi + silinmemiş düzenlenebilir/silinebilir.
-  const canEditDelete = (r: OrderListDto) => r.kontrol !== 'Onay' && !r.silindi
+  const canEditDelete = (r: OrderListDto) => r.kontrol !== 'Onay' && !r.silindi && r.siparisMiTeklifMi !== 'Tamamlandi' && r.siparisMiTeklifMi !== 'Iptal'
+  const canComplete = (r: OrderListDto) => isAccountingApprover(user) && r.siparisMiTeklifMi !== 'Tamamlandi' && r.siparisMiTeklifMi !== 'Teklif' && r.siparisMiTeklifMi !== 'Iptal' && !r.silindi
 
   const askConvert = async (r: OrderListDto) => {
     const no = rowNo(r)
@@ -139,6 +143,7 @@ export function MyOrdersPage() {
 
   const actions: RowAction<Row>[] = [
     { key: 'form', label: t('myOrders.actions.formGoster'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(rowNo(r)) },
+    { key: 'complete', label: 'Siparişi Tamamla', icon: <AlertTriangle className="h-3.5 w-3.5 text-red-600" />, hidden: (r) => !canComplete(r), onSelect: (r) => setCompleteTarget(r), destructive: true },
     { key: 'convert', label: t('myOrders.actions.sipariseCevir'), icon: <FileCheck2 className="h-3.5 w-3.5" />, disabled: (r) => !canConvert(r), onSelect: (r) => askConvert(r) },
     { key: 'red', label: t('myOrders.actions.redNotu'), icon: <MessageSquareWarning className="h-3.5 w-3.5" />, hidden: (r) => !canShowRedNote(r), onSelect: (r) => setRedTarget(rowNo(r)) },
     { key: 'revise', label: t('myOrders.actions.revize'), icon: <PencilLine className="h-3.5 w-3.5" />, separatorBefore: true, disabled: (r) => !canRevise(r), onSelect: (r) => nav(`/orders/new?revise=${encodeURIComponent(rowNo(r))}`) },
@@ -163,7 +168,16 @@ export function MyOrdersPage() {
       render: (r) => (r.kullaniciAdSoyad as string) || '—',
     } satisfies Column<Row>] : []),
     { key: 'siparisMiTeklifMi', header: t('myOrders.cols.asama'), sortable: true,
-      render: (r) => <StatusBadge value={r.siparisMiTeklifMi} context="stage" /> },
+      render: (r) => (
+        <div className="flex flex-col gap-0.5">
+          <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
+          {r.siparisMiTeklifMi === 'Tamamlandi' && r.tamamlayanAdSoyad && (
+            <span className="text-[10px] text-muted-foreground truncate" title={`${r.tamamlayanAdSoyad} tarafından tamamlandı${r.tamamlanmaTarihi ? ` (${formatDate(r.tamamlanmaTarihi)})` : ''}`}>
+              {r.tamamlayanAdSoyad}
+            </span>
+          )}
+        </div>
+      ) },
     { key: 'kontrol', header: t('myOrders.cols.durum'), sortable: true,
       render: (r) => <OrderKontrolBadge value={r.kontrol} /> },
     { key: 'tarih', header: t('myOrders.cols.tarih'), sortable: true, type: 'date',
@@ -270,6 +284,19 @@ export function MyOrdersPage() {
 
       {/* Sipariş Detayı penceresi */}
       <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} />
+
+      {completeTarget && (
+        <CompleteOrderModal
+          open={!!completeTarget}
+          onOpenChange={(o: boolean) => { if (!o) setCompleteTarget(null) }}
+          siparisNo={rowNo(completeTarget)}
+          currentStage={completeTarget.siparisMiTeklifMi}
+          musteriAd={completeTarget.musteriAd}
+          toplamFiyat={completeTarget.toplamFiyat}
+          odenenMiktar={completeTarget.odenenMiktar}
+          paraTipi={completeTarget.paraTipi}
+        />
+      )}
 
       {/* Red Notu — inline dialog (legacy MessageBox replacement) */}
       <Dialog open={!!redTarget} onOpenChange={(o) => { if (!o) setRedTarget(null) }}>

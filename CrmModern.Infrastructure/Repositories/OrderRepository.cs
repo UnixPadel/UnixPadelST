@@ -243,12 +243,20 @@ internal sealed class OrderRepository(AppDbContext context)
             .ExecuteUpdateAsync(s => s
                 .SetProperty(o => o.SiparisMiTeklifMi, "TamamlanmaBekliyor"));
 
-    // Round-9 §19 — Burcu finalize: 'TamamlanmaBekliyor' → 'Tamamlandi'.
+    // Round-9 §19 — Burcu finalize / istendiğinde erken kapatma:
+    // Yalnızca "Siparis" ve sonraki aşamalar kapatılabilir (Teklif/Iptal/Silindi hariç).
+    // Kapatıldığında Kontrol='Onay' ve LojistikOnay='Onay' yapılır.
     public async Task<int> FinalizeCompletionAsync(string siparisNo) =>
         await _context.SiparisAlTablo
-            .Where(o => o.SiparisNo == siparisNo && o.SiparisMiTeklifMi == "TamamlanmaBekliyor")
+            .Where(o => o.SiparisNo == siparisNo
+                     && !o.Silindi
+                     && o.SiparisMiTeklifMi != "Teklif"
+                     && o.SiparisMiTeklifMi != "Iptal"
+                     && o.SiparisMiTeklifMi != "Tamamlandi")
             .ExecuteUpdateAsync(s => s
-                .SetProperty(o => o.SiparisMiTeklifMi, "Tamamlandi"));
+                .SetProperty(o => o.SiparisMiTeklifMi, "Tamamlandi")
+                .SetProperty(o => o.Kontrol, "Onay")
+                .SetProperty(o => o.LojistikOnay, "Onay"));
 
     // ── Search ────────────────────────────────────────────────────────────────
 
@@ -322,7 +330,7 @@ internal sealed class OrderRepository(AppDbContext context)
         // Bekleyen (Kontrol='Kontrol') TÜMÜ + son X günde onaylanan (Kontrol='Onay').
         return await _context.SiparisAlTablo
             .AsNoTracking()
-            .Where(o => !o.Silindi && (o.Kontrol == "Kontrol"
+            .Where(o => !o.Silindi && ((o.Kontrol == "Kontrol" && o.SiparisMiTeklifMi != "Tamamlandi" && o.SiparisMiTeklifMi != "Iptal")
                      || (o.Kontrol == "Onay" && recentlyApprovedNos.Contains(o.SiparisNo))))
             .OrderByDescending(o => o.SiparisAlID)
             .ToListAsync();
@@ -385,7 +393,7 @@ internal sealed class OrderRepository(AppDbContext context)
     }
 
     public Task<int> CountBekleyenKontrolAsync() =>
-        _context.SiparisAlTablo.AsNoTracking().CountAsync(o => o.Kontrol == "Kontrol");
+        _context.SiparisAlTablo.AsNoTracking().CountAsync(o => !o.Silindi && o.Kontrol == "Kontrol" && (o.SiparisMiTeklifMi == "Teklif" || o.SiparisMiTeklifMi == "Siparis"));
 
     public Task<int> CountUretimdekiAsync() =>
         _context.SiparisAlTablo.AsNoTracking().CountAsync(o => o.SiparisMiTeklifMi == "Uretim");

@@ -7,8 +7,10 @@ namespace CrmModern.Core.Entities;
 /// </summary>
 public sealed class CompletedOrder
 {
-    public int       ID         { get; set; }
-    public string?   SiparisNo  { get; set; }
+    public int       ID          { get; set; }
+    public string?   SiparisNo   { get; set; }
     public int?      KullaniciID { get; set; }    // column: KullaniciAdi (int)
-    public DateTime? Tarih      { get; set; }
+    public DateTime? Tarih       { get; set; }
+    public string?   OncekiAsama { get; set; }
+    public string?   Aciklama    { get; set; }
 }

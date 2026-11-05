@@ -1,3 +1,5 @@
+import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { CompleteOrderModal } from '@/components/order/CompleteOrderModal'
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -132,6 +134,7 @@ export function AccountingApprovalPage() {
 
   // Yanlış girilen tahsilat/peşinat iptali (satır silinmez, iptal işaretlenir).
   const [cancelTarget, setCancelTarget] = useState<CancelTxTarget | null>(null)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
 
   // ── Veri ────────────────────────────────────────────────────────────────
   const { data: orders = [], isLoading } = useQuery({
@@ -373,7 +376,19 @@ export function AccountingApprovalPage() {
     { key: 'odemeDurum', header: t('qc.grid.odemeDurumu'), sortable: true,
       render: (r) => <StatusBadge value={r.odemeDurum as string} context="odeme" /> },
     { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true,
-      render: (r) => <StatusBadge value={r.siparisMiTeklifMi as string} context="stage" /> },
+      render: (r) => {
+        const o = r as AccountingOrderListDto
+        return (
+          <div className="flex flex-col gap-0.5">
+            <StatusBadge value={o.siparisMiTeklifMi} context="stage" />
+            {o.siparisMiTeklifMi === 'Tamamlandi' && o.tamamlayanAdSoyad && (
+              <span className="text-[10px] text-muted-foreground truncate" title={`${o.tamamlayanAdSoyad} tarafından tamamlandı${o.tamamlanmaTarihi ? ` (${formatDate(o.tamamlanmaTarihi)})` : ''}`}>
+                {o.tamamlayanAdSoyad}
+              </span>
+            )}
+          </div>
+        )
+      } },
     { key: 'kuyruk', header: t('accApproval.grid.kuyruk'), exportValue: (r) => queueLabel(r as AccountingOrderListDto),
       sortValue: (r) => queueLabel(r as AccountingOrderListDto),
       render: (r) => {
@@ -755,6 +770,12 @@ export function AccountingApprovalPage() {
                 title={canCari ? undefined : t('accApproval.disabled.cari')}
                 onClick={async () => { const no = requireSelection(); if (no && await confirmNoPesinat() && await confirmOverpay(pesinatForm.pesinat)) cariMut.mutate(no) }}>
                 {t('accApproval.actions.cariOnayla')}
+              </Button>
+            )}
+            {selectedRow && selectedRow.siparisMiTeklifMi !== 'Tamamlandi' && selectedRow.siparisMiTeklifMi !== 'TamamlanmaBekliyor' && selectedRow.siparisMiTeklifMi !== 'Teklif' && selectedRow.siparisMiTeklifMi !== 'Iptal' && (
+              <Button size="xs" className="w-full rounded-none bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium border border-red-700 dark:border-red-500 shadow-xs transition-colors"
+                onClick={() => setShowCompleteModal(true)}>
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Siparişi Tamamla
               </Button>
             )}
           </div>

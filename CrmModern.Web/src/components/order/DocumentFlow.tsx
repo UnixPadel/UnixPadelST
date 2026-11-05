@@ -127,12 +127,22 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
       done: true,
     })
   })
+  // Erken tamamlanma kontrolü: üretim veya lojistiğe girmeden erken kapatıldı mı?
+  const isEarlyCompleted = order.siparisMiTeklifMi === 'Tamamlandi' &&
+    !!order.tamamlanmaOncekiAsama &&
+    order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' &&
+    order.tamamlanmaOncekiAsama !== 'Lojistik'
+  const factorySkipped = isEarlyCompleted && (order.tamamlanmaOncekiAsama === 'Siparis' || order.tamamlanmaOncekiAsama === 'Planlama') && !order.sTarih && !order.fabrikaNot
+  const shipSkipped = isEarlyCompleted && !order.lojistikNot && (order.tamamlanmaOncekiAsama !== 'Hazir' || !offers.length)
+
   // Üretim
   nodes.push({
-    key: 'factory', at: reached('Uretim') ? order.sTarih : undefined, icon: <Factory className="h-3.5 w-3.5" />,
-    title: reached('Hazir') ? t('docFlow.productionDone') : reached('Uretim') ? t('docFlow.inProduction') : t('docFlow.awaitingProduction'),
-    tone: reached('Hazir') ? 'success' : reached('Uretim') ? 'progress' : 'neutral',
-    body: order.fabrikaNot, link: '/factory', done: reached('Uretim'),
+    key: 'factory', at: reached('Uretim') && !factorySkipped ? order.sTarih : undefined, icon: <Factory className="h-3.5 w-3.5" />,
+    title: factorySkipped
+      ? 'Üretim Atlandı (Erken Kapatıldı)'
+      : reached('Hazir') ? t('docFlow.productionDone') : reached('Uretim') ? t('docFlow.inProduction') : t('docFlow.awaitingProduction'),
+    tone: factorySkipped ? 'neutral' : reached('Hazir') ? 'success' : reached('Uretim') ? 'progress' : 'neutral',
+    body: order.fabrikaNot, link: '/factory', done: reached('Uretim') && !factorySkipped,
   })
   // Lojistik teklifleri
   for (const o of offers) {
@@ -145,18 +155,24 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
   }
   nodes.push({
     key: 'ship', icon: <Truck className="h-3.5 w-3.5" />,
-    title: reached('Lojistik') ? t('docFlow.shipped') : t('docFlow.awaitingShipment'),
-    tone: reached('Lojistik') ? 'info' : 'neutral', body: order.lojistikNot,
-    link: '/logistics/history', done: reached('Lojistik'),
+    title: shipSkipped
+      ? 'Sevkiyat Atlandı (Erken Kapatıldı)'
+      : reached('Lojistik') ? t('docFlow.shipped') : t('docFlow.awaitingShipment'),
+    tone: shipSkipped ? 'neutral' : reached('Lojistik') ? 'info' : 'neutral', body: order.lojistikNot,
+    link: '/logistics/history', done: reached('Lojistik') && !shipSkipped,
   })
   if (order.siparisMiTeklifMi === 'Iptal') {
     nodes.push({ key: 'cancel', icon: <XCircle className="h-3.5 w-3.5" />, title: stageLabel(t, 'Iptal'), tone: 'danger', done: true })
   }
   nodes.push({
-    key: 'done', icon: <CheckCircle2 className="h-3.5 w-3.5" />,
+    key: 'done',
+    at: order.tamamlanmaTarihi || undefined,
+    icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     title: stageLabel(t, reached('Tamamlandi') ? 'Tamamlandi' : 'TamamlanmaBekliyor'),
     tone: reached('Tamamlandi') ? 'success' : reached('TamamlanmaBekliyor') ? 'warning' : 'neutral',
-    done: reached('TamamlanmaBekliyor'),
+    meta: order.tamamlayanAdSoyad ? `Kapatan: ${order.tamamlayanAdSoyad}` : undefined,
+    body: order.tamamlanmaNotu || (order.tamamlanmaOncekiAsama && order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' ? `${order.tamamlanmaOncekiAsama} aşamasından doğrudan tamamlandı` : undefined),
+    done: reached('Tamamlandi') || reached('TamamlanmaBekliyor'),
   })
 
   // Kronolojik (tarihli düğümler) + mantıksal sıra (tarihsizler yerinde kalır).

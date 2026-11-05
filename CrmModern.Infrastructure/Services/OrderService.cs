@@ -41,13 +41,31 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         var users = (await uow.Kullanicilar.GetAllAsync())
             .ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim());
 
+        var completedNolar = orders.Where(o => o.SiparisMiTeklifMi == "Tamamlandi").Select(o => o.SiparisNo).Distinct().ToList();
+        var completedMap = completedNolar.Count > 0
+            ? await uow.CompletedOrders.GetLatestBySiparisNolarAsync(completedNolar)
+            : new Dictionary<string, CompletedOrder>();
+
         return orders
-            .Select(o => MapToListDto(o, users))
+            .Select(o => MapToListDto(o, users, completedMap))
             .ToList();
     }
 
-    private static OrderListDto MapToListDto(Order o, IReadOnlyDictionary<int, string>? users = null) =>
-        new(
+    private static OrderListDto MapToListDto(
+        Order o,
+        IReadOnlyDictionary<int, string>? users = null,
+        IReadOnlyDictionary<string, CompletedOrder>? completedMap = null)
+    {
+        string? tamamlayanAd = null;
+        DateTime? tamamlanmaTarih = null;
+        if (completedMap != null && completedMap.TryGetValue(o.SiparisNo, out var comp))
+        {
+            tamamlanmaTarih = comp.Tarih;
+            if (comp.KullaniciID.HasValue && users != null && users.TryGetValue(comp.KullaniciID.Value, out var cu))
+                tamamlayanAd = cu;
+        }
+
+        return new(
             SiparisAlID:       o.SiparisAlID,
             SiparisNo:         o.SiparisNo,
             TeklifNo:          o.TeklifNo,
@@ -67,7 +85,10 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
             KullaniciAdSoyad:  users is not null && users.TryGetValue(o.KullaniciID, out var n) ? n : null,
             Silindi:           o.Silindi,
             Guncellendi:       o.Guncellendi,
-            DegisiklikGerekce: o.DegisiklikGerekce);
+            DegisiklikGerekce: o.DegisiklikGerekce,
+            TamamlayanAdSoyad: tamamlayanAd,
+            TamamlanmaTarihi:  tamamlanmaTarih);
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Single record
@@ -91,7 +112,16 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         // Ekstra maliyetler — revize/amend ekranında forma yüklenmek için.
         var extras = await uow.Orders.GetExtraCostsByOrderIdAsync(order.SiparisAlID);
 
-        return MapToDetailDto(order, ownerAdSoyad, kategoriler, bilesenler, extras);
+        CompletedOrder? completed = null;
+        Kullanici? tamamlayanUser = null;
+        if (order.SiparisMiTeklifMi == "Tamamlandi")
+        {
+            completed = await uow.CompletedOrders.GetBySiparisNoAsync(order.SiparisNo);
+            if (completed?.KullaniciID is not null)
+                tamamlayanUser = await uow.Kullanicilar.GetByIdAsync(completed.KullaniciID.Value);
+        }
+
+        return MapToDetailDto(order, ownerAdSoyad, kategoriler, bilesenler, extras, completed, tamamlayanUser);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -127,8 +157,8 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
     {
         if (o.Silindi)
             throw new BusinessException("Bu sipariş zaten silinmiş.", "orderAlreadyDeleted");
-        if (o.Kontrol == "Onay")
-            throw new BusinessException("Onaylanan sipariş düzenlenemez ya da silinemez.", "approvedOrderLocked");
+        if (o.Kontrol == "Onay" || o.SiparisMiTeklifMi == "Tamamlandi" || o.SiparisMiTeklifMi == "Iptal")
+            throw new BusinessException("Onaylanan veya tamamlanan sipariş düzenlenemez ya da silinemez.", "approvedOrderLocked");
         bool isOwner = o.KullaniciID == kullaniciID;
         if (!isOwner && !isManagerOrElshan)
             throw new BusinessException("Bunu yapmaya yetkin yok.", "forbidden");
@@ -691,7 +721,9 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         string? ownerAdSoyad = null,
         IReadOnlyDictionary<int, string>? kategoriler = null,
         IReadOnlyDictionary<int, (string BilesenAdi, string? Birim)>? bilesenler = null,
-        IReadOnlyList<OrderExtraCost>? extras = null) => new(
+        IReadOnlyList<OrderExtraCost>? extras = null,
+        CompletedOrder? completed = null,
+        Kullanici? tamamlayanUser = null) => new(
         SiparisNo:         o.SiparisNo,
         TeklifNo:          o.TeklifNo,
         MusteriAd:         o.MusteriAd,
@@ -759,7 +791,14 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
                                .Select(e => new OrderExtraCostDto(
                                    e.EkMaliyetID, e.Aciklama, e.Tutar, e.EklenmeTarihi, e.KullaniciID))
                                .ToList(),
-        KullaniciID:       o.KullaniciID   // revize ekranı temsilci seçicisi (elshan)
+        KullaniciID:       o.KullaniciID,  // revize ekranı temsilci seçicisi (elshan)
+        Silindi:           o.Silindi,
+        TamamlayanKullaniciID:  completed?.KullaniciID,
+        TamamlayanAdSoyad:      tamamlayanUser is null ? null : $"{tamamlayanUser.Ad} {tamamlayanUser.Soyad}".Trim(),
+        TamamlayanKullaniciAdi: tamamlayanUser?.KullaniciAdi,
+        TamamlanmaTarihi:       completed?.Tarih,
+        TamamlanmaOncekiAsama:  completed?.OncekiAsama,
+        TamamlanmaNotu:         completed?.Aciklama
     );
 
     // ═════════════════════════════════════════════════════════════════════════
@@ -789,10 +828,17 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         int page  = Math.Max(1, f.Page);
         int size  = Math.Clamp(f.PageSize, 1, 200);
 
-        var items = filtered
-            .Skip((page - 1) * size)
-            .Take(size)
-            .Select(o => MapToListDto(o))
+        var paged = filtered.Skip((page - 1) * size).Take(size).ToList();
+        var completedNolar = paged.Where(o => o.SiparisMiTeklifMi == "Tamamlandi").Select(o => o.SiparisNo).Distinct().ToList();
+        var completedMap = completedNolar.Count > 0
+            ? await uow.CompletedOrders.GetLatestBySiparisNolarAsync(completedNolar)
+            : new Dictionary<string, CompletedOrder>();
+        var userDict = completedNolar.Count > 0
+            ? (await uow.Kullanicilar.GetAllAsync()).ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim())
+            : null;
+
+        var items = paged
+            .Select(o => MapToListDto(o, userDict, completedMap))
             .ToList()
             .AsReadOnly();
 

@@ -1,3 +1,5 @@
+import { CheckCircle2, AlertTriangle } from 'lucide-react'
+import { CompleteOrderModal } from '@/components/order/CompleteOrderModal'
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -227,6 +229,7 @@ export function QualityControlPage() {
   const [redTouched, setRedTouched] = useState(false)
   // SR-8 — opsiyonel onay notu (api approveQC kontrolNot kabul ediyor).
   const [onayNotu, setOnayNotu] = useState('')
+  const [completeModalOpen, setCompleteModalOpen] = useState(false)
 
   // Detay yüklenince cari alanını doldur
   useEffect(() => {
@@ -685,6 +688,12 @@ export function QualityControlPage() {
                 {t('qc.actions.reddet')}
               </Button>
             </div>
+            {selectedRow && selectedRow.siparisMiTeklifMi !== 'Tamamlandi' && selectedRow.siparisMiTeklifMi !== 'Teklif' && selectedRow.siparisMiTeklifMi !== 'Iptal' && (
+              <Button size="xs" className="w-full rounded-none bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium border border-red-700 dark:border-red-500 shadow-xs transition-colors"
+                onClick={() => setCompleteModalOpen(true)}>
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" /> Siparişi Tamamla
+              </Button>
+            )}
           </div>
           </div>
         </div>
@@ -849,6 +858,20 @@ export function QualityControlPage() {
 
       {/* ── Form'u getir — salt-okunur sipariş formu (legacy buttonFormGetir) ── */}
       <OrderDetailModal siparisNo={formNo} onClose={() => setFormNo(null)} />
+
+      {completeModalOpen && selectedRow && (
+        <CompleteOrderModal
+          open={completeModalOpen}
+          onOpenChange={(o: boolean) => setCompleteModalOpen(o)}
+          siparisNo={selectedRow.siparisNo}
+          currentStage={selectedRow.siparisMiTeklifMi}
+          musteriAd={selectedRow.musteriAd}
+          toplamFiyat={selectedRow.toplamFiyat}
+          odenenMiktar={odenenInput === '' ? 0 : Number(odenenInput)}
+          paraTipi={selectedRow.paraTipi}
+          onSuccess={() => setSelected(null)}
+        />
+      )}
     </FillPage>
   )
 }

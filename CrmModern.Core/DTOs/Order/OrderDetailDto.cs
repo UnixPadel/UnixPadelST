@@ -91,5 +91,16 @@ public sealed record OrderDetailDto(
     // ── Sahip (Temsilci) ID'si ────────────────────────────────────────────
     // Revize ekranındaki temsilci devri seçicisi (yalnız elshan.rasulov)
     // mevcut sahibi önceden seçili göstermek için kullanır.
-    int? KullaniciID = null
+    int? KullaniciID = null,
+
+    // ── Round-8 §7 — Silindi bayrağı ─────────────────────────────────────
+    bool Silindi = false,
+
+    // ── Kapanış Bilgileri (Tamamlandı) ───────────────────────────────────
+    int?      TamamlayanKullaniciID  = null,
+    string?   TamamlayanAdSoyad      = null,
+    string?   TamamlayanKullaniciAdi = null,
+    DateTime? TamamlanmaTarihi       = null,
+    string?   TamamlanmaOncekiAsama  = null,
+    string?   TamamlanmaNotu         = null
 );

@@ -22,6 +22,14 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         var approvedOffers = await uow.LogisticsOffers.GetApprovedForOrdersAsync(
             orders.Select(o => o.SiparisNo).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList());
 
+        var completedNolar = orders.Where(o => o.SiparisMiTeklifMi == "Tamamlandi").Select(o => o.SiparisNo).Distinct().ToList();
+        var completedMap = completedNolar.Count > 0
+            ? await uow.CompletedOrders.GetLatestBySiparisNolarAsync(completedNolar)
+            : new Dictionary<string, CompletedOrder>();
+        var userDict = completedNolar.Count > 0
+            ? (await uow.Kullanicilar.GetAllAsync()).ToDictionary(u => u.KullaniciID, u => $"{u.Ad} {u.Soyad}".Trim())
+            : new Dictionary<int, string>();
+
         foreach (var o in orders)
         {
             decimal odenen      = o.OdenenMiktar ?? 0m;
@@ -64,7 +72,9 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
                 // Lojistik teklif akışı — onaylı teklif özeti (varsa).
                 OnayliLojistikFirma: approvedOffers.TryGetValue(o.SiparisNo, out var off)  ? off.FirmaAdi   : null,
                 OnayliLojistikFiyat: approvedOffers.TryGetValue(o.SiparisNo, out var off2) ? off2.Fiyat     : null,
-                OnayliLojistikParaBirimi: approvedOffers.TryGetValue(o.SiparisNo, out var off3) ? off3.ParaBirimi : null));
+                OnayliLojistikParaBirimi: approvedOffers.TryGetValue(o.SiparisNo, out var off3) ? off3.ParaBirimi : null,
+                TamamlayanAdSoyad: completedMap.TryGetValue(o.SiparisNo, out var cRow) && cRow.KullaniciID.HasValue && userDict.TryGetValue(cRow.KullaniciID.Value, out var cUser) ? cUser : null,
+                TamamlanmaTarihi: completedMap.TryGetValue(o.SiparisNo, out var cRow2) ? cRow2.Tarih : null));
         }
 
         return result.AsReadOnly();
@@ -82,6 +92,18 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         decimal kalanBakiye = toplam - odenen;
 
         var pr = await uow.PurchaseRequests.GetMuhasebeBySiparisNoAsync(o.SiparisNo);
+
+        CompletedOrder? comp = null;
+        string? tamamlayanAd = null;
+        if (o.SiparisMiTeklifMi == "Tamamlandi")
+        {
+            comp = await uow.CompletedOrders.GetBySiparisNoAsync(o.SiparisNo);
+            if (comp?.KullaniciID is not null)
+            {
+                var u = await uow.Kullanicilar.GetByIdAsync(comp.KullaniciID.Value);
+                if (u != null) tamamlayanAd = $"{u.Ad} {u.Soyad}".Trim();
+            }
+        }
 
         return new AccountingOrderListDto(
             SiparisNo:        o.SiparisNo,
@@ -109,7 +131,9 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
             Indirim:          o.Indirim,
             Kdv:              o.Kdv,
             // PROMPT-v6 §1 — Burcu kuyruk seçicisi.
-            LojistikOnay:     o.LojistikOnay);
+            LojistikOnay:     o.LojistikOnay,
+            TamamlayanAdSoyad: tamamlayanAd,
+            TamamlanmaTarihi:  comp?.Tarih);
     }
 
     public async Task<IReadOnlyList<AccountingTransactionDto>> GetTransactionsForOrderAsync(
@@ -573,7 +597,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
     public async Task FinalizeCompletionAsync(string siparisNo, FinalizeCompletionDto dto,
         int currentUserId, string currentUserName)
     {
-        if (dto.FinalMaliyet < 0m)
+        if (dto.FinalMaliyet.HasValue && dto.FinalMaliyet.Value < 0m)
             throw new BusinessException("Son maliyet 0'dan küçük olamaz.", "finalCostNegative");
         if (dto.Pesinat is < 0m)
             throw new BusinessException("Peşinat eksi olamaz.", "downPaymentNegative");
@@ -582,39 +606,64 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         var order = await uow.Orders.GetByNoAsync(no)
             ?? throw new NotFoundException("Order", siparisNo);
 
-        if (order.SiparisMiTeklifMi != "TamamlanmaBekliyor")
-            throw new BusinessException($"Sipariş şu an {order.SiparisMiTeklifMi} aşamasında. Yalnız kapanış bekleyen sipariş kapatılabilir.", "closeWrongStage", new { stage = order.SiparisMiTeklifMi });
+        if (order.Silindi)
+            throw new BusinessException("Silinmiş sipariş tamamlanamaz.", "orderDeleted");
+        if (order.SiparisMiTeklifMi == "Teklif")
+            throw new BusinessException("Teklif aşamasındaki kayıtlar tamamlanamaz. Yalnızca sipariş ve sonraki aşamalardaki kayıtlar tamamlanabilir.", "quoteCannotBeCompleted");
+        if (order.SiparisMiTeklifMi == "Tamamlandi")
+            throw new BusinessException("Bu sipariş zaten tamamlanmış.", "orderAlreadyCompleted");
+        if (order.SiparisMiTeklifMi == "Iptal")
+            throw new BusinessException("İptal edilmiş sipariş tamamlanamaz.", "orderCancelled");
 
-        // 1) 3. Peşinat (varsa) → MuhasebeIslemTablo tahsilatı + OdenenMiktar/OdemeDurum.
+        var oncekiAsama = order.SiparisMiTeklifMi;
+
+        // 1) Peşinat / Tahsilat (varsa) → MuhasebeIslemTablo tahsilatı + OdenenMiktar/OdemeDurum.
         if (dto.Pesinat is > 0m)
             await AddTransactionAsync(
                 new AddTransactionDto(no, dto.Pesinat.Value, dto.PesinatTarihi), currentUserId);
 
         // 2) Final Maliyet → Muhasebe talebi upsert (Maliyet Reçetesi bu alanı okur).
-        await SubmitMaliyetTalepAsync(no, new SubmitMaliyetTalepDto(
-            Maliyet:          dto.FinalMaliyet,
-            MaliyetDetayi:    dto.MaliyetDetayi,
-            ToplamSiparis:    order.ToplamFiyat,
-            KaporaBakiyesi:   null,
-            KalanBakiyeTalep: null,
-            PesinYuzde:       order.PesinYüzde), currentUserName);
+        // Yalnızca kullanıcı maliyet girdiyse / > 0 ise kaydedilir; boş ise gereksiz 0 TL talep açılmaz.
+        if (dto.FinalMaliyet.HasValue && dto.FinalMaliyet.Value > 0m)
+        {
+            await SubmitMaliyetTalepAsync(no, new SubmitMaliyetTalepDto(
+                Maliyet:          dto.FinalMaliyet.Value,
+                MaliyetDetayi:    dto.MaliyetDetayi,
+                ToplamSiparis:    order.ToplamFiyat,
+                KaporaBakiyesi:   null,
+                KalanBakiyeTalep: null,
+                PesinYuzde:       order.PesinYüzde), currentUserName);
+        }
 
-        // 3) Aşama: TamamlanmaBekliyor → Tamamlandi.
+        // 3) Aşama: → Tamamlandi (ayrıca Kontrol='Onay', LojistikOnay='Onay').
         int rows = await uow.Orders.FinalizeCompletionAsync(no);
         if (rows == 0)
-            throw new BusinessException($"{no} kapanış beklemiyor, kapatılamaz.", "closeNotPending", new { no });
+            throw new BusinessException($"{no} kapatılamadı.", "closeFailed", new { no });
 
-        // 4) TamamlandiTablo + SiparisOnaylari audit (CompleteShipment'tan ertelendi).
+        // 4) TamamlandiTablo kaydı (kapatan kişi, tarih, önceki aşama, açıklama).
         await uow.CompletedOrders.AddAsync(new CompletedOrder
         {
             SiparisNo   = no,
             KullaniciID = currentUserId,
-            Tarih       = DateTime.Now
+            Tarih       = DateTime.Now,
+            OncekiAsama = oncekiAsama,
+            Aciklama    = dto.KapanisNotu
         });
-        await uow.OrderApprovals.UpsertAsync(
-            no, currentUserId, "Onaylandi",
-            $"Sipariş tamamlandı — Final Maliyet: {dto.FinalMaliyet:N2}" +
-            (dto.Pesinat is > 0m ? $", 3. Peşinat: {dto.Pesinat:N2}" : ""));
+
+        // 5) SiparisOnaylari audit:
+        // Eğer kullanıcının bu siparişte daha önce verdiği bir onay (Cari Onay / Kalite Kontrol vb.) yoksa
+        // onay kaydı ekle; varsa önceki gate onayını (MuhasebeOnaylandi vb.) ezmemek için üzerine yazma.
+        var existingApprovals = await uow.OrderApprovals.GetBySiparisNoAsync(no);
+        bool hasPriorApproval = existingApprovals.Any(a => a.KullaniciID == currentUserId);
+        if (!hasPriorApproval)
+        {
+            await uow.OrderApprovals.UpsertAsync(
+                no, currentUserId, "Onaylandi",
+                $"Sipariş tamamlandı" +
+                (dto.FinalMaliyet.HasValue && dto.FinalMaliyet.Value > 0 ? $" — Final Maliyet: {dto.FinalMaliyet:N2}" : "") +
+                (dto.Pesinat is > 0m ? $", Peşinat: {dto.Pesinat:N2}" : "") +
+                (!string.IsNullOrWhiteSpace(dto.KapanisNotu) ? $" — Not: {dto.KapanisNotu}" : ""));
+        }
 
         await uow.SaveChangesAsync();
     }

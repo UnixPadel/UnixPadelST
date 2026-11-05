@@ -9,6 +9,8 @@ interface Props {
   sTarih?: string               // son fabrika işlem tarihi (MoveToProduction tarafından
                                 // seçilen üretim tarihi, MarkAsReady tarafından "now")
   currentStage: string          // SiparisMiTeklifMi enum değeri
+  completedAt?: string | null
+  completedBy?: string | null
 }
 
 /**
@@ -24,7 +26,7 @@ interface Props {
  * timestamp'i tutulmadığı için yalnız EN SON aşama görünür.
  * QW-12 — mevcut aşama ham enum yerine çevrilmiş etiketle gösterilir.
  */
-export function OrderStageTimeline({ tarih, sTarih, currentStage }: Props) {
+export function OrderStageTimeline({ tarih, sTarih, currentStage, completedAt, completedBy }: Props) {
   const { t } = useTranslation()
 
   // Son aşama için açıklayıcı satır — sadece factory-side stage'lerde anlamlı
@@ -44,14 +46,22 @@ export function OrderStageTimeline({ tarih, sTarih, currentStage }: Props) {
     key: 'current',
     label: t('orderStage.current'),
     tone: statusTone(currentStage, 'stage'),
-    meta: <span className="font-medium text-foreground">{stageLabel(t, currentStage)}</span>,
+    meta: (
+      <span className="font-medium text-foreground">
+        {stageLabel(t, currentStage)}
+        {currentStage === 'Tamamlandi' && completedBy && (
+          <span className="block text-xs font-normal text-muted-foreground">Kapatan: {completedBy}</span>
+        )}
+      </span>
+    ),
+    date: currentStage === 'Tamamlandi' && completedAt ? formatDate(completedAt) : undefined,
   })
 
   return (
     <div className="space-y-2">
       <SectionTitle as="h4">{t('orderStage.title')}</SectionTitle>
       <Timeline items={items} />
-      {!sTarih && (
+      {!sTarih && !completedAt && (
         <p className="text-xs text-muted-foreground italic">
           {t('orderStage.noHistoryNote')}
         </p>

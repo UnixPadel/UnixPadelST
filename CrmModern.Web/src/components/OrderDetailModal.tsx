@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
-import { Check, Copy, Download, FileText } from 'lucide-react'
+import { Check, CheckCircle2, AlertTriangle, Copy, Download, FileText } from 'lucide-react'
 import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative } from '@/api/orders'
 import { getUsersLookup } from '@/api/users'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
@@ -20,7 +20,8 @@ import { DocumentFlow } from '@/components/order/DocumentFlow'
 import { useToast } from '@/components/ToastProvider'
 import { toastApiError } from '@/lib/apiError'
 import { useAuth } from '@/hooks/useAuth'
-import { isSuperAdmin } from '@/lib/permissions'
+import { isSuperAdmin, isAccountingApprover } from '@/lib/permissions'
+import { CompleteOrderModal } from '@/components/order/CompleteOrderModal'
 import { hideMoneyFor } from '@/lib/visibility'
 import { invalidateOrderGraph } from '@/lib/queryKeys'
 
@@ -94,6 +95,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
   const [showOfferForm, setShowOfferForm] = useState(false)
   const [downloading, setDownloading] = useState<'excel' | 'pdf' | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [showCompleteModal, setShowCompleteModal] = useState(false)
   const padX = embedded ? 'px-3' : 'px-6'
 
   // Çapa çubuğu ↔ bölümler. Tıklamadaki yumuşak kaydırma bitene dek kaydırma
@@ -240,6 +242,12 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
           {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
           {order.sirket && <span className="text-muted-foreground">· {order.sirket}</span>}
           <div className="ml-auto flex flex-wrap gap-1.5">
+            {isAccountingApprover(user) && order.siparisMiTeklifMi !== 'Tamamlandi' && order.siparisMiTeklifMi !== 'Teklif' && order.siparisMiTeklifMi !== 'Iptal' && !order.silindi && (
+              <Button size="xs" className="rounded-none bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium shadow-xs border border-red-700 dark:border-red-500 transition-colors"
+                onClick={() => setShowCompleteModal(true)}>
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" /> {t('accApproval.actions.tamamla', 'Siparişi Tamamla')}
+              </Button>
+            )}
             {canCreateOrders && (
               <Button size="xs" variant="outline" title={t('orderDetail.copyHint')}
                 onClick={() => nav(`/orders/new?copyFrom=${encodeURIComponent(order.siparisNo)}`)}>
@@ -286,6 +294,33 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
       >
         <section {...sectionProps('general')}>
           {sectionHeading('general')}
+          {/* Tamamlandı Bildirim Bandı */}
+          {order.siparisMiTeklifMi === 'Tamamlandi' && (
+            <div className="rounded-lg border border-orange-500/30 bg-orange-500/10 p-3 text-xs text-foreground">
+              <div className="flex items-start gap-2.5">
+                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
+                <div className="space-y-1 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5 font-semibold text-orange-950 dark:text-orange-200">
+                    <span>Bu sipariş tamamlandı olarak kapatıldı</span>
+                    {order.tamamlanmaOncekiAsama && order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' && (
+                      <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-900 dark:bg-orange-950/60 dark:text-orange-200">
+                        {order.tamamlanmaOncekiAsama} aşamasından doğrudan kapatıldı
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-[11px]">
+                    <span>Kapatan: <strong>{order.tamamlayanAdSoyad || order.tamamlayanKullaniciAdi || 'Yetkili'}</strong></span>
+                    {order.tamamlanmaTarihi && <span>· Kapanış Tarihi: <strong>{formatDate(order.tamamlanmaTarihi)}</strong></span>}
+                  </div>
+                  {order.tamamlanmaNotu && (
+                    <div className="mt-1 rounded border border-orange-500/20 bg-background/80 p-2 text-foreground/90 italic">
+                      "{order.tamamlanmaNotu}"
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           {/* Red notu — Genel'in en üstünde. */}
           {order.kontrol === 'Reddet' && order.red && (
             <div role="alert" className="rounded-md border border-danger/40 bg-danger-soft p-3 text-danger-soft-foreground">
@@ -526,6 +561,18 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
           <DocumentFlow order={order} />
         </section>
       </div>
+      {showCompleteModal && (
+        <CompleteOrderModal
+          open={showCompleteModal}
+          onOpenChange={setShowCompleteModal}
+          siparisNo={order.siparisNo}
+          currentStage={order.siparisMiTeklifMi}
+          musteriAd={order.musteriAd}
+          toplamFiyat={order.toplamFiyat}
+          odenenMiktar={order.odenenMiktar}
+          paraTipi={order.paraTipi}
+        />
+      )}
     </div>
   )
 }

@@ -760,3 +760,239 @@ export interface OrderWorkflowStatusDto {
   department: WorkflowDepartment | null
   waitingSince: string | null
 }
+
+// ── Antrepo & Depo Stokları DTOs ───────────────────────────────────────────
+
+export interface StockItemListDto {
+  id: number
+  beyannameId: number | null
+  beyannameNo: string | null
+  konum: string
+  malAdi: string
+  ticariTanim: string | null
+  miktar: number
+  kalan: number
+  birim: string
+  kapAdedi: number | null
+  kalanKap: number | null
+  kapCinsi: string | null
+  durum: 'Bekliyor' | 'Kismen' | 'Tamam' | string
+  olusturmaTarihi: string
+  sonCikisTarihi: string | null
+}
+
+export interface StockCountsDto {
+  tumu: number
+  antrepo: number
+  depo: number
+}
+
+export interface StockListDto {
+  items: StockItemListDto[]
+  sayac: StockCountsDto
+}
+
+export interface BeyannameOzetDto {
+  id: number
+  no: string | null
+  tescilTarihi: string | null
+  rejimKodu: string | null
+  gumrukIdaresi: string | null
+  gonderici: string | null
+  alici: string | null
+  doviz: string | null
+  faturaTutari: number | null
+  kaynak: string
+  belgeVar: boolean
+  belgeAdi: string | null
+  yukleyenAd: string | null
+  yuklemeTarihi: string
+}
+
+export interface StockExitDto {
+  id: number
+  miktar: number
+  kapAdedi: number | null
+  tarih: string
+  not: string | null
+  girenKullaniciId: number
+  girenAd: string | null
+  kayitZamani: string
+  geriAlinmaZamani: string | null
+  geriAlanAd: string | null
+  geriAlinabilir: boolean
+}
+
+export interface StockItemDetailDto {
+  item: StockItemListDto
+  gtip: string | null
+  menseUlke: string | null
+  brutKg: number | null
+  netKg: number | null
+  kalemNo: number | null
+  kalemFiyati: number | null
+  beyanname: BeyannameOzetDto | null
+  cikislar: StockExitDto[]
+  geriAlmaSuresiGun: number
+}
+
+export interface CreateStockItemRequest {
+  kalemNo?: number | null
+  malAdi: string
+  ticariTanim?: string | null
+  miktar: number
+  birim: string
+  kapAdedi?: number | null
+  kapCinsi?: string | null
+  gtip?: string | null
+  menseUlke?: string | null
+  brutKg?: number | null
+  netKg?: number | null
+  kalemFiyati?: number | null
+}
+
+export interface CreateStockRequest {
+  konum: string
+  beyannameNo?: string | null
+  tescilTarihi?: string | null
+  rejimKodu?: string | null
+  gumrukIdaresi?: string | null
+  gonderici?: string | null
+  alici?: string | null
+  doviz?: string | null
+  faturaTutari?: number | null
+  kur?: number | null
+  kaynak?: string | null
+  hamJson?: string | null
+  kalemler: CreateStockItemRequest[]
+}
+
+export interface CreateStockResultDto {
+  beyannameId: number
+  kalemIds: number[]
+}
+
+export interface UpdateStockItemRequest {
+  konum: string
+  malAdi: string
+  miktar: number
+  birim: string
+  kapAdedi?: number | null
+  kapCinsi?: string | null
+}
+
+export interface AddStockExitRequest {
+  tamami: boolean
+  miktar?: number | null
+  kapAdedi?: number | null
+  tarih?: string | null
+  not?: string | null
+}
+
+export interface DraftWarningDto {
+  kod: string
+  mesaj: string
+}
+
+export interface DraftItemDto {
+  kalemNo: number | null
+  malAdi: string | null
+  ticariTanim: string | null
+  miktar: number | null
+  birim: string | null
+  kapAdedi: number | null
+  kapCinsi: string | null
+  gtip: string | null
+  menseUlke: string | null
+  brutKg: number | null
+  netKg: number | null
+  kalemFiyati: number | null
+  belirsizAlanlar: string[]
+}
+
+export interface BeyannameDraftDto {
+  beyannameNo: string | null
+  tescilTarihi: string | null
+  rejimKodu: string | null
+  gumrukIdaresi: string | null
+  gonderici: string | null
+  alici: string | null
+  doviz: string | null
+  faturaTutari: number | null
+  kur: number | null
+  beyanKalemSayisi: number | null
+  onerilenKonum: string | null
+  kalemler: DraftItemDto[]
+  belirsizAlanlar: string[]
+  uyarilar: DraftWarningDto[]
+  hamJson: string | null
+}
+
+export interface AnalyzeResultDto {
+  basarili: boolean
+  hataKodu: string | null
+  hataMesaji: string | null
+  taslak: BeyannameDraftDto | null
+  mevcutBeyannameId: number | null
+}
+
+// ── Sistem Ayarları (Gemini API) DTOs ───────────────────────────────────────
+
+export interface GeminiKeyStatusDto {
+  tanimli: boolean
+  maske: string | null
+  guncellemeZamani: string | null
+  guncelleyenAd: string | null
+  sonBasariliKullanim: string | null
+  sonHata: string | null
+  sonHataZamani: string | null
+}
+
+export interface SaveGeminiKeyRequest {
+  apiKey: string
+}
+
+export interface TestGeminiKeyRequest {
+  apiKey?: string
+}
+
+export interface GeminiTestResultDto {
+  basarili: boolean
+  hataKodu: string | null
+  hataMesaji: string | null
+}
+
+export interface ClaudeKeyStatusDto {
+  tanimli: boolean
+  maske: string | null
+  model: string
+  guncellemeZamani: string | null
+  guncelleyenAd: string | null
+  sonBasariliKullanim: string | null
+  sonHata: string | null
+  sonHataZamani: string | null
+}
+
+export interface SaveClaudeKeyRequest {
+  apiKey: string
+  model?: string | null
+}
+
+export interface TestClaudeKeyRequest {
+  apiKey?: string
+  model?: string
+}
+
+export interface ClaudeTestResultDto {
+  basarili: boolean
+  hataKodu: string | null
+  hataMesaji: string | null
+}
+
+export interface AiSettingsOverviewDto {
+  aktifSaglayici: 'Claude' | 'Gemini'
+  claude: ClaudeKeyStatusDto
+  gemini: GeminiKeyStatusDto
+}
+
+

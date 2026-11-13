@@ -135,6 +135,12 @@ public static class DatabaseSchemaMigrator
         await EnsureColumnAsync(ctx, logger,
             table: "TamamlandiTablo", column: "Aciklama",
             ddl: "ALTER TABLE TamamlandiTablo ADD COLUMN Aciklama VARCHAR(500) NULL");
+
+        // 15) Antrepo ve Depo Stokları — AntrepoBeyanname, AntrepoStokKalem, AntrepoStokCikis
+        await EnsureWarehouseStockTablesAsync(ctx, logger);
+
+        // 16) Sistem Ayarları — SistemAyarlari (Gemini API anahtarı vb.)
+        await EnsureSystemSettingsTableAsync(ctx, logger);
     }
 
     /// <summary>
@@ -185,6 +191,97 @@ public static class DatabaseSchemaMigrator
         await ctx.Database.ExecuteSqlRawAsync(
             "ALTER TABLE SiparisOnaylari MODIFY COLUMN OnayDurumu VARCHAR(40) NOT NULL");
         logger?.LogInformation("SiparisOnaylari.OnayDurumu VARCHAR(40) yapıldı (§17 fix).");
+    }
+
+    /// <summary>
+    /// Antrepo ve Depo Stokları — AntrepoBeyanname, AntrepoStokKalem, AntrepoStokCikis.
+    /// CREATE IF NOT EXISTS → idempotent.
+    /// </summary>
+    private static async Task EnsureWarehouseStockTablesAsync(AppDbContext ctx, ILogger? logger)
+    {
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS AntrepoBeyanname (
+                Id                  INT AUTO_INCREMENT PRIMARY KEY,
+                BeyannameNo         VARCHAR(50) NULL,
+                TescilTarihi        DATETIME NULL,
+                RejimKodu           VARCHAR(20) NULL,
+                GumrukIdaresi       VARCHAR(150) NULL,
+                Gonderici           VARCHAR(255) NULL,
+                Alici               VARCHAR(255) NULL,
+                Doviz               VARCHAR(10) NULL,
+                FaturaTutari        DECIMAL(18,2) NULL,
+                Kur                 DECIMAL(18,4) NULL,
+                Kaynak              VARCHAR(20) NOT NULL DEFAULT 'Elle',
+                BelgeAdi            VARCHAR(255) NULL,
+                BelgeTip            VARCHAR(100) NULL,
+                Belge               LONGBLOB NULL,
+                HamJson             LONGTEXT NULL,
+                YukleyenKullaniciID INT NOT NULL,
+                YuklemeTarihi       DATETIME NOT NULL,
+                UNIQUE KEY UQ_AntrepoBeyanname_No (BeyannameNo)
+            )");
+
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS AntrepoStokKalem (
+                Id                   INT AUTO_INCREMENT PRIMARY KEY,
+                BeyannameId          INT NULL,
+                Konum                VARCHAR(20) NOT NULL DEFAULT 'Antrepo',
+                MalAdi               VARCHAR(255) NOT NULL,
+                TicariTanim          TEXT NULL,
+                Miktar               DECIMAL(18,3) NOT NULL,
+                Birim                VARCHAR(30) NOT NULL DEFAULT 'ADET',
+                KapAdedi             DECIMAL(18,2) NULL,
+                KapCinsi             VARCHAR(50) NULL,
+                Gtip                 VARCHAR(30) NULL,
+                MenseUlke            VARCHAR(50) NULL,
+                BrutKg               DECIMAL(18,2) NULL,
+                NetKg                DECIMAL(18,2) NULL,
+                KalemNo              INT NULL,
+                KalemFiyati          DECIMAL(18,2) NULL,
+                OlusturanKullaniciID INT NOT NULL,
+                OlusturmaTarihi      DATETIME NOT NULL,
+                KEY IX_AntrepoStokKalem_BeyannameId (BeyannameId),
+                KEY IX_AntrepoStokKalem_Konum (Konum)
+            )");
+
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS AntrepoStokCikis (
+                Id                  INT AUTO_INCREMENT PRIMARY KEY,
+                KalemId             INT NOT NULL,
+                Miktar              DECIMAL(18,3) NOT NULL,
+                KapAdedi            DECIMAL(18,2) NULL,
+                Tarih               DATETIME NOT NULL,
+                Aciklama            VARCHAR(500) NULL,
+                GirenKullaniciID    INT NOT NULL,
+                KayitZamani         DATETIME NOT NULL,
+                GeriAlinmaZamani    DATETIME NULL,
+                GeriAlanKullaniciID INT NULL,
+                KEY IX_AntrepoStokCikis_KalemId (KalemId)
+            )");
+
+        // MySQL 'Not' reserved keyword migration
+        if (await ColumnExistsAsync(ctx, "AntrepoStokCikis", "Not"))
+        {
+            await ctx.Database.ExecuteSqlRawAsync("ALTER TABLE AntrepoStokCikis CHANGE COLUMN `Not` Aciklama VARCHAR(500) NULL");
+            logger?.LogInformation("AntrepoStokCikis 'Not' kolonu 'Aciklama' olarak güncellendi (MySQL reserved keyword fix).");
+        }
+
+        logger?.LogInformation("Antrepo ve Depo Stokları tabloları hazırlandı (CREATE IF NOT EXISTS).");
+    }
+
+    /// <summary>
+    /// Sistem Ayarları tablosu — CREATE IF NOT EXISTS.
+    /// </summary>
+    private static async Task EnsureSystemSettingsTableAsync(AppDbContext ctx, ILogger? logger)
+    {
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS SistemAyarlari (
+                Anahtar                VARCHAR(100) NOT NULL PRIMARY KEY,
+                Deger                  TEXT NULL,
+                GuncelleyenKullaniciID INT NULL,
+                GuncellemeZamani       DATETIME NOT NULL
+            )");
+        logger?.LogInformation("SistemAyarlari tablosu hazırlandı (CREATE IF NOT EXISTS).");
     }
 
     /// <summary>

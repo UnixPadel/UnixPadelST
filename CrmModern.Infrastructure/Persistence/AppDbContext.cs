@@ -51,6 +51,12 @@ internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbC
     public DbSet<AuditEntry>         EklemeGecmisi    => Set<AuditEntry>();
     public DbSet<PurchaseApproval>   TalepOnaylari    => Set<PurchaseApproval>();
 
+    // ── Antrepo ve Depo Stokları + Sistem Ayarları ────────────────────────
+    public DbSet<AntrepoBeyanname>   AntrepoBeyanname => Set<AntrepoBeyanname>();
+    public DbSet<AntrepoStokKalem>   AntrepoStokKalem => Set<AntrepoStokKalem>();
+    public DbSet<AntrepoStokCikis>   AntrepoStokCikis => Set<AntrepoStokCikis>();
+    public DbSet<SistemAyari>        SistemAyarlari   => Set<SistemAyari>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Loads all IEntityTypeConfiguration<T> classes in this assembly

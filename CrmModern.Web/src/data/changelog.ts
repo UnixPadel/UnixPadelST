@@ -11,6 +11,30 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.9',
+    tarih:    '2026-11-11',
+    baslik: {
+      tr: 'Lojistik: Antrepo ve Depo Stokları & Gemini Beyanname Entegrasyonu',
+      en: 'Logistics: Bonded & Warehouse Stock & Gemini Declaration Integration',
+    },
+    maddeler: {
+      tr: [
+        'Lojistik menüsüne "Antrepo & Depo Stokları" sekmesi eklendi. Antrepoda veya depoda bekleyen mallar tek bir listede sade ve düşük bilişsel yükle takip edilebilir.',
+        'Gümrük beyannameleri (PDF, tarama veya fotoğraf) Gemini yapay zekâ entegrasyonu ile otomatik taranarak kalemler, tamamlayıcı ölçü birimleri ve kap bilgileri doğrudan plana eklenir.',
+        'Her mal için tek tıkla "Tamamı çıktı" veya "Bir kısmı çıktı" seçeneğiyle araca yükleme işareti konulabilir; çıkan miktar anında stoktan düşer.',
+        'Yanlış girilen çıkış işlemleri işlemi yapan kullanıcı veya Yönetici tarafından 30 gün içinde doğrudan geri alınabilir.',
+        'Yönetici için "Sistem Ayarları" ekranı eklendi; Gemini API anahtarı merkezi olarak şifreli yönetilir ve tüm bilgisayarlarda anında aktifleşir.',
+      ],
+      en: [
+        'Added "Bonded & Warehouse Stock" tab under the Logistics menu for low-cognitive-load tracking of warehouse and bonded stock in a unified view.',
+        'Automatic extraction of customs declarations (PDF, scan, or photo) via Gemini AI integration, auto-populating items, supplementary units, and packages.',
+        'Single-click exit logging with "All loaded" or "Partial loaded" options, immediately deducting quantities from stock.',
+        'Undo capability for exit operations within 30 days by the author or managers.',
+        'Added System Settings screen for administrators to manage the Gemini API key securely and centrally across all client computers.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.8',
     tarih:    '2026-11-05',
     baslik: {

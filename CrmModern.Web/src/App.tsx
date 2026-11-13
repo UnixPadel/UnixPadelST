@@ -17,6 +17,7 @@ const CustomerFormPage = lazy(() => named(import('@/pages/customers/CustomerForm
 const QualityControlPage = lazy(() => named(import('@/pages/quality-control/QualityControlPage'), 'QualityControlPage'))
 const FactoryPage = lazy(() => named(import('@/pages/factory/FactoryPage'), 'FactoryPage'))
 const LogisticsReadyPage = lazy(() => named(import('@/pages/logistics/LogisticsReadyPage'), 'LogisticsReadyPage'))
+const WarehouseStockPage = lazy(() => named(import('@/pages/logistics/WarehouseStockPage'), 'WarehouseStockPage'))
 const LogisticsOffersPage = lazy(() => named(import('@/pages/logistics/LogisticsOffersPage'), 'LogisticsOffersPage'))
 const LogisticsHistoryPage = lazy(() => named(import('@/pages/logistics/LogisticsHistoryPage'), 'LogisticsHistoryPage'))
 const CarriersPage = lazy(() => named(import('@/pages/logistics/CarriersPage'), 'CarriersPage'))
@@ -31,6 +32,7 @@ const AllPurchaseRequestsPage = lazy(() => named(import('@/pages/purchase/AllPur
 const PaymentDetailsPage = lazy(() => named(import('@/pages/approval/PaymentDetailsPage'), 'PaymentDetailsPage'))
 const FinalApprovalPage = lazy(() => named(import('@/pages/approval/FinalApprovalPage'), 'FinalApprovalPage'))
 const UsersPage = lazy(() => named(import('@/pages/users/UsersPage'), 'UsersPage'))
+const SystemSettingsPage = lazy(() => named(import('@/pages/admin/SystemSettingsPage'), 'SystemSettingsPage'))
 const RepPerformancePage = lazy(() => named(import('@/pages/reporting/RepPerformancePage'), 'RepPerformancePage'))
 const SearchPage = lazy(() => named(import('@/pages/search/SearchPage'), 'SearchPage'))
 const UpdatesPage = lazy(() => named(import('@/pages/UpdatesPage'), 'UpdatesPage'))
@@ -76,6 +78,7 @@ export const router = createHashRouter(createRoutesFromElements(
       <Route path="/factory"         element={<FactoryPage />} />
       <Route path="/logistics"           element={<Navigate to="/logistics/ready" replace />} />
       <Route path="/logistics/ready"     element={<RoleGuard roles={['Yonetici','Lojistik']}><LogisticsReadyPage /></RoleGuard>} />
+      <Route path="/logistics/warehouse-stock" element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci','Muhasebe']} usernames={['elshan.rasulov']}><WarehouseStockPage /></RoleGuard>} />
       {/* Lojistik Teklif — yalnız Lojistik + Yönetici. Onay yalnız Yönetici (sayfa içi). */}
       <Route path="/logistics/offers"    element={<RoleGuard roles={['Yonetici','Lojistik']}><LogisticsOffersPage /></RoleGuard>} />
       <Route path="/logistics/history"   element={<RoleGuard roles={['Yonetici','Lojistik','Gozlemci','Muhasebe']} usernames={['elshan.rasulov']}><LogisticsHistoryPage /></RoleGuard>} />
@@ -94,6 +97,7 @@ export const router = createHashRouter(createRoutesFromElements(
       <Route path="/approval/payment"     element={<RoleGuard roles={['Yonetici','Muhasebe']}><PaymentDetailsPage /></RoleGuard>} />
       <Route path="/approval/final"       element={<FinalApprovalPage />} />
       <Route path="/users"           element={<RoleGuard roles={['Yonetici']}><UsersPage /></RoleGuard>} />
+      <Route path="/admin/settings"  element={<RoleGuard roles={['Yonetici']}><SystemSettingsPage /></RoleGuard>} />
       <Route path="/search"          element={<SearchPage />} />
       <Route path="/updates"         element={<UpdatesPage />} />
       <Route path="/guide"           element={<GuidePage />} />

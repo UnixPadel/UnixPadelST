@@ -2,6 +2,7 @@ import {
   LayoutDashboard, Inbox, FilePlus2, ClipboardList, Contact, BarChart3, ShieldCheck, Factory,
   PackageCheck, Handshake, History, Truck, Wallet, FileText, BadgeCheck, ReceiptText, Scale,
   ShoppingCart, ShoppingBag, Boxes, CreditCard, Stamp, Users, Search, Sparkles, Settings, BookOpen,
+  Warehouse, Sliders,
   type LucideIcon,
 } from 'lucide-react'
 import type { AuthUser, DashboardKpi } from '@/types'
@@ -49,6 +50,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: '/factory',         i18nKey: 'nav.factory',        icon: Factory,     group: 'operations', code: 'FB', roles: ['Yonetici', 'Fabrika', 'Gozlemci'], countField: 'uretimdekiSiparisSayisi', descKey: 'dashboard.moduleCard.factory' },
 
   { path: '/logistics/ready',    i18nKey: 'nav.logisticsReady',    icon: PackageCheck, group: 'logistics', code: 'LH', roles: ['Yonetici', 'Lojistik'], countField: 'sevkiyatBekleyenSayisi', descKey: 'dashboard.moduleCard.logistics' },
+  { path: '/logistics/warehouse-stock', i18nKey: 'nav.warehouseStock', icon: Warehouse, group: 'logistics', code: 'AD', roles: ['Yonetici', 'Lojistik', 'Gozlemci', 'Muhasebe'], usernames: ['elshan.rasulov'], descKey: 'dashboard.moduleCard.warehouseStock' },
   { path: '/logistics/offers',   i18nKey: 'nav.logisticsOffers',   icon: Handshake,    group: 'logistics', code: 'LT', roles: ['Yonetici', 'Lojistik'] },
   { path: '/logistics/history',  i18nKey: 'nav.logisticsHistory',  icon: History,      group: 'logistics', code: 'LG', roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'], descKey: 'dashboard.moduleCard.logisticsHistory' },
   { path: '/logistics/carriers', i18nKey: 'nav.logisticsCarriers', icon: Truck,        group: 'logistics', code: 'TS', roles: ['Yonetici', 'Lojistik', 'Gozlemci'], usernames: ['elshan.rasulov'] },
@@ -67,6 +69,7 @@ export const NAV_ITEMS: NavItem[] = [
   { path: '/approval/final',   i18nKey: 'nav.approvalFinal',   icon: Stamp,        group: 'purchase', code: 'FO', roles: ['Yonetici'], usernames: ['elshan.rasulov'] },
 
   { path: '/users',                     i18nKey: 'nav.users',       icon: Users,     group: 'admin', code: 'KU', roles: ['Yonetici'], descKey: 'dashboard.moduleCard.users' },
+  { path: '/admin/settings',            i18nKey: 'nav.systemSettings', icon: Sliders, group: 'admin', code: 'SS', roles: ['Yonetici'], descKey: 'dashboard.moduleCard.systemSettings' },
   // Round-8 §13 — Temsilci performans raporu yalnız Yonetici.
   { path: '/reporting/representatives', i18nKey: 'nav.reporting',   icon: BarChart3, group: 'admin', code: 'RP', roles: ['Yonetici'] },
   { path: '/preferences',               i18nKey: 'nav.preferences', icon: Settings,  group: 'admin', code: 'TR' },

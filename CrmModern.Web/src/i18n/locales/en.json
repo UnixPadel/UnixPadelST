@@ -93,6 +93,7 @@
     "qualityControl": "Order Review",
     "factory": "Factory / Production",
     "logisticsReady": "Logistics · Ready to Ship",
+    "warehouseStock": "Logistics · Bonded & Warehouse Stock",
     "logisticsOffers": "Logistics · Shipping Quotes",
     "logisticsHistory": "Logistics · Shipment History",
     "logisticsCarriers": "Logistics · Carriers",
@@ -110,6 +111,7 @@
     "customers": "Customers",
     "myOrders": "My Orders",
     "users": "Users",
+    "systemSettings": "System Settings",
     "search": "Search Orders",
     "updates": "What's New",
     "reporting": "Reports · Sales Reps",
@@ -196,6 +198,7 @@
       "qc": "Orders waiting for review",
       "factory": "Track production",
       "logistics": "Track shipments and deliveries",
+      "warehouseStock": "Bonded and local warehouse stock and exits",
       "logisticsHistory": "Past shipments",
       "accounting": "Record and track payments",
       "accountingOrders": "View quotes and orders, open proformas",
@@ -205,6 +208,7 @@
       "createOrderQuote": "Create an order or quote",
       "myOrders": "Orders and quotes you created",
       "users": "Manage users",
+      "systemSettings": "Gemini API key and system settings",
       "search": "Search orders and quotes"
     },
     "charts": {

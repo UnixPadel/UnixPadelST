@@ -31,8 +31,10 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       'The left menu is grouped (Sales, Operations, Logistics, Accounting, Purchasing, Admin). You only see the screens your role can open. The numbers show how much work is waiting on each screen.',
     ),
     steps: [
-      L('Güne “Bekleyen İşler” ile başla: sana düşen tüm işler, kaç gündür beklediğiyle burada. “Aç” ilgili ekranı o kayıt seçili açar.',
-        'Start the day with “Pending Tasks”: everything waiting for you, with how long it has waited. “Open” takes you to the screen with that record selected.'),
+      L('Ana Sayfa’nın en üstündeki “Sıradaki işlerin” sana düşen kuyrukları, kaç iş olduğunu ve en eskisinin kaç gündür beklediğini gösterir. Satıra tıklayınca o işin ekranı açılır; uyarı işareti gecikmiş işi gösterir.',
+        '“Your next tasks” at the top of Home lists your queues, how many items each has and how long the oldest has waited. Click a row to open that screen; the warning sign marks overdue work.'),
+      L('Tek tek kayıtlar için “Bekleyen İşler”e geç (menüdeki sayı toplam iş sayısıdır). “Aç” ilgili ekranı o kayıt seçili açar.',
+        'For individual records, go to “Pending Tasks” (the number in the menu is your total). “Open” takes you to the screen with that record selected.'),
       L('Ctrl+K ile Hızlı Erişim’i aç: ekran kodu (YS Yeni Sipariş, KK Sipariş Kontrolü, FB Fabrika, LH Lojistik, TH Tahsilat, BI Bekleyen İşler, KL Kılavuz) ya da “SP <sipariş no>” yaz, Enter’a bas.',
         'Press Ctrl+K for Quick Open: type a screen code (YS New Order, KK Order Review, FB Factory, LH Logistics, TH Payments, BI Pending Tasks, KL Guide) or “SP <order no>” and press Enter.'),
       L('Tercihlerim’de varsayılan şirketi, dövizi, peşinat yüzdesini, tablo yoğunluğunu ve açılış sayfasını seç. Yeni formlar bu değerlerle açılır.',

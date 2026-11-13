@@ -8,6 +8,8 @@ import {
   NAV_GROUPS, activeNavPath, shortNavLabel, visibleNavItems,
 } from '@/lib/navigation'
 import { useNavCounts } from '@/hooks/useNavCounts'
+import { useInboxSummary } from '@/hooks/useInboxSummary'
+import { useQueueAccess } from '@/hooks/useWorkQueues'
 
 interface SidebarProps {
   isOpen: boolean
@@ -27,6 +29,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { getUser, logout } = useAuth()
   const user = getUser()
   const counts = useNavCounts()
+  // Bekleyen İşler rozeti — Ana Sayfa paneliyle aynı istek/önbellek; kuyruğu olmayan kullanıcıda istek atılmaz.
+  const { ids: queueIds } = useQueueAccess()
+  const inbox = useInboxSummary(queueIds.length > 0)
 
   const items = visibleNavItems(user)
   const active = activeNavPath(location.pathname, items)
@@ -98,7 +103,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                   {groupItems.map((item) => {
                     const isActive = item.path === active
                     const label = t(item.i18nKey)
-                    const count = item.countField ? counts?.[item.countField] : undefined
+                    const count = item.countSource === 'inbox'
+                      ? inbox.data?.total
+                      : item.countField ? counts?.[item.countField] : undefined
                     const Icon = item.icon
                     return (
                       <Link

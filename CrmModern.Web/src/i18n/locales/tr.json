@@ -1563,7 +1563,26 @@
       "payment": "Ödeme türünü ve bilgilerini gir.",
       "rejected": "Red sebebini oku, revize et."
     },
-    "loadError": "Liste yüklenemedi. F5 ile tekrar dene."
+    "loadError": "Liste yüklenemedi. F5 ile tekrar dene.",
+    "panel": {
+      "title": "Sıradaki işlerin",
+      "seeAll": "Tümünü gör",
+      "empty": "Sende bekleyen iş yok.",
+      "loadError": "yüklenemedi",
+      "retry": "Tekrar dene",
+      "failed": "Bekleyen işler yüklenemedi.",
+      "itemCount_one": "{{count}} iş",
+      "itemCount_other": "{{count}} iş",
+      "oldest": "en eski {{age}}",
+      "oldestAria": "en eski iş {{age}}dür bekliyor",
+      "late": "gecikmiş",
+      "more_one": "+{{count}} kuyruk daha · Bekleyen İşler",
+      "more_other": "+{{count}} kuyruk daha · Bekleyen İşler",
+      "summary_one": "{{count}} iş seni bekliyor",
+      "summary_other": "{{count}} iş seni bekliyor",
+      "summaryAtLeast_one": "en az {{count}} iş seni bekliyor",
+      "summaryAtLeast_other": "en az {{count}} iş seni bekliyor"
+    }
   },
   "preferences": {
     "title": "Tercihlerim",

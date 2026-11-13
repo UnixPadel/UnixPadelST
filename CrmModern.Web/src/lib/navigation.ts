@@ -30,13 +30,15 @@ export interface NavItem {
   roles?: string[]
   usernames?: string[]   // rol VEYA kullanıcı adı — birden fazla varsa OR
   countField?: keyof DashboardKpi
+  /** 'inbox' — rozet Bekleyen İşler özetinin toplamı (kullanıcıya özel, GET /api/inbox/summary). */
+  countSource?: 'inbox'
 }
 
 export const NAV_GROUPS: NavGroup[] = ['general', 'sales', 'operations', 'logistics', 'accounting', 'purchase', 'admin']
 
 export const NAV_ITEMS: NavItem[] = [
   { path: '/dashboard', i18nKey: 'nav.dashboard', icon: LayoutDashboard, group: 'general', code: 'AN' },
-  { path: '/inbox',     i18nKey: 'nav.inbox',     icon: Inbox,           group: 'general', code: 'BI' },
+  { path: '/inbox',     i18nKey: 'nav.inbox',     icon: Inbox,           group: 'general', code: 'BI', countSource: 'inbox' },
   { path: '/search',    i18nKey: 'nav.search',    icon: Search,          group: 'general', code: 'AR', descKey: 'dashboard.moduleCard.search' },
 
   // PROMPT-v3 §1 — sipariş/teklif oluşturma yalnız Temsilci'ye açık. İstisna: elshan.rasulov.

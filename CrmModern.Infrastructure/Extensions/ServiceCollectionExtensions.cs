@@ -73,6 +73,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IWorkflowService,         WorkflowService>();
         services.AddScoped<ISystemSettingsService,   SystemSettingsService>();
         services.AddScoped<IWarehouseStockService,   WarehouseStockService>();
+        services.AddScoped<IInboxService,            InboxService>();
 
         // Döviz kurları (TCMB) — typed HttpClient; sonuç IMemoryCache'te 1 saat tutulur.
         services.AddHttpClient<IExchangeRateService, ExchangeRateService>(c => c.Timeout = TimeSpan.FromSeconds(10));

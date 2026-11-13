@@ -1563,7 +1563,26 @@
       "payment": "Enter the payment type and details.",
       "rejected": "Read why it was rejected, then revise."
     },
-    "loadError": "Couldn't load the list. Press F5 to try again."
+    "loadError": "Couldn't load the list. Press F5 to try again.",
+    "panel": {
+      "title": "Your next tasks",
+      "seeAll": "See all",
+      "empty": "Nothing is waiting for you.",
+      "loadError": "couldn't load",
+      "retry": "Try again",
+      "failed": "Couldn't load your pending tasks.",
+      "itemCount_one": "{{count}} item",
+      "itemCount_other": "{{count}} items",
+      "oldest": "oldest {{age}}",
+      "oldestAria": "oldest item waiting {{age}}",
+      "late": "overdue",
+      "more_one": "+{{count}} more queue · Pending Tasks",
+      "more_other": "+{{count}} more queues · Pending Tasks",
+      "summary_one": "{{count}} item waiting for you",
+      "summary_other": "{{count}} items waiting for you",
+      "summaryAtLeast_one": "at least {{count}} item waiting for you",
+      "summaryAtLeast_other": "at least {{count}} items waiting for you"
+    }
   },
   "preferences": {
     "title": "Preferences",

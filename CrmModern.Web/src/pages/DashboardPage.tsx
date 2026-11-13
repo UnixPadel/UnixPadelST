@@ -14,6 +14,8 @@ import { visibleNavItems, NAV_ITEMS } from '@/lib/navigation'
 import { PageHeader } from '@/components/PageHeader'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { KPICard } from '@/components/KPICard'
+import { WorkQueuePanel } from '@/components/WorkQueuePanel'
+import { useWorkQueueSummary, type QueueId } from '@/hooks/useWorkQueues'
 import {
   OrderTrendChart, StageDistributionChart, TopCustomersChart,
 } from '@/components/DashboardCharts'
@@ -51,6 +53,17 @@ interface KpiDef {
   highlightWhenPositive?: boolean
   /** QW-11 — kart tıklanınca gidilecek kuyruk (kullanıcının erişimi varsa). */
   path?: string
+}
+
+/**
+ * Ana Sayfa paneli aynı işi kullanıcıya özel gösteriyorsa küresel KPI kartı
+ * gizlenir — aynı soruya ekranda iki farklı sayı kalmasın.
+ */
+const KPI_COVERED_BY: Partial<Record<KpiId, QueueId[]>> = {
+  pendingQC:       ['qc'],
+  inProduction:    ['production'],
+  pendingShipment: ['shipment'],
+  pendingPurchase: ['finalApproval', 'payment'],
 }
 
 const KPI_DEFS: Record<KpiId, KpiDef> = {
@@ -255,18 +268,31 @@ export function DashboardPage() {
 
   const hasCharts = layout.charts.length > 0
 
+  // Sıradaki işlerin paneli + panelin kapsadığı KPI'ların süzülmesi.
+  const work = useWorkQueueSummary()
+  const hasQueues = work.ids.length > 0
+  const kpiIds = layout.kpis.filter((id) => !(KPI_COVERED_BY[id] ?? []).some((q) => work.ids.includes(q)))
+  const workSummary = hasQueues && !work.loading && work.total > 0
+    ? t(work.anyError ? 'inbox.panel.summaryAtLeast' : 'inbox.panel.summary', { count: work.total })
+    : null
+
   return (
     <div>
       <PageHeader
         title={t('dashboard.title')}
-        description={`${t('dashboard.welcome')}, ${fullName}`}
+        description={`${t('dashboard.welcome')}, ${fullName}${workSummary ? ` · ${workSummary}` : ''}`}
       />
+
+      {/* ── Sıradaki işlerin (Bekleyen İşler özeti) ─────────────────────── */}
+      {hasQueues && (
+        <WorkQueuePanel rows={work.rows} loading={work.loading} failed={work.failed} expectedRows={work.ids.length} onRetry={work.refetch} />
+      )}
 
       {/* ── KPI cards ──────────────────────────────────────────────────── */}
       {/* Scaling Faz 3 — kart sayısı pencereye değil alana göre (auto-fill). */}
-      {layout.kpis.length > 0 && (
+      {kpiIds.length > 0 && (
         <div className="p-6 grid grid-cols-[repeat(auto-fill,minmax(14rem,1fr))] gap-3">
-          {layout.kpis.map(renderKpi)}
+          {kpiIds.map(renderKpi)}
         </div>
       )}
 

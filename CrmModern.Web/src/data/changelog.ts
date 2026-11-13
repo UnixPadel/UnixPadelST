@@ -11,6 +11,24 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '0.3.10',
+    tarih:    '2026-11-13',
+    baslik: {
+      tr: 'Ana Sayfa’da sıradaki işlerin',
+      en: 'Your next tasks on Home',
+    },
+    maddeler: {
+      tr: [
+        'Ana Sayfa’nın en üstünde “Sıradaki işlerin”: sana düşen kuyruklar, kaç iş olduğu ve en eskisinin kaç gündür beklediği. Satıra tıklayınca o işin ekranı açılır; uyarı işareti gecikmiş işi gösterir.',
+        'Menüdeki “Bekleyen İşler” artık toplam iş sayını gösteriyor. Panelde zaten görünen işlerin ayrı sayı kartları Ana Sayfa’dan kaldırıldı; aynı soruya tek sayı kalıyor.',
+      ],
+      en: [
+        '“Your next tasks” at the top of Home: your queues, how many items each has and how long the oldest has waited. Click a row to open that screen; the warning sign marks overdue work.',
+        '“Pending Tasks” in the menu now shows your total. Count cards that repeated what the panel already shows were removed from Home, so each question has one number.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.9',
     tarih:    '2026-11-11',
     baslik: {

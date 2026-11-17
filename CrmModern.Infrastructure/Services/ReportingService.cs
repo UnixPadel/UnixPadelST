@@ -40,6 +40,8 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
     public async Task<byte[]> ExportAccountingOrdersAsync()
     {
         var orders = await uow.Orders.GetAccountingOrdersAsync();
+        var muhasebeMap = await uow.PurchaseRequests.GetMuhasebeBySiparisNolarAsync(
+            orders.Select(o => o.SiparisNo).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList());
 
         using var wb = new XLWorkbook();
         var ws = wb.AddWorksheet("Muhasebe");
@@ -74,9 +76,9 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             decimal kalanBakiye = toplam - odenen;
 
             // fetch Muhasebe purchase request
-            var pr = string.IsNullOrEmpty(o.SiparisNo)
-                ? null
-                : await uow.PurchaseRequests.GetMuhasebeBySiparisNoAsync(o.SiparisNo);
+            var pr = !string.IsNullOrEmpty(o.SiparisNo) && muhasebeMap.TryGetValue(o.SiparisNo, out var found)
+                ? found
+                : null;
 
             decimal? maliyet = pr?.Maliyet;
             decimal? kar     = pr != null ? (toplam - (pr.Maliyet ?? 0m)) : null;

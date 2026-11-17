@@ -19,8 +19,11 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
 
         // Lojistik teklif akışı — onaylı teklif özetini Burcu lojistik onay
         // kartında göstermek için toplu çek (SiparisNo → onaylı teklif).
-        var approvedOffers = await uow.LogisticsOffers.GetApprovedForOrdersAsync(
-            orders.Select(o => o.SiparisNo).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList());
+        var siparisNolar = orders.Select(o => o.SiparisNo).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList();
+        var approvedOffers = await uow.LogisticsOffers.GetApprovedForOrdersAsync(siparisNolar);
+
+        // Muhasebe talepleri tek sorguda (eskiden sipariş başına bir sorgu — N+1).
+        var muhasebeMap = await uow.PurchaseRequests.GetMuhasebeBySiparisNolarAsync(siparisNolar);
 
         var completedNolar = orders.Where(o => o.SiparisMiTeklifMi == "Tamamlandi").Select(o => o.SiparisNo).Distinct().ToList();
         var completedMap = completedNolar.Count > 0
@@ -40,7 +43,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
 
             PurchaseRequest? pr = null;
             if (!string.IsNullOrEmpty(o.SiparisNo))
-                pr = await uow.PurchaseRequests.GetMuhasebeBySiparisNoAsync(o.SiparisNo);
+                muhasebeMap.TryGetValue(o.SiparisNo, out pr);
 
             result.Add(new AccountingOrderListDto(
                 SiparisNo:        o.SiparisNo,

@@ -53,6 +53,27 @@ internal sealed class PurchaseRepository(AppDbContext context)
             .AsNoTracking()
             .FirstOrDefaultAsync(p => p.SiparisNo == siparisNo && p.TalepTipi == "Muhasebe");
 
+    public async Task<IReadOnlyDictionary<string, PurchaseRequest>> GetMuhasebeBySiparisNolarAsync(
+        IReadOnlyCollection<string> siparisNolar)
+    {
+        if (siparisNolar.Count == 0)
+            return new Dictionary<string, PurchaseRequest>(StringComparer.OrdinalIgnoreCase);
+
+        var rows = await _context.SatinAlmaTalep
+            .AsNoTracking()
+            .Where(p => p.TalepTipi == "Muhasebe" && p.SiparisNo != null && siparisNolar.Contains(p.SiparisNo))
+            .OrderBy(p => p.TalepID)
+            .ToListAsync();
+
+        // Aynı siparişe birden çok satır varsa ilki (en küçük TalepID) — tekil
+        // GetMuhasebeBySiparisNoAsync'in idx_siparis_no üzerinden döndürdüğü satır.
+        // MySQL karşılaştırması büyük/küçük harf duyarsız; sözlük de öyle.
+        var map = new Dictionary<string, PurchaseRequest>(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in rows)
+            map.TryAdd(r.SiparisNo!, r);
+        return map;
+    }
+
     public async Task<IReadOnlyList<PurchaseRequest>> GetByStatusesAsync(string[] statuses, string? talepTipi)
     {
         var q = _context.SatinAlmaTalep.AsNoTracking().AsQueryable();

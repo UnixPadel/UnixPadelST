@@ -31,6 +31,14 @@ public interface IPurchaseRepository : IBaseRepository<PurchaseRequest>
 
     Task<PurchaseRequest?> GetMuhasebeBySiparisNoAsync(string siparisNo);
 
+    /// <summary>
+    /// Birden çok sipariş için Muhasebe talebi — tek sorgu (SiparisNo → talep).
+    /// Liste ekranlarında sipariş başına GetMuhasebeBySiparisNoAsync çağırmak
+    /// (N+1) uzak DB'de her satıra bir gidiş-dönüş ekliyordu.
+    /// </summary>
+    Task<IReadOnlyDictionary<string, PurchaseRequest>> GetMuhasebeBySiparisNolarAsync(
+        IReadOnlyCollection<string> siparisNolar);
+
     /// <summary>Onay Bekliyor durumundaki toplam talep sayısı (dashboard KPI).</summary>
     Task<int> CountPendingAsync();
 

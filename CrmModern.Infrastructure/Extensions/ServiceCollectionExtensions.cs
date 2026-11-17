@@ -27,11 +27,20 @@ public static class ServiceCollectionExtensions
                 "Connection string 'DefaultConnection' is missing. " +
                 "Add it to appsettings.json or user-secrets.");
 
+        // Sunucu sürümü süreç başına BİR kez algılanır. AutoDetect lambda içinde
+        // olunca her DbContext (= her HTTP isteği) için ayrı bir bağlantı açıp
+        // "SELECT VERSION()" çalıştırıyordu — uzak DB'de istek başına ek gecikme.
+        // PublicationOnly: ilk deneme hata verirse istisna önbelleğe alınmaz,
+        // sonraki istek yeniden dener.
+        var serverVersion = new Lazy<ServerVersion>(
+            () => ServerVersion.AutoDetect(connectionString),
+            LazyThreadSafetyMode.PublicationOnly);
+
         services.AddDbContext<AppDbContext>(options =>
         {
             options.UseMySql(
                 connectionString,
-                ServerVersion.AutoDetect(connectionString),
+                serverVersion.Value,
                 mySql => mySql
                     .EnableRetryOnFailure(
                         maxRetryCount         : 3,

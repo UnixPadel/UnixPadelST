@@ -11,6 +11,26 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '1.0.0',
+    tarih:    '2026-11-17',
+    baslik: {
+      tr: 'Tahsilat ekranı daha hızlı açılıyor',
+      en: 'The Payments screen opens faster',
+    },
+    maddeler: {
+      tr: [
+        'Muhasebe · Tahsilat listesi sipariş sayısı arttıkça yavaşlamıyor: muhasebe bilgileri her sipariş için ayrı ayrı değil, tek seferde okunuyor.',
+        'Muhasebe Excel dışa aktarımı da aynı şekilde hızlandı.',
+        'Bütün ekranlar sunucudan biraz daha hızlı yanıt alıyor.',
+      ],
+      en: [
+        'The Accounting · Payments list no longer slows down as orders pile up: accounting details are read in one go instead of one order at a time.',
+        'The accounting Excel export is faster in the same way.',
+        'Every screen gets its answers from the server a little faster.',
+      ],
+    },
+  },
+  {
     versiyon: '0.3.10',
     tarih:    '2026-11-13',
     baslik: {

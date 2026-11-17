@@ -781,15 +781,15 @@
       "title": "Amount is more than the balance due"
     },
     "cancelTx": {
-      "action": "Void payment",
-      "title": "Void Payment — {{no}}",
+      "action": "Delete payment",
+      "title": "Delete this payment? — {{no}}",
       "preview": "Balance due: {{once}} → {{sonra}}",
-      "hint": "The record isn't deleted; it's marked as void, left out of totals and shown crossed out.",
+      "hint": "The payment is left out of totals and the balance due; the record stays in the list, crossed out and marked \"Deleted\".",
       "dismiss": "Cancel",
-      "confirm": "Void",
-      "done": "Payment voided and balance updated.",
-      "badge": "Void",
-      "cancelledInfo": "Voided by {{kim}} · {{tarih}}"
+      "confirm": "Delete payment",
+      "done": "Payment deleted and balance updated.",
+      "badge": "Deleted",
+      "cancelledInfo": "Deleted by {{kim}} · {{tarih}}"
     },
     "finalize": {
       "title": "Close — {{no}}",
@@ -1684,7 +1684,7 @@
     "qc": "Order review",
     "approvalStep": "Approval",
     "payment": "Payment {{n}} · {{amount}}",
-    "paymentCancelled": "Payment {{n}} voided",
+    "paymentCancelled": "Payment {{n}} deleted",
     "productionDone": "Production done",
     "inProduction": "In production",
     "awaitingProduction": "Waiting for production",
@@ -1897,7 +1897,7 @@
     "unsupportedFileType": "This file type isn't supported.",
     "attachmentNotFound": "No attachment found.",
     "cancelReasonTooLong": "The reason can be at most 500 characters.",
-    "paymentAlreadyVoided": "This payment is already void.",
+    "paymentAlreadyVoided": "This payment has already been deleted.",
     "amountMustBePositive": "The amount must be more than 0.",
     "costNegative": "Cost can't be below 0.",
     "downPaymentNegative": "The down payment can't be negative.",

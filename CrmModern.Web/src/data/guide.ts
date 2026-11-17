@@ -159,7 +159,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       'There are three work queues at the top: Account approval, Logistics approval, Closing; the numbers show how much is waiting. The list is on the left and the decision panel on the right. The first order is selected when you enter a queue.',
     ),
     steps: [
-      L('Sağdaki panelde Ödeme özeti’ne bak: sipariş tutarı, peşinat, ödenen ve kalan bakiye tek listede. Altında tahsilatlar var; yanlış gireni “Tahsilatı iptal et” ile iptal edersin.',
+      L('Sağdaki panelde Ödeme özeti’ne bak: sipariş tutarı, peşinat, ödenen ve kalan bakiye tek listede. Altında tahsilatlar var; yanlış gireni “Tahsilatı sil” ile silersin.',
         'Check the Payment summary in the panel on the right: order amount, down payment, paid and balance due in one list. The payments are below it; void a wrong one with “Void payment”.'),
       L('Cari onay: Sipariş Kontrolü’nden geçen sipariş için 1. peşinatı gir ve onayla. Sipariş Fabrika’da Planlama’ya geçer.',
         'Account approval: for an order that passed Order Review, enter the 1st down payment and approve. The order moves to Planning at the Factory.'),
@@ -188,7 +188,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     steps: [
       L('Siparişi seç (Enter tutar alanına geçer), tutarı Türkçe biçimde gir (ör. 1.234,56) ve “Tahsilatı kaydet”e bas. “Kalan bakiyeyi yaz” tutarı tek tıkla doldurur.',
         'Pick the order (Enter jumps to the amount field), enter the amount in Turkish format (e.g. 1.234,56) and press “Save payment”. “Fill in remaining balance” fills the amount in one click.'),
-      L('Yanlış bir tahsilatı paneldeki listeden “Tahsilatı iptal et” ile, sebep yazarak iptal et (Muhasebe Onay yetkisi gerekir).',
+      L('Yanlış bir tahsilatı paneldeki listeden “Tahsilatı sil” ile sil (Muhasebe Onay yetkisi gerekir).',
         'Void a wrong payment from the list in the panel with “Void payment” and give a reason (needs Accounting Approval rights).'),
       L('Maliyet ve Ek Maliyet panelde kapalı gelen iki bölümdür; başlığına tıklayınca açılır.',
         'Cost and Extra Cost are two sections in the panel that start closed; click the heading to open one.'),

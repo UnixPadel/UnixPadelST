@@ -242,15 +242,15 @@
 
 </details>
 
-## 13. Ekran / Konum: Tahsilat iptali penceresi
+## 13. Ekran / Konum: Tahsilat silme penceresi (2026-11-17: "iptal" → "sil")
 
 **Türkçe (TR) Yenilenmiş Metin**
-- Başlık / Menü: Tahsilatı İptal Et — {{no}}
-- İçerik / Açıklama: Tahsilatı iptal et · Kalan bakiye: {{once}} → {{sonra}} · Kayıt silinmez; iptal edildi olarak işaretlenir, toplamlardan düşer ve listede üstü çizili görünür. · Vazgeç · İptal Et · Tahsilat iptal edildi, bakiye güncellendi. · İptal edildi · İptal eden: {{kim}} · {{tarih}}
+- Başlık / Menü: Tahsilat silinsin mi? — {{no}}
+- İçerik / Açıklama: Tahsilatı sil · Kalan bakiye: {{once}} → {{sonra}} · Tahsilat toplamlardan ve kalan bakiyeden düşer; kayıt listede üstü çizili ve "Silindi" etiketiyle kalır. · Vazgeç · Tahsilatı sil · Tahsilat silindi, bakiye güncellendi. · Silindi · Silen: {{kim}} · {{tarih}}
 
 **İngilizce (EN) Yenilenmiş Metin**
-- Title / Menu: Void Payment — {{no}}
-- Content / Description: Void payment · Balance due: {{once}} → {{sonra}} · The record isn't deleted; it's marked as void, left out of totals and shown crossed out. · Cancel · Void · Payment voided and balance updated. · Void · Voided by {{kim}} · {{tarih}}
+- Title / Menu: Delete this payment? — {{no}}
+- Content / Description: Delete payment · Balance due: {{once}} → {{sonra}} · The payment is left out of totals and the balance due; the record stays in the list, crossed out and marked "Deleted". · Cancel · Delete payment · Payment deleted and balance updated. · Deleted · Deleted by {{kim}} · {{tarih}}
 
 <details><summary>Eski → yeni (tüm metinler)</summary>
 

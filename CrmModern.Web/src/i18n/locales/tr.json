@@ -781,15 +781,15 @@
       "title": "Tutar kalan bakiyeden fazla"
     },
     "cancelTx": {
-      "action": "Tahsilatı iptal et",
-      "title": "Tahsilatı İptal Et — {{no}}",
+      "action": "Tahsilatı sil",
+      "title": "Tahsilat silinsin mi? — {{no}}",
       "preview": "Kalan bakiye: {{once}} → {{sonra}}",
-      "hint": "Kayıt silinmez; iptal edildi olarak işaretlenir, toplamlardan düşer ve listede üstü çizili görünür.",
+      "hint": "Tahsilat toplamlardan ve kalan bakiyeden düşer; kayıt listede üstü çizili ve \"Silindi\" etiketiyle kalır.",
       "dismiss": "Vazgeç",
-      "confirm": "İptal Et",
-      "done": "Tahsilat iptal edildi, bakiye güncellendi.",
-      "badge": "İptal edildi",
-      "cancelledInfo": "İptal eden: {{kim}} · {{tarih}}"
+      "confirm": "Tahsilatı sil",
+      "done": "Tahsilat silindi, bakiye güncellendi.",
+      "badge": "Silindi",
+      "cancelledInfo": "Silen: {{kim}} · {{tarih}}"
     },
     "finalize": {
       "title": "Kapat — {{no}}",
@@ -1684,7 +1684,7 @@
     "qc": "Sipariş kontrolü",
     "approvalStep": "Onay",
     "payment": "{{n}}. tahsilat · {{amount}}",
-    "paymentCancelled": "{{n}}. tahsilat iptal edildi",
+    "paymentCancelled": "{{n}}. tahsilat silindi",
     "productionDone": "Üretim bitti",
     "inProduction": "Üretimde",
     "awaitingProduction": "Üretim bekleniyor",
@@ -1911,7 +1911,7 @@
     "itemHasExits": "Çıkışı olan mal doğrudan silinemez. Önce çıkışları geri almalısınız.",
     "quantityLessThanExited": "Yeni miktar, daha önce çıkan miktardan az olamaz.",
     "packagesLessThanExited": "Yeni kap adedi, daha önce çıkan kap adedinden az olamaz.",
-    "paymentAlreadyVoided": "Bu tahsilat zaten iptal edilmiş.",
+    "paymentAlreadyVoided": "Bu tahsilat zaten silinmiş.",
     "amountMustBePositive": "Tutar 0'dan büyük olmalı.",
     "costNegative": "Maliyet 0'dan küçük olamaz.",
     "downPaymentNegative": "Peşinat eksi olamaz.",

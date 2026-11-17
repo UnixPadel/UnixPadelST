@@ -59,7 +59,7 @@ Tüm ekran metinleri, kılavuz, sürüm notları ve hata mesajları bu sözlüğ
 | Panel / Ana Panel | Ana Sayfa | Home |
 | Arama ekranı | Sipariş Ara | Search Orders |
 | Diyaloğu kapatma | Vazgeç | Cancel |
-| Kaydı iptal etme (tahsilat) | İptal Et | Void |
+| Yanlış girilen tahsilatı kaldırma (2026-11-17: "iptal" yerine "sil") | Tahsilatı sil | Delete payment |
 | Yazı/buton boyutu tercihi | Görünüm: Rahat / Standart | View: Comfortable / Standard |
 | Electron zoomFactor | Yakınlaştırma | Zoom |
 | Tablo üstündeki seçili satır çubuğu | Seçili kayıt | Selected record |

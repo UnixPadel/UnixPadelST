@@ -341,7 +341,7 @@ function InstallmentTable({
   return (
     <div className="h-full overflow-auto rounded-md border bg-card">
       <table className="w-full text-sm">
-        <thead className="sticky top-0 z-10 bg-muted text-xs uppercase">
+        <thead className="sticky top-0 z-10 whitespace-nowrap bg-muted text-xs uppercase">
           <tr>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.siparisNo')}</th>
             <th className="px-2 py-2 text-left">{t('accountingHistory.cols.musteri')}</th>
@@ -372,20 +372,25 @@ function InstallmentTable({
               : ''
             return (
               <tr key={r.siparisNo} className="border-t hover:bg-muted/20">
-                <td className="px-2 py-1 font-mono text-xs">{r.siparisNo}</td>
-                <td className="px-2 py-1">{r.musteriAd ?? '—'}</td>
-                <td className="px-2 py-1">{r.kullanici ?? '—'}</td>
+                <td className="whitespace-nowrap px-2 py-1 font-mono text-xs">{r.siparisNo}</td>
+                <td className="max-w-48 px-2 py-1"><span className="line-clamp-2" title={r.musteriAd ?? undefined}>{r.musteriAd ?? '—'}</span></td>
+                <td className="whitespace-nowrap px-2 py-1">{r.kullanici ?? '—'}</td>
                 <td className="px-2 py-1">{r.paraTipi ?? '—'}</td>
                 {Array.from({ length: maxN }, (_, i) => {
                   const inst = visible[i]
                   if (!inst) return <td key={i} className="px-2 py-1 text-right text-muted-foreground">—</td>
                   return (
                     <td key={i} className="px-2 py-1 text-right tabular-nums">
-                      <div className="flex items-center justify-end gap-1">
+                      {/* Tutar / tarih / "Tahsilatı sil" alt alta, sağa yaslı — sütun en geniş öğe kadar kalır. */}
+                      <div className="whitespace-nowrap font-medium">
                         {formatCurrency(inst.miktar ?? 0, r.paraTipi ?? '')}
-                        {onCancel && <CancelTxButton onClick={() => onCancel(r, inst)} />}
                       </div>
-                      <div className="text-2xs text-muted-foreground">{formatDate(inst.tarih)}</div>
+                      <div className="whitespace-nowrap text-2xs text-muted-foreground">{formatDate(inst.tarih)}</div>
+                      {onCancel && (
+                        <div className="-me-1.5 flex justify-end">
+                          <CancelTxButton onClick={() => onCancel(r, inst)} />
+                        </div>
+                      )}
                     </td>
                   )
                 })}

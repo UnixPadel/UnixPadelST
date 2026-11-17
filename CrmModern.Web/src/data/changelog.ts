@@ -11,6 +11,24 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '1.1.1',
+    tarih:    '2026-11-17',
+    baslik: {
+      tr: '“Tahsilatı sil” ve sığan Tahsilat Geçmişi',
+      en: '“Delete payment” and a Payment History that fits',
+    },
+    maddeler: {
+      tr: [
+        'Tahsilat satırlarındaki “Tahsilatı iptal et” artık “Tahsilatı sil”: çöp kutusu simgeli küçük bir buton. Tahsilat Geçmişi, Muhasebe · Tahsilat ve Onaylar panelleri ile muhasebe satır detayında aynı. Silinen tahsilat toplamlardan ve kalan bakiyeden düşer; listede üstü çizili ve “Silindi” etiketiyle kalır.',
+        'Tahsilat Geçmişi tablosu yana kaymadan sığıyor: peşinat tutarı, tarihi ve “Tahsilatı sil” alt alta ve sağa yaslı. Sipariş no ve satış temsilcisi alt satıra kırılmıyor; uzun müşteri adları iki satırda kısalır, tamamı fareyle üzerine gelince görünür.',
+      ],
+      en: [
+        '“Cancel payment” on payment rows is now “Delete payment”: a small button with a bin icon, the same on Payment History, the Accounting · Payments and Approvals panels and the accounting row detail. A deleted payment comes off the totals and the remaining balance; it stays in the list struck through and labelled “Deleted”.',
+        'Payment History fits without sideways scrolling: the down payment amount, its date and “Delete payment” stack right-aligned. Order no and sales rep no longer wrap; long customer names are cut to two lines and the full name shows on hover.',
+      ],
+    },
+  },
+  {
     versiyon: '1.1.0',
     tarih:    '2026-11-17',
     baslik: {

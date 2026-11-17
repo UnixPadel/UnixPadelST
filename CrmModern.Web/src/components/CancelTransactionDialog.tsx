@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { X } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import { cancelTransaction } from '@/api/accounting'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -26,13 +26,14 @@ export interface CancelTxTarget {
   kalanBakiye?: number | null
 }
 
+/** "Tahsilatı sil" — her yerde aynı, kompakt (tablo hücresine ve panel listesine sığar). */
 export function CancelTxButton({ onClick }: { onClick: () => void }) {
   const { t } = useTranslation()
   return (
     <Button size="xs" variant="ghost"
-      className="text-danger hover:bg-danger-soft hover:text-danger"
+      className="h-[calc(var(--ctl-xs)-0.5rem)] gap-1 px-1.5 text-xs font-medium text-danger hover:bg-danger-soft hover:text-danger"
       onClick={(e) => { e.stopPropagation(); onClick() }}>
-      <X className="h-4 w-4" strokeWidth={2.5} aria-hidden /> {t('accApproval.cancelTx.action')}
+      <Trash2 className="h-3.5 w-3.5" aria-hidden /> {t('accApproval.cancelTx.action')}
     </Button>
   )
 }

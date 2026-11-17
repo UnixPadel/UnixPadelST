@@ -100,7 +100,7 @@ export const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(functi
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed',
           fieldStateClasses,
           'aria-[invalid=true]:border-destructive',
-          inputSize === 'sm' ? 'h-8 text-xs' : 'h-10',
+          inputSize === 'sm' ? 'h-ctl-sm text-sm' : 'h-ctl-md',
         )}
         onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
         onFocus={(e) => e.currentTarget.select()}
@@ -183,7 +183,7 @@ export const Combobox = React.forwardRef<HTMLInputElement, ComboboxProps>(functi
             </li>
           ))}
           {options.length > filtered.length && !query && (
-            <li className="px-2 py-1 text-[11px] text-muted-foreground">{t('combobox.typeToFilter')}</li>
+            <li className="px-2 py-1 text-2xs text-muted-foreground">{t('combobox.typeToFilter')}</li>
           )}
         </ul>
       </Popover>

@@ -16,6 +16,23 @@ export default {
       screens: { '2xl': '1400px' },
     },
     extend: {
+      // 40+ ergonomi — yazı ölçeği CSS değişkenlerinden (index.css "ölçek tokenları").
+      // text-[10px]/[11px] gibi sabit pikseller yerine text-2xs kullanılır.
+      fontSize: {
+        '2xs': ['var(--fs-2xs)', { lineHeight: 'var(--lh-2xs)' }],
+        xs: ['var(--fs-xs)', { lineHeight: 'var(--lh-xs)' }],
+        sm: ['var(--fs-sm)', { lineHeight: 'var(--lh-sm)' }],
+        base: ['var(--fs-base)', { lineHeight: 'var(--lh-base)' }],
+        lg: ['var(--fs-lg)', { lineHeight: 'var(--lh-lg)' }],
+      },
+      // Kontrol yükseklikleri: h-ctl-md, min-h-ctl-xs … (Standart/Rahat'a göre değişir).
+      spacing: {
+        'ctl-xs': 'var(--ctl-xs)',
+        'ctl-sm': 'var(--ctl-sm)',
+        'ctl-md': 'var(--ctl-md)',
+        'ctl-lg': 'var(--ctl-lg)',
+        check: 'var(--check)',
+      },
       colors: {
         border: {
           DEFAULT: 'hsl(var(--border))',

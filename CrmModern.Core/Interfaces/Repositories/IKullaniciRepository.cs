@@ -21,6 +21,7 @@ public interface IKullaniciRepository : IBaseRepository<Kullanici>
     /// bilinmeyen durum 'aktif' sayılır (yalnız açıkça 'Pasif' gizlenir).
     /// Tarihsel ad çözümlemesi (sipariş sahibi vb.) GetAllAsync ile yapılır — onlar
     /// pasif kullanıcıyı KORUR ki eski kayıtlar adı göstermeye devam etsin.
+    /// 40+ ergonomi K5 — yumuşak silinen (Silindi) kullanıcılar da hariçtir.
     /// </summary>
     Task<IReadOnlyList<Kullanici>> GetActiveAsync();
 

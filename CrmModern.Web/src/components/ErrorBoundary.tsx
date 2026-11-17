@@ -34,7 +34,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
     return (
       <div className="flex items-center justify-center min-h-screen p-6 bg-background">
         <div className="max-w-lg w-full text-center space-y-3">
-          <div className="flex justify-center text-destructive">
+          <div className="flex justify-center text-danger">
             <AlertOctagon className="h-12 w-12" />
           </div>
           <h1 className="text-2xl font-semibold">{t('errorPage.title')}</h1>

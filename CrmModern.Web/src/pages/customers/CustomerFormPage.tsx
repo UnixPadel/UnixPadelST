@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { useToast } from '@/components/ToastProvider'
 import { useEnterNavigation } from '@/hooks/useEnterNavigation'
 import { usePreferences } from '@/lib/preferences'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { FieldError } from '@/components/FieldError'
 import { describeApiError } from '@/lib/axios'
 
@@ -57,6 +58,12 @@ export function CustomerFormPage() {
 
   const [form, setForm] = useState<CustomerWriteDto>(blank)
   const [submitted, setSubmitted] = useState(false)
+  // 3.2 — kaydetmeden çıkarken sorulur (önceden yazılanlar sessizce kayboluyordu).
+  const baselineRef = useRef<string>(JSON.stringify(blank))
+  const [leaving, setLeaving] = useState(false)
+  const dirty = JSON.stringify(form) !== baselineRef.current
+  useUnsavedChangesGuard(dirty && !leaving)
+  useEffect(() => { if (leaving) nav('/customers') }, [leaving, nav])
   const [ulkeOpen, setUlkeOpen] = useState(false)
   const [ulkeForm, setUlkeForm] = useState({ ulkeAdi: '', numaraBirimi: '' })
   const [ulkeSubmitted, setUlkeSubmitted] = useState(false)
@@ -72,7 +79,7 @@ export function CustomerFormPage() {
   })
   useEffect(() => {
     if (existing) {
-      setForm({
+      const loaded: CustomerWriteDto = {
         musteriAd:   existing.musteriAd,
         telefon:     existing.telefon,
         zipKod:      existing.zipKod,
@@ -80,7 +87,9 @@ export function CustomerFormPage() {
         adres:       existing.adres,
         vatNumarasi: existing.vatNumarasi,
         ulkelerID:   existing.ulkelerID,
-      })
+      }
+      baselineRef.current = JSON.stringify(loaded)
+      setForm(loaded)
     }
   }, [existing])
 
@@ -108,8 +117,9 @@ export function CustomerFormPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['customers'] })
       if (isEdit) qc.invalidateQueries({ queryKey: ['customer', editId] })
-      toast({ title: isEdit ? t('customers.toast.updated') : t('customers.toast.created') })
-      nav('/customers')
+      // Liste ekranına dönülür → sonuç bu ekrandan çıkar (K6: açılır mesaj).
+      toast({ title: isEdit ? t('customers.toast.updated') : t('customers.toast.created'), variant: 'success', popup: true })
+      setLeaving(true)
     },
     onError: (e: unknown) => toast({
       title: t('customers.toast.saveFailed'),

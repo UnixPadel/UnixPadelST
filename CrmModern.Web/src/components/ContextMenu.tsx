@@ -78,7 +78,7 @@ export function ContextMenu<T>({
       role="menu"
       tabIndex={-1}
       style={{ position: 'fixed', top: y, left: x }}
-      className="z-[80] min-w-[12rem] rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none animate-in fade-in-0 zoom-in-95"
+      className="z-[80] min-w-[12rem] rounded-md border bg-popover p-1 text-sm text-popover-foreground shadow-lg outline-none animate-in fade-in-0 duration-150"
       onKeyDown={(e) => {
         if (e.key === 'ArrowDown') { e.preventDefault(); move(1) }
         else if (e.key === 'ArrowUp') { e.preventDefault(); move(-1) }
@@ -99,12 +99,12 @@ export function ContextMenu<T>({
             className={cn(
               'flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left outline-none disabled:pointer-events-none disabled:opacity-40',
               i === idx && 'bg-accent text-accent-foreground',
-              a.destructive && 'text-destructive',
+              a.destructive && 'text-danger',
             )}
           >
             <span className="flex h-4 w-4 items-center justify-center">{a.icon}</span>
             <span className="flex-1">{a.label}</span>
-            {a.shortcut && <kbd className="text-[10px] text-muted-foreground">{a.shortcut}</kbd>}
+            {a.shortcut && <kbd className="text-2xs text-muted-foreground">{a.shortcut}</kbd>}
           </button>
         </React.Fragment>
       ))}

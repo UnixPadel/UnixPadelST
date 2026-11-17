@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getCustomers, deleteCustomer } from '@/api/customers'
+import { getCustomers, getCustomersIncludingDeleted, deleteCustomer, restoreCustomer } from '@/api/customers'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdmin } from '@/lib/permissions'
 import { PageHeader } from '@/components/PageHeader'
@@ -13,6 +14,7 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useToast } from '@/components/ToastProvider'
 import { toastApiError } from '@/lib/apiError'
+import { Checkbox } from '@/components/ui/checkbox'
 import type { Musteri } from '@/types'
 
 /**
@@ -48,17 +50,20 @@ export function CustomersPage() {
   const [q, setQ] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Musteri | null>(null)
 
+  const [showDeleted, setShowDeleted] = useState(false)
   const { data: customers = [], isLoading } = useQuery({
-    queryKey: ['customers'],
-    queryFn: getCustomers,
+    queryKey: ['customers', showDeleted ? 'withDeleted' : 'active'],
+    queryFn: showDeleted ? getCustomersIncludingDeleted : getCustomers,
   })
 
+  const undoable = useUndoableDelete()
   const deleteMut = useMutation({
     mutationFn: (id: number) => deleteCustomer(id),
-    onSuccess: () => {
+    onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ['customers'] })
+      const name = deleteTarget?.musteriAd ?? `#${id}`
       setDeleteTarget(null)
-      toast({ title: t('customers.toast.deleted') })
+      undoable({ title: t('customers.toast.deleted'), name, restore: () => restoreCustomer(id), onRestored: () => qc.invalidateQueries({ queryKey: ['customers'] }) })
     },
     // Siparişi olan müşteride backend BusinessException döner — net mesaj göster.
     onError: (e) => toastApiError(toast, t('customers.toast.deleteFailed'), e),
@@ -86,15 +91,37 @@ export function CustomersPage() {
     { key: 'adres',       header: t('customers.fields.adres') },
     { key: 'ulkeAdi',     header: t('customers.fields.ulke'),  sortable: true },
     { key: 'bolge',       header: t('customers.fields.bolge'), render: (r) => (r.bolge as string) ?? '—' },
-    // Round-8 §10 — Sil aksiyonu yalnız elshan.rasulov'a render edilir.
-    ...(canDelete ? [{
+    // 4.5 — görünür "Düzenle" (önceden yalnız satıra tıklamak düzenlemeyi açıyordu).
+    // Round-8 §10 — Sil aksiyonu yalnız elshan.rasulov'a render edilir; ayraçla ayrı.
+    ...(canEdit || canDelete ? [{
       key: 'actions', pin: 'right',
       header: t('common.actions'),
-      render: (r: Musteri & Record<string, unknown>) => (
-        <Button size="xs" variant="destructive"
-          onClick={() => setDeleteTarget(r as Musteri)}>
-          {t('common.delete')}
-        </Button>
+      render: (r: Musteri & Record<string, unknown>) => r.silindi ? (
+        <div className="flex items-center gap-1.5">
+          <span className="rounded bg-danger-soft px-1.5 text-xs font-medium text-danger-soft-foreground">{t('undo.deletedBadge')}</span>
+          {canDelete && (
+            <Button size="xs" variant="outline" onClick={async () => {
+              try { await restoreCustomer(r.musteriID as number); await qc.invalidateQueries({ queryKey: ['customers'] }); toast({ title: t('undo.restored'), description: r.musteriAd as string, variant: 'success' }) }
+              catch (e) { toastApiError(toast, t('undo.failed'), e) }
+            }}>{t('undo.restore')}</Button>
+          )}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5">
+          {canEdit && (
+            <Button size="xs" variant="outline" onClick={() => nav(`/customers/${(r as Musteri).musteriID}/edit`)}>
+              {t('common.edit')}
+            </Button>
+          )}
+          {canDelete && (
+            <>
+              <span className="mx-1 w-px self-stretch bg-border" aria-hidden />
+              <Button size="xs" variant="outline" className="text-danger" onClick={() => setDeleteTarget(r as Musteri)}>
+                {t('common.delete')}
+              </Button>
+            </>
+          )}
+        </div>
       ),
     } as Column<Musteri & Record<string, unknown>>] : []),
   ]
@@ -108,12 +135,16 @@ export function CustomersPage() {
         actions={canAdd ? <Button onClick={() => nav('/customers/new')}>{t('common.add')}</Button> : undefined}
       />
       <div className="space-y-2 px-4 pt-2">
-        <div className="max-w-md">
-          <Input
-            placeholder={t('customers.searchPlaceholder')}
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="w-full max-w-md">
+            <Input
+              placeholder={t('customers.searchPlaceholder')}
+              aria-label={t('customers.searchPlaceholder')}
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+            />
+          </div>
+          {canDelete && <Checkbox checked={showDeleted} onCheckedChange={setShowDeleted} label={t('undo.showDeleted')} />}
         </div>
       </div>
       <FillRegion className="pt-2">
@@ -123,7 +154,6 @@ export function CustomersPage() {
           data={filtered as (Musteri & Record<string, unknown>)[]}
           keyField="musteriID"
           loading={isLoading}
-          density="compact"
           onRowClick={canEdit ? (r) => nav(`/customers/${(r as Musteri).musteriID}/edit`) : undefined}
         />
       </FillRegion>

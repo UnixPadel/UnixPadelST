@@ -200,7 +200,7 @@ export function AccountingHistoryPage() {
               value={filter.mUlke ?? SENTINEL_ALL}
               onValueChange={(v) => update('mUlke', v === SENTINEL_ALL ? undefined : v)}
             >
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
                 {ulkeler.map((u) => (
@@ -214,7 +214,7 @@ export function AccountingHistoryPage() {
               value={filter.kullaniciID ? String(filter.kullaniciID) : SENTINEL_ALL}
               onValueChange={(v) => update('kullaniciID', v === SENTINEL_ALL ? undefined : Number(v))}
             >
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={SENTINEL_ALL}>{t('accounting.filter.all')}</SelectItem>
                 {temsilciUsers.map((u) => (
@@ -245,7 +245,7 @@ export function AccountingHistoryPage() {
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>
             {t('accounting.filter.rowCount')}: <span className="font-semibold text-foreground">{page?.totalCount ?? 0}</span>
-            {isFetching && !isLoading && <span className="ml-2 animate-pulse">{t('table.refreshing')}</span>}
+            {isFetching && !isLoading && <span className="ml-2 text-muted-foreground">{t('table.refreshing')}</span>}
           </span>
           {!hideMoney && (
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -368,7 +368,7 @@ function InstallmentTable({
             const farkClass = fark == null
               ? 'text-muted-foreground'
               : fark > 0 ? 'text-success font-semibold'
-              : fark < 0 ? 'text-destructive font-semibold'
+              : fark < 0 ? 'text-danger font-semibold'
               : ''
             return (
               <tr key={r.siparisNo} className="border-t hover:bg-muted/20">
@@ -385,7 +385,7 @@ function InstallmentTable({
                         {formatCurrency(inst.miktar ?? 0, r.paraTipi ?? '')}
                         {onCancel && <CancelTxButton onClick={() => onCancel(r, inst)} />}
                       </div>
-                      <div className="text-[10px] text-muted-foreground">{formatDate(inst.tarih)}</div>
+                      <div className="text-2xs text-muted-foreground">{formatDate(inst.tarih)}</div>
                     </td>
                   )
                 })}

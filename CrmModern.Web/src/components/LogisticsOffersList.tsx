@@ -99,7 +99,7 @@ export function LogisticsOffersList({ siparisNo, canApprove }: Props) {
               )}
             </div>
             {rejected && o.redNotu && (
-              <p className="mt-1 text-xs text-destructive">
+              <p className="mt-1 text-xs text-danger">
                 <span className="font-semibold">{t('logisticsOffer.rejectedReason')}:</span> {o.redNotu}
               </p>
             )}

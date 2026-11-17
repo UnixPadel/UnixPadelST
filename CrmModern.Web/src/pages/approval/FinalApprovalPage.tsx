@@ -52,7 +52,7 @@ export function FinalApprovalPage() {
 
   const approveMut = useAppMutation({
     mutationFn: (id: number) => finalApprovePurchase(id),
-    successTitle: t('purchase.final.approved'),
+    successTitle: t('purchase.final.approved'), notify: 'toast',
     successDescription: (_d, id) => '#' + id,
     errorTitle: t('purchase.final.approveFailed'),
     onSuccess: () => setDetailId(null),
@@ -60,7 +60,7 @@ export function FinalApprovalPage() {
 
   const rejectMut = useAppMutation({
     mutationFn: ({ id, not }: { id: number; not: string }) => finalRejectPurchase(id, not),
-    successTitle: t('purchase.final.rejected'),
+    successTitle: t('purchase.final.rejected'), notify: 'toast',
     errorTitle: t('common.error'),
     onSuccess: () => setDetailId(null),
   })

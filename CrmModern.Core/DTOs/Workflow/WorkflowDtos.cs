@@ -12,10 +12,16 @@ public sealed record WaitingOrderDto(
     DateTime? WaitingSince,
     string?   Temsilci);
 
-/// <summary>Siparişin şu an beklediği adım; StepCode null = terminal (Tamamlandı/İptal) veya silinmiş.</summary>
+/// <summary>
+/// Siparişin şu an beklediği adım; StepCode null = terminal (Tamamlandı/İptal) veya silinmiş.
+/// NextStepCode/NextDepartment: mevcut adım olağan yoldan tamamlanınca beklenecek adım
+/// (onay pencerelerindeki "Sonraki adım"); null = sonrası Tamamlandı.
+/// </summary>
 public sealed record OrderWorkflowStatusDto(
     string    SiparisNo,
     string    Asama,
     string?   StepCode,
     string?   Department,
-    DateTime? WaitingSince);
+    DateTime? WaitingSince,
+    string?   NextStepCode = null,
+    string?   NextDepartment = null);

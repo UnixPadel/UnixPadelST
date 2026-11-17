@@ -20,7 +20,9 @@ import {
   addStockExit,
   undoStockExit,
   deleteStockItem,
+  restoreStockItem,
 } from '@/api/warehouseStock'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 import { useAuth } from '@/hooks/useAuth'
 import { isSuperAdmin } from '@/lib/permissions'
 import { PageHeader } from '@/components/PageHeader'
@@ -50,6 +52,7 @@ type Row = StockItemListDto & Record<string, unknown>
 
 export function WarehouseStockPage() {
   const qc = useQueryClient()
+  const undoable = useUndoableDelete()
   const { toast } = useToast()
   const { confirm } = useConfirm()
   const { t } = useTranslation()
@@ -62,6 +65,7 @@ export function WarehouseStockPage() {
   // Filters
   const [konum, setKonum] = useState<string>('Tumu')
   const [tamamlananlar, setTamamlananlar] = useState<boolean>(false)
+  const [showDeleted, setShowDeleted] = useState(false)
   const [search, setSearch] = useState<string>('')
   const debouncedSearch = useDebouncedValue(search, 300)
 
@@ -81,12 +85,13 @@ export function WarehouseStockPage() {
   const [addMenuOpen, setAddMenuOpen] = useState(false)
 
   const { data, isLoading, isError } = useQuery({
-    queryKey: ['warehouse-stock', konum, tamamlananlar, debouncedSearch],
+    queryKey: ['warehouse-stock', konum, tamamlananlar, debouncedSearch, showDeleted],
     queryFn: () =>
       getStockItems({
         konum: konum !== 'Tumu' ? konum : undefined,
         tamamlananlar,
         q: debouncedSearch || undefined,
+        includeDeleted: showDeleted,
       }),
     placeholderData: keepPreviousData,
   })
@@ -165,23 +170,24 @@ export function WarehouseStockPage() {
 
   const handleDeleteItem = async (row: Row) => {
     const ok = await confirm({
-      title: 'Stok Kalemini Sil',
-      description: `"${row.malAdi}" kalemini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`,
-      confirmLabel: 'Evet, Sil',
+      title: t('stockUndo.deleteTitle', { name: row.malAdi as string }),
+      description: row.beyannameNo ? `${t('addStock.beyannameNo')}: ${row.beyannameNo as string}` : undefined,
+      impact: [t('stockUndo.deleteImpact'), t('common.undoHint')],
+      confirmLabel: t('common.delete'),
       destructive: true,
     })
     if (!ok) return
 
     try {
-      await deleteStockItem(row.id as number)
+      const id = row.id as number
+      await deleteStockItem(id)
       void qc.invalidateQueries({ queryKey: ['warehouse-stock'] })
-      toast({
-        title: 'Stok kalemi silindi',
-        variant: 'success',
-      })
+      // K5 — silme yumuşak; 10 sn "Geri al".
+      undoable({ title: t('stockUndo.deleted'), name: row.malAdi as string, restore: () => restoreStockItem(id),
+        onRestored: () => qc.invalidateQueries({ queryKey: ['warehouse-stock'] }) })
     } catch (err) {
       toast({
-        title: 'Silme işlemi başarısız',
+        title: t('stockUndo.deleteFailed'),
         description: describeApiError(err),
         variant: 'destructive',
       })
@@ -215,7 +221,7 @@ export function WarehouseStockPage() {
       className: 'w-40',
       render: (r) => (
         <span className="font-mono text-xs text-foreground font-medium">
-          {(r.beyannameNo as string) || <span className="text-muted-foreground/60">—</span>}
+          {(r.beyannameNo as string) || <span className="text-muted-foreground">—</span>}
         </span>
       ),
     },
@@ -290,7 +296,7 @@ export function WarehouseStockPage() {
       sortable: true,
       className: 'w-28',
       render: (r) => {
-        if (r.kapAdedi == null) return <span className="text-muted-foreground/60">—</span>
+        if (r.kapAdedi == null) return <span className="text-muted-foreground">—</span>
         return (
           <span className="text-xs tabular-nums text-foreground">
             {r.kalanKap ?? 0} / {r.kapAdedi as number} {((r.kapCinsi as string) || 'kap').toLowerCase()}
@@ -364,12 +370,21 @@ export function WarehouseStockPage() {
                 onSelect: (row) => handleOpenExit(row as StockItemListDto),
               },
               {
+                key: 'restore',
+                label: t('undo.restore'),
+                hidden: !canMutate || !r.silindi,
+                onSelect: async (row) => {
+                  try { await restoreStockItem(row.id as number); await qc.invalidateQueries({ queryKey: ['warehouse-stock'] }); toast({ title: t('undo.restored'), description: row.malAdi as string, variant: 'success' }) }
+                  catch (e) { toast({ title: t('undo.failed'), description: describeApiError(e), variant: 'destructive' }) }
+                },
+              },
+              {
                 key: 'delete',
-                label: 'Kalemi Sil',
+                label: t('stockUndo.deleteAction'),
                 destructive: true,
                 separatorBefore: true,
                 icon: <Trash2 className="h-3.5 w-3.5" />,
-                hidden: !canMutate,
+                hidden: !canMutate || !!r.silindi,
                 onSelect: (row) => handleDeleteItem(row),
               },
             ]}
@@ -403,7 +418,7 @@ export function WarehouseStockPage() {
                     className="fixed inset-0 z-40"
                     onClick={() => setAddMenuOpen(false)}
                   />
-                  <div className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-lg border bg-popover p-1 shadow-lg animate-in fade-in-50 zoom-in-95">
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-56 rounded-lg border bg-popover p-1 shadow-lg animate-in fade-in-0 duration-150">
                     <button
                       type="button"
                       onClick={() => {
@@ -416,7 +431,7 @@ export function WarehouseStockPage() {
                       <UploadCloud className="h-4 w-4 text-primary" />
                       <div>
                         <p className="font-semibold">Beyanname Yükle</p>
-                        <p className="text-[11px] text-muted-foreground">Yapay zekâ ile otomatik oku</p>
+                        <p className="text-2xs text-muted-foreground">Yapay zekâ ile otomatik oku</p>
                       </div>
                     </button>
 
@@ -432,7 +447,7 @@ export function WarehouseStockPage() {
                       <FileEdit className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="font-semibold">Elle Bilgi Gir</p>
-                        <p className="text-[11px] text-muted-foreground">Form üzerinden doğrudan ekle</p>
+                        <p className="text-2xs text-muted-foreground">Form üzerinden doğrudan ekle</p>
                       </div>
                     </button>
                   </div>
@@ -491,7 +506,7 @@ export function WarehouseStockPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Mal veya beyanname no ara..."
-              className="pl-8 text-xs h-8"
+              className="pl-8 text-xs"
             />
           </div>
 
@@ -502,6 +517,10 @@ export function WarehouseStockPage() {
             label="Tamamı çıkanları göster"
             labelClassName="text-xs font-medium text-muted-foreground whitespace-nowrap"
           />
+          {canMutate && (
+            <Checkbox checked={showDeleted} onCheckedChange={setShowDeleted} label={t('undo.showDeleted')}
+              labelClassName="text-xs font-medium text-muted-foreground whitespace-nowrap" />
+          )}
         </div>
       </div>
 
@@ -515,7 +534,6 @@ export function WarehouseStockPage() {
           keyField="id"
           loading={isLoading}
           error={isError}
-          density="compact"
           emptyMessage="Antrepoda veya depoda bekleyen stok bulunamadı."
           onRowClick={(r) => handleOpenDetail(r.id as number)}
         />

@@ -52,7 +52,7 @@ export function WorkInboxPage() {
                 <li key={i} className="px-2 py-2"><div className="h-4 animate-pulse rounded bg-muted" /></li>
               ))}
               {!q.loading && q.error && (
-                <li className="px-2 py-4 text-center text-xs text-destructive">{t('inbox.loadError')}</li>
+                <li className="px-2 py-4 text-center text-xs text-danger">{t('inbox.loadError')}</li>
               )}
               {!q.loading && !q.error && q.items.length === 0 && (
                 <li className="px-2 py-4 text-center text-xs text-muted-foreground">{t('inbox.empty')}</li>
@@ -68,9 +68,9 @@ export function WorkInboxPage() {
                   </div>
                   <AgeChip since={it.since} />
                   {it.orderNo && (
-                    <Button size="icon-sm" variant="ghost" aria-label={t('common.details')}
+                    <Button size="xs" variant="ghost" aria-label={t('common.details')}
                       onClick={() => setParams((p) => { const np = new URLSearchParams(p); np.set('order', it.orderNo!); return np })}>
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-4 w-4" aria-hidden /> {t('common.details')}
                     </Button>
                   )}
                   <Button size="xs" asChild>

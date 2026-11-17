@@ -50,6 +50,17 @@ internal sealed class MusteriConfiguration : IEntityTypeConfiguration<Musteri>
         builder.Property(m => m.CreatedByKullaniciID)
                .HasColumnName("CreatedByKullaniciID");
 
+        // 40+ ergonomi K5 — yumuşak silme. Global filtre YOK (id ile detay/bakiye
+        // okunabilsin); liste/arama sorguları açıkça süzer.
+        builder.Property(m => m.Silindi)
+               .HasColumnName("Silindi");
+
+        builder.Property(m => m.SilinmeTarihi)
+               .HasColumnName("SilinmeTarihi");
+
+        builder.Property(m => m.SilenKullaniciID)
+               .HasColumnName("SilenKullaniciID");
+
         builder.HasOne(m => m.Ulke)
                .WithMany(u => u.Musteriler)
                .HasForeignKey(m => m.UlkelerID)

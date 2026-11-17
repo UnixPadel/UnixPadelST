@@ -40,10 +40,11 @@ public sealed class WarehouseStockController(IWarehouseStockService stockService
     public async Task<IActionResult> GetItems(
         [FromQuery] string? konum = null,
         [FromQuery] bool tamamlananlar = false,
-        [FromQuery] string? q = null)
+        [FromQuery] string? q = null,
+        [FromQuery] bool includeDeleted = false)   // 40+ ergonomi K5 — "Silinenleri göster"
     {
         if (!CanRead()) return Forbid();
-        var result = await stockService.GetItemsAsync(konum, tamamlananlar, q);
+        var result = await stockService.GetItemsAsync(konum, tamamlananlar, q, includeDeleted);
         return Ok(ApiResponse<StockListDto>.Ok(result));
     }
 
@@ -133,6 +134,16 @@ public sealed class WarehouseStockController(IWarehouseStockService stockService
     {
         await stockService.DeleteItemAsync(id, CurrentUserId);
         return Ok(ApiResponse<object>.Ok(null!, "Stok kalemi silindi."));
+    }
+
+    /// <summary>40+ ergonomi K5 — "Geri al / Geri yükle": yumuşak silinen kalemi geri getirir.</summary>
+    [HttpPost("items/{id:int}/restore")]
+    [Authorize(Roles = "Yonetici,Lojistik")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RestoreItem(int id)
+    {
+        await stockService.RestoreItemAsync(id, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Stok kalemi geri yüklendi."));
     }
 
     [HttpPost("items/{id:int}/exits")]

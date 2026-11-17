@@ -57,5 +57,16 @@ internal sealed class KullaniciConfiguration : IEntityTypeConfiguration<Kullanic
 
         builder.Property(k => k.SatinAlmaYetkisi)
                .HasColumnName("SatinAlmaYetkisi");
+
+        // 40+ ergonomi K5 — yumuşak silme. Global filtre YOK: tarihsel ad
+        // çözümlemesi silinen kullanıcıyı da görmeli; seçim listeleri açıkça süzer.
+        builder.Property(k => k.Silindi)
+               .HasColumnName("Silindi");
+
+        builder.Property(k => k.SilinmeTarihi)
+               .HasColumnName("SilinmeTarihi");
+
+        builder.Property(k => k.SilenKullaniciID)
+               .HasColumnName("SilenKullaniciID");
     }
 }

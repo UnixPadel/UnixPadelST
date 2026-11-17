@@ -25,7 +25,22 @@ export interface ConfirmOptions {
   confirmLabel?: string
   cancelLabel?: string
   destructive?: boolean
+  /**
+   * 40+ ergonomi (3.3) — "Ne olacak?" etki önizlemesi: kullanıcı butona basmadan
+   * işlemin sonuçlarını madde madde görür (ör. "Sipariş Muhasebe'ye geçer").
+   */
+  impact?: React.ReactNode[]
+  /** Dikkat edilecekler (ör. "peşinat girilmedi"); etki listesinin üstünde sarı kutuda, aynı pencerede. */
+  warnings?: React.ReactNode[]
+  /** "Sonraki adım: Muhasebe · Cari onayı" — iş akışı zincirinden (OrderWorkflow.cs). */
+  nextStep?: React.ReactNode
+  /** İkinci onay butonu (ör. "Onayla ve sonrakine geç"); yalnız confirmChoice ile anlamlıdır. */
+  altLabel?: string
+  /** Enter hangi butonu tetikler; varsayılan 'ok'. */
+  primary?: 'ok' | 'alt'
 }
+
+export type ConfirmChoice = 'ok' | 'alt' | null
 
 export interface ReasonOptions extends ConfirmOptions {
   label?: string
@@ -35,12 +50,15 @@ export interface ReasonOptions extends ConfirmOptions {
   defaultValue?: string
 }
 
+type CloseResult = 'ok' | 'alt' | 'cancel'
 type Pending =
-  | { kind: 'confirm'; opts: ConfirmOptions; resolve: (v: boolean) => void }
+  | { kind: 'confirm'; opts: ConfirmOptions; resolve: (v: CloseResult) => void }
   | { kind: 'reason'; opts: ReasonOptions; resolve: (v: string | null) => void }
 
 interface ConfirmContextValue {
   confirm: (opts: ConfirmOptions) => Promise<boolean>
+  /** İki onay butonlu pencere: 'ok' | 'alt' | null (vazgeçildi). */
+  confirmChoice: (opts: ConfirmOptions) => Promise<ConfirmChoice>
   askReason: (opts: ReasonOptions) => Promise<string | null>
 }
 
@@ -59,7 +77,9 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [touched, setTouched] = React.useState(false)
 
   const confirm = React.useCallback((opts: ConfirmOptions) =>
-    new Promise<boolean>((resolve) => setPending({ kind: 'confirm', opts, resolve })), [])
+    new Promise<boolean>((resolve) => setPending({ kind: 'confirm', opts, resolve: (v) => resolve(v !== 'cancel') })), [])
+  const confirmChoice = React.useCallback((opts: ConfirmOptions) =>
+    new Promise<ConfirmChoice>((resolve) => setPending({ kind: 'confirm', opts, resolve: (v) => resolve(v === 'cancel' ? null : v) })), [])
   const askReason = React.useCallback((opts: ReasonOptions) =>
     new Promise<string | null>((resolve) => {
       setReason(opts.defaultValue ?? '')
@@ -67,10 +87,10 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
       setPending({ kind: 'reason', opts, resolve })
     }), [])
 
-  const close = (result: 'ok' | 'cancel') => {
+  const close = (result: CloseResult) => {
     if (!pending) return
-    if (pending.kind === 'confirm') pending.resolve(result === 'ok')
-    else pending.resolve(result === 'ok' ? reason.trim() : null)
+    if (pending.kind === 'confirm') pending.resolve(result)
+    else pending.resolve(result === 'cancel' ? null : reason.trim())
     setPending(null)
   }
 
@@ -80,21 +100,43 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (pending?.kind === 'reason' && reasonInvalid) { setTouched(true); return }
-    close('ok')
+    close(pending?.kind === 'confirm' && pending.opts.altLabel && pending.opts.primary === 'alt' ? 'alt' : 'ok')
   }
 
   const opts = pending?.opts
   return (
-    <ConfirmContext.Provider value={{ confirm, askReason }}>
+    <ConfirmContext.Provider value={{ confirm, confirmChoice, askReason }}>
       {children}
       <Dialog open={!!pending} onOpenChange={(o) => { if (!o) close('cancel') }}>
-        <DialogContent size="sm">
+        <DialogContent size={opts?.impact?.length || opts?.nextStep || opts?.altLabel || opts?.warnings?.length ? 'md' : 'sm'}>
           {opts && (
             <form onSubmit={onSubmit} className="space-y-4">
               <DialogHeader>
                 <DialogTitle>{opts.title}</DialogTitle>
-                {opts.description && <DialogDescription asChild><div>{opts.description}</div></DialogDescription>}
+                {opts.description && <DialogDescription asChild><div className="text-sm text-foreground">{opts.description}</div></DialogDescription>}
               </DialogHeader>
+              {!!opts.warnings?.length && (
+                <div role="alert" className="space-y-1 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-soft-foreground">
+                  {opts.warnings.map((w, i) => <p key={i}>{w}</p>)}
+                </div>
+              )}
+              {(!!opts.impact?.length || opts.nextStep) && (
+                <div className="rounded-md border bg-muted p-3 text-sm">
+                  {!!opts.impact?.length && (
+                    <>
+                      <p className="font-semibold">{t('confirm.impactTitle')}</p>
+                      <ul className="mt-1 list-disc space-y-0.5 pl-5">
+                        {opts.impact.map((line, i) => <li key={i}>{line}</li>)}
+                      </ul>
+                    </>
+                  )}
+                  {opts.nextStep && (
+                    <p className={opts.impact?.length ? 'mt-2' : undefined}>
+                      <span className="font-semibold">{t('confirm.nextStep')}:</span> {opts.nextStep}
+                    </p>
+                  )}
+                </div>
+              )}
               {pending?.kind === 'reason' && (
                 <div className="space-y-1">
                   {pending.opts.label && <Label htmlFor="confirm-reason">{pending.opts.label}{reasonRequired && ' *'}</Label>}
@@ -114,20 +156,34 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
                   {touched && reasonInvalid && <FieldError message={t('validation.required')} />}
                 </div>
               )}
-              <DialogFooter className="gap-2">
+              {/* 2.5 — "Vazgeç" solda, onay sağda: zıt butonlar fiziksel olarak ayrı. */}
+              <DialogFooter className="gap-2 sm:justify-between">
                 {/* Yıkıcı onaylarda varsayılan odak "Vazgeç"te: Enter yanlışlıkla
                     silme/veri kaybı yaptırmasın. Diğerlerinde Enter onaylar. */}
                 <Button type="button" variant="outline" onClick={() => close('cancel')}
                   autoFocus={pending?.kind === 'confirm' && !!opts.destructive}>
                   {opts.cancelLabel ?? t('common.cancel')}
                 </Button>
-                <Button
-                  type="submit"
-                  variant={opts.destructive ? 'destructive' : 'default'}
-                  autoFocus={pending?.kind === 'confirm' && !opts.destructive}
-                >
-                  {opts.confirmLabel ?? t('common.yes')}
-                </Button>
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                  {opts.altLabel && (
+                    <Button
+                      type={opts.primary === 'alt' ? 'submit' : 'button'}
+                      variant={opts.primary === 'alt' ? 'default' : 'outline'}
+                      onClick={opts.primary === 'alt' ? undefined : () => close('alt')}
+                      autoFocus={pending?.kind === 'confirm' && !opts.destructive && opts.primary === 'alt'}
+                    >
+                      {opts.altLabel}
+                    </Button>
+                  )}
+                  <Button
+                    type={opts.altLabel && opts.primary === 'alt' ? 'button' : 'submit'}
+                    variant={opts.destructive ? 'destructive' : opts.altLabel && opts.primary === 'alt' ? 'outline' : 'default'}
+                    onClick={opts.altLabel && opts.primary === 'alt' ? () => close('ok') : undefined}
+                    autoFocus={pending?.kind === 'confirm' && !opts.destructive && !(opts.altLabel && opts.primary === 'alt')}
+                  >
+                    {opts.confirmLabel ?? t('common.yes')}
+                  </Button>
+                </div>
               </DialogFooter>
             </form>
           )}

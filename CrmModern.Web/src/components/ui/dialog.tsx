@@ -52,7 +52,7 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed left-[50%] top-[50%] z-50 grid w-full max-h-[92vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg',
+        'fixed left-[50%] top-[50%] z-50 grid w-full max-h-[92vh] overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-150 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 sm:rounded-lg',
         DIALOG_SIZE[size],
         className
       )}
@@ -61,8 +61,8 @@ const DialogContent = React.forwardRef<
     >
       {description != null && <DialogDescription className="sr-only">{description}</DialogDescription>}
       {children}
-      <DialogClose className="absolute right-4 top-4 z-20 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
+      <DialogClose className="absolute right-2 top-2 z-20 flex h-ctl-sm w-ctl-sm items-center justify-center rounded-md text-foreground ring-offset-background transition-colors hover:bg-accent focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
+        <X className="h-5 w-5" aria-hidden />
         <span className="sr-only">{t('common.close')}</span>
       </DialogClose>
     </DialogPrimitive.Content>
@@ -75,7 +75,7 @@ DialogContent.displayName = DialogPrimitive.Content.displayName
 // butonları) altta yapışık kalır → kısa pencerede Kaydet/Onayla görünmez olmaz.
 // -top-6/-bottom-6 + negatif margin: p-6 dolgu şeridini de örter (içerik arkadan görünmez).
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('sticky -top-6 z-10 -mx-6 -mt-6 flex flex-col space-y-1.5 bg-background px-6 pb-1 pr-10 pt-6 text-center sm:text-left', className)} {...props} />
+  <div className={cn('sticky -top-6 z-10 -mx-6 -mt-6 flex flex-col space-y-1.5 bg-background px-6 pb-1 pr-14 pt-6 text-center sm:text-left', className)} {...props} />
 )
 DialogHeader.displayName = 'DialogHeader'
 

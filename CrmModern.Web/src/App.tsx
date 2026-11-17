@@ -3,7 +3,8 @@ import { createHashRouter, createRoutesFromElements, Route, Navigate } from 'rea
 import { Layout } from '@/components/Layout'
 import { LoginPage } from '@/pages/LoginPage'
 import { RoleGuard } from '@/components/RoleGuard'
-import { getPreferences } from '@/lib/preferences'
+import { resolveStartPage } from '@/lib/preferences'
+import { getStoredUser } from '@/lib/authStore'
 
 // QW-16 — rota bazlı kod bölme: 110 KB'lık NewOrderPage dahil sayfalar ilk
 // açılışta değil, ilgili rotaya girildiğinde yüklenir (Layout'taki Suspense).
@@ -42,7 +43,7 @@ const PreferencesPage = lazy(() => named(import('@/pages/PreferencesPage'), 'Pre
 const NotFoundPage = lazy(() => named(import('@/pages/NotFoundPage'), 'NotFoundPage'))
 
 function StartRedirect() {
-  return <Navigate to={getPreferences().startPage || '/dashboard'} replace />
+  return <Navigate to={resolveStartPage(getStoredUser()?.yetkiTuru)} replace />
 }
 
 // SR-9 — data router (createHashRouter): useBlocker ile kaydedilmemiş değişiklik

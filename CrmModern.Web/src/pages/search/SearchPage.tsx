@@ -7,6 +7,9 @@ import { FillPage, FillRegion } from '@/components/FillPage'
 import { FilterBar, FilterField } from '@/components/FilterBar'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
+import { OrderDetailModal } from '@/components/OrderDetailModal'
+import { Button } from '@/components/ui/button'
+import { Eye } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDateShort, formatCurrency } from '@/lib/utils'
@@ -38,6 +41,8 @@ export function SearchPage() {
   const hideMoney = hideMoneyFor(getUser())
   const [filters, setFilters] = useState<Filters>(empty())
   const [submitted, setSubmitted] = useState<Filters | null>(null)
+  // Sonuç satırı açılamıyordu (tık/Enter/buton yoktu) — artık tek tık ve görünür "Siparişi Aç".
+  const [openNo, setOpenNo] = useState<string | null>(null)
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['search', submitted],
@@ -72,6 +77,14 @@ export function SearchPage() {
     // §6 — yoğun grid: kısa tarih (dd.MM.yy)
     { key: 'tarih',             header: t('common.date'),       sortable: true, render: (r) => formatDateShort((r.tarih as string) ?? '-') },
     { key: 'sirket',            header: t('orders.form.sirket') },
+    {
+      key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
+      render: (r) => (
+        <Button size="xs" variant="outline" onClick={() => setOpenNo(r.siparisNo as string)}>
+          <Eye className="h-4 w-4" aria-hidden /> {t('common.openOrder')}
+        </Button>
+      ),
+    },
   ]
 
   const set = (key: keyof Filters) => (val: string) => setFilters((f) => ({ ...f, [key]: val }))
@@ -98,13 +111,13 @@ export function SearchPage() {
           </FilterField>
           <FilterField label={t('common.stage')}>
             <Select value={filters.asama} onValueChange={set('asama')}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t('common.all')} /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue placeholder={t('common.all')} /></SelectTrigger>
               <SelectContent>{STAGES.map((s) => <SelectItem key={s} value={s}>{s === 'all' ? t('common.all') : statusLabel(t, s)}</SelectItem>)}</SelectContent>
             </Select>
           </FilterField>
           <FilterField label={t('common.control')}>
             <Select value={filters.kontrol} onValueChange={set('kontrol')}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={t('common.all')} /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue placeholder={t('common.all')} /></SelectTrigger>
               <SelectContent>{CONTROLS.map((c) => <SelectItem key={c} value={c}>{c === 'all' ? t('common.all') : statusLabel(t, c)}</SelectItem>)}</SelectContent>
             </Select>
           </FilterField>
@@ -126,10 +139,11 @@ export function SearchPage() {
             data={data as (SearchResultDto & Record<string, unknown>)[]}
             keyField="siparisNo"
             loading={isLoading}
-            density="compact"
+            onRowClick={(r) => setOpenNo(r.siparisNo as string)}
           />
         </FillRegion>
       )}
+      <OrderDetailModal siparisNo={openNo} onClose={() => setOpenNo(null)} />
     </FillPage>
   )
 }

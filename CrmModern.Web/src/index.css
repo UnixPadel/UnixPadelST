@@ -3,30 +3,62 @@
 @tailwind utilities;
 
 @layer base {
+  /* 40+ ergonomi (K1) — ölçek tokenları. "Rahat" varsayılandır (:root);
+     Tercihlerim → Görünüm: Standart ile <html data-ui-scale="standart"> olur.
+     Tailwind text-2xs…lg ve kontrol yükseklikleri (Button/Input/Select/Tabs)
+     bu değişkenleri okur; böylece tüm ekranlar tek ayardan büyür. 12px altı yok. */
   :root {
+    --fs-2xs: 0.875rem;   --lh-2xs: 1.2rem;    /* 14px */
+    --fs-xs: 0.9375rem;   --lh-xs: 1.3rem;     /* 15px */
+    --fs-sm: 1rem;        --lh-sm: 1.45rem;    /* 16px */
+    --fs-base: 1.0625rem; --lh-base: 1.6rem;   /* 17px */
+    --fs-lg: 1.1875rem;   --lh-lg: 1.7rem;     /* 19px */
+    --ctl-xs: 2.25rem;    /* 36px */
+    --ctl-sm: 2.5rem;     /* 40px */
+    --ctl-md: 2.75rem;    /* 44px */
+    --ctl-lg: 3rem;       /* 48px */
+    --check: 1.375rem;    /* 22px */
+  }
+  :root[data-ui-scale="standart"] {
+    --fs-2xs: 0.75rem;    --lh-2xs: 1rem;      /* 12px */
+    --fs-xs: 0.8125rem;   --lh-xs: 1.125rem;   /* 13px */
+    --fs-sm: 0.875rem;    --lh-sm: 1.25rem;    /* 14px */
+    --fs-base: 1rem;      --lh-base: 1.5rem;   /* 16px */
+    --fs-lg: 1.125rem;    --lh-lg: 1.625rem;   /* 18px */
+    --ctl-xs: 2rem;       /* 32px */
+    --ctl-sm: 2.25rem;    /* 36px */
+    --ctl-md: 2.5rem;     /* 40px */
+    --ctl-lg: 2.75rem;    /* 44px */
+    --check: 1.125rem;    /* 18px */
+  }
+
+  :root {
+    /* 40+ ergonomi (1.5, 2026-11) — metin tonları beyaz, zemin ve muted üstünde
+       ≥7:1 (WCAG AAA). Hiyerarşi renk açıklığıyla değil boyut/kalınlıkla kurulur;
+       `text-destructive` yerine metinde `text-danger` kullanılır. */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 220 20% 12%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 20% 12%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --popover-foreground: 220 20% 12%;
+    --primary: 221 83% 40%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     /* Ayırt edilebilirlik (0.3.4) — muted/accent beyaz kart üstünde seçilsin
        (tablo başlığı, sekme şeridi, hover, aktif satır); ikincil metin ≈6:1. */
     --muted: 214 32% 92.5%;
-    --muted-foreground: 215 19% 40%;
+    --muted-foreground: 215 25% 30%;
     --accent: 214 40% 91%;
     --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
+    --destructive: 0 72% 35%;
     --destructive-foreground: 210 40% 98%;
     --border: 214 24% 85%;
     --border-strong: 214 18% 72%;
     /* Alan çerçevesi beyaz/zemin üstünde ≥3:1 (WCAG 1.4.11); önceden ~1.2:1. */
     --input: 215 16% 53%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 221 83% 40%;
     --radius: 0.5rem;
 
     /* Sayfa zemini: kartlar/alanlar beyaz kalır, zemin açık gri → bölümler ayrışır. */
@@ -44,22 +76,22 @@
     /* QW-1 — semantik durum tonları. Soft zeminler legacy WinForms/Excel
        hücre renkleridir (#C6EFCE / #FFEB9C / #FFC7CE / #DDEBF7); operatör
        bunları zaten tanıyor. *-soft-foreground koyu metin → WCAG AA. */
-    --success: 142 71% 32%;
+    --success: 142 72% 22%;
     --success-soft: 132 59% 86%;
-    --success-soft-foreground: 142 72% 20%;
-    --warning: 32 95% 40%;
+    --success-soft-foreground: 142 72% 18%;
+    --warning: 28 92% 27%;
     --warning-soft: 48 100% 81%;
     --warning-soft-foreground: 28 80% 22%;
-    --danger: 0 72% 45%;
+    --danger: 0 72% 35%;
     --danger-soft: 352 100% 89%;
-    --danger-soft-foreground: 0 70% 30%;
-    --info: 212 75% 42%;
+    --danger-soft-foreground: 0 70% 26%;
+    --info: 212 80% 32%;
     --info-soft: 208 67% 92%;
     --info-soft-foreground: 212 75% 26%;
-    --progress: 262 55% 50%;
+    --progress: 262 55% 40%;
     --progress-soft: 262 80% 93%;
     --progress-soft-foreground: 262 55% 32%;
-    --neutral: 215 16% 47%;
+    --neutral: 215 18% 35%;
     --neutral-soft: 210 20% 93%;
     --neutral-soft-foreground: 215 25% 27%;
   }
@@ -71,12 +103,12 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217 91% 68%;
+    --primary-foreground: 222 60% 8%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted-foreground: 215 20% 72%;
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
@@ -100,13 +132,13 @@
     --warning: 38 92% 55%;
     --warning-soft: 38 60% 17%;
     --warning-soft-foreground: 45 90% 78%;
-    --danger: 0 75% 60%;
+    --danger: 0 85% 72%;
     --danger-soft: 0 45% 20%;
     --danger-soft-foreground: 0 85% 85%;
-    --info: 212 85% 62%;
+    --info: 212 85% 70%;
     --info-soft: 212 45% 20%;
     --info-soft-foreground: 212 85% 85%;
-    --progress: 262 75% 68%;
+    --progress: 262 75% 76%;
     --progress-soft: 262 35% 22%;
     --progress-soft-foreground: 262 85% 88%;
     --neutral: 215 15% 65%;
@@ -122,5 +154,16 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+  }
+}
+
+/* 40+ ergonomi (1.6) — işletim sisteminde "hareketi azalt" açıksa animasyon ve
+   yumuşak kaydırma kapanır; geçişler zaten ≤150ms. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

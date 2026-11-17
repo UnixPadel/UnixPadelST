@@ -28,7 +28,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(({ className, type,
         fieldStateClasses,
         // Hatalı alan: kırmızı çerçeve (FormField aria-invalid verir).
         'aria-[invalid=true]:border-destructive aria-[invalid=true]:focus-visible:ring-destructive',
-        inputSize === 'sm' ? 'h-8 px-2 py-1 text-xs' : 'h-10',
+        inputSize === 'sm' ? 'h-ctl-sm px-2.5 py-1 text-sm' : 'h-ctl-md',
         className
       )}
       ref={ref}

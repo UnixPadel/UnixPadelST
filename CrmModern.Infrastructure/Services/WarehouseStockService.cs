@@ -89,10 +89,13 @@ internal sealed class WarehouseStockService : IWarehouseStockService
         }
     }
 
-    public async Task<StockListDto> GetItemsAsync(string? konum, bool tamamlananlar, string? q)
+    public async Task<StockListDto> GetItemsAsync(string? konum, bool tamamlananlar, string? q, bool includeDeleted = false)
     {
         // 1. Fetch raw items, declarations, and active exits
-        var itemsQuery = _ctx.AntrepoStokKalem.AsNoTracking();
+        // 40+ ergonomi K5 — global filtre silinenleri gizler; "Silinenleri göster" filtreyi kaldırır.
+        var itemsQuery = includeDeleted
+            ? _ctx.AntrepoStokKalem.IgnoreQueryFilters().AsNoTracking()
+            : _ctx.AntrepoStokKalem.AsNoTracking();
         var declarations = await _ctx.AntrepoBeyanname.AsNoTracking()
             .Select(b => new { b.Id, b.BeyannameNo })
             .ToDictionaryAsync(b => b.Id, b => b.BeyannameNo);
@@ -146,7 +149,9 @@ internal sealed class WarehouseStockService : IWarehouseStockService
                 KapCinsi: item.KapCinsi,
                 Durum: durum,
                 OlusturmaTarihi: item.OlusturmaTarihi,
-                SonCikisTarihi: exitInfo?.SonCikis));
+                SonCikisTarihi: exitInfo?.SonCikis,
+                Silindi: item.Silindi,
+                SilinmeTarihi: item.SilinmeTarihi));
         }
 
         // Apply text search q if provided
@@ -163,9 +168,10 @@ internal sealed class WarehouseStockService : IWarehouseStockService
         // Compute counts based on the 'tamamlananlar' rule:
         // By default (tamamlananlar=false), counts represent active stock (Bekliyor or Kismen).
         // If tamamlananlar=true, counts include finished stock too.
+        // Sayaçlar silinen kalemleri saymaz (includeDeleted olsa bile).
         var countBase = tamamlananlar
-            ? queryFiltered
-            : queryFiltered.Where(i => i.Durum != "Tamam");
+            ? queryFiltered.Where(i => !i.Silindi)
+            : queryFiltered.Where(i => !i.Silindi && i.Durum != "Tamam");
 
         var countTumu = countBase.Count();
         var countAntrepo = countBase.Count(i => i.Konum == WarehouseStockRules.KonumAntrepo);
@@ -180,9 +186,10 @@ internal sealed class WarehouseStockService : IWarehouseStockService
         if (!string.IsNullOrWhiteSpace(konum) && konum != "Tumu")
             queryFiltered = queryFiltered.Where(i => string.Equals(i.Konum, konum, StringComparison.OrdinalIgnoreCase));
 
-        // Order: active first, then created desc
+        // Order: active first, then created desc (silinenler en sonda)
         var ordered = queryFiltered
-            .OrderBy(i => i.Durum == "Tamam" ? 1 : 0)
+            .OrderBy(i => i.Silindi ? 1 : 0)
+            .ThenBy(i => i.Durum == "Tamam" ? 1 : 0)
             .ThenByDescending(i => i.OlusturmaTarihi)
             .ToList();
 
@@ -191,7 +198,10 @@ internal sealed class WarehouseStockService : IWarehouseStockService
 
     public async Task<StockItemDetailDto> GetItemDetailAsync(int id, int currentUserId, bool isManager)
     {
-        var item = await _ctx.AntrepoStokKalem.FindAsync(id)
+        // 40+ ergonomi K5 — "Silinenleri göster" listesinden açılabilsin diye silinen kalemin
+        // detayı da okunur (Item.Silindi=true); düzenleme/çıkış uçları silineni bulamaz.
+        var item = await _ctx.AntrepoStokKalem.IgnoreQueryFilters().AsNoTracking()
+                       .FirstOrDefaultAsync(k => k.Id == id)
             ?? throw new NotFoundException("StockItem", id);
 
         var exits = await _ctx.AntrepoStokCikis
@@ -258,7 +268,9 @@ internal sealed class WarehouseStockService : IWarehouseStockService
             KapCinsi: item.KapCinsi,
             Durum: durum,
             OlusturmaTarihi: item.OlusturmaTarihi,
-            SonCikisTarihi: activeExits.Count > 0 ? activeExits.Max(c => c.Tarih) : null);
+            SonCikisTarihi: activeExits.Count > 0 ? activeExits.Max(c => c.Tarih) : null,
+            Silindi: item.Silindi,
+            SilinmeTarihi: item.SilinmeTarihi);
 
         var now = DateTime.Now;
         var exitDtos = new List<StockExitDto>();
@@ -270,7 +282,7 @@ internal sealed class WarehouseStockService : IWarehouseStockService
                 users.TryGetValue(c.GeriAlanKullaniciID.Value, out geriAlanAd);
 
             bool geriAlinabilir = false;
-            if (c.GeriAlinmaZamani == null)
+            if (c.GeriAlinmaZamani == null && !item.Silindi)
             {
                 var days = (now - c.KayitZamani).TotalDays;
                 if (days <= WarehouseStockRules.CikisGeriAlmaSuresiGun &&
@@ -468,12 +480,11 @@ internal sealed class WarehouseStockService : IWarehouseStockService
                 "itemHasExits");
         }
 
-        // Also clean up undone exits if any
-        var undoneExits = await _ctx.AntrepoStokCikis.Where(c => c.KalemId == id).ToListAsync();
-        if (undoneExits.Count > 0)
-            _ctx.AntrepoStokCikis.RemoveRange(undoneExits);
-
-        _ctx.AntrepoStokKalem.Remove(item);
+        // 40+ ergonomi K5 — yumuşak silme: satır ve (geri alınmış) çıkış geçmişi korunur,
+        // global query filter kalemi tüm sorgulardan düşürür; RestoreItemAsync geri getirir.
+        item.Silindi          = true;
+        item.SilinmeTarihi    = DateTime.Now;
+        item.SilenKullaniciID = currentUserId;
         await _ctx.SaveChangesAsync();
 
         await _audit.LogAsync(
@@ -482,6 +493,27 @@ internal sealed class WarehouseStockService : IWarehouseStockService
             id.ToString(),
             currentUserId,
             $"Stok kalemi silindi: {item.MalAdi} ({item.Konum})");
+    }
+
+    public async Task RestoreItemAsync(int id, int currentUserId)
+    {
+        var item = await _ctx.AntrepoStokKalem.IgnoreQueryFilters()
+                       .FirstOrDefaultAsync(k => k.Id == id)
+            ?? throw new NotFoundException("StockItem", id);
+        if (!item.Silindi)
+            throw new BusinessException("Bu stok kalemi silinmemiş.", "stockItemNotDeleted", new { name = item.MalAdi });
+
+        item.Silindi          = false;
+        item.SilinmeTarihi    = null;
+        item.SilenKullaniciID = null;
+        await _ctx.SaveChangesAsync();
+
+        await _audit.LogAsync(
+            "StockRestore",
+            "AntrepoStokKalem",
+            id.ToString(),
+            currentUserId,
+            $"Stok kalemi geri yüklendi: {item.MalAdi} ({item.Konum})");
     }
 
     public async Task<int> AddExitAsync(int itemId, AddStockExitRequest req, int currentUserId)

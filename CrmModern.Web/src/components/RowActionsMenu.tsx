@@ -1,31 +1,30 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MoreHorizontal } from 'lucide-react'
+import { ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ContextMenu, type RowAction } from '@/components/ContextMenu'
 
 /**
- * "⋯" butonu — satırın bağlam menüsünü (sağ tık ile aynı RowAction kaydı)
- * butonun altında açar. Satır başına 6 eş ağırlıklı buton yerine tek birincil
- * aksiyon + bu menü kullanılır (QW: hiyerarşi).
+ * Satırın işlem menüsü (sağ tık ile aynı RowAction kaydı). 40+ ergonomi (2.2) —
+ * önceden 28px'lik etiketsiz "⋯" ikonuydu; artık görünür metinli "İşlemler ▾"
+ * butonu. Menü tıklamayla açılır (üzerine gelince değil).
  */
-export function RowActionsMenu<T>({ row, actions }: { row: T; actions: RowAction<T>[] }) {
+export function RowActionsMenu<T>({ row, actions, label }: { row: T; actions: RowAction<T>[]; label?: string }) {
   const { t } = useTranslation()
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null)
   return (
     <>
       <Button
-        size="icon-sm"
-        variant="ghost"
-        aria-label={t('table.moreActions')}
-        title={t('table.moreActions')}
+        size="xs"
+        variant="outline"
         aria-haspopup="menu"
+        aria-expanded={!!pos}
         onClick={(e) => {
           const r = e.currentTarget.getBoundingClientRect()
           setPos({ x: r.left, y: r.bottom + 4 })
         }}
       >
-        <MoreHorizontal className="h-4 w-4" />
+        {label ?? t('table.actions')} <ChevronDown className="h-4 w-4" aria-hidden />
       </Button>
       {pos && <ContextMenu x={pos.x} y={pos.y} row={row} actions={actions} onClose={() => setPos(null)} />}
     </>

@@ -18,5 +18,10 @@ internal sealed class OrderExtraCostConfiguration : IEntityTypeConfiguration<Ord
         builder.Property(e => e.Tutar)         .HasColumnName("Tutar").HasColumnType("decimal(10,2)");
         builder.Property(e => e.EklenmeTarihi) .HasColumnName("EklenmeTarihi");
         builder.Property(e => e.KullaniciID)   .HasColumnName("KullaniciID");
+
+        // 40+ ergonomi K5 — yumuşak silme
+        builder.Property(e => e.Silindi)          .HasColumnName("Silindi");
+        builder.Property(e => e.SilinmeTarihi)    .HasColumnName("SilinmeTarihi");
+        builder.Property(e => e.SilenKullaniciID) .HasColumnName("SilenKullaniciID");
     }
 }

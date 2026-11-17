@@ -14,7 +14,8 @@ namespace CrmModern.API.Controllers;
 [Authorize]
 public sealed class OrderController(
     IOrderService orderService,
-    IReportingService reportingService) : ControllerBase
+    IReportingService reportingService,
+    IOrderFolderService folderService) : ControllerBase
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -250,6 +251,17 @@ public sealed class OrderController(
         return Ok(ApiResponse<object>.Ok(null!, "Sipariş silindi."));
     }
 
+    /// <summary>40+ ergonomi K5 — "Geri al": yumuşak silinen siparişi geri yükler.
+    /// Silme ile aynı yetki: sahip + Yönetici/elshan.</summary>
+    [HttpPost("{no}/restore")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> Restore(string no)
+    {
+        bool mgr = User.IsInRole("Yonetici") || IsControlUser;
+        await orderService.RestoreOrderAsync(CurrentUserId, no, mgr);
+        return Ok(ApiResponse<object>.Ok(null!, "Sipariş geri yüklendi."));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Status transitions
     // ─────────────────────────────────────────────────────────────────────────
@@ -408,13 +420,17 @@ public sealed class OrderController(
         if (file is null || file.Length == 0)
             return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
 
+        // Muhasebe ekleri artık Muhasebe Klasörü'ne EKLENİR (eski blob'un üzerine yazılmaz).
+        if (string.Equals(type, "muhasebeek", StringComparison.OrdinalIgnoreCase))
+            return await UploadFolderFile(no, file);
+
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
         await orderService.UploadAttachmentAsync(no, type, ms.ToArray());
         return Ok(ApiResponse<object>.Ok(null!, "Ek yüklendi."));
     }
 
-    /// <summary>Ek dosya indir. type=ek|muhasebeek</summary>
+    /// <summary>Ek dosya indir (eski tek-blob ekler). type=ek|muhasebeek</summary>
     [HttpGet("{no}/attachments/{type}")]
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
@@ -424,8 +440,143 @@ public sealed class OrderController(
         if (data is null || data.Length == 0)
             return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
 
-        var filename = $"{type}_{no}.bin";
-        return File(data, "application/octet-stream", filename);
+        // Ad ve tür saklanmadığı için ilk baytlardan tespit edilir (.zip/.rar/.pdf…).
+        var (uzanti, tip) = CrmModern.Core.FileSignature.Detect(data.AsSpan(0, Math.Min(8, data.Length)));
+        var prefix = string.Equals(type, "ek", StringComparison.OrdinalIgnoreCase) ? "siparis_ek_" : "muhasebe_ek_";
+        return File(data, tip, $"{prefix}{no}{uzanti}");
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Muhasebe Klasörü — proforma + muhasebe ekleri (çok dosya) + Satıcı Ek.
+    // Görme: parasal değer görebilen herkes; Satış Temsilcisi yalnız kendi siparişi.
+    // Ekleme / silme: Yönetici, Muhasebe, Muhasebe Onay kullanıcıları.
+    // ─────────────────────────────────────────────────────────────────────────
+
+    private static readonly string[] AccountingApprovers = { "burcu.karaman", "elshan.rasulov", "admin" };
+
+    // Round-11 §3 — ad bazlı parasal gizleme (bkz. web lib/visibility.ts).
+    private static readonly string[] HideMoneyUsers = { "omur.caliskan" };
+
+    private bool CanManageFolder =>
+        User.IsInRole("Yonetici") || User.IsInRole("Muhasebe")
+        || AccountingApprovers.Contains(CurrentUserName) || User.IsSuperAdmin();
+
+    private bool HidesMoney => IsFabrika || HideMoneyUsers.Contains(CurrentUserName);
+
+    /// <summary>Klasörü görebilir mi? (Fabrika / ad bazlı gizleme hayır; Temsilci yalnız kendi siparişi.)</summary>
+    private bool CanSeeFolder(OrderFolderRef order)
+    {
+        if (HidesMoney) return false;
+        if (User.IsInRole("Temsilci") && !IsControlUser && !CanManageFolder)
+            return order.KullaniciID == CurrentUserId;
+        return true;
+    }
+
+    private static IActionResult FolderFileNotFound() =>
+        new NotFoundObjectResult(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
+
+    /// <summary>SiparisNo → muhasebe eki sayısı (klasör düğmesindeki sayaç).</summary>
+    [HttpGet("folder-counts")]
+    [ProducesResponseType(typeof(ApiResponse<IReadOnlyDictionary<string, int>>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFolderCounts()
+    {
+        if (HidesMoney) return Forbid();
+        var counts = await folderService.GetCountsAsync();
+        return Ok(ApiResponse<IReadOnlyDictionary<string, int>>.Ok(counts));
+    }
+
+    /// <summary>Klasör içeriği (blob yok) + bu kullanıcının yetkileri.
+    /// 40+ ergonomi K5 — includeDeleted=true: silinen dosyalar da (silindi=true) döner.</summary>
+    [HttpGet("{no}/folder")]
+    [ProducesResponseType(typeof(ApiResponse<OrderFolderDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> GetFolder(string no, [FromQuery] bool includeDeleted = false)
+    {
+        var order = await folderService.ResolveAsync(no);
+        if (!CanSeeFolder(order)) return Forbid();
+
+        var (dosyalar, onceki, satici) = await folderService.GetContentAsync(order, includeDeleted);
+        var dto = new OrderFolderDto(
+            order.SiparisNo,
+            CanManage: CanManageFolder,
+            CanSeeProforma: await CanDownloadProformaAsync(no),
+            dosyalar, onceki, satici);
+        return Ok(ApiResponse<OrderFolderDto>.Ok(dto));
+    }
+
+    /// <summary>Klasöre tek dosya ekler (≤25 MB, izinli uzantı). Önceki dosyalar korunur.</summary>
+    [HttpPost("{no}/folder/files")]
+    [ProducesResponseType(typeof(ApiResponse<OrderFolderFileDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> UploadFolderFile(string no, IFormFile file)
+    {
+        if (!CanManageFolder) return Forbid();
+        if (file is null || file.Length == 0)
+            return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
+        if (file.Length > FileRules.MaxBytes)
+            return BadRequest(ApiResponse<object>.FailCode("fileTooLarge", "Dosya 25 MB'tan büyük.", null));
+        var ad = Path.GetFileName(file.FileName);
+        if (!FileRules.IsAllowed(ad))
+            return BadRequest(ApiResponse<object>.FailCode("unsupportedFileType", "Bu dosya türü yüklenemez.", null));
+
+        var order = await folderService.ResolveAsync(no);
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms);
+        var saved = await folderService.UploadAsync(order, ad, FileRules.ContentTypeFor(ad, file.ContentType), ms.ToArray(), CurrentUserId);
+        return Ok(ApiResponse<OrderFolderFileDto>.Ok(saved, "Dosya eklendi."));
+    }
+
+    /// <summary>Klasördeki dosyayı indirir (orijinal ad + içerik tipi; önizleme de bunu kullanır).</summary>
+    [HttpGet("{no}/folder/files/{ekId:int}")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DownloadFolderFile(string no, int ekId)
+    {
+        var order = await folderService.ResolveAsync(no);
+        if (!CanSeeFolder(order)) return Forbid();
+        var data = await folderService.GetFileAsync(order, ekId);
+        return data is null ? FolderFileNotFound() : File(data.Veri, data.Tip, data.Ad);
+    }
+
+    /// <summary>Eski tek-blob ekler: kind=muhasebe (önceki muhasebe eki) | satici (Satıcı Ek).</summary>
+    [HttpGet("{no}/folder/legacy/{kind}")]
+    [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DownloadFolderLegacyFile(string no, string kind)
+    {
+        var order = await folderService.ResolveAsync(no);
+        if (!CanSeeFolder(order)) return Forbid();
+        var data = await folderService.GetLegacyFileAsync(order, kind);
+        return data is null ? FolderFileNotFound() : File(data.Veri, data.Tip, data.Ad);
+    }
+
+    /// <summary>Klasörden dosya siler (yumuşak silme — Geri al ile geri gelir; denetim kaydına yazılır).</summary>
+    [HttpDelete("{no}/folder/files/{ekId:int}")]
+    public async Task<IActionResult> DeleteFolderFile(string no, int ekId)
+    {
+        if (!CanManageFolder) return Forbid();
+        var order = await folderService.ResolveAsync(no);
+        await folderService.DeleteAsync(order, ekId, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Dosya silindi."));
+    }
+
+    /// <summary>40+ ergonomi K5 — silinen klasör dosyasını geri yükler (silme ile aynı yetki).</summary>
+    [HttpPost("{no}/folder/files/{ekId:int}/restore")]
+    [ProducesResponseType(typeof(ApiResponse<OrderFolderFileDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> RestoreFolderFile(string no, int ekId)
+    {
+        if (!CanManageFolder) return Forbid();
+        var order = await folderService.ResolveAsync(no);
+        var restored = await folderService.RestoreAsync(order, ekId, CurrentUserId);
+        return Ok(ApiResponse<OrderFolderFileDto>.Ok(restored, "Dosya geri yüklendi."));
+    }
+
+    /// <summary>Önceki (tek-blob) muhasebe ekini siler. Blob, silinmiş bir klasör
+    /// dosyasına taşınır; dönen ekId ile .../folder/files/{ekId}/restore geri yükler.</summary>
+    [HttpDelete("{no}/folder/legacy/muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> DeleteFolderLegacyFile(string no)
+    {
+        if (!CanManageFolder) return Forbid();
+        var order = await folderService.ResolveAsync(no);
+        var ekId = await folderService.DeleteLegacyMuhasebeEkAsync(order, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(new { ekId }, "Dosya silindi."));
     }
 
     /// <summary>

@@ -6,7 +6,7 @@ import { invalidateOrderGraph } from '@/lib/queryKeys'
 
 /**
  * SR-7 — sipariş akışı mutasyonları için standart sarmalayıcı:
- *  • başarıda `successTitle` (success toast) + `invalidateOrderGraph`
+ *  • başarıda `successTitle` (durum çubuğu; `notify: 'toast'` ile açılır mesaj) + `invalidateOrderGraph`
  *  • hatada `errorTitle` + backend mesajı (describeApiError)
  *  • `isPendingFor(vars)` → satır bazlı bekleme: yalnız tıklanan satırın
  *    butonu spinner gösterir (önceden tek mutasyon tüm satırları kilitliyordu).
@@ -14,6 +14,11 @@ import { invalidateOrderGraph } from '@/lib/queryKeys'
 export function useAppMutation<TData, TVars>(
   options: Omit<UseMutationOptions<TData, unknown, TVars>, 'onError'> & {
     successTitle?: string | ((data: TData, vars: TVars) => string)
+    /**
+     * K6 — 'inline' (varsayılan): başarı mesajı yalnız durum çubuğuna yazılır.
+     * 'toast': sonucu ekrandan çıkan işlemler için açılır mesaj (ör. onaylanan sipariş listeden kaybolur).
+     */
+    notify?: 'inline' | 'toast'
     successDescription?: (data: TData, vars: TVars) => string | undefined
     errorTitle?: string
     /** false → order graph tazelenmez (yalnız kendi onSuccess'i çalışır). */
@@ -24,7 +29,7 @@ export function useAppMutation<TData, TVars>(
   const qc = useQueryClient()
   const { toast } = useToast()
   const { t } = useTranslation()
-  const { successTitle, successDescription, errorTitle, invalidate = true, onSuccess, onError, ...rest } = options
+  const { successTitle, successDescription, notify = 'inline', errorTitle, invalidate = true, onSuccess, onError, ...rest } = options
 
   const m = useMutation<TData, unknown, TVars>({
     ...rest,
@@ -35,6 +40,7 @@ export function useAppMutation<TData, TVars>(
           title: typeof successTitle === 'function' ? successTitle(data, vars) : successTitle,
           description: successDescription?.(data, vars),
           variant: 'success',
+          popup: notify === 'toast',
         })
       }
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

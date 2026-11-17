@@ -79,14 +79,15 @@ function setupAutoUpdater() {
   }, UPDATE_CHECK_INTERVAL_MS);
 }
 
-// ── Pencere durumu + arayüz ölçeği (scaling Faz 1) ─────────────────────────
-// Windows %125/%150 ölçekte CSS viewport küçülür (1920×1080@125% ≈ 1536×790);
-// web ölçeğindeki arayüz tabloya yer bırakmaz. Ölçek 'auto' iken çalışma alanı
-// yüksekliğine göre küçültülür; kullanıcı Ctrl+= / Ctrl+- / Ctrl+0, Ctrl+tekerlek
-// veya Tercihlerim → Arayüz ölçeği ile seçerse o değer kalıcı olur.
+// ── Pencere durumu + arayüz ölçeği ─────────────────────────────────────────
+// 40+ ergonomi (K2, 2026-11): küçük ekranlarda %85/%90'a OTOMATİK küçültme
+// kaldırıldı (metin 10–11px'e iniyordu). 'auto' artık her zaman %100 demektir;
+// yoğunluğu web tarafındaki "Görünüm: Rahat | Standart" tercihi yönetir.
+// Kullanıcı Ctrl+= / Ctrl+- / Ctrl+tekerlek veya Tercihlerim → Yakınlaştırma ile
+// seçerse o değer kalıcı olur; Ctrl+0 %100'e döner.
 // Boyut/konum/maximize da hatırlanır; ilk açılış maximize.
 const STATE_FILE = path.join(app.getPath('userData'), 'window-state.json');
-const ZOOM_STEPS = [0.8, 0.85, 0.9, 1, 1.1, 1.25];
+const ZOOM_STEPS = [0.9, 1, 1.1, 1.25, 1.5];
 
 function readState() {
   try { return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')); } catch { return {}; }
@@ -96,22 +97,15 @@ function writeState(patch) {
   try { fs.writeFileSync(STATE_FILE, JSON.stringify({ ...readState(), ...patch })); } catch { /* yoksay */ }
 }
 
-function autoZoomFor(win) {
-  const h = screen.getDisplayMatching(win.getBounds()).workAreaSize.height;
-  if (h < 720) return 0.85;
-  if (h < 860) return 0.9;
-  return 1;
-}
-
-/** Kayıtlı ayar ('auto' | sayı) → uygulanacak zoomFactor. */
-function effectiveZoom(win) {
+/** Kayıtlı ayar ('auto' | sayı) → uygulanacak zoomFactor. 'auto' = %100 (K2). */
+function effectiveZoom() {
   const z = readState().zoom;
-  return typeof z === 'number' ? z : autoZoomFor(win);
+  return typeof z === 'number' ? z : 1;
 }
 
 function applyZoom(win) {
   if (!win || win.isDestroyed()) return;
-  const factor = effectiveZoom(win);
+  const factor = effectiveZoom();
   win.webContents.setZoomFactor(factor);
   win.webContents.send('desktop:zoom-changed', { setting: readState().zoom ?? 'auto', factor });
 }
@@ -172,6 +166,9 @@ async function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.cjs'),
+      // Muhasebe Klasörü — PDF önizlemesi (iframe + blob URL) Chromium'un yerleşik
+      // PDF görüntüleyicisini kullanır; Electron'da bu ayar olmadan PDF boş açılır.
+      plugins: true,
     },
   });
 

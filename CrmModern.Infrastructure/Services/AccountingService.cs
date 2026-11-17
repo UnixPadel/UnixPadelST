@@ -671,22 +671,6 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         await uow.SaveChangesAsync();
     }
 
-    public async Task UploadMuhasebeEkAsync(string siparisNo, byte[] data, int currentUserId)
-    {
-        var order = await uow.Orders.GetByNoAsync(NormalizeNo(siparisNo))
-            ?? throw new NotFoundException("Order", siparisNo);
-
-        // SiparisAlTablo.MuhasebeEk = byte[]  (Faz 3 bloku bu metod ile kalktı)
-        order.MuhasebeEk = data;
-        uow.Orders.Update(order);
-
-        // SiparisOnaylari audit (Paket 2 — UPSERT)
-        await uow.OrderApprovals.UpsertAsync(
-            order.SiparisNo, currentUserId, "Onaylandi",
-            $"MuhasebeEk yüklendi ({data.Length} bayt).");
-        await uow.SaveChangesAsync();
-    }
-
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static AccountingTransactionDto MapTx(AccountingTransaction t) =>
@@ -758,6 +742,8 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
     {
         var cost = await uow.Orders.GetExtraCostByIdAsync(ekMaliyetId)
             ?? throw new NotFoundException("EkMaliyet", ekMaliyetId);
+        if (cost.Silindi)
+            throw new NotFoundException("EkMaliyet", ekMaliyetId);
 
         var order = await uow.Orders.GetByIdAsync(cost.SiparisAlID)
             ?? throw new NotFoundException("Order", cost.SiparisAlID);
@@ -765,12 +751,47 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         if (!CanEditExtras(order))
             throw new BusinessException("Bu aşamada ek maliyet silinemez (yalnız cari ya da lojistik onayı sırasında).", "extraCostLockedDelete");
 
-        uow.Orders.RemoveExtraCost(cost);
+        // 40+ ergonomi K5 — yumuşak silme: satır kalır (Geri al), tutar toplamdan düşer.
+        cost.Silindi          = true;
+        cost.SilinmeTarihi    = DateTime.Now;
+        cost.SilenKullaniciID = currentUserId;
 
         order.ToplamFiyat     = (order.ToplamFiyat     ?? 0m) - cost.Tutar;
         order.BrutToplamFiyat = (order.BrutToplamFiyat ?? 0m) - cost.Tutar;
         uow.Orders.Update(order);
 
+        // Bayrak + toplam güncellemesi tek SaveChanges → atomik.
         await uow.SaveChangesAsync();
+        await audit.LogAsync("Delete", "SiparisEkMaliyet", ekMaliyetId.ToString(), currentUserId,
+            $"{order.SiparisNo}: {cost.Aciklama} ({cost.Tutar:N2})");
+    }
+
+    public async Task<OrderExtraCostDto> RestoreExtraCostAsync(int ekMaliyetId, int currentUserId)
+    {
+        var cost = await uow.Orders.GetExtraCostByIdAsync(ekMaliyetId)
+            ?? throw new NotFoundException("EkMaliyet", ekMaliyetId);
+        if (!cost.Silindi)
+            throw new BusinessException("Bu ek maliyet silinmemiş.", "extraCostNotDeleted");
+
+        var order = await uow.Orders.GetByIdAsync(cost.SiparisAlID)
+            ?? throw new NotFoundException("Order", cost.SiparisAlID);
+
+        if (!CanEditExtras(order))
+            throw new BusinessException("Bu aşamada ek maliyet geri yüklenemez (yalnız cari ya da lojistik onayı sırasında).", "extraCostLockedRestore");
+
+        cost.Silindi          = false;
+        cost.SilinmeTarihi    = null;
+        cost.SilenKullaniciID = null;
+
+        // Tutarı sipariş toplamına geri ekle (AddExtraCostAsync ile aynı kural).
+        order.ToplamFiyat     = (order.ToplamFiyat     ?? 0m) + cost.Tutar;
+        order.BrutToplamFiyat = (order.BrutToplamFiyat ?? 0m) + cost.Tutar;
+        uow.Orders.Update(order);
+
+        await uow.SaveChangesAsync();
+        await audit.LogAsync("Restore", "SiparisEkMaliyet", ekMaliyetId.ToString(), currentUserId,
+            $"{order.SiparisNo}: {cost.Aciklama} ({cost.Tutar:N2})");
+
+        return new OrderExtraCostDto(cost.EkMaliyetID, cost.Aciklama, cost.Tutar, cost.EklenmeTarihi, cost.KullaniciID);
     }
 }

@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next'
 import { login } from '@/api/auth'
 import { describeApiError } from '@/lib/axios'
 import { useAuth } from '@/hooks/useAuth'
-import { getRememberedLogin, saveRememberedLogin, clearRememberedLogin } from '@/lib/authStore'
+import { getRememberedLogin, saveRememberedLogin, clearRememberedLogin, getStoredUser } from '@/lib/authStore'
+import { resolveStartPage } from '@/lib/preferences'
 import { useToast } from '@/components/ToastProvider'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { Button } from '@/components/ui/button'
@@ -38,7 +39,8 @@ export function LoginPage() {
       // sakla, değilse temizle. Token/JWT/oturum davranışı DEĞİŞMEZ.
       if (remember) saveRememberedLogin(form.kullaniciAdi, form.sifre)
       else clearRememberedLogin()
-      navigate('/dashboard', { replace: true })
+      // H3 — kayıtlı açılış sayfası / rol varsayılanı (önceden hep /dashboard'a gidiyordu).
+      navigate(resolveStartPage(data.yetkiTuru), { replace: true })
     },
     // Sunucunun söylediğini göster (hatalı şifre, pasif hesap, sunucuya ulaşılamıyor…);
     // önceden her hata "şifre hatalı" görünüyordu.
@@ -49,7 +51,7 @@ export function LoginPage() {
 
   // Otomatik giriş: geçerli (hatırlanan ya da oturumluk) token varsa login
   // ekranını hiç gösterme, doğrudan uygulamaya yönlendir.
-  if (isLoggedIn()) return <Navigate to="/dashboard" replace />
+  if (isLoggedIn()) return <Navigate to={resolveStartPage(getStoredUser()?.yetkiTuru)} replace />
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()

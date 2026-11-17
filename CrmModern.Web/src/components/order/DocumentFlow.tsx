@@ -26,15 +26,28 @@ import type { OrderDetail } from '@/types'
  *   getOffers (lojistik teklifleri — yalnız yetkili rollerde; 403 sessizce boş)
  * Her düğüm: ikon, etiket+ton, tarih, kullanıcı, kısa açıklama ve ilgili ekrana link.
  */
+// Sipariş geçmişindeki onay kayıtları (SiparisOnaylari.OnayDurumu). Önceden yalnız
+// Onaylandi/Reddedildi tanınıyordu; "Silindi", "MuhasebeOnaylandi" gibi kayıtlar
+// yanlışlıkla "Bekliyor" görünüyordu.
+const isApproved = (d: string) => d === 'Onaylandı' || /Onaylandi$/.test(d)
 export function approvalTone(durum?: string | null): StatusTone {
-  if (durum === 'Onaylandi' || durum === 'Onaylandı') return 'success'
-  if (durum === 'Reddedildi') return 'danger'
+  if (!durum) return 'neutral'
+  if (isApproved(durum)) return 'success'
+  if (durum === 'Reddedildi' || durum === 'Silindi') return 'danger'
+  if (durum === 'GeriYuklendi' || durum === 'Guncellendi') return 'info'
   return 'warning'
 }
 export function approvalLabel(t: TFunction, durum?: string | null): string {
-  if (durum === 'Onaylandi' || durum === 'Onaylandı') return t('docFlow.approval.approved')
+  if (!durum) return '—'
+  if (durum === 'MuhasebeOnaylandi') return t('docFlow.approval.accountingApproved')
+  if (durum === 'LojistikOnaylandi') return t('docFlow.approval.logisticsApproved')
+  if (durum === 'LojistikTeklifOnaylandi') return t('docFlow.approval.logisticsOfferApproved')
+  if (isApproved(durum)) return t('docFlow.approval.approved')
   if (durum === 'Reddedildi') return t('docFlow.approval.rejected')
-  return durum ? t('docFlow.approval.pending') : '—'
+  if (durum === 'Silindi') return t('docFlow.approval.deleted')
+  if (durum === 'GeriYuklendi') return t('docFlow.approval.restored')
+  if (durum === 'Guncellendi') return t('docFlow.approval.updated')
+  return t('docFlow.approval.pending')
 }
 
 interface FlowNode {
@@ -182,7 +195,7 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
       <p className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-warning/30 bg-warning-soft px-2 py-1.5 text-xs text-warning-soft-foreground">
         <span className="font-semibold">{t('workflow.currentStep')}:</span>
         <span>{t(stepLabelKey(step.stepCode))}</span>
-        <span className="opacity-80">· {t(departmentLabelKey(step.department))}</span>
+        <span>· {t(departmentLabelKey(step.department))}</span>
         <AgeChip since={step.waitingSince} className="ml-auto" />
       </p>
     )}
@@ -199,7 +212,7 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
           </div>
         )
         return (
-          <li key={n.key} className={cn('relative pb-1 pl-5', !n.done && 'opacity-60')}>
+          <li key={n.key} className={cn('relative pb-1 pl-5', !n.done && 'text-muted-foreground')}>
             <span className={cn(
               'absolute -left-[0.8rem] top-1.5 flex h-6 w-6 items-center justify-center rounded-full border bg-background',
               n.done ? 'text-foreground' : 'text-muted-foreground border-dashed',

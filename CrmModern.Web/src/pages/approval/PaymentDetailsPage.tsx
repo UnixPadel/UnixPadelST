@@ -58,7 +58,7 @@ export function PaymentDetailsPage() {
 
   const saveMut = useAppMutation({
     mutationFn: (_: void) => setPaymentDetails(target!, form),
-    successTitle: t('purchase.payment.saved'),
+    successTitle: t('purchase.payment.saved'), notify: 'toast',
     successDescription: () => '#' + target,
     errorTitle: t('common.failed'),
     onSuccess: () => { setTarget(null); setForm(buildEmpty()) },

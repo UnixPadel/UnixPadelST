@@ -1,6 +1,7 @@
 using System.IO;
 using System.Security.Claims;
 using CrmModern.API.Authorization;
+using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Purchase;
 using CrmModern.Core.Interfaces.Services;
@@ -17,17 +18,14 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     // WinForms birebir özel kullanıcı adları (rol değil)
     private const string FinalApproverUser = "elshan.rasulov";
 
-    // Ek dosya kuralları — izin verilen uzantılar + boyut sınırı.
-    private static readonly HashSet<string> AllowedEkUzantilar = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ".png", ".jpg", ".jpeg", ".gif", ".webp", ".pdf",
-        ".doc", ".docx", ".txt", ".xls", ".xlsx", ".csv", ".rtf", ".odt", ".zip", ".rar",
-    };
-    private const long MaxEkBytes = 25L * 1024 * 1024;   // 25 MB
+    // Ek dosya kuralları (uzantı + boyut) ortak: Security/FileRules.
 
     private string CurrentUserName =>
         User.FindFirstValue(ClaimTypes.Name)
             ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
+
+    private int? CurrentUserId =>
+        int.TryParse(User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
 
     private bool IsRole(string role) => User.IsInRole(role);
 
@@ -160,11 +158,10 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     {
         if (file is null || file.Length == 0)
             return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
-        if (file.Length > MaxEkBytes)
+        if (file.Length > FileRules.MaxBytes)
             return BadRequest(ApiResponse<object>.FailCode("fileTooLarge", "Dosya 25 MB'tan büyük.", null));
 
-        var ext = Path.GetExtension(file.FileName);
-        if (string.IsNullOrWhiteSpace(ext) || !AllowedEkUzantilar.Contains(ext))
+        if (!FileRules.IsAllowed(file.FileName))
             return BadRequest(ApiResponse<object>.FailCode("unsupportedFileType", "Bu dosya türü yüklenemez.", null));
 
         using var ms = new MemoryStream();
@@ -175,13 +172,24 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
         return Ok(ApiResponse<object>.Ok(null!, "Ek yüklendi."));
     }
 
-    /// <summary>Talebin ek dosyasını kaldır.</summary>
+    /// <summary>Talebin ek dosyasını kaldır (40+ ergonomi K5 — yumuşak; Geri al ile döner).</summary>
     [HttpDelete("{talepId:int}/attachment")]
     [Authorize(Roles = "Yonetici,Lojistik,Fabrika,Gozlemci,Temsilci,Muhasebe")]
     public async Task<IActionResult> DeleteAttachment(int talepId)
     {
-        await purchaseService.DeleteAttachmentAsync(talepId);
+        await purchaseService.DeleteAttachmentAsync(talepId, CurrentUserId);
         return Ok(ApiResponse<object>.Ok(null!, "Ek silindi."));
+    }
+
+    /// <summary>40+ ergonomi K5 — "Geri al": silinen eki geri yükler (silme ile aynı yetki).</summary>
+    [HttpPost("{talepId:int}/attachment/restore")]
+    [Authorize(Roles = "Yonetici,Lojistik,Fabrika,Gozlemci,Temsilci,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RestoreAttachment(int talepId)
+    {
+        await purchaseService.RestoreAttachmentAsync(talepId);
+        return Ok(ApiResponse<object>.Ok(null!, "Ek geri yüklendi."));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

@@ -7,9 +7,11 @@ Tüm ekran metinleri, kılavuz, sürüm notları ve hata mesajları bu sözlüğ
 - **Bir kavram, tek kelime.** Menüde, butonda, bildirimde ve kılavuzda aynı kelime kullanılır.
 - **"Sen" hitabı, kısa cümle.** "Müşteri seç", "Tutar gir", "Kaydetmeden çık".
 - **Bildirimler:**
-  - Başarı: "Kaydedildi." / "Saved."
-  - Hata: "Kaydedilemedi. Tekrar dene." / "Couldn't save. Try again."
+  - Başarı: "Kaydedildi." / "Saved." — 40+ ergonomi (K6, 2026-11): başarı mesajı açılır pencere değil, alt durum çubuğuna yazılır. Açılır mesaj (toast) yalnız sonucu ekrandan çıkan işlemlerde (onaylanan sipariş listeden kaybolur, silme + "Geri al").
+  - Hata: "Kaydedilemedi. Tekrar dene." / "Couldn't save. Try again." — hata mesajı kullanıcı kapatana kadar kalır.
   - Boş durum: "Henüz … yok." / "No … yet."
+- **Onay pencereleri (2026-11):** başlık soru ("… silinsin mi?"), açıklamada kayıt adı, "Ne olacak?" maddeleri ve varsa "Sonraki adım". Buton etiketi eylem fiilidir ("Hazır olarak işaretle", "Formu temizle"); "Evet/Tamam" kullanılmaz.
+- **Etiketler:** her ikon butonun yanında adı yazar; devre dışı butonun sebebi butonun altında görünür metindir (yalnız ipucu değil)."
 - **Yasak:** "optimize", "entegre", "sinerji", "kesintisiz", "mükemmel çözüm", "dijital dünya", "harmanla", "gerçekleştirilmektedir", "temin edilmektedir", "başarıyla", "lütfen" / "please", "successfully".
 - **Adım ve aşama farkı:**
   - **Aşama** (Stage): siparişin durumu; Teklif, Sipariş, Planlama, Üretim, Hazır, Lojistik, Tamamlandı.
@@ -36,6 +38,9 @@ Tüm ekran metinleri, kılavuz, sürüm notları ve hata mesajları bu sözlüğ
 | Proforma indirme | Proforma (Excel) / Proforma (PDF) | Proforma (Excel) / Proforma (PDF) |
 | Ekrandaki listeyi indirme | Listeyi İndir | Download List |
 | Satıcı Ek / Muhasebe Ek | Satıcı Ek / Muhasebe Ek (aynen) | Seller File / Accounting File |
+| Siparişin belge klasörü (proforma + muhasebe ekleri + Satıcı Ek) | Muhasebe Klasörü | Accounting Folder |
+| Klasördeki yüklenmiş dosyalar | Muhasebe Ekleri | Accounting Files |
+| Muhasebe · Teklif ve Siparişler (menü) | Muhasebe · Klasörler | Accounting · Folders |
 | Bileşen | Parça | Part |
 | Öznitelik | Özellik | Option |
 | Serbest / özel kalem | Ek kalem | Extra item |
@@ -55,6 +60,18 @@ Tüm ekran metinleri, kılavuz, sürüm notları ve hata mesajları bu sözlüğ
 | Arama ekranı | Sipariş Ara | Search Orders |
 | Diyaloğu kapatma | Vazgeç | Cancel |
 | Kaydı iptal etme (tahsilat) | İptal Et | Void |
+| Yazı/buton boyutu tercihi | Görünüm: Rahat / Standart | View: Comfortable / Standard |
+| Electron zoomFactor | Yakınlaştırma | Zoom |
+| Tablo üstündeki seçili satır çubuğu | Seçili kayıt | Selected record |
+| Satır işlem menüsü (eski "⋯") | İşlemler | Actions |
+| Etki önizlemesi başlığı | Ne olacak? | What happens next? |
+| İş akışındaki bir sonraki iş | Sonraki adım | Next step |
+| Silmeden hemen sonra geri alma | Geri al | Undo |
+| Silinmiş kaydı listeden geri getirme | Geri yükle | Restore |
+| Silinmiş kayıtları listeleme filtresi | Silinenleri göster | Show deleted |
+| Yapay zekânın doldurduğu alan işareti | YZ doldurdu · kontrol et | Filled by AI · check |
+| Taslak durumu | Taslak kaydedildi · 13:25 | Draft saved · 13:25 |
+| Sipariş detayının sağ paneli | Sipariş detayı | Order details |
 | Siparişi kapatma (muhasebe) | Siparişi Kapat | Close Order |
 | Teklifi siparişe çevirme | Siparişe Çevir | Turn into Order |
 

@@ -21,4 +21,10 @@ public sealed class Kullanici
     // sadece map'le. Form3 1449. satır INSERT bu kolonları yazıyor.
     public DateTime? OlusturmaTarihi  { get; set; }
     public bool      SatinAlmaYetkisi { get; set; }
+
+    // 40+ ergonomi K5 — yumuşak silme: silinen kullanıcı giriş yapamaz, seçim
+    // listelerinde görünmez; tarihsel ad çözümlemesi için satır korunur.
+    public bool      Silindi          { get; set; }
+    public DateTime? SilinmeTarihi    { get; set; }
+    public int?      SilenKullaniciID { get; set; }
 }

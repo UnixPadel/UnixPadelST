@@ -100,8 +100,8 @@ export function LogisticsOffersPage() {
                         <Badge variant={r.teklifSayisi > 0 ? 'info' : 'neutral'}>{t('logisticsOffer.count', { n: r.teklifSayisi })}</Badge>
                       </span>
                     </button>
-                    <Button size="icon-sm" variant="ghost" aria-label={t('common.details')} onClick={() => openDetail(r.siparisNo)}>
-                      <Eye className="h-4 w-4" />
+                    <Button size="xs" variant="ghost" aria-label={t('common.details')} onClick={() => openDetail(r.siparisNo)}>
+                      <Eye className="h-4 w-4" aria-hidden /> {t('common.details')}
                     </Button>
                   </div>
 

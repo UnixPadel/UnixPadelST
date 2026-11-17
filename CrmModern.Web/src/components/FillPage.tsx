@@ -120,7 +120,7 @@ export function ResizableTop({
         aria-expanded={!state.collapsed}
         tabIndex={0}
         title={`${t('layout.splitterHint')} (F7)`}
-        className="group relative mx-4 flex h-2 cursor-row-resize items-center justify-center rounded bg-border/60 hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="group relative mx-4 my-1 flex h-3 cursor-row-resize items-center justify-center rounded bg-border/60 hover:bg-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         onPointerDown={startDrag}
         onDoubleClick={toggle}
         onKeyDown={(e) => {
@@ -137,7 +137,7 @@ export function ResizableTop({
           type="button"
           onPointerDown={(e) => e.stopPropagation()}
           onClick={toggle}
-          className="absolute right-0 top-1/2 flex h-5 -translate-y-1/2 items-center gap-1 rounded border bg-background px-1.5 text-[11px] text-muted-foreground shadow-sm hover:text-foreground"
+          className="absolute right-0 top-1/2 flex h-7 -translate-y-1/2 items-center gap-1 rounded border bg-background px-2 text-xs text-foreground shadow-sm hover:bg-accent"
           aria-label={state.collapsed ? t('layout.expandTop') : t('layout.collapseTop')}
         >
           {state.collapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}

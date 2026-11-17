@@ -31,6 +31,10 @@ public static class DatabaseSchemaMigrator
         // 1) Sifre kolonu büyüt
         await EnsureSifreColumnSizeAsync(ctx, logger);
 
+        // 1b) 40+ ergonomi K5 — yumuşak silme (kullanıcı). Login sorgusu bu kolonu
+        // okuduğu için olabildiğince erken eklenir. Additive + DEFAULT 0.
+        await EnsureSoftDeleteColumnsAsync(ctx, logger, "KullaniciBilgileri");
+
         // 2) EklemeGecmisi: stok-only tablodan genel audit log'a evrilt
         await EnsureEklemeGecmisiAuditColumnsAsync(ctx, logger);
 
@@ -50,6 +54,8 @@ public static class DatabaseSchemaMigrator
 
         // 4) PROMPT-v2 §7: MusteriBilgileri.CreatedByKullaniciID + tek seferlik backfill.
         await EnsureMusteriCreatedByColumnAsync(ctx, logger);
+        // 40+ ergonomi K5 — yumuşak silme (müşteri). Liste/arama/seçim silineni dışlar.
+        await EnsureSoftDeleteColumnsAsync(ctx, logger, "MusteriBilgileri");
 
         // 5) PROMPT-v4 §5.5: SiparisAlTablo.KontrolNot — legacy Kontrol formu yazıyor,
         // canlı DB'de büyük ihtimalle var; yoksa eklenir (idempotent).
@@ -88,10 +94,20 @@ public static class DatabaseSchemaMigrator
 
         // 10) Satın alma ek dosyaları — SatinAlmaTalepEk (yoksa CREATE).
         await EnsureSatinAlmaTalepEkTableAsync(ctx, logger);
+        // 40+ ergonomi K5 — yumuşak silme (satın alma eki; blob korunur).
+        await EnsureSoftDeleteColumnsAsync(ctx, logger, "SatinAlmaTalepEk");
+
+        // 10b) Muhasebe Klasörü — SiparisMuhasebeEk (yoksa CREATE). Additive:
+        // eski SiparisAlTablo.MuhasebeEk blob'una dokunulmaz.
+        await EnsureSiparisMuhasebeEkTableAsync(ctx, logger);
+        // 40+ ergonomi K5 — yumuşak silme (muhasebe klasörü dosyası).
+        await EnsureSoftDeleteColumnsAsync(ctx, logger, "SiparisMuhasebeEk");
 
         // 11) Muhasebe ekstra maliyet kalemleri — SiparisEkMaliyet (yoksa CREATE).
         // Additive: sipariş çekirdek kalemleri (SiparisIslemTablo) değişmez.
         await EnsureSiparisEkMaliyetTableAsync(ctx, logger);
+        // 40+ ergonomi K5 — yumuşak silme (ekstra maliyet; toplamlardan düşülür).
+        await EnsureSoftDeleteColumnsAsync(ctx, logger, "SiparisEkMaliyet");
 
         // 12) §17 — SiparisOnaylari.OnayDurumu varchar(20) → varchar(40).
         await EnsureOnayDurumuWidenedAsync(ctx, logger);
@@ -138,6 +154,8 @@ public static class DatabaseSchemaMigrator
 
         // 15) Antrepo ve Depo Stokları — AntrepoBeyanname, AntrepoStokKalem, AntrepoStokCikis
         await EnsureWarehouseStockTablesAsync(ctx, logger);
+        // 40+ ergonomi K5 — yumuşak silme (antrepo/depo stok kalemi).
+        await EnsureSoftDeleteColumnsAsync(ctx, logger, "AntrepoStokKalem");
 
         // 16) Sistem Ayarları — SistemAyarlari (Gemini API anahtarı vb.)
         await EnsureSystemSettingsTableAsync(ctx, logger);
@@ -324,6 +342,29 @@ public static class DatabaseSchemaMigrator
                 INDEX IX_SatinAlmaTalepEk_TalepID (TalepID)
             )");
         logger?.LogInformation("SatinAlmaTalepEk tablosu hazırlandı (CREATE IF NOT EXISTS).");
+    }
+
+    /// <summary>
+    /// Muhasebe Klasörü dosyaları — sipariş başına çok dosya. Siparişe SiparisAlID
+    /// ile bağlanır; blob ayrı tabloda. CREATE IF NOT EXISTS → idempotent.
+    /// </summary>
+    private static async Task EnsureSiparisMuhasebeEkTableAsync(AppDbContext ctx, ILogger? logger)
+    {
+        await ctx.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS SiparisMuhasebeEk (
+                EkID                INT            NOT NULL AUTO_INCREMENT,
+                SiparisAlID         INT            NOT NULL,
+                Ad                  VARCHAR(255)   NOT NULL,
+                Tip                 VARCHAR(150)   NOT NULL,
+                Boyut               BIGINT         NOT NULL,
+                Veri                LONGBLOB       NOT NULL,
+                Tarih               DATETIME       NOT NULL,
+                YukleyenKullaniciID INT            NULL,
+                YukleyenAdSoyad     VARCHAR(200)   NULL,
+                PRIMARY KEY (EkID),
+                INDEX IX_SiparisMuhasebeEk_SiparisAlID (SiparisAlID)
+            )");
+        logger?.LogInformation("SiparisMuhasebeEk tablosu hazırlandı (CREATE IF NOT EXISTS).");
     }
 
     /// <summary>
@@ -958,6 +999,21 @@ public static class DatabaseSchemaMigrator
         cmd.CommandText = sql;
         var v = await cmd.ExecuteScalarAsync();
         return v is null || v is DBNull ? null : v.ToString();
+    }
+
+    /// <summary>
+    /// 40+ ergonomi K5 — yumuşak silme kolonları: Silindi (0/1), SilinmeTarihi,
+    /// SilenKullaniciID. Silinen kayıt bayraklanır, normal sorgulardan gizlenir,
+    /// "Geri al / Geri yükle" bayrağı kaldırır. Yalnız sabit tablo adlarıyla çağrılır.
+    /// </summary>
+    private static async Task EnsureSoftDeleteColumnsAsync(AppDbContext ctx, ILogger? logger, string table)
+    {
+        await EnsureColumnAsync(ctx, logger, table, "Silindi",
+            $"ALTER TABLE {table} ADD COLUMN Silindi TINYINT(1) NOT NULL DEFAULT 0");
+        await EnsureColumnAsync(ctx, logger, table, "SilinmeTarihi",
+            $"ALTER TABLE {table} ADD COLUMN SilinmeTarihi DATETIME NULL");
+        await EnsureColumnAsync(ctx, logger, table, "SilenKullaniciID",
+            $"ALTER TABLE {table} ADD COLUMN SilenKullaniciID INT NULL");
     }
 
     private static async Task EnsureColumnAsync(AppDbContext ctx, ILogger? logger,

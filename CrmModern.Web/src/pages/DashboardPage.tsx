@@ -12,6 +12,8 @@ import { hideMoneyFor } from '@/lib/visibility'
 import { formatMoney } from '@/lib/currency'
 import { visibleNavItems, NAV_ITEMS } from '@/lib/navigation'
 import { PageHeader } from '@/components/PageHeader'
+import { Button } from '@/components/ui/button'
+import { Inbox } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { KPICard } from '@/components/KPICard'
 import { WorkQueuePanel } from '@/components/WorkQueuePanel'
@@ -281,6 +283,11 @@ export function DashboardPage() {
       <PageHeader
         title={t('dashboard.title')}
         description={`${t('dashboard.welcome')}, ${fullName}${workSummary ? ` · ${workSummary}` : ''}`}
+        actions={
+          <Button asChild variant="outline">
+            <Link to="/inbox"><Inbox className="h-4 w-4" aria-hidden /> {t('dashboard.goInbox')}</Link>
+          </Button>
+        }
       />
 
       {/* ── Sıradaki işlerin (Bekleyen İşler özeti) ─────────────────────── */}

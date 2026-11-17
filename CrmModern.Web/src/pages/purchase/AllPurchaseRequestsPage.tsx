@@ -54,7 +54,7 @@ export function AllPurchaseRequestsPage() {
   // Override sonrası talep tüm bekleyen kuyruklardan düşer (ortak tazeleme).
   const overrideMut = useAppMutation({
     mutationFn: (talepId: number) => overrideApprovePurchase(talepId),
-    successTitle: t('purchase.overrideSuccess'),
+    successTitle: t('purchase.overrideSuccess'), notify: 'toast',
     successDescription: (_d, id) => '#' + id,
     errorTitle: t('common.error'),
   })
@@ -118,7 +118,7 @@ export function AllPurchaseRequestsPage() {
           </FilterField>
           <FilterField label={t('purchase.filter.departman')}>
             <Select value={filter.departman ?? 'all'} onValueChange={(v) => update('departman', v === 'all' ? undefined : v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
                 {DEPARTMANLAR.map((d) => <SelectItem key={d} value={d}>{t(`roles.${d}`, { defaultValue: d })}</SelectItem>)}
@@ -127,7 +127,7 @@ export function AllPurchaseRequestsPage() {
           </FilterField>
           <FilterField label={t('purchase.filter.durum')}>
             <Select value={filter.durum ?? 'all'} onValueChange={(v) => update('durum', v === 'all' ? undefined : v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
                 {DURUMLAR.map((d) => <SelectItem key={d} value={d}>{purchaseStatusLabel(t, d)}</SelectItem>)}
@@ -136,7 +136,7 @@ export function AllPurchaseRequestsPage() {
           </FilterField>
           <FilterField label={t('purchase.filter.tip')}>
             <Select value={filter.talepTipi ?? 'all'} onValueChange={(v) => update('talepTipi', v === 'all' ? undefined : v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">{t('common.all')}</SelectItem>
                 {TIPLER.map((tp) => <SelectItem key={tp} value={tp}>{t(`purchase.tipLabel.${tp}`, { defaultValue: tp })}</SelectItem>)}
@@ -153,7 +153,7 @@ export function AllPurchaseRequestsPage() {
       </div>
 
       <FillRegion className="pt-2">
-        <DataTable fill tableId="purchase-all" exportFileName="satin-alma-talepleri" columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} error={isError} density="compact" />
+        <DataTable fill tableId="purchase-all" exportFileName="satin-alma-talepleri" columns={cols} data={(page?.items ?? []) as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} error={isError} />
       </FillRegion>
 
       {page && (

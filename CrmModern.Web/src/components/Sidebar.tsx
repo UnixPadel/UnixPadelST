@@ -60,9 +60,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <aside
         aria-label={t('nav.menu')}
         className={cn(
-          'flex h-screen flex-col border-r bg-card transition-all duration-200 ease-in-out overflow-hidden',
+          'flex h-screen flex-col overflow-hidden border-r bg-card transition-[width,transform] duration-150 ease-out',
           'lg:relative lg:translate-x-0',
-          isOpen ? 'lg:w-60' : 'lg:w-14',
+          isOpen ? 'lg:w-64' : 'lg:w-24',
           // Mobil: fixed overlay, slayt animasyonu
           'fixed inset-y-0 left-0 z-40 w-60',
           isOpen ? 'translate-x-0' : '-translate-x-full',
@@ -79,10 +79,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <button
             onClick={onClose}
-            className="lg:hidden rounded-md p-1 hover:bg-accent"
-            aria-label={t('common.close')}
+            className="flex min-h-ctl-xs items-center gap-1 rounded-md px-2 text-sm hover:bg-accent lg:hidden"
           >
-            <X className="h-4 w-4" />
+            <X className="h-4 w-4" aria-hidden /> {t('common.close')}
           </button>
         </div>
 
@@ -94,7 +93,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             return (
               <div key={group} className="mb-2">
                 {group !== 'general' && (
-                  <p className={cn('px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80', rail && 'lg:hidden')}>
+                  <p className={cn('px-3 pb-1 pt-2 text-2xs font-semibold uppercase tracking-wide text-muted-foreground', rail && 'lg:hidden')}>
                     {t(`nav.groups.${group}`)}
                   </p>
                 )}
@@ -112,26 +111,27 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         key={item.path}
                         to={item.path}
                         title={rail ? `${label} (${item.code})` : undefined}
+                        aria-label={rail ? label : undefined}
                         aria-current={isActive ? 'page' : undefined}
                         onClick={() => { if (window.innerWidth < 1024) onClose() }}
                         className={cn(
-                          'relative flex items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
-                          rail && 'lg:justify-center lg:px-0 lg:py-2',
+                          'relative flex min-h-ctl-sm items-center gap-3 rounded-md px-3 py-1.5 text-sm transition-colors',
+                          rail && 'lg:flex-col lg:justify-center lg:gap-1 lg:px-1 lg:py-2 lg:text-center',
                           isActive
                             ? 'bg-primary text-primary-foreground'
                             : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                         )}
                       >
-                        <Icon className="h-4 w-4 shrink-0" />
-                        <span className={cn('flex-1 truncate', rail && 'lg:hidden')}>
+                        <Icon className={cn('h-4 w-4 shrink-0', rail && 'lg:h-5 lg:w-5')} aria-hidden />
+                        <span className={cn('flex-1 truncate', rail && 'lg:line-clamp-2 lg:flex-none lg:whitespace-normal lg:break-words lg:text-2xs lg:leading-tight')}>
                           {group === 'general' ? label : shortNavLabel(label)}
                         </span>
                         {typeof count === 'number' && count > 0 && (
                           <span
                             className={cn(
-                              'min-w-[1.25rem] rounded-full px-1.5 text-center text-[11px] font-semibold tabular-nums',
+                              'min-w-[1.25rem] rounded-full px-1.5 text-center text-2xs font-semibold tabular-nums',
                               isActive ? 'bg-primary-foreground/20' : 'bg-warning-soft text-warning-soft-foreground',
-                              rail && 'lg:absolute lg:-right-0.5 lg:-top-0.5 lg:min-w-0 lg:px-1 lg:text-[10px]',
+                              rail && 'lg:absolute lg:-right-0.5 lg:-top-0.5 lg:min-w-0 lg:px-1 lg:text-2xs',
                             )}
                             aria-label={t('nav.pendingCount', { count })}
                           >
@@ -157,14 +157,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           )}
           <button
             onClick={handleLogout}
-            title={rail ? t('common.logout') : undefined}
-            className={cn('flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors', rail && 'lg:justify-center lg:px-0')}
+            className={cn('flex min-h-ctl-sm w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground', rail && 'lg:flex-col lg:justify-center lg:gap-1 lg:px-1')}
           >
-            <LogOut className="h-4 w-4 shrink-0" />
-            <span className={cn(rail && 'lg:hidden')}>{t('common.logout')}</span>
+            <LogOut className="h-4 w-4 shrink-0" aria-hidden />
+            <span className={cn(rail && 'lg:text-2xs')}>{t('common.logout')}</span>
           </button>
           {/* Sol alt köşe — güncel sürüm (package.json'dan derleme anında gömülür). */}
-          <p className={cn('mt-2 px-3 text-center text-[10px] text-muted-foreground/70', rail && 'lg:hidden')}>
+          <p className={cn('mt-2 px-3 text-center text-2xs text-muted-foreground', rail && 'lg:hidden')}>
             v{__APP_VERSION__}
           </p>
         </div>

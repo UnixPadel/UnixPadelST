@@ -28,6 +28,8 @@ public interface IOrderService
     // ── Round-8 §7 — Kontrol onayı öncesi yerinde düzenleme / yumuşak silme ─
     Task<string> AmendOrderAsync(int kullaniciID, string no, CreateOrderDto dto, string gerekce, bool isManagerOrElshan);
     Task SoftDeleteOrderAsync(int kullaniciID, string no, string gerekce, bool isManagerOrElshan);
+    /// <summary>40+ ergonomi K5 — yumuşak silinen siparişi geri yükler (silme ile aynı yetki).</summary>
+    Task RestoreOrderAsync(int kullaniciID, string no, bool isManagerOrElshan);
 
     // ── Temsilci devri — sahipliği (KullaniciID) başka kullanıcıya atar.
     //    Yalnız ControlUser (elshan.rasulov); gate controller'da uygulanır.

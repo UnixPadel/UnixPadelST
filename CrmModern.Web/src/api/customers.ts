@@ -6,6 +6,17 @@ export const getCustomers = async (): Promise<Musteri[]> => {
   return res.data.data
 }
 
+/** K5 — "Silinenleri göster": silinmiş müşteriler `silindi: true` ile birlikte gelir. */
+export const getCustomersIncludingDeleted = async (): Promise<Musteri[]> => {
+  const res = await api.get<ApiResponse<Musteri[]>>('/api/musteri', { params: { includeDeleted: true } })
+  return res.data.data
+}
+
+/** K5 — silinen müşteriyi geri yükler. */
+export const restoreCustomer = async (id: number): Promise<void> => {
+  await api.post(`/api/musteri/${id}/restore`)
+}
+
 export const getCustomer = async (id: number): Promise<Musteri> => {
   const res = await api.get<ApiResponse<Musteri>>(`/api/musteri/${id}`)
   return res.data.data

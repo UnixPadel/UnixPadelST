@@ -32,8 +32,10 @@ public interface IPurchaseService
     Task<PurchaseAttachmentInfoDto?> GetAttachmentInfoAsync(int talepId);
     /// <summary>Ek indirme verisi (bayt + ad + tip) — yoksa null.</summary>
     Task<PurchaseAttachmentDataDto?> GetAttachmentAsync(int talepId);
-    /// <summary>Talebin ek dosyasını kaldır.</summary>
-    Task DeleteAttachmentAsync(int talepId);
+    /// <summary>Talebin ek dosyasını kaldır. 40+ ergonomi K5 — yumuşak: blob korunur, ek "yok" sayılır.</summary>
+    Task DeleteAttachmentAsync(int talepId, int? silenKullaniciId);
+    /// <summary>Yumuşak silinen eki geri yükler (silinmemişse attachmentNotDeleted).</summary>
+    Task RestoreAttachmentAsync(int talepId);
 
     // ── Aşama 2: muhasebe ödeme detayı ────────────────────────────────────
     Task SetPaymentDetailsAsync(int talepId, SetPaymentDetailsDto dto, string currentUserName);

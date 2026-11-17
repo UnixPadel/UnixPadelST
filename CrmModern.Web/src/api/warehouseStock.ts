@@ -14,12 +14,14 @@ export const getStockItems = async (params?: {
   konum?: string
   tamamlananlar?: boolean
   q?: string
+  includeDeleted?: boolean
 }): Promise<StockListDto> => {
   const res = await api.get<ApiResponse<StockListDto>>('/api/warehouse-stock/items', {
     params: {
       konum: params?.konum && params.konum !== 'Tumu' ? params.konum : undefined,
       tamamlananlar: params?.tamamlananlar ? true : undefined,
       q: params?.q || undefined,
+      includeDeleted: params?.includeDeleted ? true : undefined,
     },
   })
   return res.data.data
@@ -66,6 +68,11 @@ export const updateStockItem = async (
 
 export const deleteStockItem = async (id: number): Promise<void> => {
   await api.delete(`/api/warehouse-stock/items/${id}`)
+}
+
+/** K5 — silinen stok kalemini geri yükler. */
+export const restoreStockItem = async (id: number): Promise<void> => {
+  await api.post(`/api/warehouse-stock/items/${id}/restore`)
 }
 
 export const addStockExit = async (

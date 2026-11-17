@@ -69,6 +69,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IAuthService,             AuthService>();
         services.AddScoped<IMusteriService,          MusteriService>();
         services.AddScoped<IOrderService,            OrderService>();
+        services.AddScoped<IOrderFolderService,      OrderFolderService>();
         services.AddScoped<IQualityControlService,   QualityControlService>();
         services.AddScoped<IFactoryService,          FactoryService>();
         services.AddScoped<ILogisticsService,        LogisticsService>();

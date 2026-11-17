@@ -112,7 +112,7 @@ export function SetTabPanel({
             disabled={tab.checklist.length === 0}
           />
           {tab.checklist.length > 0 && (
-            <span className="text-[11px] text-muted-foreground tabular-nums">{t('orders.form.checkedCount', { checked: checkedCount, total: tab.checklist.length })}</span>
+            <span className="text-2xs text-muted-foreground tabular-nums">{t('orders.form.checkedCount', { checked: checkedCount, total: tab.checklist.length })}</span>
           )}
         </div>
         <div className="h-36 overflow-y-auto p-1.5">
@@ -127,7 +127,7 @@ export function SetTabPanel({
                   onCheckedChange={(v) => onToggleComponent(c.bilesenID, v)}
                   data-enter-skip
                 />
-                <span className="font-mono text-[10px] text-muted-foreground">{c.bilesenID}</span>
+                <span className="font-mono text-2xs text-muted-foreground">{c.bilesenID}</span>
                 <span className="flex-1">{c.bilesenAdi}</span>
                 <span className="text-muted-foreground tabular-nums">×{c.defaultAdet}</span>
               </label>
@@ -159,7 +159,7 @@ export function SetTabPanel({
                 return (
                   <tr key={`${cmp.bilesenID}-${k}`} className="border-t">
                     <td className="px-2 py-1">
-                      <span className="mr-1 font-mono text-[10px] text-muted-foreground">{cmp.bilesenID}</span>{cmp.bilesenAdi}
+                      <span className="mr-1 font-mono text-2xs text-muted-foreground">{cmp.bilesenID}</span>{cmp.bilesenAdi}
                     </td>
                     <td className="px-2 py-1">
                       {/* §2.4: boş seçim serbest; auto-default seçeneklerde yoksa enjekte edildi. */}
@@ -183,7 +183,7 @@ export function SetTabPanel({
                         aria-label={t('orders.form.adet')}
                         value={cmp.adet}
                         onChange={(e) => onUpdateComponent(k, { adet: Math.max(1, Number(e.target.value) || 1) })}
-                        className="h-7 text-right"
+                        className="text-right"
                       />
                     </td>
                     <td className="px-2 py-1 text-right">
@@ -204,7 +204,7 @@ export function SetTabPanel({
                             const from = shown == null ? cmp.kaynakPara : viewIso
                             onUpdateComponent(k, { kaynakFiyat: n, kaynakPara: from, birimFiyat: priceIn(n, from) })
                           }}
-                          className="h-7 text-right"
+                          className="text-right"
                         />
                       </div>
                     </td>

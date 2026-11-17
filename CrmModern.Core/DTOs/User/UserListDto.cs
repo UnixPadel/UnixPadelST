@@ -8,4 +8,7 @@ public sealed record UserListDto(
     string Email,
     string Telefon,
     string YetkiTuru,
-    string Durum);
+    string Durum,
+    // 40+ ergonomi K5 — yalnız ?includeDeleted=true listesinde true olabilir.
+    bool      Silindi       = false,
+    DateTime? SilinmeTarihi = null);

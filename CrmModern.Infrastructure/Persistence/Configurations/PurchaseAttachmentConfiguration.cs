@@ -19,5 +19,10 @@ internal sealed class PurchaseAttachmentConfiguration : IEntityTypeConfiguration
         builder.Property(e => e.Veri)                 .HasColumnName("Veri") .HasColumnType("longblob");
         builder.Property(e => e.Tarih)                .HasColumnName("Tarih");
         builder.Property(e => e.YukleyenKullaniciAdi) .HasColumnName("YukleyenKullaniciAdi").HasMaxLength(200);
+
+        // 40+ ergonomi K5 — yumuşak silme
+        builder.Property(e => e.Silindi)              .HasColumnName("Silindi");
+        builder.Property(e => e.SilinmeTarihi)        .HasColumnName("SilinmeTarihi");
+        builder.Property(e => e.SilenKullaniciID)     .HasColumnName("SilenKullaniciID");
     }
 }

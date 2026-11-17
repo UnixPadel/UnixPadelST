@@ -18,13 +18,15 @@ const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 rounded-md px-3',
+        // 40+ ergonomi — yükseklikler ölçek tokenlarından (Rahat 44/40/36/48px,
+        // Standart 40/36/32/44px). Önceki xs ve icon-sm 28px'ti (Fitts hedefi altında).
+        default: 'h-ctl-md px-4 py-2',
+        sm: 'h-ctl-sm rounded-md px-3',
         // QW-3 — yoğun gridler/araç çubukları için (eski `h-7 text-xs` ezmeleri).
-        xs: 'h-7 rounded-md px-2 text-xs gap-1',
-        lg: 'h-11 rounded-md px-8',
-        icon: 'h-10 w-10',
-        'icon-sm': 'h-7 w-7',
+        xs: 'h-ctl-xs rounded-md px-2.5 text-xs gap-1.5',
+        lg: 'h-ctl-lg rounded-md px-8',
+        icon: 'h-ctl-md w-ctl-md',
+        'icon-sm': 'h-ctl-xs w-ctl-xs',
       },
     },
     defaultVariants: { variant: 'default', size: 'default' },
@@ -37,25 +39,42 @@ export interface ButtonProps
   asChild?: boolean
   /** QW-3 — bekleme durumu: spinner + disabled + aria-busy. */
   loading?: boolean
+  /**
+   * 40+ ergonomi (2.4) — buton devre dışıyken sebebi yalnız üzerine gelince açılan
+   * ipucunda değil, butonun altında görünür metin olarak yazılır. Verilince buton
+   * bir sarmalayıcıya alınır (`wrapperClassName` ile genişlik verilebilir).
+   */
+  disabledReason?: string | null
+  wrapperClassName?: string
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, loading = false, disabled, children, ...props }, ref) => {
+  ({ className, variant, size, asChild = false, loading = false, disabled, disabledReason, wrapperClassName, children, ...props }, ref) => {
     const Comp = asChild ? Slot : 'button'
+    const reasonId = React.useId()
     if (asChild) {
       return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props}>{children}</Comp>
     }
-    return (
+    const showReason = !!disabled && !loading && !!disabledReason
+    const button = (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         disabled={disabled || loading}
         aria-busy={loading || undefined}
+        aria-describedby={showReason ? reasonId : undefined}
         {...props}
       >
-        {loading && <Loader2 className={cn('animate-spin', size === 'xs' || size === 'icon-sm' ? 'h-3 w-3' : 'h-4 w-4')} />}
+        {loading && <Loader2 className={cn('animate-spin', size === 'xs' || size === 'icon-sm' ? 'h-3.5 w-3.5' : 'h-4 w-4')} aria-hidden />}
         {children}
       </Comp>
+    )
+    if (disabledReason === undefined) return button
+    return (
+      <span className={cn('inline-flex flex-col gap-1', wrapperClassName)}>
+        {button}
+        {showReason && <span id={reasonId} className="text-xs leading-snug text-muted-foreground">{disabledReason}</span>}
+      </span>
     )
   }
 )

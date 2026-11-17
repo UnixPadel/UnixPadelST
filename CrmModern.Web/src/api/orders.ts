@@ -103,6 +103,10 @@ export const amendOrder = (no: string, dto: CreateOrderDto, gerekce: string) =>
 export const deleteOrder = (no: string, gerekce: string) =>
   api.delete(`/api/orders/${no}`, { data: { gerekce } }).then((r) => r.data)
 
+/** K5 — yumuşak silinen siparişi geri yükler (silme yetkisiyle aynı). */
+export const restoreOrder = (no: string) =>
+  api.post(`/api/orders/${no}/restore`).then((r) => r.data)
+
 export const cloneOrder = (sourceNo: string) =>
   api.post<ApiResponse<string>>(`/api/orders/${sourceNo}/clone`).then((r) => r.data.data)
 
@@ -157,6 +161,12 @@ export const uploadAttachment = (no: string, type: 'ek' | 'muhasebeek', file: Fi
 export const attachmentUrl = (no: string, type: 'ek' | 'muhasebeek') =>
   `/api/orders/${no}/attachments/${type}`
 
+const EXT_BY_TYPE: Record<string, string> = {
+  'application/pdf': '.pdf', 'application/zip': '.zip', 'application/vnd.rar': '.rar',
+  'application/x-7z-compressed': '.7z', 'image/png': '.png', 'image/jpeg': '.jpg', 'image/gif': '.gif',
+}
+const extensionFor = (mime: string) => EXT_BY_TYPE[mime] ?? '.zip'
+
 // PROMPT-v4 §5.6 — Kontrol ekranı Satıcı Ek / Muhasebe Ek indirme.
 // 404 (blob yok) çağıran tarafta toast'a çevrilir.
 export const downloadAttachment = async (no: string, type: 'ek' | 'muhasebeek') => {
@@ -164,7 +174,9 @@ export const downloadAttachment = async (no: string, type: 'ek' | 'muhasebeek') 
   const url = URL.createObjectURL(res.data as Blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = type === 'ek' ? `siparis_ek_${no}.zip` : `muhasebe_ek_${no}.zip`
+  // Uzantı sunucunun ilk baytlardan tespit ettiği içerik tipinden gelir (önceden
+  // her dosya ".zip" iniyordu; PDF yüklendiyse açılmıyordu).
+  a.download = `${type === 'ek' ? 'siparis_ek' : 'muhasebe_ek'}_${no}${extensionFor((res.data as Blob).type)}`
   document.body.appendChild(a)
   a.click()
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url) }, 0)
@@ -179,7 +191,7 @@ export const downloadAttachment = async (no: string, type: 'ek' | 'muhasebeek') 
 // / bölgesel kod (en-US) / zamanlama nedeniyle görünen UI dilinden SAPABİLİR ve
 // İngilizce arayüzde Türkçe proforma üretirdi. `i18n.language` arayüz dilinin tek
 // otoritesidir (LanguageSwitcher de bunu kullanır); böylece export = görünen dil.
-const currentLang = (): 'tr' | 'en' =>
+export const currentLang = (): 'tr' | 'en' =>
   (i18n.language || localStorage.getItem('i18nextLng') || 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr'
 
 export const excelUrl = (no: string) => `/api/orders/${no}/excel?lang=${currentLang()}`

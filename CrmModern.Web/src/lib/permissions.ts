@@ -27,3 +27,15 @@ export function isAccountingApprover(
   const u = user?.kullaniciAdi
   return (!!u && ACCOUNTING_APPROVERS.includes(u)) || isSuperAdmin(user)
 }
+
+// Muhasebe Klasörü — backend OrderController.CanManageFolder ile aynı küme.
+// Görme kuralı parasal görünürlüğe bağlıdır (lib/visibility.ts hideMoneyFor);
+// ekleme/silme: Yönetici, Muhasebe, Muhasebe Onay kullanıcıları. Sunucu ayrıca
+// klasör yanıtında `canManage` döner — arayüz kararını o verir; bu yardımcı
+// yalnız "+" gibi klasörü açmadan görünen düğmeler içindir.
+export function canManageAccountingFolder(
+  user: { yetkiTuru?: string | null; kullaniciAdi?: string | null } | null | undefined,
+): boolean {
+  if (!user) return false
+  return user.yetkiTuru === 'Yonetici' || user.yetkiTuru === 'Muhasebe' || isAccountingApprover(user)
+}

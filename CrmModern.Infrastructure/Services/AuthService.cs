@@ -69,7 +69,8 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
             throw new UnauthorizedException("Kullanıcı adı veya şifre hatalı.", "invalidCredentials");
 
         // Replicates original: if (durum == "Aktif") { ... } else { MessageBox.Show("Hesabınız pasif durumda.") }
-        if (!kullanici.Durum.Equals("Aktif", StringComparison.OrdinalIgnoreCase))
+        // 40+ ergonomi K5 — yumuşak silinen kullanıcı pasif kullanıcıyla aynı yoldan reddedilir.
+        if (kullanici.Silindi || !kullanici.Durum.Equals("Aktif", StringComparison.OrdinalIgnoreCase))
             throw new UnauthorizedException("Hesabın pasif. Yöneticine sor.", "accountInactive");
 
         var token = GenerateJwtToken(kullanici, request.RememberMe);
@@ -90,6 +91,9 @@ internal sealed class AuthService(IUnitOfWork unitOfWork, IConfiguration configu
     {
         var kullanici = await unitOfWork.Kullanicilar.GetByIdAsync(kullaniciId)
             ?? throw new UnauthorizedException("Kullanıcı bulunamadı.", "userNotFound");
+        // 40+ ergonomi K5 — silinen kullanıcının oturumu geçersiz (bulunamadı yolu).
+        if (kullanici.Silindi)
+            throw new UnauthorizedException("Kullanıcı bulunamadı.", "userNotFound");
 
         return new LoginResponseDto(
             KullaniciID            : kullanici.KullaniciID,

@@ -1,15 +1,18 @@
 import { useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { Check, CheckCircle2, AlertTriangle, Copy, Download, FileText } from 'lucide-react'
-import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative } from '@/api/orders'
+import { getOrderDetail, downloadExcel, downloadPdf, changeRepresentative, restoreOrder } from '@/api/orders'
 import { getUsersLookup } from '@/api/users'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { resolveClause, isFreeNote, isClauseCode, getProductDetails, detectOrderCategory } from '@/lib/clauses'
 import { StatusBadge } from '@/components/StatusBadge'
+import { RowActionsMenu } from '@/components/RowActionsMenu'
+import type { RowAction } from '@/components/ContextMenu'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SectionTitle } from '@/components/ui/section-title'
@@ -24,6 +27,8 @@ import { isSuperAdmin, isAccountingApprover } from '@/lib/permissions'
 import { CompleteOrderModal } from '@/components/order/CompleteOrderModal'
 import { hideMoneyFor } from '@/lib/visibility'
 import { invalidateOrderGraph } from '@/lib/queryKeys'
+import { usePanelHeaderSlot } from '@/components/MasterDetailLayout'
+import { AccountingFolderButton, AccountingFolderDialog, canSeeAccountingFolder } from '@/components/order/AccountingFolder'
 
 interface Props {
   siparisNo: string | null
@@ -45,6 +50,12 @@ interface Props {
 type PanelProps = Omit<Props, 'onClose'> & {
   /** E-9 — panel bir master-detail düzeninde satır içi gösterilirken true. */
   embedded?: boolean
+  /**
+   * Ekrana özel işlemler (ör. Revize Et, Sil). Başlıktaki tek "Diğer işlemler"
+   * menüsüne eklenir: tehlikesizler en üste, `destructive` olanlar en alta.
+   * Böylece panelde iki ayrı menü oluşmaz. `onSelect` satır argümanını kullanmamalı.
+   */
+  extraActions?: RowAction<unknown>[]
 }
 
 /** Modal sarmalayıcı — mevcut tüm ekranlar bunu kullanmaya devam eder. */
@@ -77,7 +88,7 @@ const SECTION_OFFSET = 12
  * Çapa butonu ilgili bölüme kaydırır; kaydırdıkça etkin buton güncellenir.
  * Kap (modal / aside) sınırlı yükseklikte bir flex sütunu olmalıdır.
  */
-export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView = false, factoryView = false, embedded = false }: PanelProps) {
+export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView = false, factoryView = false, embedded = false, extraActions = [] }: PanelProps) {
   const { t } = useTranslation()
   const { toast } = useToast()
   const nav = useNavigate()
@@ -96,7 +107,12 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
   const [downloading, setDownloading] = useState<'excel' | 'pdf' | null>(null)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [showCompleteModal, setShowCompleteModal] = useState(false)
+  const [folderOpen, setFolderOpen] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const qc = useQueryClient()
   const padX = embedded ? 'px-3' : 'px-6'
+  const panelSlot = usePanelHeaderSlot()
+  const headerSlot = embedded ? panelSlot : null
 
   // Çapa çubuğu ↔ bölümler. Tıklamadaki yumuşak kaydırma bitene dek kaydırma
   // takibi durur (yoksa kısa son bölümlerde vurgu "sona" atlar).
@@ -160,7 +176,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
     )
   }
   if (isError || !order) {
-    return <p className={cn('py-8 text-center text-sm text-destructive', padX)}>{t('orderDetail.loadError')}</p>
+    return <p className={cn('py-8 text-center text-sm text-danger', padX)}>{t('orderDetail.loadError')}</p>
   }
 
   const detectedCategory = detectOrderCategory(order)
@@ -182,6 +198,27 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
   const allFreeNotes = [
     ...(order.siparisNotu ? [order.siparisNotu] : []),
     ...freeNotes,
+  ]
+
+  // Başlıktaki "Diğer işlemler" menüsü: belge indirme, kopyalama ve (ayrı, en altta)
+  // ara adımları atlayarak tamamlama.
+  const canCompleteDirect = isAccountingApprover(user) && order.siparisMiTeklifMi !== 'Tamamlandi'
+    && order.siparisMiTeklifMi !== 'Teklif' && order.siparisMiTeklifMi !== 'Iptal' && !order.silindi
+  const headerMenu: RowAction<unknown>[] = [
+    ...extraActions.filter((a) => !a.destructive),
+    ...(!hideMoney ? [
+      { key: 'excel', label: t('folder.proformaExcel'), icon: <Download className="h-3.5 w-3.5" />, separatorBefore: extraActions.some((a) => !a.destructive), onSelect: () => void handleDownload('excel') },
+      { key: 'pdf', label: t('folder.proformaPdf'), icon: <FileText className="h-3.5 w-3.5" />, onSelect: () => void handleDownload('pdf') },
+    ] : []),
+    ...(canCreateOrders ? [
+      { key: 'copy', label: t('orderDetail.copyAsNew'), icon: <Copy className="h-3.5 w-3.5" />, separatorBefore: !hideMoney,
+        onSelect: () => nav(`/orders/new?copyFrom=${encodeURIComponent(order.siparisNo)}`) },
+    ] : []),
+    ...(canCompleteDirect ? [
+      { key: 'complete', label: t('accApproval.completeDirect'), icon: <AlertTriangle className="h-4 w-4" aria-hidden />, destructive: true, separatorBefore: true,
+        onSelect: () => setShowCompleteModal(true) },
+    ] : []),
+    ...extraActions.filter((a) => a.destructive).map((a, i) => ({ ...a, separatorBefore: a.separatorBefore || (i === 0 && !canCompleteDirect) })),
   ]
 
   const itemCount = order.items?.length ?? 0
@@ -230,45 +267,62 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
     )
   }
 
+  const badges = (
+    <>
+      <StatusBadge value={order.siparisMiTeklifMi} context="stage" />
+      <StatusBadge value={order.kontrol} context="kontrol" />
+    </>
+  )
+
   return (
     <div className="flex min-h-0 flex-1 flex-col text-sm">
+      {/* K5 — silinmiş sipariş: durum + geri yükleme. */}
+      {order.silindi && (
+        <div role="status" className={cn('mb-2 flex flex-wrap items-center gap-2 rounded-md border border-danger/30 bg-danger-soft py-2 text-sm text-danger-soft-foreground', embedded ? 'mx-3 px-3' : 'mx-6 px-3')}>
+          <span className="font-semibold">{t('undo.deletedBadge')}</span>
+          <Button size="xs" variant="outline" className="ml-auto" loading={restoring}
+            onClick={async () => {
+              setRestoring(true)
+              try { await restoreOrder(order.siparisNo); await invalidateOrderGraph(qc); toast({ title: t('undo.restored'), description: order.siparisNo, variant: 'success' }) }
+              catch (e) { toastApiError(toast, t('undo.failed'), e) }
+              finally { setRestoring(false) }
+            }}>
+            {t('undo.restore')}
+          </Button>
+        </div>
+      )}
       {/* Sabit üst kısım (kaymaz): durum şeridi + bölüm çapaları. */}
       <div className={cn('shrink-0 space-y-2 border-b pb-2', padX)}>
         {/* Başlık şeridi: durum + tarih + aksiyonlar */}
-        <div className="flex flex-wrap items-center gap-2">
-          {embedded && <span className="font-mono text-sm font-semibold">{siparisNo}</span>}
-          <StatusBadge value={order.siparisMiTeklifMi} context="stage" />
-          <StatusBadge value={order.kontrol} context="kontrol" />
-          {order.tarih && <span className="text-muted-foreground">{formatDate(order.tarih)}</span>}
-          {order.sirket && <span className="text-muted-foreground">· {order.sirket}</span>}
-          <div className="ml-auto flex flex-wrap gap-1.5">
-            {isAccountingApprover(user) && order.siparisMiTeklifMi !== 'Tamamlandi' && order.siparisMiTeklifMi !== 'Teklif' && order.siparisMiTeklifMi !== 'Iptal' && !order.silindi && (
-              <Button size="xs" className="rounded-none bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium shadow-xs border border-red-700 dark:border-red-500 transition-colors"
-                onClick={() => setShowCompleteModal(true)}>
-                <AlertTriangle className="h-3.5 w-3.5 mr-1" /> {t('accApproval.actions.tamamla', 'Siparişi Tamamla')}
-              </Button>
+        {/* Yan panelde rozetler panel başlığına (sipariş no. yanına) taşınır; tarih ·
+            şirket ile işlemler tek satırda kalır. Önceden rozetler + tarih bir satır,
+            işlemler sığmayıp ikinci satır oluyordu → sipariş içeriği daralıyordu. */}
+        {headerSlot && createPortal(badges, headerSlot)}
+        <div className={cn('flex items-center gap-2', headerSlot ? 'flex-nowrap' : 'flex-wrap')}>
+          {/* Sipariş no. burada tekrar yazılmaz: pencere / panel başlığında zaten var. */}
+          {!headerSlot && badges}
+          <span className={cn('text-muted-foreground', headerSlot && 'min-w-0 truncate')}
+            title={headerSlot ? [order.tarih && formatDate(order.tarih), order.sirket].filter(Boolean).join(' · ') : undefined}>
+            {order.tarih && formatDate(order.tarih)}
+            {order.sirket && <>{order.tarih ? ' · ' : ''}{order.sirket}</>}
+          </span>
+          {/* Önceden burada beş eş ağırlıklı buton vardı (Tamamla · Kopyala · Excel · PDF ·
+              Klasör). Görünür tek buton siparişin belgeleri; diğerleri "Diğer işlemler"de. */}
+          <div className={cn('ml-auto flex items-center gap-1.5', headerSlot ? 'shrink-0' : 'flex-wrap')}>
+            {/* Parasal değer göremeyenler (Fabrika vb.) klasörü görmez. */}
+            {canSeeAccountingFolder(user) && (
+              <AccountingFolderButton siparisNo={order.siparisNo} onClick={() => setFolderOpen(true)} />
             )}
-            {canCreateOrders && (
-              <Button size="xs" variant="outline" title={t('orderDetail.copyHint')}
-                onClick={() => nav(`/orders/new?copyFrom=${encodeURIComponent(order.siparisNo)}`)}>
-                <Copy className="h-3.5 w-3.5" /> {t('orderDetail.copyAsNew')}
-              </Button>
-            )}
-            {!hideMoney && (
-              <>
-                <Button size="xs" variant="outline" loading={downloading === 'excel'} onClick={() => handleDownload('excel')}>
-                  <Download className="h-3.5 w-3.5" /> {t('common.excel')}
-                </Button>
-                <Button size="xs" variant="outline" loading={downloading === 'pdf'} onClick={() => handleDownload('pdf')}>
-                  <FileText className="h-3.5 w-3.5" /> PDF
-                </Button>
-              </>
+            {headerMenu.length > 0 && (
+              downloading
+                ? <Button size="xs" variant="outline" loading disabled>{t('common.moreActions')}</Button>
+                : <RowActionsMenu row={order} actions={headerMenu} label={t('common.moreActions')} />
             )}
           </div>
         </div>
 
         {/* Bölüm çapaları — sekme görünümünde ama sayfa değiştirmez, kaydırır. */}
-        <nav aria-label={t('orderDetail.sections')} className="inline-flex h-9 max-w-full items-center overflow-x-auto rounded-md bg-muted p-1 text-muted-foreground">
+        <nav aria-label={t('orderDetail.sections')} className={cn('inline-flex max-w-full flex-wrap items-center rounded-md bg-muted text-muted-foreground', embedded ? 'p-0.5' : 'min-h-ctl-sm p-1')}>
           {sections.map((s) => (
             <button
               key={s.id}
@@ -276,7 +330,8 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
               aria-current={activeSection === s.id || undefined}
               onClick={() => goToSection(s.id)}
               className={cn(
-                'inline-flex items-center whitespace-nowrap rounded-sm px-3 py-1.5 text-xs font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                // Panelde daha dar: dört bölüm ~400 px panelde tek satıra sığsın.
+                'inline-flex items-center whitespace-nowrap rounded-sm text-xs font-medium', embedded ? 'px-2 py-1' : 'px-3 py-1.5', ' ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                 activeSection === s.id ? 'bg-background text-foreground shadow-sm' : 'hover:text-foreground',
               )}
             >
@@ -303,17 +358,17 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                   <div className="flex flex-wrap items-center gap-1.5 font-semibold text-orange-950 dark:text-orange-200">
                     <span>Bu sipariş tamamlandı olarak kapatıldı</span>
                     {order.tamamlanmaOncekiAsama && order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' && (
-                      <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-900 dark:bg-orange-950/60 dark:text-orange-200">
+                      <span className="rounded bg-orange-100 px-1.5 py-0.5 text-2xs font-medium text-orange-900 dark:bg-orange-950/60 dark:text-orange-200">
                         {order.tamamlanmaOncekiAsama} aşamasından doğrudan kapatıldı
                       </span>
                     )}
                   </div>
-                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-[11px]">
+                  <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-2xs">
                     <span>Kapatan: <strong>{order.tamamlayanAdSoyad || order.tamamlayanKullaniciAdi || 'Yetkili'}</strong></span>
                     {order.tamamlanmaTarihi && <span>· Kapanış Tarihi: <strong>{formatDate(order.tamamlanmaTarihi)}</strong></span>}
                   </div>
                   {order.tamamlanmaNotu && (
-                    <div className="mt-1 rounded border border-orange-500/20 bg-background/80 p-2 text-foreground/90 italic">
+                    <div className="mt-1 rounded border border-orange-500/20 bg-background/80 p-2 text-foreground italic">
                       "{order.tamamlanmaNotu}"
                     </div>
                   )}
@@ -339,7 +394,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                   {t('orderDetail.currentRep')}: <span className="font-medium text-foreground">{order.kullaniciAdi || '—'}</span>
                 </span>
                 <Select value={newRepId || undefined} onValueChange={setNewRepId}>
-                  <SelectTrigger className="h-8 w-56 text-xs"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
+                  <SelectTrigger size="sm" className="w-56"><SelectValue placeholder={t('orderDetail.selectRep')} /></SelectTrigger>
                   <SelectContent>
                     {temsilciler.map((u) => (
                       <SelectItem key={u.kullaniciID} value={String(u.kullaniciID)}>
@@ -412,9 +467,24 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                     value={formatCurrency(((order.toplamFiyat ?? 0) * (order.pesinYuzde ?? 0)) / 100, order.paraTipi)}
                   />
                 )}
-                {order.montajVar && <PriceBox label={t('orderDetail.montaj')} value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
-                {order.teslimatVar && <PriceBox label={t('orderDetail.teslimat')} value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
+                {order.montajVar && <PriceBox label={t('orderDetail.montajQty', { adet: order.mAdet })} value={formatCurrency(order.montajFiyat, order.paraTipi)} />}
+                {order.teslimatVar && <PriceBox label={t('orderDetail.teslimatQty', { adet: order.mTeslimat })} value={formatCurrency(order.teslimatFiyat, order.paraTipi)} />}
+                {/* 4.3 — ekstra maliyetler önceden fiyat bölümünde hiç görünmüyordu (toplama ekli olsalar da). */}
+                {(order.extraCosts ?? []).length > 0 && (
+                  <PriceBox label={t('orderDetail.extraCosts', { count: (order.extraCosts ?? []).length })}
+                    value={formatCurrency((order.extraCosts ?? []).reduce((s, x) => s + (x.tutar ?? 0), 0), order.paraTipi)} />
+                )}
               </div>
+              {(order.extraCosts ?? []).length > 0 && (
+                <ul className="space-y-0.5 text-xs text-muted-foreground">
+                  {(order.extraCosts ?? []).map((x) => (
+                    <li key={x.ekMaliyetID} className="flex justify-between gap-4">
+                      <span>• {x.aciklama}</span>
+                      <span className="tabular-nums">{formatCurrency(x.tutar, order.paraTipi)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           )}
 
@@ -438,7 +508,8 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                     <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.adet')}</th>
                     {/* Round-11 §4: Fiyat = tekil (birim) fiyat; Toplam = Tekil Fiyat × Adet. */}
                     {!hideMoney && <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.fiyat')}</th>}
-                    {!hideMoney && <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.toplam')}</th>}
+                    {/* 4.3 — set satırı dışındaki tutarlar bilgi amaçlıdır, toplama girmez. */}
+                    {!hideMoney && <th className="px-2 py-1.5 text-right font-medium text-muted-foreground">{t('orderDetail.lineTotal')}</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -454,12 +525,17 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                       <tr key={i} className={`border-t ${isCategory ? 'bg-muted/40 font-semibold' : ''}`}>
                         <td className={`px-2 py-1 ${!isCategory && !isFreeItem ? 'pl-5' : ''}`}>
                           {ad}
-                          {isFreeItem && <Badge variant="warning" className="ml-1 px-1.5 py-0 text-[10px]">{t('orderDetail.ozelBadge')}</Badge>}
+                          {isFreeItem && <Badge variant="warning" className="ml-1 px-1.5 py-0 text-2xs">{t('orderDetail.ozelBadge')}</Badge>}
                         </td>
                         <td className="px-2 py-1">{item.oznitelikAdi ?? '—'}</td>
                         <td className="px-2 py-1 text-right tabular-nums">{item.adet}</td>
                         {!hideMoney && <td className="px-2 py-1 text-right tabular-nums">{formatCurrency(item.fiyat, order.paraTipi)}</td>}
-                        {!hideMoney && <td className="px-2 py-1 text-right tabular-nums">{formatCurrency((item.fiyat ?? 0) * item.adet, order.paraTipi)}</td>}
+                        {!hideMoney && (
+                          <td className="px-2 py-1 text-right tabular-nums">
+                            {formatCurrency((item.fiyat ?? 0) * item.adet, order.paraTipi)}
+                            {!isCategory && !isFreeItem && <span className="ml-1 text-2xs font-normal text-muted-foreground">({t('orderDetail.infoOnly')})</span>}
+                          </td>
+                        )}
                       </tr>
                     )
                   })}
@@ -503,7 +579,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                           key={clause}
                           className={cn(
                             'flex items-start gap-2 rounded px-2 py-1 text-xs transition-colors',
-                            isSelected ? 'bg-primary/5 text-foreground font-medium' : 'text-muted-foreground/50',
+                            isSelected ? 'bg-primary/5 text-foreground font-medium' : 'text-muted-foreground',
                           )}
                         >
                           {isSelected ? (
@@ -511,7 +587,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                           ) : (
                             <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-muted-foreground/30 mt-0.5" />
                           )}
-                          <span className={cn(!isSelected && 'opacity-60')}>{clause}</span>
+                          <span className={cn(!isSelected && 'text-muted-foreground line-through decoration-1')}>{clause}</span>
                         </div>
                       )
                     })}
@@ -573,6 +649,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
           paraTipi={order.paraTipi}
         />
       )}
+      <AccountingFolderDialog siparisNo={folderOpen ? order.siparisNo : null} onClose={() => setFolderOpen(false)} />
     </div>
   )
 }
@@ -580,7 +657,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
 function PriceBox({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className={`rounded p-2 text-center ${highlight ? 'bg-primary text-primary-foreground' : 'bg-muted/50'}`}>
-      <p className="text-xs opacity-70">{label}</p>
+      <p className="text-xs">{label}</p>
       <p className="font-semibold tabular-nums">{value}</p>
     </div>
   )

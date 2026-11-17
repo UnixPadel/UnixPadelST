@@ -10,5 +10,8 @@ public sealed record MusteriDto(
     string  VATNumarasi,
     int     UlkelerID,
     string  UlkeAdi,
-    string? Bolge
+    string? Bolge,
+    // 40+ ergonomi K5 — yalnız ?includeDeleted=true listesinde (veya silinmiş kaydın detayında) true.
+    bool      Silindi       = false,
+    DateTime? SilinmeTarihi = null
 );

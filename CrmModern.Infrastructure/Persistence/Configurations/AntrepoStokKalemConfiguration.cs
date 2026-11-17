@@ -33,5 +33,13 @@ internal sealed class AntrepoStokKalemConfiguration : IEntityTypeConfiguration<A
         builder.Property(k => k.KalemFiyati)         .HasColumnName("KalemFiyati")         .HasColumnType("decimal(18,2)");
         builder.Property(k => k.OlusturanKullaniciID).HasColumnName("OlusturanKullaniciID");
         builder.Property(k => k.OlusturmaTarihi)     .HasColumnName("OlusturmaTarihi");
+
+        // 40+ ergonomi K5 — yumuşak silme. Global filtre: silinen kalem HER sorgudan
+        // (liste, sayaç, çıkış, detay) düşer; "silinenleri göster" ve geri yükleme
+        // IgnoreQueryFilters() kullanır.
+        builder.Property(k => k.Silindi)             .HasColumnName("Silindi");
+        builder.Property(k => k.SilinmeTarihi)       .HasColumnName("SilinmeTarihi");
+        builder.Property(k => k.SilenKullaniciID)    .HasColumnName("SilenKullaniciID");
+        builder.HasQueryFilter(k => !k.Silindi);
     }
 }

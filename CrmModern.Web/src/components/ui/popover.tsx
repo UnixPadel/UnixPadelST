@@ -85,7 +85,7 @@ export function Popover({
         transform: align === 'end' ? 'translateX(-100%)' : undefined,
       }}
       className={cn(
-        'z-[70] min-w-[10rem] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 zoom-in-95',
+        'z-[70] min-w-[10rem] overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md animate-in fade-in-0 duration-150',
         className,
       )}
     >

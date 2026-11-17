@@ -75,7 +75,11 @@
     "rejectReasonPrompt": "Neden reddediyorsun?",
     "module": "Modül",
     "select": "Seç",
-    "representative": "Satış Temsilcisi"
+    "representative": "Satış Temsilcisi",
+    "showValue": "Değeri göster",
+    "hideValue": "Değeri gizle",
+    "undoHint": "Hemen ardından \"Geri al\" ile geri alabilirsin.",
+    "moreActions": "Diğer işlemler"
   },
   "login": {
     "title": "Giriş Yap",
@@ -98,7 +102,7 @@
     "logisticsHistory": "Lojistik · Sevkiyat Geçmişi",
     "logisticsCarriers": "Lojistik · Nakliye Firmaları",
     "accounting": "Muhasebe · Tahsilat",
-    "accountingOrders": "Muhasebe · Teklif ve Siparişler",
+    "accountingOrders": "Muhasebe · Klasörler",
     "accountingApproval": "Muhasebe · Onaylar",
     "accountingHistory": "Muhasebe · Tahsilat Geçmişi",
     "accountingBalance": "Muhasebe · Müşteri Bakiyesi",
@@ -166,12 +170,16 @@
   "topbar": {
     "toggleMenu": "Menüyü aç/kapat",
     "language": "Dil",
-    "zoom": "Arayüz ölçeği",
+    "zoom": "Yakınlaştırma",
     "zoomIn": "Büyüt",
     "zoomOut": "Küçült",
-    "zoomReset": "Otomatik ölçeğe dön",
+    "zoomReset": "%100'e dön",
     "search": "Ara…",
-    "searchMinChars": "En az 2 harf yaz…"
+    "searchMinChars": "En az 2 harf yaz…",
+    "view": "Görünüm",
+    "viewRahat": "Rahat",
+    "viewStandart": "Standart",
+    "menu": "Menü"
   },
   "dashboard": {
     "title": "Ana Sayfa",
@@ -201,7 +209,7 @@
       "warehouseStock": "Antrepo ve depoda bekleyen mallar ve çıkışlar",
       "logisticsHistory": "Geçmiş sevkiyatlar",
       "accounting": "Tahsilatları gir ve takip et",
-      "accountingOrders": "Teklif ve siparişleri gör, proforma aç",
+      "accountingOrders": "Proforma ve muhasebe eklerini tek yerde tut",
       "accountingApproval": "Cari ve lojistik onayları",
       "accountingHistory": "Geçmiş tahsilatlar",
       "purchase": "Satın alma talepleri",
@@ -217,7 +225,8 @@
       "stages": "Aşamalara göre siparişler",
       "topCustomers": "En çok ciro yapan müşteriler (son 90 gün)",
       "revenue": "Ciro"
-    }
+    },
+    "goInbox": "Bekleyen İşlerime git"
   },
   "myOrders": {
     "title": "Siparişlerim",
@@ -277,7 +286,11 @@
     "convertConfirm": {
       "title": "Teklif siparişe çevrilsin mi?"
     },
-    "newOrder": "Yeni Sipariş / Teklif"
+    "newOrder": "Yeni Sipariş / Teklif",
+    "impact": {
+      "convert": "Teklif siparişe dönüşür.",
+      "delete": "Sipariş tüm listelerden kalkar."
+    }
   },
   "orders": {
     "newOrderTitle": "Yeni Sipariş / Teklif",
@@ -407,7 +420,7 @@
       "setRemoveHint": "Bu seti siparişten çıkarır",
       "bilesenAra": "Parça ara…",
       "checkedCount": "{{checked}} / {{total}} seçili",
-      "infoOnly": "bilgi",
+      "infoOnly": "Parçalar · bilgi amaçlı, toplama dahil değil",
       "infoOnlyHint": "Parça ve ek kalem tutarları bilgi içindir; toplam fiyat set fiyatı × adetten hesaplanır.",
       "freeItemRemoveTitle": "Ek kalem silinsin mi?",
       "extraCount_one": "{{count}} ek maliyet",
@@ -491,6 +504,15 @@
       "extraRemoveTitle": "Ek maliyet silinsin mi?",
       "resetTitle": "Yeni form açılsın mı?",
       "resetDesc": "Kaydetmediğin değişiklikler kaybolacak."
+    },
+    "clearForm": "Formu temizle",
+    "backToForm": "Forma dön",
+    "impact": {
+      "quote": "Teklif kaydedilir ve Sipariş Kontrolü'ne gönderilir.",
+      "order": "Sipariş kaydedilir ve Sipariş Kontrolü'ne gönderilir.",
+      "new": "Teklif veya sipariş olarak kaydedersin; her ikisi de Sipariş Kontrolü'ne gönderilir.",
+      "revise": "Değişiklikler kaydedilir ve sipariş yeniden Sipariş Kontrolü'ne gider.",
+      "infoLines": "Parça satırlarının tutarları bilgi amaçlıdır; toplam fiyata girmez."
     }
   },
   "qc": {
@@ -597,7 +619,8 @@
       "excelYaz": "Proforma (Excel)",
       "formGetir": "Siparişi Aç",
       "saticiEk": "Satıcı Ek",
-      "muhasebeEk": "Muhasebe Ek"
+      "muhasebeEk": "Muhasebe Ek",
+      "approveNext": "Onayla ve sonrakine geç"
     },
     "items": {
       "kategori": "Kategori",
@@ -628,14 +651,32 @@
     },
     "alreadyApproved": "Bu sipariş zaten onaylı",
     "approveConfirmTitle": "Sipariş onaylansın mı?",
-    "approveNotePlaceholder": "Onay notu (isteğe bağlı)",
+    "approveNotePlaceholder": "Örn: Ölçüler müşteriyle teyit edildi",
     "capped": "İlk 200 sonuç görünüyor; filtreyi daralt",
     "legend": {
       "approved": "Onaylandı"
     },
     "nextHint": "Karar verince sıradaki bekleyen sipariş açılır.",
     "noPending": "Kontrol bekleyen sipariş yok.",
-    "splitter": "Üst panelin yüksekliği (↑/↓)"
+    "splitter": "Üst panelin yüksekliği (↑/↓)",
+    "approveNoteLabel": "Onay notu",
+    "impact": {
+      "approve": "Sipariş onaylanır ve Kontrol listesinden çıkar.",
+      "note": "Onay notu kaydedilir: \"{{note}}\"",
+      "reject": "Sipariş reddedilir ve düzeltmesi için satış temsilcisine döner; red sebebini temsilci görür."
+    },
+    "panel": "Sipariş ve karar",
+    "selectHint": "Soldaki listeden bir sipariş seç.",
+    "searchPrompt": "Aramak için alanları doldur ve Ara'ya bas.",
+    "noApproved": "Son 30 günde onaylanan sipariş yok.",
+    "cariNewAmount": "Yeni ödenen tutar",
+    "listTabs": {
+      "label": "Listeler",
+      "pending": "Kontrol bekleyen",
+      "approved": "Onaylanan",
+      "search": "Tüm siparişlerde ara"
+    },
+    "addApproveNote": "Onay notu ekle"
   },
   "users": {
     "title": "Kullanıcılar",
@@ -658,6 +699,10 @@
       "telefon": "Telefon",
       "yetki": "Rol",
       "durum": "Durum"
+    },
+    "deleteTitle": "{{name}} silinsin mi?",
+    "impact": {
+      "delete": "Kullanıcı giriş yapamaz ve listeden kalkar."
     }
   },
   "search": {
@@ -710,12 +755,7 @@
   },
   "accApproval": {
     "title": "Muhasebe · Onaylar",
-    "queueCounts": "Cari: {{cari}} · Lojistik: {{lojistik}} bekliyor",
-    "selectFirst": "Önce bir sipariş seç.",
     "views": {
-      "cariQueue": "Cari onay bekleyen",
-      "lojistikQueue": "Lojistik onayı bekleyen",
-      "tamamlanmaQueue": "Kapanış bekleyen",
       "hepsi": "Tümü",
       "beklenen": "Ödeme bekleyen",
       "onaylanan": "Ödenen"
@@ -731,16 +771,10 @@
     "cariLabel": {
       "pesinat1": "1. peşinat",
       "pesinat2": "2. peşinat",
-      "pesinatN": "{{n}}. peşinat",
-      "maliyet": "Maliyet"
+      "pesinatN": "{{n}}. peşinat"
     },
     "pesinat": {
-      "hint": "Peşinat, onayla birlikte tahsilat olarak kaydedilir. Maliyete yazılmaz.",
       "hintEk": "Tahsilat olarak kaydedilir; siparişin aşaması değişmez. Geçmiş bir tarih girersen sırası tarihe göre ayarlanır."
-    },
-    "noPesinat": {
-      "confirm": "Bu siparişte %{{yuzde}} peşinat ({{kapora}}) bekleniyor ama henüz tahsilat yok.\n\nPeşinat girmeden cari onay verirsen sipariş ödenmeden üretime gidebilir. Yine de onaylansın mı?",
-      "title": "Peşinat girilmedi"
     },
     "overpay": {
       "confirm": "Girdiğin tutar kalan bakiyeyi ({{kalan}}) {{fark}} aşıyor; kalan bakiye eksiye düşecek.\n\nTutar doğru mu? Devam edilsin mi?",
@@ -763,29 +797,19 @@
       "pesinatTarihi": "Peşinat tarihi",
       "finalMaliyet": "Son maliyet",
       "maliyetNotu": "Maliyet notu",
-      "hint": "3. peşinat tahsilat olarak kaydedilir, son maliyet maliyete yazılır ve sipariş Tamamlandı olur.",
       "submit": "Siparişi Kapat",
       "done": "Sipariş kapandı.",
       "needCost": "Kapatmak için son maliyeti gir."
     },
-    "blocks": {
-      "ozet": "Özet"
-    },
     "fields": {
       "teslimatCesiti": "Teslim şekli",
-      "kapora": "Kalan peşinat",
-      "brutKapora": "Toplam peşinat",
-      "siparisNotu": "Sipariş notu",
-      "dosya": "Dosya (PDF/ZIP/JPG…)"
+      "siparisNotu": "Sipariş notu"
     },
     "actions": {
       "cariOnayla": "Cariyi Onayla",
       "lojistikOnayla": "Lojistiği Onayla",
       "tamamla": "Siparişi Kapat",
       "pesinatKaydet": "Peşinatı Kaydet"
-    },
-    "disabled": {
-      "cari": "Cari onay için sipariş, Sipariş aşamasında olmalı ve kontrolden onay almış olmalı."
     },
     "toast": {
       "cariApproved": "Cari onaylandı, sipariş Planlama'ya geçti.",
@@ -794,7 +818,70 @@
     },
     "shortcut": {
       "form": "Siparişi aç"
-    }
+    },
+    "panel": "Karar paneli",
+    "completeDirect": "Siparişi Tamamla (ara adımları atla)",
+    "tabs": {
+      "label": "İş sıraları",
+      "cariQueue": "Cari onay",
+      "lojistikQueue": "Lojistik onayı",
+      "tamamlanmaQueue": "Kapanış",
+      "all": "Tüm siparişler"
+    },
+    "filter": {
+      "odemeDurumu": "Ödeme durumu",
+      "search": "Sipariş no veya müşteri"
+    },
+    "summary": {
+      "title": "Ödeme özeti",
+      "tutar": "Sipariş tutarı",
+      "pesinat": "Peşinat (%{{yuzde}})",
+      "odenen_one": "Ödenen ({{count}} tahsilat)",
+      "odenen_other": "Ödenen ({{count}} tahsilat)",
+      "kalanPesinat": "Kalan peşinat",
+      "kalanBakiye": "Kalan bakiye",
+      "overpaid": "Tahsilatlar sipariş tutarını aşıyor; kalan bakiye eksi."
+    },
+    "payments": {
+      "title": "Tahsilatlar"
+    },
+    "step": {
+      "kapanis": "Kapanış bilgileri",
+      "ek": "{{n}}. peşinat (sonradan tahsilat)",
+      "tutar": "Tutar",
+      "needAmount": "Kaydetmek için tutar gir.",
+      "optional": "isteğe bağlı"
+    },
+    "note": {
+      "more": "Devamını göster",
+      "less": "Daha az göster"
+    },
+    "empty": {
+      "select": "Soldaki listeden bir sipariş seç.",
+      "noAction": "Bu siparişte yapılacak onay yok.",
+      "queue": "Bu sırada bekleyen iş yok.",
+      "upstream_one": "{{count}} sipariş önceki adımda bekliyor.",
+      "upstream_other": "{{count}} sipariş önceki adımda bekliyor."
+    },
+    "confirmTitle": {
+      "cari": "Cari onaylansın mı?",
+      "lojistik": "Lojistik onaylansın mı?",
+      "kapanis": "Sipariş kapatılsın mı?",
+      "ek": "Peşinat kaydedilsin mi?"
+    },
+    "impact": {
+      "payment": "{{amount}} ({{label}}) tahsilat olarak kaydedilir.",
+      "noPayment": "Peşinat girmedin; tahsilat kaydı açılmaz.",
+      "cost": "Son maliyet {{amount}} olarak yazılır.",
+      "cari": "Sipariş cari onay sırasından çıkar ve Fabrika'ya geçer.",
+      "lojistik": "Sipariş lojistik onayı sırasından çıkar ve sevkiyat için Lojistik'e geçer.",
+      "kapanis": "Sipariş Tamamlandı olur ve iş listelerinden çıkar."
+    },
+    "warn": {
+      "noPesinat": "Bu siparişte %{{yuzde}} peşinat ({{kapora}}) bekleniyor ama henüz tahsilat yok. Onaylarsan sipariş ödenmeden üretime gidebilir.",
+      "overpay": "Girdiğin tutar kalan bakiyeyi ({{kalan}}) {{fark}} aşıyor; kalan bakiye eksiye düşer."
+    },
+    "gone": "{{no}} artık bu sırada değil; başka bir kullanıcı işlemiş olabilir. Sıradaki sipariş seçildi."
   },
   "accounting": {
     "title": "Muhasebe · Tahsilat",
@@ -828,7 +915,12 @@
       "ekUpload": "Muhasebe ek yükle",
       "ekUploaded": "Muhasebe ek yüklendi.",
       "saveClose": "Kaydet ve kapat",
-      "saved": "{{amount}} tahsilat kaydedildi."
+      "saved": "{{amount}} tahsilat kaydedildi.",
+      "formTitle": "Yeni tahsilat",
+      "save": "Tahsilatı kaydet",
+      "fillRemaining": "Kalan bakiyeyi yaz ({{amount}})",
+      "impact": "{{amount}} tahsilat olarak kaydedilir; siparişin aşaması değişmez.",
+      "shortcut": "Tutar alanına geç"
     },
     "history": {
       "excelHint": "Filtrelere göre tahsilat geçmişini Excel olarak indirir",
@@ -836,8 +928,16 @@
     },
     "historyExcel": "Tahsilat geçmişi (Excel)",
     "historyExcelHint": "Tüm tahsilat geçmişini indirir. Sadece ekrandaki listeyi almak için tablonun üstündeki Listeyi İndir'i kullan.",
-    "ordersViewDescription": "Tüm teklif ve siparişler (yalnız görüntüleme); proformayı Excel ya da PDF olarak açabilirsin.",
-    "rowSummary": "Satır detayları"
+    "ordersViewDescription": "Her teklif ve siparişin Muhasebe Klasörü: proforma ve muhasebe ekleri. Belgesi eksik siparişleri bulmak için Klasör: Dosyası olmayan filtresini kullan.",
+    "rowSummary": "Satır detayları",
+    "panel": "Tahsilat paneli",
+    "cost": {
+      "none": "girilmedi"
+    },
+    "extra": {
+      "summary_one": "{{count}} kalem · {{total}}",
+      "summary_other": "{{count}} kalem · {{total}}"
+    }
   },
   "accountingHistory": {
     "maliyetRecetesi": "Maliyet tablosu",
@@ -929,7 +1029,8 @@
       "completeNote": "Teslim notu (isteğe bağlı)",
       "completeTitle_one": "Sevkiyat tamamlansın mı?",
       "completeTitle_other": "{{count}} sevkiyat tamamlansın mı?",
-      "shipmentId": "Sevkiyat No"
+      "shipmentId": "Sevkiyat No",
+      "completeAction": "Sevkiyatı tamamla"
     },
     "approvedOffer": "Onaylanan teklif",
     "carriersDescription": "Sevkiyatlarda kullanılan nakliye firmaları ve taşıma türleri.",
@@ -1021,7 +1122,12 @@
       "movedToProduction": "Üretime alındı.",
       "readyFailed": "Hazır yapılamadı."
     },
-    "uretimTarihiHint": "Yerel saat; boş bırakırsan şimdiki zaman."
+    "uretimTarihiHint": "Yerel saat; boş bırakırsan şimdiki zaman.",
+    "readyAction": "Hazır olarak işaretle",
+    "impact": {
+      "ready_one": "Sipariş Hazır olur ve Fabrika listesinden çıkar.",
+      "ready_other": "{{count}} sipariş Hazır olur ve Fabrika listesinden çıkar."
+    }
   },
   "purchase": {
     "newTitle": "Satın Alma · Yeni Talep",
@@ -1079,7 +1185,8 @@
       "genelToplam": "Genel toplam",
       "ekle": "Satır ekle",
       "sil": "Sil",
-      "enAzBir": "En az bir kalemi eksiksiz gir."
+      "enAzBir": "En az bir kalemi eksiksiz gir.",
+      "birimOtherName": "Birim adı"
     },
     "summarySuffix": "+{{count}} kalem",
     "approvalFlowNote": "Talep Bekliyor olarak kaydedilir ve onaya gider.",
@@ -1253,6 +1360,44 @@
       "loadError": "Ayrıntılar yüklenemedi."
     }
   },
+  "folder": {
+    "button": "Muhasebe Klasörü",
+    "buttonWithCount": "Muhasebe Klasörü · {{count}} dosya",
+    "buttonEmpty": "Muhasebe Klasörü · dosya yok",
+    "titleWithNo": "Muhasebe Klasörü — {{no}}",
+    "column": "Klasör",
+    "addFile": "Dosya ekle",
+    "filterHas": "Dosyası olan",
+    "filterNone": "Dosyası olmayan",
+    "dropHint": "Dosyaları buraya sürükle ya da",
+    "chooseFiles": "Dosya seç",
+    "rules": "PDF, Excel, Word, görsel, ZIP ya da RAR · dosya başına en çok 25 MB · eklenen dosya öncekilerin yerini almaz",
+    "sections": {
+      "proforma": "Proforma",
+      "proformaHint": "otomatik, siparişin güncel hâli",
+      "files": "Muhasebe Ekleri",
+      "saticiEk": "Satıcı Ek"
+    },
+    "proformaExcel": "Proforma (Excel)",
+    "proformaPdf": "Proforma (PDF)",
+    "oncekiMuhasebeEk": "Önceki muhasebe eki",
+    "empty": "Bu siparişin henüz muhasebe eki yok.",
+    "view": "Görüntüle",
+    "download": "İndir",
+    "delete": "Sil",
+    "deleteTitle": "“{{name}}” silinsin mi?",
+    "deleteDesc": "Dosya klasörden kalıcı olarak silinir. Bu işlem geri alınamaz.",
+    "deleted": "Dosya silindi.",
+    "uploaded": "{{count}} dosya eklendi.",
+    "uploading": "Yükleniyor",
+    "uploadFailed": "Yüklenemedi.",
+    "tooBig": "25 MB'tan büyük.",
+    "badType": "Bu dosya türü yüklenemez.",
+    "loadError": "Klasör açılamadı.",
+    "previewError": "Dosya açılamadı. İndirip açabilirsin.",
+    "actionFailed": "İşlem yapılamadı.",
+    "short": "Klasör"
+  },
   "orderDetail": {
     "title": "Sipariş {{no}}",
     "musteriInfo": "Müşteri",
@@ -1306,7 +1451,13 @@
       "details": "Detaylar",
       "flow": "Sipariş Geçmişi",
       "notes": "Ek Notlar"
-    }
+    },
+    "lineTotal": "Tutar",
+    "infoOnly": "bilgi",
+    "montajQty": "Montaj (adet: {{adet}})",
+    "teslimatQty": "Teslimat (adet: {{adet}})",
+    "extraCosts_one": "Ek maliyet ({{count}})",
+    "extraCosts_other": "Ek maliyetler ({{count}})"
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",
@@ -1408,15 +1559,23 @@
     "selectRow": "Satırı seç",
     "loadError": "Liste yüklenemedi. F5 ile tekrar dene.",
     "pageOf": "Sayfa {{page}} / {{count}}",
-    "moreActions": "Diğer işlemler",
-    "refreshing": "Yenileniyor…"
+    "moreActions": "İşlemler",
+    "refreshing": "Yenileniyor…",
+    "selectedRow": "Seçili kayıt",
+    "selectRowHint": "İşlem yapmak için listeden bir satıra tıkla.",
+    "rowGone": "{{key}} artık bu listede yok: başka bir kullanıcı işlemiş ya da filtreye uymuyor.",
+    "updatedAt": "Son güncelleme {{time}}",
+    "refresh": "Yenile",
+    "actions": "İşlemler"
   },
   "filter": {
     "reset": "Sıfırla",
     "title": "Filtreler",
     "active": "{{count}} aktif",
     "show": "Filtreleri göster",
-    "hide": "Filtreleri gizle"
+    "hide": "Filtreleri gizle",
+    "more": "Diğer filtreler",
+    "less": "Daha az filtre"
   },
   "layout": {
     "splitter": "Panel ile tablo arasındaki bölme",
@@ -1431,7 +1590,8 @@
     "deleteTitle": "Görünümü sil",
     "empty": "Kayıtlı görünüm yok.",
     "setDefault": "Varsayılan yap",
-    "saveCurrent": "Bu görünümü kaydet"
+    "saveCurrent": "Bu görünümü kaydet",
+    "default": "Varsayılan"
   },
   "combobox": {
     "placeholder": "Aramak için yaz…",
@@ -1510,7 +1670,13 @@
     "approval": {
       "approved": "Onaylandı",
       "rejected": "Reddedildi",
-      "pending": "Bekliyor"
+      "pending": "Bekliyor",
+      "accountingApproved": "Muhasebe onayladı",
+      "logisticsApproved": "Lojistik onayı verildi",
+      "logisticsOfferApproved": "Lojistik teklifi onaylandı",
+      "deleted": "Silindi",
+      "restored": "Geri yüklendi",
+      "updated": "Düzenlendi"
     },
     "quoteCreated": "Teklif {{no}} oluşturuldu",
     "orderCreated": "Sipariş {{no}} oluşturuldu",
@@ -1593,24 +1759,29 @@
     "defaultPesinHint": "Boş bırakırsan her siparişte girmen gerekir.",
     "workspace": "Çalışma alanı",
     "startPage": "Açılış sayfası",
-    "uiScale": "Arayüz ölçeği",
-    "uiScaleAuto": "Otomatik (ekrana göre)",
-    "uiScaleHint": "Şu an %{{pct}}. Ctrl+ / Ctrl- ile büyüt ya da küçült, Ctrl+0 ile otomatiğe dön.",
-    "tableDensity": "Tablo yoğunluğu",
-    "density": {
-      "normal": "Normal",
-      "compact": "Sıkı (daha çok satır)"
-    },
+    "uiScale": "Yakınlaştırma",
+    "uiScaleAuto": "%100 (varsayılan)",
+    "uiScaleHint": "Şu an %{{pct}}. Ctrl+ / Ctrl- ile büyüt ya da küçült, Ctrl+0 ile %100'e dön.",
     "enterNavigation": "Formlarda Enter sonraki alana geçsin",
     "showShortcutHints": "Alt çubukta kısayolları göster",
-    "reset": "Varsayılanlara dön"
+    "reset": "Varsayılanlara dön",
+    "view": "Görünüm",
+    "viewHint": "Rahat: büyük yazı, geniş satır ve buton. Standart: aynı ekrana daha çok satır sığar.",
+    "viewOptions": {
+      "rahat": "Rahat (büyük yazı)",
+      "standart": "Standart (sıkı)"
+    },
+    "startAuto": "Rolüne göre ({{page}})"
   },
   "bulk": {
     "result": "{{ok}} tamam, {{failed}} hata"
   },
   "masterDetail": {
     "close": "Detayı kapat",
-    "expand": "Tam ekran"
+    "expand": "Tam ekran",
+    "panel": "Sipariş detayı",
+    "selectHint": "Soldaki listeden bir sipariş seç.",
+    "emptyList": "Bu listede sipariş yok."
   },
   "payment": {
     "select": "Seç",
@@ -1809,6 +1980,128 @@
       "purchaseRequest": "Satın alma talebi",
       "record": "Kayıt"
     },
-    "network": "Sunucuya ulaşılamıyor. İnternet bağlantını kontrol et."
+    "network": "Sunucuya ulaşılamıyor. İnternet bağlantını kontrol et.",
+    "orderNotDeleted": "Bu sipariş silinmemiş.",
+    "fileNotDeleted": "Bu dosya silinmemiş.",
+    "userNotDeleted": "Bu kullanıcı silinmemiş.",
+    "userDeletedExists": "Bu kullanıcı adı silinmiş bir kullanıcıya ait: {{username}}. Silinenlerden geri yükle.",
+    "stockItemNotDeleted": "Bu stok kalemi silinmemiş.",
+    "extraCostNotDeleted": "Bu ek maliyet silinmemiş.",
+    "extraCostLockedRestore": "Bu aşamada ek maliyet geri yüklenemez (yalnız cari ya da lojistik onayı sırasında).",
+    "attachmentNotDeleted": "Bu talebin eki silinmemiş.",
+    "customerNotDeleted": "Bu müşteri silinmemiş.",
+    "customerDeletedExists": "Bu müşteri adı silinmiş bir müşteriye ait. Silinenlerden geri yükle."
+  },
+  "completeOrder": {
+    "open": "Siparişi Tamamla",
+    "title": "Siparişi Tamamla",
+    "earlyTitle": "Ara adımlar atlanacak",
+    "earlyBody": "Sipariş şu an {{stage}} aşamasında. Tamamlarsan aradaki adımlar atlanır ve sipariş kapanır.",
+    "total": "Toplam tutar",
+    "paid": "Ödenen",
+    "remaining": "Kalan bakiye",
+    "remainingNote": "Kalan bakiye var. Tamamladıktan sonra da Muhasebe ekranından tahsilat ekleyebilirsin.",
+    "kapanisNotu": "Kapanış notu",
+    "kapanisNotuPh": "Örn: Erken teslim edildi, müşteri isteğiyle kapatıldı",
+    "pesinat": "Tahsilat / Peşinat",
+    "pesinatTarihi": "Tahsilat tarihi",
+    "finalMaliyet": "Final maliyet",
+    "finalMaliyetHint": "Maliyet reçetesine yazılır.",
+    "maliyetDetayi": "Maliyet detayı",
+    "maliyetDetayiPh": "Maliyet açıklaması",
+    "optional": "İsteğe bağlı.",
+    "impactTitle": "Ne olacak?",
+    "impactClosed": "Sipariş Tamamlandı aşamasına geçer ve bekleyen iş listelerinden çıkar.",
+    "impactPayment": "Girdiğin tahsilat siparişin ödemelerine eklenir.",
+    "confirm": "Siparişi tamamla",
+    "done": "Sipariş tamamlandı",
+    "doneDesc": "{{no}} artık Tamamlandı aşamasında."
+  },
+  "saveStatus": {
+    "saved": "Kaydedildi · {{time}}",
+    "saving": "Kaydediliyor…",
+    "unsaved": "Kaydedilmemiş değişiklik var",
+    "draftSaved": "Taslak kaydedildi · {{time}}"
+  },
+  "addStock": {
+    "titleUpload": "Beyanname / stok belgesi yükle",
+    "titleReview": "Stok girişini kontrol et",
+    "subUpload": "Gümrük beyannamesini (PDF veya görsel) yükle ya da bilgileri elle gir.",
+    "subReview": "Bilgileri kontrol et, antrepoya veya depoya kaydet.",
+    "removeFile": "Kaldır",
+    "analyzing": "Beyanname yapay zekâ ile okunuyor…",
+    "analyzingHint": "Kutu 41 tamamlayıcı ölçü birimleri, eşya tanımı, kap bilgileri ve tescil numarası taranıyor.",
+    "dropTitle": "Beyanname dosyasını buraya sürükle ya da tıklayıp seç",
+    "dropHint": "PDF, taranmış belge veya fotoğraf (JPG/PNG, en fazla 10 MB)",
+    "aiNote": "Alanları yapay zekâ (Claude / Gemini) doldurur; kaydetmeden önce sen kontrol edersin.",
+    "manualEntry": "Belge olmadan elle gir",
+    "aiUnavailable": "Otomatik okuma servisi kullanılamadı. Belge ekte duruyor; kalemleri elle gir.",
+    "aiFailed": "Otomatik okuma başarısız oldu. Belge ekte duruyor; bilgileri elle girebilirsin.",
+    "aiFilledBanner": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları soldaki belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
+    "aiFilledBannerNoPreview": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
+    "aiChip": "YZ doldurdu · kontrol et",
+    "warningsTitle": "Okuma uyarıları",
+    "konum": "Malın konumu",
+    "antrepo": "Antrepo",
+    "depo": "Kendi deposu",
+    "beyannameNo": "Beyanname no",
+    "beyannameNoHint": "Varsa gir (örn: 26341200AN000123), yoksa boş bırak.",
+    "beyannameNoPh": "İsteğe bağlı",
+    "items": "Stok kalemleri ({{count}})",
+    "addItem": "Kalem ekle",
+    "itemN": "{{n}}. kalem",
+    "removeItem": "Kalemi sil",
+    "malAdi": "Mal adı (kısa tanım)",
+    "malAdiPh": "Örn: Cam 10 mm, Demir profil 80x80",
+    "miktar": "Miktar",
+    "birim": "Ölçü birimi",
+    "birimPh": "ADET, KG, KAP, SANDIK, BAĞ",
+    "kapAdedi": "Kap adedi",
+    "kapCinsi": "Kap cinsi",
+    "kapCinsiPh": "KAP, SANDIK, BAĞ",
+    "optional": "İsteğe bağlı.",
+    "ticariTanim": "Ticari tanım / detay",
+    "ticariTanimPh": "Kutu 31 detaylı eşya tanımı",
+    "aciklama": "Açıklama / detay",
+    "aciklamaPh": "Mal hakkında detay, parti no vb.",
+    "extraTitle": "Diğer beyanname başlık bilgileri (isteğe bağlı)",
+    "tescilTarihi": "Tescil tarihi",
+    "gumrukIdaresi": "Gümrük idaresi",
+    "gumrukIdaresiPh": "Erenköy Gümrük Md.",
+    "rejimKodu": "Rejim kodu",
+    "gonderici": "Gönderici firma",
+    "gondericiPh": "Gönderici firma unvanı",
+    "alici": "Alıcı firma",
+    "aliciPh": "Alıcı firma unvanı",
+    "fatura": "Fatura tutarı ve döviz",
+    "kur": "Kur",
+    "errNoItems": "En az bir mal kalemi gir.",
+    "errMalAdi": "{{n}}. kalemin mal adı boş.",
+    "errMiktar": "{{n}}. kalemin miktarı 0'dan büyük olmalı.",
+    "otherDoc": "Başka belge yükle",
+    "save": "Stoğa ekle ve kaydet",
+    "previewTitle": "Yüklenen belge",
+    "previewUnsupported": "Bu dosya türü burada önizlenemiyor."
+  },
+  "confirm": {
+    "impactTitle": "Ne olacak?",
+    "nextStep": "Sonraki adım",
+    "nextDone": "Sipariş tamamlanır."
+  },
+  "undo": {
+    "deleted": "Silindi.",
+    "action": "Geri al",
+    "restored": "Geri yüklendi.",
+    "failed": "Geri alınamadı.",
+    "restore": "Geri yükle",
+    "showDeleted": "Silinenleri göster",
+    "deletedBadge": "Silindi"
+  },
+  "stockUndo": {
+    "deleteTitle": "\"{{name}}\" silinsin mi?",
+    "deleteImpact": "Kalem stok listesinden ve toplamlardan çıkar.",
+    "deleted": "Stok kalemi silindi.",
+    "deleteFailed": "Silinemedi.",
+    "deleteAction": "Kalemi sil"
   }
 }

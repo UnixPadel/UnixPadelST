@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FormField } from '@/components/ui/form-field'
 import { DecimalInput } from '@/components/DecimalInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -16,6 +17,7 @@ import { useToast } from '@/components/ToastProvider'
 import { toastApiError } from '@/lib/apiError'
 import { useEnterNavigation } from '@/hooks/useEnterNavigation'
 import { usePreferences } from '@/lib/preferences'
+import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { formatCurrency } from '@/lib/utils'
 import type { CreatePurchaseRequestLine } from '@/types'
 
@@ -82,17 +84,24 @@ export function NewPurchaseRequestPage() {
   const { t } = useTranslation()
   // E-3 — ETA tarzı Enter ile sonraki alan (Tercihlerim'den kapatılabilir).
   const onEnterNav = useEnterNavigation()
-  const { enterNavigation } = usePreferences()
+  const { enterNavigation, defaultParaTipi } = usePreferences()
   const { getUser } = useAuth()
   const user = getUser()
 
   const [rows, setRows] = useState<LineRow[]>([blankRow()])
-  const [paraBirimi, setParaBirimi] = useState<string>('Euro')
+  // H7 — Tercihlerim'deki varsayılan para birimi (önceden sabit 'Euro').
+  const [paraBirimi, setParaBirimi] = useState<string>(() => defaultParaTipi || 'Euro')
   const [alinanYer, setAlinanYer] = useState('')
   const [notlar, setNotlar] = useState('')
   const [submitted, setSubmitted] = useState(false)
   // Talep oluşturulurken seçilen ek dosya — "Talep Oluştur"da otomatik yüklenir.
   const [ekFile, setEkFile] = useState<File | null>(null)
+  // 3.2 — kaydetmeden çıkarken sorulur.
+  const [leaving, setLeaving] = useState(false)
+  const dirty = !!(alinanYer.trim() || notlar.trim() || ekFile
+    || rows.some((r) => r.urunAdi?.trim() || r.miktar != null || r.birimFiyat != null))
+  useUnsavedChangesGuard(dirty && !leaving)
+  useEffect(() => { if (leaving) nav('/purchase/mine') }, [leaving, nav])
   const fileRef = useRef<HTMLInputElement>(null)
   const departman = user?.yetkiTuru ?? ''
 
@@ -144,9 +153,9 @@ export function NewPurchaseRequestPage() {
     onSuccess: ({ ekUploaded }) => {
       qc.invalidateQueries({ queryKey: ['purchase-mine'] })
       toast(ekUploaded
-        ? { title: t('purchase.createSuccess') }
+        ? { title: t('purchase.createSuccess'), variant: 'success', popup: true }
         : { title: t('purchase.attachment.createButUploadFailed'), variant: 'destructive' })
-      nav('/purchase/mine')
+      setLeaving(true)
     },
     onError: (e) => toastApiError(toast, t('purchase.createError'), e),
   })
@@ -220,16 +229,17 @@ export function NewPurchaseRequestPage() {
                       </td>
                       <td className="px-2 py-1.5">
                         <Select value={r.birimChoice} onValueChange={(v) => patchRow(r.id, { birimChoice: v })}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
                             <SelectItem value={OTHER_UNIT}>{t('purchase.lines.birimOther')}</SelectItem>
                           </SelectContent>
                         </Select>
                         {r.birimChoice === OTHER_UNIT && (
-                          <Input className="mt-1" value={r.birimOther}
-                            onChange={(e) => patchRow(r.id, { birimOther: e.target.value })}
-                            placeholder={t('purchase.lines.birim')} />
+                          <FormField className="mt-1" label={t('purchase.lines.birimOtherName')}>
+                            <Input value={r.birimOther}
+                              onChange={(e) => patchRow(r.id, { birimOther: e.target.value })} />
+                          </FormField>
                         )}
                       </td>
                       <td className="px-2 py-1.5">
@@ -243,7 +253,7 @@ export function NewPurchaseRequestPage() {
                       </td>
                       <td className="px-2 py-1.5">
                         <Select value={r.indirimTipi} onValueChange={(v) => patchRow(r.id, { indirimTipi: v as IndirimTipi })}>
-                          <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="yuzde">{t('purchase.lines.indirimYuzde')}</SelectItem>
                             <SelectItem value="tutar">{t('purchase.lines.indirimTutar')}</SelectItem>
@@ -256,7 +266,7 @@ export function NewPurchaseRequestPage() {
                           placeholder="0" />
                         {/* Round-Next §14 — % seçiliyse uygulanan indirim tutarını net göster. */}
                         {r.indirimTipi === 'yuzde' && (r.indirim ?? 0) > 0 && (
-                          <div className="text-[10px] text-muted-foreground text-right whitespace-nowrap">
+                          <div className="text-2xs text-muted-foreground text-right whitespace-nowrap">
                             = {formatCurrency(indirimTutari(r), paraBirimi)}
                           </div>
                         )}
@@ -268,7 +278,7 @@ export function NewPurchaseRequestPage() {
                         {formatCurrency(lineTotal(r), paraBirimi)}
                       </td>
                       <td className="px-2 py-1.5 text-center">
-                        <Button size="sm" variant="ghost" className="text-destructive"
+                        <Button size="sm" variant="ghost" className="text-danger"
                           disabled={rows.length <= 1} onClick={() => removeRow(r.id)}>
                           {t('purchase.lines.sil')}
                         </Button>
@@ -319,12 +329,12 @@ export function NewPurchaseRequestPage() {
               {ekFile && (
                 <span className="flex items-center gap-1 text-sm break-all">
                   {ekFile.name}
-                  <button type="button" className="px-1 text-destructive" aria-label={t('purchase.attachment.remove')}
+                  <button type="button" className="px-1 text-danger" aria-label={t('purchase.attachment.remove')}
                     onClick={() => setEkFile(null)}>×</button>
                 </span>
               )}
             </div>
-            <p className="text-[10px] text-muted-foreground">{t('purchase.attachment.hint')}</p>
+            <p className="text-2xs text-muted-foreground">{t('purchase.attachment.hint')}</p>
           </div>
         </div>
 

@@ -15,12 +15,18 @@ export function PageHeader({ title, description, actions, density = 'normal', me
   const compact = density === 'compact'
   return (
     <div className={cn('flex flex-wrap items-center justify-between gap-2 border-b bg-card', compact ? 'px-4 py-2' : 'px-6 py-4')}>
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
+      {/* flex-1: başlığın yanındaki sekmeler/arama (meta) satırın tamamını kullanır. */}
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className={cn('font-semibold truncate', compact ? 'text-base' : 'text-lg')}>{title}</h1>
           {meta}
+          {/* İnce başlıkta açıklama aynı satırda (sığmazsa kısalır, tamamı ipucunda):
+              ayrı satır liste ve sağ paneli kısaltıyordu. */}
+          {description && compact && (
+            <p className="min-w-[10rem] flex-1 basis-0 truncate text-sm text-muted-foreground" title={description}>{description}</p>
+          )}
         </div>
-        {description && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
+        {description && !compact && <p className="text-sm text-muted-foreground mt-0.5">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

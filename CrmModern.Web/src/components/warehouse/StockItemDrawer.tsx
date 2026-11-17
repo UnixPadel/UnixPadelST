@@ -90,7 +90,7 @@ export function StockItemDrawer({
 
             {/* Kalan Stok Göstergesi */}
             <div className="text-right shrink-0 bg-muted/60 px-4 py-2 rounded-lg border">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground block font-medium">
+              <span className="text-2xs uppercase tracking-wide text-muted-foreground block font-medium">
                 Kalan Stok
               </span>
               <span className="text-base font-bold text-foreground tabular-nums">
@@ -146,7 +146,7 @@ export function StockItemDrawer({
                   </div>
                 )}
                 {item.ticariTanim && (
-                  <div className="pt-1 text-[11px] text-muted-foreground border-t">
+                  <div className="pt-1 text-2xs text-muted-foreground border-t">
                     <span className="font-medium text-foreground block">Ticari Tanım:</span>
                     {item.ticariTanim}
                   </div>
@@ -194,7 +194,7 @@ export function StockItemDrawer({
                         variant="outline"
                         size="xs"
                         onClick={handleDownloadDoc}
-                        className="w-full gap-1.5 text-xs h-8 text-primary hover:text-primary"
+                        className="w-full gap-1.5 text-xs text-primary hover:text-primary"
                       >
                         <Download className="h-3.5 w-3.5" />
                         <span>Orijinal Beyannameyi Aç ({beyanname.belgeAdi || 'PDF'})</span>
@@ -217,7 +217,7 @@ export function StockItemDrawer({
                 <Truck className="h-3.5 w-3.5" />
                 Çıkış Hareketleri ({cikislar.length})
               </h4>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-2xs text-muted-foreground">
                 Geri alma süresi: 30 gün
               </span>
             </div>
@@ -229,7 +229,7 @@ export function StockItemDrawer({
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-muted/50 border-b text-[11px] uppercase tracking-wider text-muted-foreground">
+                  <thead className="bg-muted/50 border-b text-2xs uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th className="py-2 px-3 font-semibold">Tarih</th>
                       <th className="py-2 px-3 font-semibold">Çıkan Miktar</th>
@@ -245,7 +245,7 @@ export function StockItemDrawer({
                       return (
                         <tr
                           key={c.id}
-                          className={isUndone ? 'bg-muted/30 text-muted-foreground opacity-60' : 'hover:bg-muted/20'}
+                          className={isUndone ? 'bg-muted/30 text-muted-foreground line-through decoration-1' : 'hover:bg-muted/20'}
                         >
                           <td className="py-2.5 px-3 whitespace-nowrap font-medium">
                             {formatDate(c.tarih)}
@@ -266,7 +266,7 @@ export function StockItemDrawer({
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             {isUndone ? (
-                              <Badge variant="outline" className="text-[10px] text-muted-foreground">
+                              <Badge variant="outline" className="text-2xs text-muted-foreground">
                                 Geri Alındı
                               </Badge>
                             ) : c.geriAlinabilir && canMutate ? (
@@ -276,14 +276,14 @@ export function StockItemDrawer({
                                 size="xs"
                                 loading={undoingId === c.id}
                                 onClick={() => onUndoExit?.(c.id)}
-                                className="h-6 px-2 text-[11px] gap-1 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                                className="h-6 px-2 text-2xs gap-1 text-danger hover:bg-destructive/10 hover:text-danger"
                                 title="Çıkışı geri al (stok tekrar artar)"
                               >
                                 <RotateCcw className="h-3 w-3" />
                                 Geri Al
                               </Button>
                             ) : (
-                              <span className="text-muted-foreground text-[10px]">
+                              <span className="text-muted-foreground text-2xs">
                                 —
                               </span>
                             )}

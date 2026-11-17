@@ -37,10 +37,12 @@ public interface IOrderRepository : IBaseRepository<Order>
 
     // ── Ekstra maliyet (SiparisEkMaliyet) ──────────────────────────────────────
 
-    /// <summary>Bir siparişin ekstra maliyet kalemleri (EkMaliyetID artan).</summary>
+    /// <summary>Bir siparişin ekstra maliyet kalemleri (EkMaliyetID artan).
+    /// 40+ ergonomi K5 — yumuşak silinen kalemler hariç (liste, proforma, kopya).</summary>
     Task<IReadOnlyList<OrderExtraCost>> GetExtraCostsByOrderIdAsync(int siparisAlID);
 
-    /// <summary>Tek ekstra maliyet kalemi (silme için; bulunamazsa null).</summary>
+    /// <summary>Tek ekstra maliyet kalemi (silme/geri yükleme için; silinmiş olsa da döner,
+    /// Silindi kontrolü serviste; bulunamazsa null).</summary>
     Task<OrderExtraCost?> GetExtraCostByIdAsync(int ekMaliyetID);
 
     /// <summary>Ekstra maliyet kalemi ekler (SaveChanges çağrısı servise bırakılır).</summary>

@@ -2,15 +2,18 @@ import { useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, keepPreviousData } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { CheckCheck, Eye, Factory } from 'lucide-react'
+import { CheckCheck, Eye, Factory, RefreshCw } from 'lucide-react'
 import { getFactoryOrders, moveToProduction, markReady, type FactoryFilter } from '@/api/factory'
 import { getUsersLookup } from '@/api/users'
 import { PageHeader } from '@/components/PageHeader'
-import { FillPage, FillRegion } from '@/components/FillPage'
+import { FillPage } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
-import { FilterBar, FilterField, ALL, useFilterState, useDefaultView } from '@/components/FilterBar'
+import { FilterBar, FilterField, ALL, useFilterState, useDefaultView, moreFilterCount } from '@/components/FilterBar'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
+import { OrderWorkPanel } from '@/components/order/OrderWorkPanel'
+import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { useAutoSelectFirst } from '@/hooks/useAutoSelectFirst'
 import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
 import { useNotHereHint } from '@/hooks/useNotHereHint'
 import { useShortcutHints } from '@/components/StatusBar'
@@ -22,6 +25,7 @@ import { FormField } from '@/components/ui/form-field'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useNextStepLabel } from '@/hooks/useNextStep'
 import { useToast } from '@/components/ToastProvider'
 import { useAppMutation } from '@/hooks/useAppMutation'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -55,6 +59,7 @@ const FILTER_DEFAULTS = {
 export function FactoryPage() {
   const { toast } = useToast()
   const { confirm } = useConfirm()
+  const nextStepLabel = useNextStepLabel()
   const qc = useQueryClient()
   const { t } = useTranslation()
   const { getUser } = useAuth()
@@ -68,6 +73,8 @@ export function FactoryPage() {
   const [sTarih, setSTarih] = useState(() => localDateTimeInput())
   const [bulkRunning, setBulkRunning] = useState(false)
   const [activeNo, setActiveNo] = useState<string | null>(() => params.get('sel'))
+  // 4.1 — "Tam ekran": aynı sipariş büyük pencerede.
+  const [expandedNo, setExpandedNo] = useState<string | null>(null)
   const [selection, setSelection] = useState<(string | number)[]>([])
 
   // Faz-fix 2.2 — Fabrika.cs çoklu filtre. Boş alanlar query'ye gönderilmez.
@@ -88,7 +95,7 @@ export function FactoryPage() {
   // Round-8 §11 — Temsilci filtresi yalnız Temsilci rolündeki kullanıcıları listeler.
   const temsilciUsers = useMemo(() => users.filter((u) => u.yetkiTuru === 'Temsilci'), [users])
 
-  const { data = [], isLoading, isFetching, isError } = useQuery({
+  const { data = [], isLoading, isFetching, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ['factory', filter],
     queryFn: () => getFactoryOrders(filter),
     placeholderData: keepPreviousData,
@@ -103,7 +110,7 @@ export function FactoryPage() {
   const toProductionMut = useAppMutation({
     mutationFn: ({ siparisNo, dto }: { siparisNo: string; dto: { sTarih: string; fabrikaNot: string } }) =>
       moveToProduction(siparisNo, dto),
-    successTitle: t('factory.toast.movedToProduction'),
+    successTitle: t('factory.toast.movedToProduction'), notify: 'toast',
     successDescription: (_d, v) => v.siparisNo,
     errorTitle: t('factory.toast.moveFailed'),
     onSuccess: () => { setProductionTargets([]); setFabrikaNot('') },
@@ -111,7 +118,7 @@ export function FactoryPage() {
 
   const readyMut = useAppMutation({
     mutationFn: (siparisNo: string) => markReady(siparisNo),
-    successTitle: t('factory.toast.markedReady'),
+    successTitle: t('factory.toast.markedReady'), notify: 'toast',
     successDescription: (_d, no) => no,
     errorTitle: t('factory.toast.readyFailed'),
   })
@@ -127,7 +134,9 @@ export function FactoryPage() {
     const ok = await confirm({
       title: t('factory.readyConfirmTitle', { count: nos.length }),
       description: nos.join(', '),
-      confirmLabel: t('factory.ready'),
+      impact: [t('factory.impact.ready', { count: nos.length })],
+      nextStep: nos.length === 1 ? await nextStepLabel(nos[0]) : undefined,
+      confirmLabel: t('factory.readyAction'),
     })
     if (!ok) return
     if (nos.length === 1) { readyMut.mutate(nos[0]); return }
@@ -167,40 +176,32 @@ export function FactoryPage() {
 
   const columns: Column<Row>[] = [
     { key: 'siparisNo', pin: 'left', header: t('common.orderNo'),  sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
-    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'), sortable: true },
-    { key: 'mUlke',             header: t('common.country'),  sortable: true },
+    { key: 'musteriAd', truncate: '10rem', header: t('common.customer'), sortable: true },
+    { key: 'mUlke',             header: t('common.country'),  sortable: true, defaultHidden: true },
     // 2.2 — legacy "Temsilci" (CONCAT(Ad, Soyad)) sütunu
-    { key: 'kullanici',         header: t('factory.temsilci'), sortable: true, render: (r) => (r.kullanici as string) ?? '—' },
+    { key: 'kullanici',         header: t('factory.temsilci'), sortable: true, defaultHidden: true, render: (r) => (r.kullanici as string) ?? '—' },
     { key: 'siparisMiTeklifMi', header: t('common.stage'),    sortable: true, render: (r) => <StatusBadge value={r.siparisMiTeklifMi} context="stage" /> },
-    { key: 'fabrikaNot',        header: t('common.note'),     render: (r) => <span className="text-muted-foreground">{(r.fabrikaNot as string) ?? '—'}</span> },
+    { key: 'fabrikaNot', truncate: '12rem', header: t('common.note'), defaultHidden: true, render: (r) => <span className="text-muted-foreground">{(r.fabrikaNot as string) ?? '—'}</span> },
     { key: 'sTarih',            header: t('common.startDate'), sortable: true, type: 'date', render: (r) => r.sTarih ? formatDate(r.sTarih as string) : '—' },
     // Round-8 §11 — Cari onay tarihi (başlangıç tarihinden ayrı).
-    { key: 'cariOnayTarih',     header: t('factory.cariOnayTarih'), sortable: true, type: 'date', render: (r) => r.cariOnayTarih ? formatDate(r.cariOnayTarih as string) : '—' },
-    { key: 'tarih',             header: t('common.date'),     sortable: true, type: 'date', render: (r) => formatDate(r.tarih as string) },
-    {
-      key: 'actions', pin: 'right',
-      header: t('common.actions'),
-      hideable: false,
-      exportValue: false,
-      render: (r) => (
-        <div className="flex flex-wrap gap-1.5">
-          <Button size="xs" variant="outline" onClick={() => setActiveNo(r.siparisNo)}>
-            <Eye className="h-3.5 w-3.5" /> {t('common.openOrder')}
-          </Button>
-          {isFactoryUser && r.siparisMiTeklifMi === 'Planlama' && (
-            <Button size="xs" onClick={() => openProduction([r.siparisNo])}>
-              <Factory className="h-3.5 w-3.5" /> {t('factory.moveToProduction')}
-            </Button>
-          )}
-          {isFactoryUser && r.siparisMiTeklifMi === 'Uretim' && (
-            <Button size="xs" variant="secondary" loading={readyMut.isPendingFor((no) => no === r.siparisNo)} onClick={() => askReady([r.siparisNo])}>
-              <CheckCheck className="h-3.5 w-3.5" /> {t('factory.ready')}
-            </Button>
-          )}
-        </div>
-      ),
-    },
+    { key: 'cariOnayTarih',     header: t('factory.cariOnayTarih'), sortable: true, type: 'date', defaultHidden: true, render: (r) => r.cariOnayTarih ? formatDate(r.cariOnayTarih as string) : '—' },
+    { key: 'tarih',             header: t('common.date'),     sortable: true, type: 'date', defaultHidden: true, render: (r) => formatDate(r.tarih as string) },
+    // Satır başına buton yok: seçili siparişin işi sağ panelin altında (tek ana buton).
   ]
+
+  // Liste yüklenince ilk sipariş seçilir; sağ panel hep dolu.
+  useAutoSelectFirst(data.map((r) => r.siparisNo), activeNo, setActiveNo, isLoading)
+  const activeRow = data.find((r) => r.siparisNo === activeNo) ?? null
+  const panelFooter = !isFactoryUser || !activeRow ? undefined
+    : activeRow.siparisMiTeklifMi === 'Planlama' ? (
+      <Button size="lg" className="w-full" onClick={() => openProduction([activeRow.siparisNo])}>
+        <Factory className="h-4 w-4" aria-hidden /> {t('factory.moveToProduction')}
+      </Button>
+    ) : activeRow.siparisMiTeklifMi === 'Uretim' ? (
+      <Button size="lg" className="w-full" loading={readyMut.isPendingFor((no) => no === activeRow.siparisNo)} onClick={() => askReady([activeRow.siparisNo])}>
+        <CheckCheck className="h-4 w-4" aria-hidden /> {t('factory.readyAction')}
+      </Button>
+    ) : undefined
 
   useShortcutHints([
     { keys: '/', label: t('shortcuts.focusFilter') },
@@ -213,9 +214,19 @@ export function FactoryPage() {
     // (başlık + araç çubuğu yerinde kalır).
     <FillPage>
       <PageHeader density="compact" actions={<WaitingUpstreamPanel screen="factory" variant="button" />} title={t('factory.title')} description={t('factory.description')} />
-      <div className="space-y-2 px-4 pt-2">
-        {/* Filter grid — Fabrika.cs araButtonInTab port'u */}
-        <FilterBar onReset={reset} tableId="factory" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
+      {/* 4.1 (K7) — liste solda, sipariş detayı sağda (önceden modal listeyi kapatıyordu). */}
+      <MasterDetailLayout
+        pageId="factory"
+        open
+        defaultShare={0.42}
+        onExpand={activeNo ? () => setExpandedNo(activeNo) : undefined}
+        title={activeNo ? t('orderDetail.title', { no: activeNo }) : t('masterDetail.panel')}
+        detail={<OrderWorkPanel siparisNo={activeNo} emptyText={t(data.length ? 'masterDetail.selectHint' : 'masterDetail.emptyList')} factoryView footer={panelFooter} />}
+        list={<>
+        {/* Filtreler yalnız listeyi süzer: liste sütununun üstünde durur, sağ panel sayfa başlığının hemen altından başlar.
+            (Fabrika.cs araButtonInTab port'u) */}
+        <FilterBar className="mb-2 shrink-0" onReset={reset} tableId="factory" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}
+          primaryCount={2} moreActiveCount={moreFilterCount(f, FILTER_DEFAULTS, ['siparisNo', 'musteriAd'])}>
           <FilterField label={t('common.orderNo')}>
             <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
           </FilterField>
@@ -227,7 +238,7 @@ export function FactoryPage() {
           </FilterField>
           <FilterField label={t('factory.temsilci')}>
             <Select value={f.kullaniciID} onValueChange={(v) => set('kullaniciID', v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t('common.all')}</SelectItem>
                 {temsilciUsers.map((u) => (
@@ -238,7 +249,7 @@ export function FactoryPage() {
           </FilterField>
           <FilterField label={t('common.stage')}>
             <Select value={f.asama} onValueChange={(v) => set('asama', v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t('common.all')}</SelectItem>
                 {FACTORY_ASAMALAR.map((a) => <SelectItem key={a} value={a}>{statusLabel(t, a)}</SelectItem>)}
@@ -252,11 +263,12 @@ export function FactoryPage() {
             <Input inputSize="sm" type="date" value={f.bitisTarih} onChange={(e) => set('bitisTarih', e.target.value)} />
           </FilterField>
         </FilterBar>
-      </div>
-      <FillRegion className="pt-2">
         <DataTable
           fill
-          tableId="factory"
+          updatedAt={dataUpdatedAt}
+          onRefresh={() => void refetch()}
+          tableId="factory-v2"
+          rowGoneNotice={false}
           exportFileName="fabrika"
           columns={columns}
           data={data as Row[]}
@@ -264,8 +276,7 @@ export function FactoryPage() {
           loading={isLoading}
           error={isError}
           emptyMessage={notHere}
-          density="compact"
-          toolbar={isFetching && !isLoading ? <span className="animate-pulse">{t('table.refreshing')}</span> : null}
+          toolbar={isFetching && !isLoading ? <span className="inline-flex items-center gap-1.5 text-muted-foreground"><RefreshCw className="h-4 w-4" aria-hidden />{t('table.refreshing')}</span> : null}
           activeRowKey={activeNo}
           // Satıra tıklama (ve Enter) "Siparişi Aç" ile aynı: Sipariş Detayı penceresi.
           onRowClick={(r) => setActiveNo(r.siparisNo)}
@@ -286,16 +297,18 @@ export function FactoryPage() {
               </>
             )
           }}
+          actionBar={false}
           rowActions={[
             { key: 'detail', label: t('common.openOrder'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(r.siparisNo) },
             { key: 'prod', label: t('factory.moveToProduction'), hidden: (r) => !isFactoryUser || r.siparisMiTeklifMi !== 'Planlama', onSelect: (r) => openProduction([r.siparisNo]) },
             { key: 'ready', label: t('factory.ready'), hidden: (r) => !isFactoryUser || r.siparisMiTeklifMi !== 'Uretim', onSelect: (r) => askReady([r.siparisNo]) },
           ]}
         />
-      </FillRegion>
+        </>}
+      />
 
       {/* Sipariş Detayı penceresi (aşama geçmişi + belge akışı dahil). */}
-      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} factoryView />
+      <OrderDetailModal siparisNo={expandedNo} onClose={() => setExpandedNo(null)} factoryView />
 
       <Dialog open={productionTargets.length > 0} onOpenChange={(o) => { if (!o) setProductionTargets([]) }}>
         <DialogContent>

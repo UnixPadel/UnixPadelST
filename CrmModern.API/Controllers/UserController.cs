@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.User;
 using CrmModern.Core.Interfaces.Services;
@@ -15,11 +16,16 @@ namespace CrmModern.API.Controllers;
 [Authorize(Roles = "Yonetici")]
 public sealed class UserController(IUserService userService) : ControllerBase
 {
+    private int CurrentUserId =>
+        int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? throw new InvalidOperationException("KullaniciID claim missing."));
+
+    /// <summary>40+ ergonomi K5 — includeDeleted=true: silinen kullanıcılar da (silindi=true) döner.</summary>
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<UserListDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] bool includeDeleted = false)
     {
-        var result = await userService.GetAllAsync();
+        var result = await userService.GetAllAsync(includeDeleted);
         return Ok(ApiResponse<IReadOnlyList<UserListDto>>.Ok(result));
     }
 
@@ -70,8 +76,18 @@ public sealed class UserController(IUserService userService) : ControllerBase
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Delete(int kullaniciId)
     {
-        await userService.DeleteAsync(kullaniciId);
+        await userService.DeleteAsync(kullaniciId, CurrentUserId);
         return NoContent();
+    }
+
+    /// <summary>40+ ergonomi K5 — "Geri al / Geri yükle": yumuşak silinen kullanıcıyı geri getirir.</summary>
+    [HttpPost("{kullaniciId:int}/restore")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Restore(int kullaniciId)
+    {
+        await userService.RestoreAsync(kullaniciId, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Kullanıcı geri yüklendi."));
     }
 
     [HttpPost("{kullaniciId:int}/password")]

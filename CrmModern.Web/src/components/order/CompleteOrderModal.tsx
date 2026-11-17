@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, AlertTriangle, Info } from 'lucide-react'
+import { AlertTriangle, Info } from 'lucide-react'
 import { finalizeCompletion } from '@/api/accounting'
 import {
   Dialog,
@@ -12,11 +12,15 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FormField } from '@/components/ui/form-field'
 import { DecimalInput } from '@/components/DecimalInput'
 import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/components/ToastProvider'
 import { toastApiError } from '@/lib/apiError'
 import { formatCurrency } from '@/lib/utils'
+import { localDateInput } from '@/lib/date'
+import { stageLabel } from '@/lib/status'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
 
 interface Props {
   open: boolean
@@ -30,6 +34,10 @@ interface Props {
   onSuccess?: () => void
 }
 
+/**
+ * Siparişi doğrudan "Tamamlandı"ya alır (v0.3.8 yetkisi). Kapatma aradaki adımları
+ * atladığı için pencere "Ne olacak?" listesini butondan önce gösterir.
+ */
 export function CompleteOrderModal({
   open,
   onOpenChange,
@@ -47,7 +55,8 @@ export function CompleteOrderModal({
 
   const [kapanisNotu, setKapanisNotu] = useState('')
   const [pesinat, setPesinat] = useState<number | null>(null)
-  const [pesinatTarihi, setPesinatTarihi] = useState(new Date().toISOString().slice(0, 10))
+  // Yerel tarih (toISOString UTC verir; TR'de 00:00–03:00 arası bir gün geride kalırdı).
+  const [pesinatTarihi, setPesinatTarihi] = useState(() => localDateInput())
   const [finalMaliyet, setFinalMaliyet] = useState<number | null>(null)
   const [maliyetDetayi, setMaliyetDetayi] = useState('')
 
@@ -66,19 +75,9 @@ export function CompleteOrderModal({
         kapanisNotu: kapanisNotu.trim() || undefined,
       }),
     onSuccess: () => {
-      toast({
-        title: 'Sipariş Tamamlandı',
-        description: `${siparisNo} başarıyla "Tamamlandı" statüsüne alındı.`,
-        variant: 'success',
-      })
-      qc.invalidateQueries({ queryKey: ['order', siparisNo] })
-      qc.invalidateQueries({ queryKey: ['orders'] })
-      qc.invalidateQueries({ queryKey: ['accounting-orders'] })
-      qc.invalidateQueries({ queryKey: ['quality-control'] })
-      qc.invalidateQueries({ queryKey: ['factory-orders'] })
-      qc.invalidateQueries({ queryKey: ['logistics-history'] })
-      qc.invalidateQueries({ queryKey: ['logistics-ready'] })
-      qc.invalidateQueries({ queryKey: ['nav-counts'] })
+      // Sipariş bekleyen listelerden çıkar; sonuç ekrandan kaybolduğu için toast.
+      toast({ title: t('completeOrder.done'), description: t('completeOrder.doneDesc', { no: siparisNo }), variant: 'success', popup: true })
+      void invalidateOrderGraph(qc)
       onOpenChange(false)
       onSuccess?.()
     },
@@ -86,9 +85,7 @@ export function CompleteOrderModal({
   })
 
   const handleClose = () => {
-    if (!finalizeMut.isPending) {
-      onOpenChange(false)
-    }
+    if (!finalizeMut.isPending) onOpenChange(false)
   }
 
   return (
@@ -96,125 +93,107 @@ export function CompleteOrderModal({
       <DialogContent size="md" className="space-y-4">
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-            <DialogTitle>Siparişi Tamamla</DialogTitle>
+            <AlertTriangle className="h-5 w-5 text-danger" aria-hidden />
+            <DialogTitle>{t('completeOrder.title')}</DialogTitle>
           </div>
-          <p className="text-xs text-muted-foreground">
-            <span className="font-mono font-medium">{siparisNo}</span>
+          <p className="text-sm text-muted-foreground">
+            <span className="font-mono font-medium text-foreground">{siparisNo}</span>
             {musteriAd && <span> · {musteriAd}</span>}
           </p>
         </DialogHeader>
 
         {isEarlyCompletion && (
-          <div className="flex items-start gap-2.5 rounded-md border border-amber-500/40 bg-amber-500/10 p-2.5 text-xs text-amber-900 dark:text-amber-200">
-            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600 mt-0.5" />
+          <div className="flex items-start gap-2.5 rounded-md border border-warning/40 bg-warning-soft p-3 text-sm text-warning-soft-foreground">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <div className="space-y-0.5">
-              <span className="font-semibold">Doğrudan Kapatma Uyarısı</span>
-              <p className="text-amber-800/90 dark:text-amber-300/90">
-                Bu sipariş şu anda <strong>{currentStage}</strong> aşamasındadır. Tüm ara adımlar atlanarak sipariş &quot;tamamlandı&quot; sayılıp kapatılacaktır.
-              </p>
+              <p className="font-semibold">{t('completeOrder.earlyTitle')}</p>
+              <p>{t('completeOrder.earlyBody', { stage: stageLabel(t, currentStage) })}</p>
             </div>
           </div>
         )}
 
-        {/* Finansal Özet */}
-        <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted/30 p-2.5 text-center text-xs">
+        {/* Finansal özet */}
+        <div className="grid grid-cols-3 gap-2 rounded-lg border bg-muted p-3 text-center text-sm">
           <div>
-            <div className="text-muted-foreground text-[11px]">Toplam Tutar</div>
-            <div className="font-semibold tabular-nums mt-0.5">{formatCurrency(toplam, paraTipi)}</div>
+            <div className="text-xs text-muted-foreground">{t('completeOrder.total')}</div>
+            <div className="mt-0.5 font-semibold tabular-nums">{formatCurrency(toplam, paraTipi)}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-[11px]">Ödenen</div>
-            <div className="font-semibold tabular-nums mt-0.5 text-success">{formatCurrency(odenen, paraTipi)}</div>
+            <div className="text-xs text-muted-foreground">{t('completeOrder.paid')}</div>
+            <div className="mt-0.5 font-semibold tabular-nums text-success">{formatCurrency(odenen, paraTipi)}</div>
           </div>
           <div>
-            <div className="text-muted-foreground text-[11px]">Kalan Bakiye</div>
-            <div className={`font-semibold tabular-nums mt-0.5 ${kalanBakiye > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+            <div className="text-xs text-muted-foreground">{t('completeOrder.remaining')}</div>
+            <div className={`mt-0.5 font-semibold tabular-nums ${kalanBakiye > 0 ? 'text-warning' : 'text-muted-foreground'}`}>
               {formatCurrency(kalanBakiye, paraTipi)}
             </div>
           </div>
         </div>
 
         {kalanBakiye > 0 && (
-          <div className="flex items-center gap-2 rounded border border-blue-500/30 bg-blue-500/5 p-2 text-[11px] text-blue-900 dark:text-blue-200">
-            <Info className="h-3.5 w-3.5 shrink-0 text-blue-600 dark:text-blue-400" />
-            <span>Kalan bakiye bulunmaktadır. Sipariş tamamlandıktan sonra da Muhasebe ekranından tahsilat eklenebilir.</span>
+          <div className="flex items-start gap-2 rounded-md border border-info/30 bg-info-soft p-2.5 text-sm text-info-soft-foreground">
+            <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <span>{t('completeOrder.remainingNote')}</span>
           </div>
         )}
 
-        {/* Form Alanları */}
-        <div className="space-y-3 text-xs">
-          <div>
-            <label className="mb-1 block font-medium text-foreground">
-              Kapanış Notu / Açıklama <span className="text-muted-foreground font-normal">(opsiyonel)</span>
-            </label>
+        <div className="space-y-3">
+          <FormField label={t('completeOrder.kapanisNotu')} hint={t('completeOrder.optional')}>
             <Textarea
               rows={2}
-              placeholder="Örn: Erken teslim edildi, müşteri talebiyle kapatıldı..."
+              placeholder={t('completeOrder.kapanisNotuPh')}
               value={kapanisNotu}
               onChange={(e) => setKapanisNotu(e.target.value)}
             />
-          </div>
+          </FormField>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block font-medium text-foreground">
-                Tahsilat / Peşinat <span className="text-muted-foreground font-normal">(opsiyonel)</span>
-              </label>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t('completeOrder.pesinat')} hint={t('completeOrder.optional')}>
               <DecimalInput
                 placeholder="0,00"
                 value={pesinat ?? ''}
                 onValueChange={(v: number | '') => setPesinat(v === '' ? null : v)}
               />
-            </div>
-            <div>
-              <label className="mb-1 block font-medium text-foreground">
-                Tahsilat Tarihi
-              </label>
-              <Input
-                type="date"
-                value={pesinatTarihi}
-                onChange={(e) => setPesinatTarihi(e.target.value)}
-              />
-            </div>
+            </FormField>
+            <FormField label={t('completeOrder.pesinatTarihi')}>
+              <Input type="date" value={pesinatTarihi} onChange={(e) => setPesinatTarihi(e.target.value)} />
+            </FormField>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="mb-1 block font-medium text-foreground">
-                Final Maliyet <span className="text-muted-foreground font-normal">({isEarlyCompletion ? 'opsiyonel' : 'Maliyet Reçetesi'})</span>
-              </label>
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label={t('completeOrder.finalMaliyet')}
+              hint={isEarlyCompletion ? t('completeOrder.optional') : t('completeOrder.finalMaliyetHint')}>
               <DecimalInput
                 placeholder="0,00"
                 value={finalMaliyet ?? ''}
                 onValueChange={(v: number | '') => setFinalMaliyet(v === '' ? null : v)}
               />
-            </div>
-            <div>
-              <label className="mb-1 block font-medium text-foreground">
-                Maliyet Detayı <span className="text-muted-foreground font-normal">(opsiyonel)</span>
-              </label>
+            </FormField>
+            <FormField label={t('completeOrder.maliyetDetayi')} hint={t('completeOrder.optional')}>
               <Input
-                placeholder="Maliyet açıklaması"
+                placeholder={t('completeOrder.maliyetDetayiPh')}
                 value={maliyetDetayi}
                 onChange={(e) => setMaliyetDetayi(e.target.value)}
               />
-            </div>
+            </FormField>
           </div>
         </div>
 
-        <DialogFooter className="mt-4">
-          <Button variant="outline" size="sm" onClick={handleClose} disabled={finalizeMut.isPending}>
-            Vazgeç
+        {/* Etki önizlemesi: kullanıcı butona basmadan sonucu görür. */}
+        <div className="rounded-md border p-3 text-sm">
+          <p className="font-semibold">{t('completeOrder.impactTitle')}</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-5">
+            <li>{t('completeOrder.impactClosed')}</li>
+            {pesinat !== null && pesinat > 0 && <li>{t('completeOrder.impactPayment')}</li>}
+          </ul>
+        </div>
+
+        <DialogFooter className="sm:justify-between">
+          <Button variant="outline" onClick={handleClose} disabled={finalizeMut.isPending}>
+            {t('common.cancel')}
           </Button>
-          <Button
-            size="sm"
-            className="rounded-none bg-red-600 hover:bg-red-700 active:bg-red-800 text-white font-medium shadow-xs border border-red-700 dark:border-red-500 transition-colors"
-            loading={finalizeMut.isPending}
-            onClick={() => finalizeMut.mutate()}
-          >
-            <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
-            Siparişi Tamamla
+          <Button variant="destructive" loading={finalizeMut.isPending} onClick={() => finalizeMut.mutate()}>
+            {t('completeOrder.confirm')}
           </Button>
         </DialogFooter>
       </DialogContent>

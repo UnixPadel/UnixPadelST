@@ -42,6 +42,9 @@ export interface Musteri {
   ulkelerID: number
   ulkeAdi: string
   bolge?: string | null
+  /** K5 — yumuşak silme (yalnız includeDeleted listelerinde true gelir). */
+  silindi?: boolean
+  silinmeTarihi?: string | null
 }
 
 export interface Ulke {
@@ -547,6 +550,9 @@ export interface UserListDto {
   telefon: string
   yetkiTuru: string
   durum: string
+  /** K5 — yumuşak silme (yalnız includeDeleted listelerinde true gelir). */
+  silindi?: boolean
+  silinmeTarihi?: string | null
 }
 
 /** Slim user record for dropdowns/filters — Fabrika "Temsilci" gibi. */
@@ -759,11 +765,17 @@ export interface OrderWorkflowStatusDto {
   stepCode: WorkflowStepCode | null
   department: WorkflowDepartment | null
   waitingSince: string | null
+  /** Mevcut adım tamamlanınca beklenecek adım (onay penceresindeki "Sonraki adım"). null → Tamamlandı. */
+  nextStepCode?: WorkflowStepCode | null
+  nextDepartment?: WorkflowDepartment | null
 }
 
 // ── Antrepo & Depo Stokları DTOs ───────────────────────────────────────────
 
 export interface StockItemListDto {
+  /** K5 — yumuşak silme (yalnız includeDeleted listelerinde true gelir). */
+  silindi?: boolean
+  silinmeTarihi?: string | null
   id: number
   beyannameId: number | null
   beyannameNo: string | null

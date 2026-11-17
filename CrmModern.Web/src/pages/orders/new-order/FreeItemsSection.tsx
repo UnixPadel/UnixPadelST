@@ -84,7 +84,7 @@ export function FreeItemsSection({
                 <tr key={idx} className="border-t">
                   <td className="px-2 py-1">
                     {fi.bilesenAdi}
-                    <Badge variant="warning" className="ml-1 px-1.5 py-0 text-[10px]">{t('orderDetail.ozelBadge')}</Badge>
+                    <Badge variant="warning" className="ml-1 px-1.5 py-0 text-2xs">{t('orderDetail.ozelBadge')}</Badge>
                   </td>
                   <td className="px-2 py-1">{fi.oznitelikAdi || '—'}</td>
                   <td className="px-2 py-1">{fi.birim || '—'}</td>
@@ -92,11 +92,11 @@ export function FreeItemsSection({
                   <td className="px-2 py-1 text-right tabular-nums">{formatNumberTR(fi.fiyat ?? 0)} {sym}</td>
                   <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{formatNumberTR((fi.adet ?? 0) * (fi.fiyat ?? 0))}</td>
                   <td className="px-1 py-1 text-right">
-                    <Button type="button" variant="ghost" size="icon-sm" aria-label={t('common.edit')} onClick={() => openDialog(idx)}>
-                      <Pencil className="h-3.5 w-3.5" />
+                    <Button type="button" variant="ghost" size="xs" aria-label={t('common.edit')} onClick={() => openDialog(idx)}>
+                      <Pencil className="h-3.5 w-3.5" aria-hidden /> {t('common.edit')}
                     </Button>
-                    <Button type="button" variant="ghost" size="icon-sm" className="text-destructive" aria-label={t('common.delete')} onClick={() => remove(idx)}>
-                      <Trash2 className="h-3.5 w-3.5" />
+                    <Button type="button" variant="ghost" size="xs" className="text-danger" aria-label={t('common.delete')} onClick={() => remove(idx)}>
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden /> {t('common.delete')}
                     </Button>
                   </td>
                 </tr>

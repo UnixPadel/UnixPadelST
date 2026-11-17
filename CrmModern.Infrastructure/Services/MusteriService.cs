@@ -6,11 +6,13 @@ using CrmModern.Core.Interfaces.Services;
 
 namespace CrmModern.Infrastructure.Services;
 
-internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
+internal sealed class MusteriService(IUnitOfWork unitOfWork, IAuditService audit) : IMusteriService
 {
-    public async Task<IEnumerable<MusteriDto>> GetAllAsync(int currentUserId, string role)
+    private const string AuditEntity = "Musteri";
+
+    public async Task<IEnumerable<MusteriDto>> GetAllAsync(int currentUserId, string role, bool includeDeleted = false)
     {
-        var list = await unitOfWork.Musteriler.GetAllWithUlkeAsync();
+        var list = await unitOfWork.Musteriler.GetAllWithUlkeAsync(includeDeleted);
 
         // PROMPT-v2 §7: Temsilci yalnız kendi yarattığı müşterileri görür.
         // Diğer roller (Yonetici, Muhasebe, Gozlemci, Fabrika, Lojistik) tüm
@@ -32,7 +34,13 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
     public async Task<MusteriDto> CreateAsync(CreateMusteriDto dto, int currentUserId)
     {
         // Replicates: SELECT COUNT(*) FROM MusteriBilgileri WHERE MusteriAd = @MusteriAd
-        if (await unitOfWork.Musteriler.MusteriAdExistsAsync(dto.MusteriAd))
+        var ayniAd = await unitOfWork.Musteriler.GetByMusteriAdAsync(dto.MusteriAd);
+        // 40+ ergonomi K5 — ad silinmiş bir müşteriye aitse yenisi açılmaz; geri yüklenmeli.
+        if (ayniAd is { Silindi: true })
+            throw new BusinessException(
+                "Bu müşteri adı silinmiş bir müşteriye ait. Silinenlerden geri yükle.",
+                "customerDeletedExists", new { name = dto.MusteriAd });
+        if (ayniAd is not null)
             throw new BusinessException("Bu müşteri adı zaten var.", "customerExists");
 
         var ulke = await unitOfWork.Ulkeler.GetByIdAsync(dto.UlkelerID)
@@ -85,18 +93,42 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
         return ToDto(musteri);
     }
 
-    public async Task DeleteAsync(int id)
+    public async Task DeleteAsync(int id, int silenKullaniciId)
     {
         var musteri = await unitOfWork.Musteriler.GetByIdAsync(id)
             ?? throw new NotFoundException(nameof(Musteri), id);
+        if (musteri.Silindi)
+            throw new NotFoundException(nameof(Musteri), id);
 
         // Round-8 §10 — siparişi olan müşteri silinemez (yetim sipariş riski).
         bool hasOrders = await unitOfWork.Orders.AnyByCustomerAsync(musteri.MusteriID, musteri.MusteriAd);
         if (hasOrders)
             throw new BusinessException("Bu müşterinin sipariş ya da teklifleri var, silinemez.", "customerHasOrders");
 
-        unitOfWork.Musteriler.Remove(musteri);
+        // 40+ ergonomi K5 — yumuşak silme: satır kalır, liste/arama/seçim dışlar.
+        musteri.Silindi          = true;
+        musteri.SilinmeTarihi    = DateTime.Now;
+        musteri.SilenKullaniciID = silenKullaniciId;
+        unitOfWork.Musteriler.Update(musteri);
         await unitOfWork.SaveChangesAsync();
+
+        await audit.LogAsync("Delete", AuditEntity, id.ToString(), silenKullaniciId, musteri.MusteriAd);
+    }
+
+    public async Task RestoreAsync(int id, int geriYukleyenKullaniciId)
+    {
+        var musteri = await unitOfWork.Musteriler.GetByIdAsync(id)
+            ?? throw new NotFoundException(nameof(Musteri), id);
+        if (!musteri.Silindi)
+            throw new BusinessException("Bu müşteri silinmemiş.", "customerNotDeleted", new { name = musteri.MusteriAd });
+
+        musteri.Silindi          = false;
+        musteri.SilinmeTarihi    = null;
+        musteri.SilenKullaniciID = null;
+        unitOfWork.Musteriler.Update(musteri);
+        await unitOfWork.SaveChangesAsync();
+
+        await audit.LogAsync("Restore", AuditEntity, id.ToString(), geriYukleyenKullaniciId, musteri.MusteriAd);
     }
 
     public async Task<IEnumerable<UlkeDto>> GetUlkelerAsync()
@@ -137,6 +169,8 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork) : IMusteriService
         VATNumarasi : m.VATNumarasi,
         UlkelerID   : m.UlkelerID,
         UlkeAdi     : m.Ulke?.UlkeAdi     ?? string.Empty,
-        Bolge       : m.Ulke?.Bolge
+        Bolge       : m.Ulke?.Bolge,
+        Silindi       : m.Silindi,
+        SilinmeTarihi : m.SilinmeTarihi
     );
 }

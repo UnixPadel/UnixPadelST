@@ -21,11 +21,11 @@ export function ReadOnlyField({
   const empty = value == null || value === ''
   return (
     <div className={cn('min-w-0 space-y-0.5', className)}>
-      <div className="text-[11px] font-medium text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div
         className={cn(
-          'rounded border bg-field-readonly px-1.5 py-1 text-xs min-h-[1.625rem]',
-          multiline ? 'whitespace-pre-wrap break-words' : 'truncate',
+          'rounded border bg-field-readonly px-2 py-1 text-sm min-h-ctl-xs',
+          multiline ? 'whitespace-pre-wrap break-words' : 'break-words',
           mono && 'font-mono',
           align === 'right' && 'text-right tabular-nums',
         )}

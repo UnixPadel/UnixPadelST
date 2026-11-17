@@ -131,7 +131,8 @@ export function CommandPalette() {
     it.kind === 'nav' ? t('palette.screens') : it.kind === 'doc' ? t('palette.commands') : it.recent ? t('palette.recent') : it.hit.kategori
 
   return (
-    <div className="relative w-full max-w-xl">
+    // min-w-0 flex-1: dar ekranda arama kutusu daralır, üst çubuk iki satıra bölünmez.
+    <div className="relative min-w-0 max-w-xl flex-1">
       <button
         type="button"
         onClick={openPalette}
@@ -140,7 +141,7 @@ export function CommandPalette() {
       >
         <Search className="h-4 w-4" />
         <span className="flex-1 truncate text-left">{t('palette.trigger')}</span>
-        <kbd className="hidden items-center gap-1 rounded border bg-muted px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground sm:inline-flex">
+        <kbd className="hidden items-center gap-1 rounded border bg-muted px-1.5 py-0.5 font-mono text-2xs text-muted-foreground sm:inline-flex">
           Ctrl K
         </kbd>
       </button>
@@ -188,10 +189,10 @@ export function CommandPalette() {
                 return (
                   <div key={it.id}>
                     {header && (
-                      <div className="flex items-center justify-between bg-muted/50 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                      <div className="flex items-center justify-between bg-muted/50 px-3 py-1 text-2xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <span className="flex items-center gap-1">{it.kind === 'hit' && it.recent && <Clock className="h-3 w-3" />}{header}</span>
                         {it.kind === 'hit' && it.recent && (
-                          <button onClick={clearRecents} className="text-[10px] font-normal normal-case hover:text-foreground">{t('common.clear')}</button>
+                          <button onClick={clearRecents} className="text-2xs font-normal normal-case hover:text-foreground">{t('common.clear')}</button>
                         )}
                       </div>
                     )}
@@ -207,7 +208,7 @@ export function CommandPalette() {
                         <>
                           <it.item.icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="flex-1 truncate text-sm">{t(it.item.i18nKey)}</span>
-                          <kbd className="rounded border bg-muted px-1.5 font-mono text-[10px]">{it.item.code}</kbd>
+                          <kbd className="rounded border bg-muted px-1.5 font-mono text-2xs">{it.item.code}</kbd>
                         </>
                       )}
                       {it.kind === 'doc' && (
@@ -230,7 +231,7 @@ export function CommandPalette() {
                 )
               })}
             </div>
-            <div className="flex items-center gap-3 border-t px-3 py-1.5 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-3 border-t px-3 py-1.5 text-2xs text-muted-foreground">
               <span><kbd className="font-mono">↑↓</kbd> {t('palette.navigate')}</span>
               <span><kbd className="font-mono">Enter</kbd> {t('palette.open')}</span>
               <span><kbd className="font-mono">Esc</kbd> {t('common.close')}</span>

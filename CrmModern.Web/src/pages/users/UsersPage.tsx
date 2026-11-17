@@ -1,13 +1,17 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { getUsers, createUser, updateUser, deleteUser, changeUserPassword } from '@/api/users'
+import { getUsers, getUsersIncludingDeleted, createUser, updateUser, deleteUser, restoreUser, changeUserPassword } from '@/api/users'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 import { PageHeader } from '@/components/PageHeader'
 import { FillPage, FillRegion } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
+import { RowActionsMenu } from '@/components/RowActionsMenu'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FormField } from '@/components/ui/form-field'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -32,13 +36,31 @@ export function UsersPage() {
   const [createForm, setCreateForm] = useState<CreateUserDto>(emptyCreate())
   const [editUser, setEditUser] = useState<UserListDto | null>(null)
   const [editForm, setEditForm] = useState<UpdateUserDto>({ ad: '', soyad: '', email: '', telefon: '', yetkiTuru: '', durum: '' })
+  const [editBaseline, setEditBaseline] = useState('')
+  // 3.2 — değişiklik varken pencere kapatılırsa sorulur.
+  const closeEdit = async () => {
+    if (JSON.stringify(editForm) !== editBaseline && !(await confirm({
+      title: t('unsaved.title'), description: t('unsaved.description'),
+      confirmLabel: t('unsaved.leave'), cancelLabel: t('unsaved.stay'), destructive: true,
+    }))) return
+    setEditUser(null)
+  }
   const [pwUser, setPwUser] = useState<UserListDto | null>(null)
   const [pwValue, setPwValue] = useState('')
   // §26 — Pasif kullanıcılar varsayılan olarak gizli (uygulamanın geri kalanında
   // hiç görünmezler). Yönetici bu anahtarla yeniden etkinleştirmek için görebilir.
   const [showPassive, setShowPassive] = useState(false)
 
-  const { data = [], isLoading } = useQuery({ queryKey: ['users'], queryFn: getUsers })
+  const [showDeleted, setShowDeleted] = useState(false)
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['users', showDeleted ? 'withDeleted' : 'active'],
+    queryFn: showDeleted ? getUsersIncludingDeleted : getUsers,
+  })
+  const restoreMut = useMutation({
+    mutationFn: (id: number) => restoreUser(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); toast({ title: t('undo.restored'), variant: 'success' }) },
+    onError: (e) => toastApiError(toast, t('undo.failed'), e),
+  })
   const visibleData = showPassive ? data : data.filter((u) => u.durum !== 'Pasif')
 
   const createMut = useMutation({
@@ -53,9 +75,13 @@ export function UsersPage() {
     onError: (e) => toastApiError(toast, t('common.error'), e),
   })
 
+  const undoable = useUndoableDelete()
   const deleteMut = useMutation({
-    mutationFn: (id: number) => deleteUser(id),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); toast({ title: t('users.deleteSuccess') }) },
+    mutationFn: ({ id }: { id: number; name: string }) => deleteUser(id),
+    onSuccess: (_d, { id, name }) => {
+      qc.invalidateQueries({ queryKey: ['users'] })
+      undoable({ title: t('users.deleteSuccess'), name, restore: () => restoreUser(id), onRestored: () => qc.invalidateQueries({ queryKey: ['users'] }) })
+    },
     onError: (e) => toastApiError(toast, t('common.failed'), e),
   })
 
@@ -77,23 +103,41 @@ export function UsersPage() {
     {
       key: 'actions', pin: 'right',
       header: t('common.actions'),
-      render: (r) => (
+      render: (r) => r.silindi ? (
+        <div className="flex items-center gap-2">
+          <span className="rounded bg-danger-soft px-1.5 text-xs font-medium text-danger-soft-foreground">{t('undo.deletedBadge')}</span>
+          <Button size="sm" variant="outline" loading={restoreMut.isPending && restoreMut.variables === r.kullaniciID}
+            onClick={() => restoreMut.mutate(r.kullaniciID as number)}>
+            {t('undo.restore')}
+          </Button>
+        </div>
+      ) : (
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={() => {
             setEditUser(r as UserListDto)
-            setEditForm({ ad: r.ad as string, soyad: r.soyad as string, email: r.email as string, telefon: r.telefon as string, yetkiTuru: r.yetkiTuru as string, durum: r.durum as string })
+            const f = { ad: r.ad as string, soyad: r.soyad as string, email: r.email as string, telefon: r.telefon as string, yetkiTuru: r.yetkiTuru as string, durum: r.durum as string }
+            setEditForm(f)
+            setEditBaseline(JSON.stringify(f))
           }}>
             {t('common.edit')}
           </Button>
-          <Button size="sm" variant="outline" onClick={() => { setPwUser(r as UserListDto); setPwValue('') }}>
-            {t('login.password')}
-          </Button>
-          <Button size="sm" variant="destructive" onClick={async () => {
-            if (await confirm({ title: t('common.delete'), description: t('users.deleteConfirm'), destructive: true, confirmLabel: t('common.delete') }))
-              deleteMut.mutate(r.kullaniciID as number)
-          }}>
-            {t('common.delete')}
-          </Button>
+          {/* Tek görünür iş "Düzenle"; seyrek ve tehlikeli olanlar menüde (eş ağırlıklı üç buton yerine). */}
+          <RowActionsMenu
+            row={r}
+            label={t('common.moreActions')}
+            actions={[
+              { key: 'password', label: t('users.changePassword'), onSelect: (u) => { setPwUser(u as UserListDto); setPwValue('') } },
+              { key: 'delete', label: t('common.delete'), destructive: true, separatorBefore: true, onSelect: async (u) => {
+                if (await confirm({
+                  title: t('users.deleteTitle', { name: u.kullaniciAdi as string }),
+                  description: `${u.ad ?? ''} ${u.soyad ?? ''} · ${u.yetkiTuru ?? ''}`,
+                  impact: [t('users.impact.delete'), t('common.undoHint')],
+                  destructive: true, confirmLabel: t('common.delete'),
+                }))
+                  deleteMut.mutate({ id: u.kullaniciID as number, name: u.kullaniciAdi as string })
+              } },
+            ]}
+          />
         </div>
       ),
     },
@@ -129,6 +173,7 @@ export function UsersPage() {
               />
               {t('users.showPassive')}
             </label>
+            <Checkbox checked={showDeleted} onCheckedChange={setShowDeleted} label={t('undo.showDeleted')} />
             <Button onClick={() => setShowCreate(true)}>{t('users.newUser')}</Button>
           </div>
         }
@@ -178,25 +223,22 @@ export function UsersPage() {
       </Dialog>
 
       {/* Edit */}
-      <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
+      <Dialog open={!!editUser} onOpenChange={(o) => { if (!o) void closeEdit() }}>
         <DialogContent className="max-w-md">
           <DialogHeader><DialogTitle>{t('users.editUser')} — {editUser?.kullaniciAdi}</DialogTitle></DialogHeader>
           <div className="grid grid-cols-2 gap-3">
             {(['ad', 'soyad', 'email', 'telefon'] as const).map((field) => (
-              <div key={field} className="space-y-1">
-                <Label>{fieldLabel(field)}</Label>
+              <FormField key={field} label={fieldLabel(field)}>
                 <Input value={editForm[field]} onChange={(e) => setEditForm((f) => ({ ...f, [field]: e.target.value }))} />
-              </div>
+              </FormField>
             ))}
-            <div className="space-y-1">
-              <Label>{t('users.yetkiTuru')}</Label>
+            <FormField label={t('users.yetkiTuru')}>
               <Select value={editForm.yetkiTuru} onValueChange={(v) => setEditForm((f) => ({ ...f, yetkiTuru: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>{YETKI_TURLERI.map((y) => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
               </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>{t('common.status')}</Label>
+            </FormField>
+            <FormField label={t('common.status')}>
               <Select value={editForm.durum} onValueChange={(v) => setEditForm((f) => ({ ...f, durum: v }))}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -204,11 +246,11 @@ export function UsersPage() {
                   <SelectItem value="Pasif">{t('common.passive')}</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </FormField>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditUser(null)}>{t('common.cancel')}</Button>
-            <Button disabled={updateMut.isPending} onClick={() => updateMut.mutate()}>{t('common.save')}</Button>
+          <DialogFooter className="sm:justify-between">
+            <Button variant="outline" onClick={() => void closeEdit()}>{t('common.cancel')}</Button>
+            <Button loading={updateMut.isPending} onClick={() => updateMut.mutate()}>{t('common.save')}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

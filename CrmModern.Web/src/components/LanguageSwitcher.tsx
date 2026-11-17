@@ -13,20 +13,22 @@ export function LanguageSwitcher() {
 
   return (
     <div
-      className="flex items-center gap-1 rounded-md border px-1 py-0.5"
+      className="flex items-center gap-0.5 rounded-md border p-0.5"
       role="group"
       aria-label={t('topbar.language')}
     >
-      <Globe className="h-3.5 w-3.5 text-muted-foreground ml-1" />
+      <Globe className="ml-1 h-4 w-4 text-muted-foreground" aria-hidden />
       {LANGS.map((l) => (
         <button
           key={l.code}
           onClick={() => i18n.changeLanguage(l.code)}
+          aria-pressed={current === l.code}
+          // 40+ ergonomi — 20px'lik düğmeler ölçek tokenına (32/36px) büyütüldü.
           className={cn(
-            'rounded px-2 py-0.5 text-xs font-medium transition-colors',
+            'h-ctl-xs min-w-[2.75rem] rounded px-2 text-sm font-medium transition-colors',
             current === l.code
               ? 'bg-primary text-primary-foreground'
-              : 'text-muted-foreground hover:bg-accent',
+              : 'text-foreground hover:bg-accent',
           )}
         >
           {l.label}

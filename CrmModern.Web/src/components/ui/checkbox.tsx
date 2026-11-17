@@ -19,7 +19,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
         ref={ref}
         type="checkbox"
         className={cn(
-          'h-4 w-4 shrink-0 cursor-pointer rounded border border-input accent-primary',
+          'h-check w-check shrink-0 cursor-pointer rounded border border-input accent-primary',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1',
           'disabled:cursor-not-allowed disabled:opacity-50',
           className,
@@ -30,7 +30,7 @@ export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
     )
     if (label == null) return box
     return (
-      <label className={cn('inline-flex cursor-pointer select-none items-center gap-2 text-sm', props.disabled && 'cursor-not-allowed opacity-60', labelClassName)}>
+      <label className={cn('inline-flex min-h-ctl-xs cursor-pointer select-none items-center gap-2.5 text-sm', props.disabled && 'cursor-not-allowed text-muted-foreground', labelClassName)}>
         {box}
         <span>{label}</span>
       </label>

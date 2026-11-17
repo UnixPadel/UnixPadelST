@@ -1,24 +1,28 @@
 import { CompleteOrderModal } from '@/components/order/CompleteOrderModal'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { CheckCircle2, AlertTriangle, Copy, Eye, FileCheck2, MessageSquareWarning, PencilLine, Pencil, Plus, Trash2 } from 'lucide-react'
-import { getMyOrders, convertToOrder, getRejectionNote, deleteOrder } from '@/api/orders'
+import { AlertTriangle, Copy, Eye, FileCheck2, MessageSquareWarning, PencilLine, Pencil, Plus, Trash2, Undo2 } from 'lucide-react'
+import { getMyOrders, convertToOrder, getRejectionNote, deleteOrder, restoreOrder } from '@/api/orders'
 import { PageHeader } from '@/components/PageHeader'
-import { FillPage, FillRegion } from '@/components/FillPage'
+import { FillPage } from '@/components/FillPage'
 import { DataTable, type Column, type RowAction } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { OrderKontrolBadge } from '@/components/OrderKontrolBadge'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
-import { RowActionsMenu } from '@/components/RowActionsMenu'
-import { FilterBar, FilterField, ALL, useFilterState, useDefaultView } from '@/components/FilterBar'
+import { OrderWorkPanel } from '@/components/order/OrderWorkPanel'
+import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { useAutoSelectFirst } from '@/hooks/useAutoSelectFirst'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
+import { invalidateOrderGraph } from '@/lib/queryKeys'
+import { FilterBar, FilterField, ALL, useFilterState, useDefaultView, moreFilterCount } from '@/components/FilterBar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useConfirm } from '@/components/ui/confirm-dialog'
+import { useNextStepLabel } from '@/hooks/useNextStep'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppMutation } from '@/hooks/useAppMutation'
 import { isSuperAdmin, isAccountingApprover } from '@/lib/permissions'
@@ -57,6 +61,7 @@ export function MyOrdersPage() {
   const nav = useNavigate()
   const { t } = useTranslation()
   const { confirm, askReason } = useConfirm()
+  const nextStepLabel = useNextStepLabel()
   const { getUser } = useAuth()
   const user = getUser()
   // PROMPT-v4 §6.2 — elshan.rasulov tüm sistemi izler; sahip (Temsilci) kolonu
@@ -65,7 +70,7 @@ export function MyOrdersPage() {
   const { values: f, set, setAll, reset } = useFilterState(FILTER_DEFAULTS)
   useDefaultView('my-orders', JSON.stringify(f) !== JSON.stringify(FILTER_DEFAULTS), (v) => setAll(v as typeof FILTER_DEFAULTS))
 
-  const { data: orders = [], isLoading, isError } = useQuery({
+  const { data: orders = [], isLoading, isError, dataUpdatedAt, refetch } = useQuery({
     queryKey: ['my-orders'],
     queryFn: () => getMyOrders(),
     // PROMPT-v5 §3 — canlı izleme: başka kullanıcıların statü değişimleri ≤30 sn'de
@@ -98,8 +103,14 @@ export function MyOrdersPage() {
   }, [orders, isGlobalViewer, f])
 
   const [activeNo, setActiveNo] = useState<string | null>(null)
+  // 4.1 — "Tam ekran": aynı sipariş büyük pencerede.
+  const [expandedNo, setExpandedNo] = useState<string | null>(null)
   const [completeTarget, setCompleteTarget] = useState<OrderListDto | null>(null)
-  const [redTarget, setRedTarget] = useState<string | null>(null)
+  // Liste yüklenince ilk kayıt seçilir; sağ panel hep dolu.
+  useAutoSelectFirst(filtered.map(rowNo), activeNo, setActiveNo, isLoading)
+  const activeRow = (filtered.find((o) => rowNo(o) === activeNo) as Row | undefined) ?? null
+  // Reddedilen siparişte red sebebi ayrı pencere yerine panelin altında görünür.
+  const redTarget = activeRow?.kontrol === 'Reddet' ? activeNo : null
   const { data: redData, isLoading: redLoading } = useQuery({
     queryKey: ['order-rejection-note', redTarget],
     queryFn: () => getRejectionNote(redTarget!),
@@ -112,10 +123,21 @@ export function MyOrdersPage() {
     successDescription: (no) => String(no ?? ''),
     errorTitle: t('myOrders.toast.convertFailed'),
   })
+  const undoable = useUndoableDelete()
+  const qc = useQueryClient()
   const deleteMut = useAppMutation({
     mutationFn: ({ no, gerekce }: { no: string; gerekce: string }) => deleteOrder(no, gerekce),
-    successTitle: t('myOrders.toast.deleted'),
     errorTitle: t('myOrders.toast.deleteFailed'),
+    // K5 — "Geri al" restore ucunu çağırır (sipariş zaten yumuşak siliniyor).
+    onSuccess: (_d, { no }) => undoable({ title: t('myOrders.toast.deleted'), name: no, restore: () => restoreOrder(no), onRestored: () => invalidateOrderGraph(qc) }),
+  })
+
+  // K5 — kaçırılan "Geri al" için kalıcı yol: silinmiş satırda "Geri yükle".
+  const restoreMut = useAppMutation({
+    mutationFn: (no: string) => restoreOrder(no),
+    successTitle: t('undo.restored'),
+    successDescription: (_d, no) => no,
+    errorTitle: t('undo.failed'),
   })
 
   // ── Validity helpers (legacy rules) ────────────────────────────────────
@@ -129,13 +151,19 @@ export function MyOrdersPage() {
 
   const askConvert = async (r: OrderListDto) => {
     const no = rowNo(r)
-    if (await confirm({ title: t('myOrders.convertConfirm.title'), description: `${no} — ${r.musteriAd}`, confirmLabel: t('myOrders.actions.sipariseCevir') }))
+    if (await confirm({
+      title: t('myOrders.convertConfirm.title'), description: `${no} — ${r.musteriAd}`,
+      impact: [t('myOrders.impact.convert')],
+      nextStep: await nextStepLabel(no),
+      confirmLabel: t('myOrders.actions.sipariseCevir'),
+    }))
       convertMut.mutate(no)
   }
   const askDelete = async (r: OrderListDto) => {
     const no = rowNo(r)
     const gerekce = await askReason({
-      title: t('myOrders.delete.title', { no }), label: t('myOrders.delete.reason'),
+      title: t('myOrders.delete.title', { no }), description: r.musteriAd, label: t('myOrders.delete.reason'),
+      impact: [t('myOrders.impact.delete'), t('common.undoHint')],
       destructive: true, confirmLabel: t('common.delete'),
     })
     if (gerekce) deleteMut.mutate({ no, gerekce })
@@ -143,13 +171,13 @@ export function MyOrdersPage() {
 
   const actions: RowAction<Row>[] = [
     { key: 'form', label: t('myOrders.actions.formGoster'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(rowNo(r)) },
-    { key: 'complete', label: 'Siparişi Tamamla', icon: <AlertTriangle className="h-3.5 w-3.5 text-red-600" />, hidden: (r) => !canComplete(r), onSelect: (r) => setCompleteTarget(r), destructive: true },
+    { key: 'complete', label: t('completeOrder.open'), icon: <AlertTriangle className="h-4 w-4 text-danger" aria-hidden />, hidden: (r) => !canComplete(r), onSelect: (r) => setCompleteTarget(r), destructive: true },
     { key: 'convert', label: t('myOrders.actions.sipariseCevir'), icon: <FileCheck2 className="h-3.5 w-3.5" />, disabled: (r) => !canConvert(r), onSelect: (r) => askConvert(r) },
-    { key: 'red', label: t('myOrders.actions.redNotu'), icon: <MessageSquareWarning className="h-3.5 w-3.5" />, hidden: (r) => !canShowRedNote(r), onSelect: (r) => setRedTarget(rowNo(r)) },
     { key: 'revise', label: t('myOrders.actions.revize'), icon: <PencilLine className="h-3.5 w-3.5" />, separatorBefore: true, disabled: (r) => !canRevise(r), onSelect: (r) => nav(`/orders/new?revise=${encodeURIComponent(rowNo(r))}`) },
     { key: 'amend', label: t('myOrders.actions.duzenle'), icon: <Pencil className="h-3.5 w-3.5" />, disabled: (r) => !canEditDelete(r), onSelect: (r) => nav(`/orders/new?amend=${encodeURIComponent(rowNo(r))}`) },
     { key: 'copy', label: t('orderDetail.copyAsNew'), icon: <Copy className="h-3.5 w-3.5" />, onSelect: (r) => nav(`/orders/new?copyFrom=${encodeURIComponent(rowNo(r))}`) },
-    { key: 'delete', label: t('myOrders.actions.sil'), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true, separatorBefore: true, disabled: (r) => !canEditDelete(r), onSelect: (r) => askDelete(r) },
+    { key: 'restore', label: t('undo.restore'), hidden: (r) => !r.silindi, onSelect: (r) => restoreMut.mutate(rowNo(r)) },
+    { key: 'delete', label: t('myOrders.actions.sil'), icon: <Trash2 className="h-3.5 w-3.5" />, destructive: true, separatorBefore: true, hidden: (r) => !!r.silindi, disabled: (r) => !canEditDelete(r), onSelect: (r) => askDelete(r) },
   ]
 
   const cols: Column<Row>[] = [
@@ -161,18 +189,13 @@ export function MyOrdersPage() {
           {!r.silindi && r.guncellendi && <Badge variant="warning" title={r.degisiklikGerekce ?? undefined}>{t('myOrders.badge.guncellendi')}</Badge>}
         </span>
       ) },
-    { key: 'musteriAd', truncate: '16rem', header: t('myOrders.cols.musteriAd'), sortable: true },
-    // PROMPT-v4 §6.2 — sahip kolonu yalnız elshan görünümünde
-    ...(isGlobalViewer ? [{
-      key: 'kullaniciAdSoyad', header: t('myOrders.cols.temsilci'), sortable: true,
-      render: (r) => (r.kullaniciAdSoyad as string) || '—',
-    } satisfies Column<Row>] : []),
+    { key: 'musteriAd', truncate: '10rem', header: t('myOrders.cols.musteriAd'), sortable: true },
     { key: 'siparisMiTeklifMi', header: t('myOrders.cols.asama'), sortable: true,
       render: (r) => (
         <div className="flex flex-col gap-0.5">
           <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
           {r.siparisMiTeklifMi === 'Tamamlandi' && r.tamamlayanAdSoyad && (
-            <span className="text-[10px] text-muted-foreground truncate" title={`${r.tamamlayanAdSoyad} tarafından tamamlandı${r.tamamlanmaTarihi ? ` (${formatDate(r.tamamlanmaTarihi)})` : ''}`}>
+            <span className="text-2xs text-muted-foreground truncate" title={`${r.tamamlayanAdSoyad} tarafından tamamlandı${r.tamamlanmaTarihi ? ` (${formatDate(r.tamamlanmaTarihi)})` : ''}`}>
               {r.tamamlayanAdSoyad}
             </span>
           )}
@@ -180,28 +203,53 @@ export function MyOrdersPage() {
       ) },
     { key: 'kontrol', header: t('myOrders.cols.durum'), sortable: true,
       render: (r) => <OrderKontrolBadge value={r.kontrol} /> },
-    { key: 'tarih', header: t('myOrders.cols.tarih'), sortable: true, type: 'date',
+    // PROMPT-v4 §6.2 — sahip kolonu yalnız elshan görünümünde. Sonda durur: dar ekranda
+    // bir sütun taşacaksa aşama / durum değil bu taşsın.
+    ...(isGlobalViewer ? [{
+      key: 'kullaniciAdSoyad', truncate: '9rem', header: t('myOrders.cols.temsilci'), sortable: true,
+      render: (r) => (r.kullaniciAdSoyad as string) || '—',
+    } satisfies Column<Row>] : []),
+    { key: 'tarih', header: t('myOrders.cols.tarih'), sortable: true, type: 'date', defaultHidden: true,
       render: (r) => formatDate(r.tarih) },
-    {
-      key: 'actions', pin: 'right', header: t('myOrders.cols.actions'), hideable: false, exportValue: false,
-      render: (r) => (
-        <div className="flex items-center gap-1">
-          <Button size="xs" variant="outline" onClick={() => setActiveNo(rowNo(r))}>{t('myOrders.actions.formGoster')}</Button>
-          {canConvert(r) && (
-            <Button size="xs" loading={convertMut.isPendingFor((no) => no === rowNo(r))} onClick={() => askConvert(r)}>
-              {t('myOrders.actions.sipariseCevir')}
-            </Button>
-          )}
-          {canShowRedNote(r) && (
-            <Button size="xs" variant="outline" className="text-destructive" onClick={() => setRedTarget(rowNo(r))}>
-              {t('myOrders.actions.redNotu')}
-            </Button>
-          )}
-          <RowActionsMenu row={r} actions={actions} />
-        </div>
-      ),
-    },
+    // Satır başına buton yok: seçili siparişin işi sağ panelin altında (tek ana buton),
+    // geri kalan işlemler panel başlığındaki "Diğer işlemler" menüsünde.
   ]
+
+  // Sağ panelin sabit alt bölgesi: bu siparişte sıradaki tek iş.
+  const panelFooter = !activeRow ? undefined
+    : activeRow.silindi ? (
+      <Button size="lg" variant="outline" className="w-full" loading={restoreMut.isPendingFor((no) => no === rowNo(activeRow))} onClick={() => restoreMut.mutate(rowNo(activeRow))}>
+        <Undo2 className="h-4 w-4" aria-hidden /> {t('undo.restore')}
+      </Button>
+    ) : canShowRedNote(activeRow) ? (
+      <>
+        <div className="rounded-md border border-danger/40 bg-danger-soft px-3 py-2">
+          <p className="flex items-center gap-1.5 text-sm font-semibold text-danger-soft-foreground">
+            <MessageSquareWarning className="h-4 w-4" aria-hidden /> {t('myOrders.redNote.title')}
+          </p>
+          <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap text-sm text-danger-soft-foreground">
+            {redLoading ? t('common.loading') : redData?.red || t('myOrders.redNote.empty')}
+          </p>
+        </div>
+        {canRevise(activeRow) && (
+          <Button size="lg" className="w-full" onClick={() => nav(`/orders/new?revise=${encodeURIComponent(rowNo(activeRow))}`)}>
+            <PencilLine className="h-4 w-4" aria-hidden /> {t('myOrders.actions.revize')}
+          </Button>
+        )}
+      </>
+    ) : canConvert(activeRow) ? (
+      <Button size="lg" className="w-full" loading={convertMut.isPendingFor((no) => no === rowNo(activeRow))} onClick={() => askConvert(activeRow)}>
+        <FileCheck2 className="h-4 w-4" aria-hidden /> {t('myOrders.actions.sipariseCevir')}
+      </Button>
+    ) : undefined
+  // Sipariş detayının "Diğer işlemler" menüsüne eklenenler: alt bölgedeki ana buton,
+  // "Siparişi Aç" (zaten açık) ve detayın kendi sunduğu Kopyala / Tamamla dışındakiler.
+  const resolve = (v: boolean | ((r: Row) => boolean) | undefined, r: Row) => (typeof v === 'function' ? v(r) : !!v)
+  const moreActions: RowAction<unknown>[] = !activeRow ? [] : actions
+    .filter((a) => !['form', 'convert', 'copy', 'complete'].includes(a.key) && !resolve(a.hidden, activeRow))
+    // Reddedilen siparişte "Revize Et" zaten alttaki ana buton.
+    .filter((a) => !(a.key === 'revise' && canShowRedNote(activeRow)))
+    .map((a) => ({ ...a, hidden: false, disabled: resolve(a.disabled, activeRow), separatorBefore: false, onSelect: () => a.onSelect(activeRow) }))
 
   return (
     // Scaling Faz 2 — FillPage: sayfa kaymaz, tablo kalan yüksekliği doldurur
@@ -211,12 +259,28 @@ export function MyOrdersPage() {
         title={t('myOrders.title')}
         actions={<Button size="sm" onClick={() => nav('/orders/new')}><Plus className="h-4 w-4" /> {t('myOrders.newOrder')}</Button>}
       />
-      <div className="space-y-2 px-4 pt-2">
-        <FilterBar onReset={reset} tableId="my-orders" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
+      {/* 4.1 (K7) — liste solda, sipariş detayı sağda (önceden modal listeyi kapatıyordu). */}
+      <MasterDetailLayout
+        pageId="my-orders"
+        open
+        defaultShare={0.4}
+        onExpand={activeNo ? () => setExpandedNo(activeNo) : undefined}
+        title={activeNo ? t('orderDetail.title', { no: activeNo }) : t('masterDetail.panel')}
+        detail={<OrderWorkPanel siparisNo={activeNo} emptyText={t(filtered.length ? 'masterDetail.selectHint' : 'masterDetail.emptyList')} footer={panelFooter} extraActions={moreActions} />}
+        list={<>
+        {/* Filtreler yalnız listeyi süzer: liste sütununun üstünde durur, sağ panel sayfa başlığının hemen altından başlar. */}
+        <FilterBar className="mb-2 shrink-0" onReset={reset} tableId="my-orders" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}
+          primaryCount={2} moreActiveCount={moreFilterCount(f, FILTER_DEFAULTS, ['siparisNo', 'musteri'])}>
+          <FilterField label={t('common.orderNo')}>
+            <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
+          </FilterField>
+          <FilterField label={t('common.customer')}>
+            <Input inputSize="sm" value={f.musteri} onChange={(e) => set('musteri', e.target.value)} />
+          </FilterField>
           {isGlobalViewer && (
             <FilterField label={t('common.representative')}>
               <Select value={f.temsilci} onValueChange={(v) => set('temsilci', v)}>
-                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
                   {temsilciOptions.map((n) => <SelectItem key={n} value={n}>{n}</SelectItem>)}
@@ -224,15 +288,9 @@ export function MyOrdersPage() {
               </Select>
             </FilterField>
           )}
-          <FilterField label={t('common.orderNo')}>
-            <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
-          </FilterField>
-          <FilterField label={t('common.customer')}>
-            <Input inputSize="sm" value={f.musteri} onChange={(e) => set('musteri', e.target.value)} />
-          </FilterField>
           <FilterField label={t('myOrders.filter.stage')}>
             <Select value={f.stage} onValueChange={(v) => set('stage', v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
                 {STAGE_OPTIONS.map((s) => <SelectItem key={s} value={s}>{stageLabel(t, s)}</SelectItem>)}
@@ -241,7 +299,7 @@ export function MyOrdersPage() {
           </FilterField>
           <FilterField label={t('myOrders.filter.kontrol')}>
             <Select value={f.kontrol} onValueChange={(v) => set('kontrol', v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
                 {KONTROL_OPTIONS.map((s) => <SelectItem key={s} value={s}>{kontrolLabel(t, s)}</SelectItem>)}
@@ -250,7 +308,7 @@ export function MyOrdersPage() {
           </FilterField>
           <FilterField label={t('myOrders.filter.odeme')}>
             <Select value={f.odeme} onValueChange={(v) => set('odeme', v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
                 {ODEME_OPTIONS.map((s) => <SelectItem key={s} value={s}>{statusLabel(t, s)}</SelectItem>)}
@@ -264,11 +322,11 @@ export function MyOrdersPage() {
             <Input inputSize="sm" type="date" value={f.to} onChange={(e) => set('to', e.target.value)} />
           </FilterField>
         </FilterBar>
-      </div>
-      <FillRegion className="pt-2">
         <DataTable
           fill
-          tableId="my-orders"
+          updatedAt={dataUpdatedAt}
+          onRefresh={() => void refetch()}
+          tableId="my-orders-v2"
           exportFileName="siparislerim"
           columns={cols}
           data={filtered as Row[]}
@@ -277,13 +335,16 @@ export function MyOrdersPage() {
           error={isError}
           activeRowKey={filtered.find((o) => rowNo(o) === activeNo)?.siparisAlID ?? null}
           onRowActivate={(r) => setActiveNo(rowNo(r))}
-          onRowDoubleClick={(r) => setActiveNo(rowNo(r))}
+          onRowClick={(r) => setActiveNo(rowNo(r))}
+          rowGoneNotice={false}
+          actionBar={false}
           rowActions={actions}
         />
-      </FillRegion>
+        </>}
+      />
 
       {/* Sipariş Detayı penceresi */}
-      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} />
+      <OrderDetailModal siparisNo={expandedNo} onClose={() => setExpandedNo(null)} />
 
       {completeTarget && (
         <CompleteOrderModal
@@ -298,27 +359,6 @@ export function MyOrdersPage() {
         />
       )}
 
-      {/* Red Notu — inline dialog (legacy MessageBox replacement) */}
-      <Dialog open={!!redTarget} onOpenChange={(o) => { if (!o) setRedTarget(null) }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{t('myOrders.redNote.title')} — {redTarget}</DialogTitle></DialogHeader>
-          <div className="min-h-[3rem] whitespace-pre-wrap text-sm">
-            {redLoading
-              ? t('common.loading')
-              : redData?.red
-                ? redData.red
-                : <span className="text-muted-foreground">{t('myOrders.redNote.empty')}</span>}
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setRedTarget(null)}>{t('common.close')}</Button>
-            {redTarget && (
-              <Button onClick={() => { const no = redTarget; setRedTarget(null); nav(`/orders/new?revise=${encodeURIComponent(no)}`) }}>
-                <PencilLine className="h-4 w-4" /> {t('myOrders.actions.revize')}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </FillPage>
   )
 }

@@ -114,6 +114,32 @@ public static class OrderWorkflow
     public static WorkflowStep? CurrentStep(Order o) => Steps.FirstOrDefault(s => s.Matches(o));
 
     /// <summary>
+    /// 40+ ergonomi (etki önizlemesi) — mevcut adım olağan yoldan (onay/ilerletme)
+    /// tamamlanınca siparişin bekleyeceği adım. Onay pencereleri "Sonraki adım: …"
+    /// olarak gösterir. Red yolu (Kontrol → Reddet → temsilci düzeltmesi) ayrıca
+    /// TemsilciDuzeltme ile bilinir; burada yalnız ileri yön vardır.
+    /// Kapanış sonrası (Tamamlandı) ve terminal durumlarda null.
+    /// </summary>
+    public static WorkflowStep? NextStep(Order o)
+    {
+        var current = CurrentStep(o);
+        if (current is null) return null;
+        if (current == TemsilciDuzeltme) return KontrolOnayi;
+        // Kontrol onayı: teklif → temsilcinin siparişe çevirmesi; sipariş → muhasebe cari onayı.
+        if (current == KontrolOnayi) return o.SiparisMiTeklifMi == "Teklif" ? SiparisCevirme : CariOnay;
+        // Siparişe çevirme Kontrol'ü sıfırlamaz (OrderService.ConvertToOrderAsync) → doğrudan cari onay.
+        if (current == SiparisCevirme) return CariOnay;
+        if (current == CariOnay) return UretimeAlma;
+        if (current == UretimeAlma) return Uretim;
+        // "Hazır" olunca LojistikOnay='Bekliyor' yazılır (OrderRepository.MarkAsReadyAsync).
+        if (current == Uretim) return LojistikOnay;
+        if (current == LojistikOnay) return Sevkiyat;
+        if (current == Sevkiyat) return Teslimat;
+        if (current == Teslimat) return Kapanis;
+        return null; // Kapanis → Tamamlandı (terminal)
+    }
+
+    /// <summary>
     /// Bir siparişin toplam ciroya ve dashboard para metriklerine eklenme kriteri:
     /// 1) Silinmemiş ve iptal edilmemiş olmalı,
     /// 2) Teklif olmamalı,

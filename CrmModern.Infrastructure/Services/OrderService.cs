@@ -203,6 +203,27 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
         await uow.SaveChangesAsync();
     }
 
+    /// <summary>40+ ergonomi K5 — "Geri al": yumuşak silinen siparişi geri yükler.
+    /// Silme ile aynı kural: sahip (Temsilci) veya Yönetici/elshan.</summary>
+    public async Task RestoreOrderAsync(int kullaniciID, string no, bool isManagerOrElshan)
+    {
+        var existing = await uow.Orders.GetByNoAsync(NormalizeToSiparisNo(no))
+            ?? throw new NotFoundException("Order", no);
+        if (!existing.Silindi)
+            throw new BusinessException("Bu sipariş silinmemiş.", "orderNotDeleted");
+        if (existing.KullaniciID != kullaniciID && !isManagerOrElshan)
+            throw new BusinessException("Bunu yapmaya yetkin yok.", "forbidden");
+
+        existing.Silindi               = false;
+        existing.DegisiklikKullaniciID = kullaniciID;
+        existing.DegisiklikTarihi      = DateTime.Now;
+        uow.Orders.Update(existing);
+
+        // Audit (SiparisOnaylari) — geri yükleyen kullanıcı.
+        await uow.OrderApprovals.UpsertAsync(existing.SiparisNo, kullaniciID, "GeriYuklendi", null);
+        await uow.SaveChangesAsync();
+    }
+
     /// <summary>Sipariş sahipliğini (KullaniciID/Temsilci) başka kullanıcıya devreder.
     /// Yalnız ControlUser (elshan.rasulov / süper-admin) — gate controller'da.</summary>
     public async Task ChangeRepresentativeAsync(string no, int yeniKullaniciID)
@@ -212,6 +233,9 @@ internal sealed class OrderService(IUnitOfWork uow) : IOrderService
 
         var yeniKullanici = await uow.Kullanicilar.GetByIdAsync(yeniKullaniciID)
             ?? throw new NotFoundException("Kullanici", yeniKullaniciID.ToString());
+        // 40+ ergonomi K5 — silinen kullanıcıya sipariş devredilemez.
+        if (yeniKullanici.Silindi)
+            throw new NotFoundException("Kullanici", yeniKullaniciID.ToString());
 
         order.KullaniciID = yeniKullanici.KullaniciID;
         uow.Orders.Update(order);

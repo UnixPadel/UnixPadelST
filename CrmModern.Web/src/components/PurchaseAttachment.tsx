@@ -7,7 +7,9 @@ import {
   uploadPurchaseAttachment,
   downloadPurchaseAttachment,
   deletePurchaseAttachment,
+  restorePurchaseAttachment,
 } from '@/api/purchase'
+import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ToastProvider'
 
@@ -51,9 +53,13 @@ export function PurchaseAttachment({ talepId, canManage = false }: Props) {
     }),
   })
 
+  const undoable = useUndoableDelete()
   const deleteMut = useMutation({
     mutationFn: () => deletePurchaseAttachment(talepId),
-    onSuccess: () => { invalidate(); toast({ title: t('purchase.attachment.removed') }) },
+    onSuccess: () => {
+      invalidate()
+      undoable({ title: t('purchase.attachment.removed'), name: info?.ad ?? `#${talepId}`, restore: () => restorePurchaseAttachment(talepId), onRestored: invalidate })
+    },
     onError: () => toast({ title: t('purchase.attachment.error'), variant: 'destructive' }),
   })
 
@@ -77,7 +83,7 @@ export function PurchaseAttachment({ talepId, canManage = false }: Props) {
             <Download className="mr-1 h-3.5 w-3.5" />{t('purchase.attachment.download')}
           </Button>
           {canManage && (
-            <Button size="sm" variant="ghost" className="text-destructive"
+            <Button size="sm" variant="ghost" className="text-danger"
               disabled={deleteMut.isPending} onClick={() => deleteMut.mutate()}>
               <Trash2 className="mr-1 h-3.5 w-3.5" />{t('purchase.attachment.remove')}
             </Button>
@@ -99,7 +105,7 @@ export function PurchaseAttachment({ talepId, canManage = false }: Props) {
             <Upload className="mr-1 h-3.5 w-3.5" />
             {uploadMut.isPending ? t('purchase.attachment.uploading') : info ? t('purchase.attachment.replace') : t('purchase.attachment.upload')}
           </Button>
-          <p className="mt-1 text-[10px] text-muted-foreground">{t('purchase.attachment.hint')}</p>
+          <p className="mt-1 text-2xs text-muted-foreground">{t('purchase.attachment.hint')}</p>
         </div>
       )}
     </div>

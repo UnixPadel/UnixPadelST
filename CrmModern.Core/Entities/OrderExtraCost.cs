@@ -15,4 +15,9 @@ public sealed class OrderExtraCost
     public decimal  Tutar         { get; set; }
     public DateTime EklenmeTarihi { get; set; }
     public int?     KullaniciID   { get; set; }
+
+    // 40+ ergonomi K5 — yumuşak silme: silinen kalem listelerden ve toplamdan düşer.
+    public bool      Silindi          { get; set; }
+    public DateTime? SilinmeTarihi    { get; set; }
+    public int?      SilenKullaniciID { get; set; }
 }

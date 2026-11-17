@@ -64,7 +64,7 @@ export function OrderSummaryRail({
         value={<span className="font-medium tabular-nums">{m(totals.kapora)}</span>}
       />
       {freeCount > 0 && (
-        <p className="text-[11px] text-muted-foreground">{t('orders.summary.freeItemsNote', { count: freeCount })}</p>
+        <p className="text-2xs text-muted-foreground">{t('orders.summary.freeItemsNote', { count: freeCount })}</p>
       )}
 
       <div className="border-t pt-2">

@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import {
-  ChevronUp, ChevronDown, ChevronsUpDown, Inbox, Columns3, Download, ChevronLeft, ChevronRight, X, AlertTriangle,
+  ChevronUp, ChevronDown, ChevronsUpDown, Inbox, Columns3, Download, ChevronLeft, ChevronRight, X, AlertTriangle, Info, RefreshCw,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -10,7 +10,7 @@ import { Popover } from '@/components/ui/popover'
 import { ContextMenu, type RowAction } from '@/components/ContextMenu'
 import { setTableState, useTableState, type SortDir } from '@/lib/tableState'
 import { downloadCsv } from '@/lib/export'
-import { usePreferences } from '@/lib/preferences'
+import { densityFor, usePreferences } from '@/lib/preferences'
 
 export type { RowAction }
 
@@ -104,6 +104,24 @@ interface DataTableProps<T> {
   bulkActions?: (rows: T[], clear: () => void) => React.ReactNode
   /** Sağ tık bağlam menüsü aksiyonları. */
   rowActions?: RowAction<T>[]
+  /**
+   * 40+ ergonomi (2.2) — rowActions, seçili satır için tablonun üstünde etiketli
+   * butonlar olarak da görünür ("Seçili kayıt" çubuğu); sağ tık / Shift+F10 yalnız
+   * kısayoldur. Aynı işlemleri zaten satırda veya karar panelinde görünür buton
+   * olarak gösteren ekranlar `false` verir.
+   */
+  actionBar?: boolean
+  /** İşlem çubuğunda seçili kaydın kısa adı (ör. "2025-0123 · Müşteri"). Verilmezse anahtar. */
+  rowLabel?: (row: T) => React.ReactNode
+  /** Tablo verisinin en son alındığı an (react-query dataUpdatedAt) — "Son güncelleme 13:25". */
+  updatedAt?: number
+  /** "Yenile" butonu (F5 ile aynı). Verilirse son güncelleme saatinin yanında görünür. */
+  onRefresh?: () => void
+  /**
+   * false → "X artık bu listede yok" notu çıkmaz. Seçimi ve listeden çıkan satırı kendi
+   * yöneten ekranlar (ör. Muhasebe · Onaylar: arama süzünce not çıkmasın) kapatır.
+   */
+  rowGoneNotice?: boolean
   /** Klavye/master-detail için etkin satır (vurgulanır). */
   activeRowKey?: string | number | null
   /** ↑/↓ ile satır değişince (master-detail detayı günceller). */
@@ -151,13 +169,14 @@ export function DataTable<T extends Record<string, unknown>>({
   onRowClick, onRowDoubleClick, rowClassName,
   density: densityProp, singleLineRows = false,
   tableId, toolbar, exportFileName, selectable, selectedKeys, onSelectionChange, bulkActions,
-  rowActions, activeRowKey, onActiveRowChange, onRowActivate, pageSize, maxHeight, fill = false, showFooter, footerGroups,
+  rowActions, actionBar = true, rowLabel, updatedAt, onRefresh, rowGoneNotice = true,
+  activeRowKey, onActiveRowChange, onRowActivate, pageSize, maxHeight, fill = false, showFooter, footerGroups,
 }: DataTableProps<T>) {
   const { t, i18n } = useTranslation()
   const prefs = usePreferences()
   const persisted = useTableState(tableId)
   const effectiveEmpty = emptyMessage ?? t('common.noData')
-  const density = densityProp ?? prefs.tableDensity
+  const density = densityProp ?? densityFor(prefs.uiScale)
   const compact = density === 'compact'
   const cellPad = compact ? 'px-2 py-1.5' : 'px-3 py-2.5'
   // Compact başlık: iki satıra sarsa da alçak kalsın (fit-first, yatay kaydırma yok).
@@ -245,6 +264,26 @@ export function DataTable<T extends Record<string, unknown>>({
   // ── Bağlam menüsü ───────────────────────────────────────────────────
   const [menu, setMenu] = useState<{ x: number; y: number; row: T } | null>(null)
 
+  // ── "Seçili kayıt" işlem çubuğu (2.2) + kaybolan satır notu (3.5) ────
+  const showActionBar = actionBar && !!rowActions?.length
+  const [actionKey, setActionKey] = useState<string | number | null>(null)
+  // Kontrollü kullanımda (activeRowKey verildi) üst bileşenin seçimi esas alınır.
+  useEffect(() => { if (activeRowKey !== undefined) setActionKey(activeRowKey) }, [activeRowKey])
+  const actionRow = actionKey != null ? data.find((r) => rowKey(r) === actionKey) ?? null : null
+  // Seçili satır otomatik yenilemede listeden çıktıysa sessizce düşürülmez; kullanıcı neden kaybolduğunu görür.
+  const [goneKey, setGoneKey] = useState<string | number | null>(null)
+  useEffect(() => {
+    if (loading || actionKey == null) return
+    // Seçimi üst bileşen bilerek değiştirdiyse (onay sonrası sıradakine geçiş, sekme
+    // değişimi) "artık listede yok" notu çıkmaz.
+    if (activeRowKey !== undefined && activeRowKey !== actionKey) return
+    if (!data.some((r) => rowKey(r) === actionKey)) { setGoneKey(actionKey); setActionKey(null) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, loading])
+  const pick = (row: T) => { setActionKey(rowKey(row)); setGoneKey(null) }
+  const visibleActions = (row: T) => (rowActions ?? []).filter((a) => !(typeof a.hidden === 'function' ? a.hidden(row) : a.hidden))
+  const actionDisabled = (a: RowAction<T>, row: T) => (typeof a.disabled === 'function' ? a.disabled(row) : !!a.disabled)
+
   // ── Kolon seçici / dışa aktarma ─────────────────────────────────────
   const colBtn = useRef<HTMLButtonElement>(null)
   const [colOpen, setColOpen] = useState(false)
@@ -261,7 +300,7 @@ export function DataTable<T extends Record<string, unknown>>({
     )
   }
 
-  const hasToolbar = !!(toolbar || tableId || exportFileName)
+  const hasToolbar = !!(toolbar || tableId || exportFileName || updatedAt || onRefresh)
   const colCount = visibleCols.length + (selectable ? 1 : 0)
   const alignOf = (c: Column<T>) => c.align ?? (c.type === 'number' || c.type === 'money' ? 'right' : 'left')
 
@@ -302,7 +341,13 @@ export function DataTable<T extends Record<string, unknown>>({
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {toolbar}
             {!loading && <span>{t('table.rowCount', { count: sorted.length })}</span>}
+            {updatedAt ? <span>· {t('table.updatedAt', { time: new Date(updatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) })}</span> : null}
           </div>
+          {onRefresh && (
+            <Button size="xs" variant="outline" onClick={onRefresh} title="F5">
+              <RefreshCw className="h-4 w-4" aria-hidden /> {t('table.refresh')}
+            </Button>
+          )}
           {exportFileName && (
             <Button size="xs" variant="outline" onClick={doExport} disabled={sorted.length === 0} title={t('table.exportHint')}>
               <Download className="h-3.5 w-3.5" /> {t('table.export')}
@@ -343,6 +388,43 @@ export function DataTable<T extends Record<string, unknown>>({
         </div>
       )}
 
+      {rowGoneNotice && goneKey != null && (
+        <div role="status" className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border border-info/30 bg-info-soft px-3 py-1.5 text-sm text-info-soft-foreground">
+          <Info className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="flex-1">{t('table.rowGone', { key: String(goneKey) })}</span>
+          <Button size="xs" variant="ghost" onClick={() => setGoneKey(null)}>{t('common.close')}</Button>
+        </div>
+      )}
+
+      {showActionBar && (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 rounded-md border bg-card px-3 py-1.5 text-sm" role="toolbar" aria-label={t('table.selectedRow')}>
+          {actionRow ? (
+            <>
+              <span className="mr-1 font-semibold">{t('table.selectedRow')}:</span>
+              <span className="mr-2 min-w-0 truncate">{rowLabel ? rowLabel(actionRow) : String(rowKey(actionRow))}</span>
+              {visibleActions(actionRow).filter((a) => !a.destructive).map((a) => (
+                <Button key={a.key} size="xs" variant="outline" disabled={actionDisabled(a, actionRow)} onClick={() => a.onSelect(actionRow)}
+                  title={a.shortcut ? `${a.label} (${a.shortcut})` : undefined}>
+                  {a.icon} {a.label}
+                </Button>
+              ))}
+              {/* Yıkıcı işlemler en sağda, ayraçla ayrı (yanlış tıklamayı önler). */}
+              {visibleActions(actionRow).some((a) => a.destructive) && (
+                <div className="ml-auto flex items-center gap-2 border-l pl-3">
+                  {visibleActions(actionRow).filter((a) => a.destructive).map((a) => (
+                    <Button key={a.key} size="xs" variant="outline" className="text-danger" disabled={actionDisabled(a, actionRow)} onClick={() => a.onSelect(actionRow)}>
+                      {a.icon} {a.label}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            <span className="text-muted-foreground">{t('table.selectRowHint')}</span>
+          )}
+        </div>
+      )}
+
       <div className={cn('rounded-md border bg-card overflow-hidden', fill && 'flex min-h-0 flex-1 flex-col')}>
         {/* Round-11 §2 — fit-first: tablo viewport'a sığsın diye w-full; sütunlar
             daralır, başlıklar gerekirse sarar. maxHeight verilirse dikey kaydırma
@@ -370,7 +452,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       key={k}
                       scope="col"
                       aria-sort={active ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                      className={cn(headPad, 'font-medium text-muted-foreground', align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left', col.className, pinClass(col, 'head'))}
+                      className={cn(headPad, 'font-semibold text-foreground', align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left', col.className, pinClass(col, 'head'))}
                     >
                       {col.sortable ? (
                         <button
@@ -379,10 +461,10 @@ export function DataTable<T extends Record<string, unknown>>({
                           className={cn('inline-flex items-center gap-1 rounded hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', align === 'right' && 'flex-row-reverse')}
                         >
                           {col.header}
-                          <span className="text-muted-foreground/60">
+                          <span className={active ? 'text-foreground' : 'text-muted-foreground'} aria-hidden>
                             {active
-                              ? (sort!.dir === 'asc' ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />)
-                              : <ChevronsUpDown className="h-3 w-3" />}
+                              ? (sort!.dir === 'asc' ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />)
+                              : <ChevronsUpDown className="h-3.5 w-3.5" />}
                           </span>
                         </button>
                       ) : col.header}
@@ -406,7 +488,7 @@ export function DataTable<T extends Record<string, unknown>>({
               ) : error && data.length === 0 ? (
                 <tr>
                   <td colSpan={colCount} className="px-4 py-10">
-                    <div className="flex flex-col items-center gap-2 text-destructive">
+                    <div className="flex flex-col items-center gap-2 text-danger">
                       <AlertTriangle className="h-7 w-7 opacity-70" />
                       <p className="text-sm">{t('table.loadError')}</p>
                     </div>
@@ -437,17 +519,19 @@ export function DataTable<T extends Record<string, unknown>>({
                       aria-selected={selectable ? isSel : isActive || undefined}
                       className={cn(
                         'border-t transition-colors outline-none hover:bg-muted/40 hover:[--pin-tint:hsl(var(--muted)/0.4)] focus-visible:bg-accent/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                        (onRowClick || onRowDoubleClick || onActiveRowChange) && 'cursor-pointer',
+                        (onRowClick || onActiveRowChange || showActionBar) && 'cursor-pointer',
+                        showActionBar && !isActive && actionKey === k && 'bg-accent ring-2 ring-inset ring-primary',
                         isSel && 'bg-primary/5',
                         isActive && 'bg-accent ring-2 ring-inset ring-primary',
                         rowClassName?.(row),
                       )}
-                      onFocus={() => setFocusIdx(i)}
+                      onFocus={() => { setFocusIdx(i); if (showActionBar) pick(row) }}
                       onClick={(e) => {
                         // Buton / link / input içinden gelen click row-click'i tetiklemesin.
                         const el = e.target as HTMLElement
                         if (el.closest('button,a,input,select,textarea,[role="button"]')) return
                         setFocusIdx(i)
+                        pick(row)
                         onActiveRowChange?.(row)
                         onRowClick?.(row)
                       }}
@@ -459,6 +543,7 @@ export function DataTable<T extends Record<string, unknown>>({
                       onContextMenu={rowActions?.length ? (e) => {
                         e.preventDefault()
                         setFocusIdx(i)
+                        pick(row)
                         onActiveRowChange?.(row)
                         setMenu({ x: e.clientX, y: e.clientY, row })
                       } : undefined}
@@ -548,11 +633,11 @@ export function DataTable<T extends Record<string, unknown>>({
         {pageSize && pageCount > 1 && (
           <div className="flex shrink-0 items-center justify-end gap-2 border-t px-3 py-1.5 text-xs text-muted-foreground">
             <span>{t('table.pageOf', { page: page + 1, count: pageCount })}</span>
-            <Button size="icon-sm" variant="ghost" aria-label={t('common.previous')} disabled={page === 0} onClick={() => setPage(page - 1)}>
-              <ChevronLeft className="h-4 w-4" />
+            <Button size="xs" variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>
+              <ChevronLeft className="h-4 w-4" aria-hidden /> {t('common.previous')}
             </Button>
-            <Button size="icon-sm" variant="ghost" aria-label={t('common.next')} disabled={page >= pageCount - 1} onClick={() => setPage(page + 1)}>
-              <ChevronRight className="h-4 w-4" />
+            <Button size="xs" variant="outline" disabled={page >= pageCount - 1} onClick={() => setPage(page + 1)}>
+              {t('common.next')} <ChevronRight className="h-4 w-4" aria-hidden />
             </Button>
           </div>
         )}

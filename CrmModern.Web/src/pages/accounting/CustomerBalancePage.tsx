@@ -215,7 +215,7 @@ export function CustomerBalancePage() {
                             <td className="px-3 py-1.5">{m.aciklama}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums">{m.borc ? formatMoney(m.borc, cur) : ''}</td>
                             <td className="px-3 py-1.5 text-right tabular-nums text-success">{m.alacak ? formatMoney(m.alacak, cur) : ''}</td>
-                            <td className={cn('px-3 py-1.5 text-right font-medium tabular-nums', (m.bakiye ?? 0) > 0.005 ? 'text-warning' : (m.bakiye ?? 0) < -0.005 ? 'text-destructive' : '')}>
+                            <td className={cn('px-3 py-1.5 text-right font-medium tabular-nums', (m.bakiye ?? 0) > 0.005 ? 'text-warning' : (m.bakiye ?? 0) < -0.005 ? 'text-danger' : '')}>
                               {formatMoney(m.bakiye ?? 0, cur)}
                             </td>
                           </tr>

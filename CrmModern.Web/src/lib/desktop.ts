@@ -20,7 +20,7 @@ declare global {
 export const desktop: DesktopBridge | undefined = typeof window !== 'undefined' ? window.desktop : undefined
 
 /** Seçilebilir ölçek basamakları — electron/main.cjs ZOOM_STEPS ile aynı tutulmalı. */
-export const ZOOM_STEPS = [0.8, 0.85, 0.9, 1, 1.1, 1.25]
+export const ZOOM_STEPS = [0.9, 1, 1.1, 1.25, 1.5]
 
 /** Mevcut ölçekten bir basamak yukarı/aşağı; sınırdaysa null. */
 export function nextZoomStep(factor: number, dir: 1 | -1): number | null {

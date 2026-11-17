@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/PageHeader'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -6,10 +7,10 @@ import { DecimalInput } from '@/components/DecimalInput'
 import { FormField } from '@/components/ui/form-field'
 import { SectionTitle } from '@/components/ui/section-title'
 import { Button } from '@/components/ui/button'
-import { useToast } from '@/components/ToastProvider'
+import { SaveStatus } from '@/components/SaveStatus'
 import { useAuth } from '@/hooks/useAuth'
 import { visibleNavItems } from '@/lib/navigation'
-import { DEFAULT_PREFERENCES, setPreferences, usePreferences } from '@/lib/preferences'
+import { DEFAULT_PREFERENCES, applyUiScale, roleStartPage, setPreferences, usePreferences, type UiScale } from '@/lib/preferences'
 import { desktop, useDesktopZoom, ZOOM_STEPS } from '@/lib/desktop'
 
 /**
@@ -21,19 +22,24 @@ const PARA_TIPLERI = ['Euro', 'Dolar', 'TL', 'Sterlin']
 
 export function PreferencesPage() {
   const { t } = useTranslation()
-  const { toast } = useToast()
   const { getUser } = useAuth()
+  const user = getUser()
   const prefs = usePreferences()
   const zoom = useDesktopZoom()
-  const startOptions = visibleNavItems(getUser()).filter((n) => n.path !== '/preferences')
+  const startOptions = visibleNavItems(user).filter((n) => n.path !== '/preferences')
+  const autoTarget = startOptions.find((n) => n.path === roleStartPage(user?.yetkiTuru))
+  // K6 — her değişiklikte toast yerine sayfa başında kalıcı "Kaydedildi · 13:25".
+  const [savedAt, setSavedAt] = useState<Date | null>(null)
   const save = (patch: Parameters<typeof setPreferences>[0]) => {
     setPreferences(patch)
-    toast({ title: t('preferences.saved'), variant: 'success' })
+    if (patch.uiScale) applyUiScale(patch.uiScale)
+    setSavedAt(new Date())
   }
 
   return (
     <div>
-      <PageHeader title={t('preferences.title')} description={t('preferences.description')} />
+      <PageHeader title={t('preferences.title')} description={t('preferences.description')}
+        actions={<SaveStatus savedAt={savedAt} />} />
       <div className="grid max-w-4xl gap-6 p-4 lg:p-6 md:grid-cols-2">
         <section className="space-y-3 rounded-md border bg-card p-4">
           <SectionTitle>{t('preferences.orderDefaults')}</SectionTitle>
@@ -70,16 +76,17 @@ export function PreferencesPage() {
             <Select value={prefs.startPage} onValueChange={(v) => save({ startPage: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
+                <SelectItem value="auto">{t('preferences.startAuto', { page: autoTarget ? t(autoTarget.i18nKey) : '—' })}</SelectItem>
                 {startOptions.map((n) => <SelectItem key={n.path} value={n.path}>{t(n.i18nKey)}</SelectItem>)}
               </SelectContent>
             </Select>
           </FormField>
-          <FormField label={t('preferences.tableDensity')}>
-            <Select value={prefs.tableDensity} onValueChange={(v) => save({ tableDensity: v as 'normal' | 'compact' })}>
+          <FormField label={t('preferences.view')} hint={t('preferences.viewHint')}>
+            <Select value={prefs.uiScale} onValueChange={(v) => save({ uiScale: v as UiScale })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="normal">{t('preferences.density.normal')}</SelectItem>
-                <SelectItem value="compact">{t('preferences.density.compact')}</SelectItem>
+                <SelectItem value="rahat">{t('preferences.viewOptions.rahat')}</SelectItem>
+                <SelectItem value="standart">{t('preferences.viewOptions.standart')}</SelectItem>
               </SelectContent>
             </Select>
           </FormField>
@@ -88,7 +95,7 @@ export function PreferencesPage() {
             <FormField label={t('preferences.uiScale')} hint={t('preferences.uiScaleHint', { pct: Math.round((zoom?.factor ?? 1) * 100) })}>
               <Select
                 value={zoom ? String(zoom.setting) : 'auto'}
-                onValueChange={(v) => { void desktop!.setZoom(v === 'auto' ? 'auto' : Number(v)); toast({ title: t('preferences.saved'), variant: 'success' }) }}
+                onValueChange={(v) => { void desktop!.setZoom(v === 'auto' ? 'auto' : Number(v)); setSavedAt(new Date()) }}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

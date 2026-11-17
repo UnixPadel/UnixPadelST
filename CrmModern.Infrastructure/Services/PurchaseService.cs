@@ -165,7 +165,8 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         _ = await uow.PurchaseRequests.GetByIdAsync(talepId)
             ?? throw new NotFoundException("PurchaseRequest", talepId);
 
-        // Talep başına tek ek: öncekini sil, yenisini ekle.
+        // Talep başına tek ek: öncekini sil, yenisini ekle. Yumuşak silinmiş eski ek
+        // de burada kalıcı silinir → yeni ek bayraksız (Silindi=0) başlar.
         await uow.PurchaseAttachments.DeleteByTalepAsync(talepId);
         await uow.PurchaseAttachments.AddAsync(new PurchaseAttachment
         {
@@ -188,10 +189,20 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
         return e is null ? null : new PurchaseAttachmentDataDto(e.Veri, e.Ad, e.Tip);
     }
 
-    public async Task DeleteAttachmentAsync(int talepId)
+    public async Task DeleteAttachmentAsync(int talepId, int? silenKullaniciId)
     {
-        await uow.PurchaseAttachments.DeleteByTalepAsync(talepId);
-        await uow.SaveChangesAsync();
+        // 40+ ergonomi K5 — yumuşak silme (ExecuteUpdate; SaveChanges gerekmez).
+        await uow.PurchaseAttachments.SoftDeleteByTalepAsync(talepId, silenKullaniciId);
+    }
+
+    public async Task RestoreAttachmentAsync(int talepId)
+    {
+        var silindi = await uow.PurchaseAttachments.GetLatestDeletedStateAsync(talepId)
+            ?? throw new NotFoundException("PurchaseAttachment", talepId);
+        if (!silindi)
+            throw new BusinessException("Bu talebin eki silinmemiş.", "attachmentNotDeleted");
+
+        await uow.PurchaseAttachments.RestoreByTalepAsync(talepId);
     }
 
     // ── Aşama 2: Muhasebe ödeme detayı ───────────────────────────────────────

@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using CrmModern.API.Authorization;
+using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Accounting;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.Interfaces.Services;
@@ -12,7 +13,9 @@ namespace CrmModern.API.Controllers;
 [ApiController]
 [Route("api/accounting")]
 [Authorize]
-public sealed class AccountingController(IAccountingService accountingService) : ControllerBase
+public sealed class AccountingController(
+    IAccountingService accountingService,
+    IOrderFolderService folderService) : ControllerBase
 {
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -241,16 +244,40 @@ public sealed class AccountingController(IAccountingService accountingService) :
         return Ok(ApiResponse<object>.Ok(null!, "Ekstra maliyet silindi."));
     }
 
-    /// <summary>MuhasebeEk yükle (Faz 3 blok kaldırıldı, yetki: Yonetici, Muhasebe).</summary>
+    /// <summary>40+ ergonomi K5 — "Geri al": silinen ekstra maliyet kalemini geri yükler;
+    /// tutarını sipariş toplamına geri ekler. Silme ile aynı yetki ve aşama penceresi.</summary>
+    [HttpPost("extra-costs/{ekMaliyetId:int}/restore")]
+    [Authorize(Roles = "Yonetici,Muhasebe")]
+    [ProducesResponseType(typeof(ApiResponse<OrderExtraCostDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> RestoreExtraCost(int ekMaliyetId)
+    {
+        var restored = await accountingService.RestoreExtraCostAsync(ekMaliyetId, CurrentUserId);
+        return Ok(ApiResponse<OrderExtraCostDto>.Ok(restored, "Ekstra maliyet geri yüklendi."));
+    }
+
+    /// <summary>
+    /// Muhasebe eki yükle (eski uç; yetki: Yonetici, Muhasebe). Artık dosya Muhasebe
+    /// Klasörü'ne EKLENİR — eski tek blob'un üzerine yazılmaz. Yeni istemci
+    /// POST /api/orders/{no}/folder/files kullanır.
+    /// </summary>
     [HttpPost("orders/{siparisNo}/muhasebe-ek")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
     public async Task<IActionResult> UploadMuhasebeEk(string siparisNo, IFormFile file)
     {
         if (file is null || file.Length == 0)
             return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
+        if (file.Length > FileRules.MaxBytes)
+            return BadRequest(ApiResponse<object>.FailCode("fileTooLarge", "Dosya 25 MB'tan büyük.", null));
+        var ad = Path.GetFileName(file.FileName);
+        if (!FileRules.IsAllowed(ad))
+            return BadRequest(ApiResponse<object>.FailCode("unsupportedFileType", "Bu dosya türü yüklenemez.", null));
+
+        var order = await folderService.ResolveAsync(siparisNo);
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms);
-        await accountingService.UploadMuhasebeEkAsync(siparisNo, ms.ToArray(), CurrentUserId);
-        return Ok(ApiResponse<object>.Ok(null!, "MuhasebeEk yüklendi."));
+        await folderService.UploadAsync(order, ad, FileRules.ContentTypeFor(ad, file.ContentType), ms.ToArray(), CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Dosya eklendi."));
     }
 }

@@ -100,7 +100,7 @@ export function LookupDialog<T>({
             </tbody>
           </table>
         </div>
-        <p className="text-[11px] text-muted-foreground">{t('lookup.hint', { count: filtered.length })}</p>
+        <p className="text-2xs text-muted-foreground">{t('lookup.hint', { count: filtered.length })}</p>
       </DialogContent>
     </Dialog>
   )

@@ -109,6 +109,9 @@ public sealed class FactoryController(
         var data = await orderService.GetAttachmentAsync(siparisNo, type);
         if (data is null || data.Length == 0)
             return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
-        return File(data, "application/octet-stream", $"{type}_{siparisNo}.bin");
+        // Ad ve tür saklanmadığı için ilk baytlardan tespit edilir (.zip/.rar/.pdf…).
+        var (uzanti, tip) = CrmModern.Core.FileSignature.Detect(data.AsSpan(0, Math.Min(8, data.Length)));
+        var prefix = string.Equals(type, "ek", StringComparison.OrdinalIgnoreCase) ? "siparis_ek_" : "muhasebe_ek_";
+        return File(data, tip, $"{prefix}{siparisNo}{uzanti}");
     }
 }

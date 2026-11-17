@@ -8,6 +8,7 @@ import { CommandPalette } from './CommandPalette'
 import { UpdatesModal } from './UpdatesModal'
 import { LanguageSwitcher } from './LanguageSwitcher'
 import { ZoomControl } from './ZoomControl'
+import { ViewScaleSwitch } from './ViewScaleSwitch'
 import { PageLoader } from './PageLoader'
 import { StatusBar } from './StatusBar'
 import { ShortcutHelpDialog } from './ShortcutHelpDialog'
@@ -18,6 +19,7 @@ import { openGuide } from '@/lib/guideStore'
 import { useAuth } from '@/hooks/useAuth'
 import { useHotkeys } from '@/hooks/useHotkeys'
 import { getToken } from '@/lib/authStore'
+import { applyUiScale, usePreferences } from '@/lib/preferences'
 import { me } from '@/api/auth'
 
 const SIDEBAR_KEY = 'sidebar:open'
@@ -30,6 +32,9 @@ export function Layout() {
   const [params, setParams] = useSearchParams()
   const [bootstrapped, setBootstrapped] = useState(false)
   const [helpOpen, setHelpOpen] = useState(false)
+  // Görünüm ölçeği kullanıcıya özeldir: giriş/çıkışta ve Tercihlerim'de değişince uygulanır.
+  const { uiScale } = usePreferences()
+  useEffect(() => { applyUiScale(uiScale) }, [uiScale])
 
   // Sidebar tercihini localStorage'dan oku — yoksa default açık.
   // Mobilde ilk girişte kapalı olsun ki içerik açılışta görünür kalsın.
@@ -86,22 +91,26 @@ export function Layout() {
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Topbar */}
-        <header className="h-14 border-b bg-background/80 backdrop-blur flex items-center px-4 gap-4 shrink-0">
-          <button
+        {/* Tek satır: dar ekranda (ör. 1280 px, %150 Windows ölçeği) iki satıra bölünüp
+            her ekrandan ~45 px yükseklik yiyordu. Arama kutusu daralır; Kılavuz ve
+            "Görünüm:" etiketleri geniş ekranda yazılı, dar ekranda yalnız simge/ipucu. */}
+        <header className="flex min-h-14 shrink-0 items-center gap-x-3 border-b bg-background px-4 py-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setSidebarOpen((o) => !o)}
-            className="rounded-md p-2 hover:bg-accent transition-colors"
-            aria-label={t('topbar.toggleMenu')}
             aria-expanded={sidebarOpen}
             title={`${t('topbar.toggleMenu')} (Ctrl+B)`}
           >
-            <Menu className="h-5 w-5" />
-          </button>
+            <Menu className="h-5 w-5" aria-hidden /> {t('topbar.menu')}
+          </Button>
           <CommandPalette />
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             {/* Kullanım Kılavuzu — bulunulan ekranın bölümünü açar (Shift+F1). */}
-            <Button size="xs" variant="ghost" onClick={() => openGuide()} title={`${t('guide.title')} (Shift+F1)`}>
-              <BookOpen className="h-4 w-4" /> <span className="hidden sm:inline">{t('guide.button')}</span>
+            <Button size="sm" variant="ghost" onClick={() => openGuide()} title={`${t('guide.title')} (Shift+F1)`} aria-label={t('guide.button')}>
+              <BookOpen className="h-4 w-4" aria-hidden /> <span className="hidden 2xl:inline">{t('guide.button')}</span>
             </Button>
+            <ViewScaleSwitch />
             <ZoomControl />
             <LanguageSwitcher />
           </div>

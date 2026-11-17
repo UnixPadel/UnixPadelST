@@ -27,7 +27,6 @@ import { getCustomers, getUlkeler } from '@/api/customers'
 import { PageHeader } from '@/components/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { DecimalInput } from '@/components/DecimalInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -49,6 +48,8 @@ import { useToast } from '@/components/ToastProvider'
 import { toastApiError } from '@/lib/apiError'
 import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { usePreferences } from '@/lib/preferences'
+import { SaveStatus } from '@/components/SaveStatus'
+import { stepLabelKey } from '@/lib/workflow'
 import { readJSON, removeKey, userKey, writeJSON } from '@/lib/storage'
 import { formatNumberTR } from '@/lib/number'
 import { INCOTERMS } from '@/lib/constants'
@@ -309,6 +310,11 @@ export function NewOrderPage() {
 
   // ── Kayıt ──────────────────────────────────────────────────────────────
   const draftKey = userKey('draft', 'order', mode, sourceNo ?? 'new')
+  // H4 — eski taslak bannerı açıkken yazılanlar buraya gider (eski taslak ezilmez).
+  const pendingDraftKey = `${draftKey}.pending`
+  const clearDrafts = () => { removeKey(draftKey); removeKey(pendingDraftKey) }
+  // 3.2 — başlıkta görünür "Taslak kaydedildi · 13:25".
+  const [draftSavedAt, setDraftSavedAt] = useState<Date | null>(null)
   const maybeReassign = async (no: string) => {
     const yeniId = Number(selectedRepId)
     if (!canReassign || !yeniId || yeniId === reviseSource?.kullaniciID) return
@@ -321,7 +327,7 @@ export function NewOrderPage() {
   }
   const afterSave = (no: string, title: string) => {
     void invalidateOrderGraph(queryClient)
-    removeKey(draftKey)
+    clearDrafts()
     toast({ title, description: no, variant: 'success' })
     setCreatedNo(no)
     setPreviewOpen(false)
@@ -348,8 +354,8 @@ export function NewOrderPage() {
     onSuccess: async (no) => {
       await maybeReassign(no)
       void invalidateOrderGraph(queryClient)
-      removeKey(draftKey)
-      toast({ title: t('orders.toast.amended'), description: no, variant: 'success' })
+      clearDrafts()
+      toast({ title: t('orders.toast.amended'), description: no, variant: 'success', popup: true })
       setLeaving('/orders/mine')
     },
     onError: (e) => toastApiError(toast, t('orders.toast.error'), e),
@@ -367,6 +373,13 @@ export function NewOrderPage() {
   const saving = orderMut.isPending || quoteMut.isPending || amendMut.isPending
 
   const isSubmittingRef = useRef(false)
+  // K4 — önizleme hangi kayıt için açıldı (null: Ctrl+S / Önizleme butonu → tüm seçenekler).
+  const [previewKind, setPreviewKind] = useState<'order' | 'quote' | 'amend' | null>(null)
+  const openReview = (kind: 'order' | 'quote' | 'amend') => {
+    if (createdNo || hydrating || !checkValid()) return
+    setPreviewKind(kind)
+    setPreviewOpen(true)
+  }
   const runSave = (kind: 'order' | 'quote' | 'amend') => {
     if (isSubmittingRef.current || createdNo || hydrating) return
     if (!checkValid()) return
@@ -683,24 +696,36 @@ export function NewOrderPage() {
   useEffect(() => { if (leaving) nav(leaving) }, [leaving, nav])
 
   const [draft, setDraft] = useState<Draft | null>(() => {
-    const d = readJSON<Draft | null>(draftKey, null)
+    // Daha yeni "bekleyen" taslak varsa o gösterilir (kullanıcı eskisini seçmeden yazmaya başlamıştı).
+    const d = readJSON<Draft | null>(pendingDraftKey, null) ?? readJSON<Draft | null>(draftKey, null)
     return d && d.form ? d : null
   })
   // Kirli form periyodik olarak taslağa yazılır (kayıt/atma sonrası silinir).
+  // H4 — eskiden banner açıkken (`|| draft`) hiç yazılmıyordu; yeni girişler korumasızdı.
   useEffect(() => {
-    if (!dirty || createdNo || draft) return
-    writeJSON(draftKey, { form: debounced.form, setTabs: debounced.setTabs, odemeSekli: debounced.odemeSekli, savedAt: new Date().toISOString() } satisfies Draft)
-  }, [debounced, dirty, createdNo, draft, draftKey])
+    if (!dirty || createdNo) return
+    const savedAt = new Date()
+    writeJSON(draft ? pendingDraftKey : draftKey, { form: debounced.form, setTabs: debounced.setTabs, odemeSekli: debounced.odemeSekli, savedAt: savedAt.toISOString() } satisfies Draft)
+    setDraftSavedAt(savedAt)
+  }, [debounced, dirty, createdNo, draft, draftKey, pendingDraftKey])
   const restoreDraft = () => {
     if (!draft) return
     paraIsoRef.current = paraTipiToIso(draft.form.paraTipi || 'Euro')
     setForm(draft.form)
     setSetTabs(draft.setTabs.length === SET_COUNT ? draft.setTabs : [...draft.setTabs, ...Array.from({ length: SET_COUNT - draft.setTabs.length }, emptySetTab)].slice(0, SET_COUNT))
     setOdemeSekli(draft.odemeSekli)
+    removeKey(pendingDraftKey)
+    writeJSON(draftKey, draft)
     setDraft(null)
     toast({ title: t('orders.draft.restored'), variant: 'success' })
   }
-  const discardDraft = () => { removeKey(draftKey); setDraft(null) }
+  // Eski taslak atılınca banner açıkken yazılanlar asıl taslak olur.
+  const discardDraft = () => {
+    const pending = readJSON<Draft | null>(pendingDraftKey, null)
+    removeKey(draftKey); removeKey(pendingDraftKey)
+    if (pending?.form && pending.savedAt !== draft?.savedAt) writeJSON(draftKey, pending)
+    setDraft(null)
+  }
 
   const resetForm = () => {
     const f = blankOrder(prefs)
@@ -709,7 +734,8 @@ export function NewOrderPage() {
     setForm(f); setSetTabs(tabs); setOdemeSekli(prefs.defaultOdemeSekli)
     setCreatedNo(null); setSubmitted(false); setCustomerId(null); setEkFileName(''); setActiveTab('set-0')
     baselineRef.current = snapshotOf(f, tabs)
-    removeKey(userKey('draft', 'order', 'new', 'new'))
+    removeKey(userKey('draft', 'order', 'new', 'new')); removeKey(`${userKey('draft', 'order', 'new', 'new')}.pending`)
+    setDraftSavedAt(null)
     if (mode !== 'new') nav('/orders/new', { replace: true })
   }
 
@@ -731,16 +757,47 @@ export function NewOrderPage() {
     { keys: 'F4', label: t('shortcuts.lookup') },
   ])
 
+  // Sayfadaki (yapışkan çubuk) butonlar: "…" = önce önizleme penceresi açılır (K4).
+  const reviewButtons = (
+    <>
+      {mode === 'new' && (
+        <>
+          <Button variant="secondary" disabled={!!createdNo || saving} onClick={() => openReview('quote')}>
+            {t('orders.form.teklifiHazirla')}…
+          </Button>
+          <Button disabled={!!createdNo || saving} onClick={() => openReview('order')}>
+            {t('orders.form.siparisiHazirla')}…
+          </Button>
+        </>
+      )}
+      {mode === 'revise' && (
+        <Button disabled={!!createdNo || saving || hydrating} onClick={() => openReview('order')}>
+          {t('orders.form.revizeEt')}…
+        </Button>
+      )}
+      {mode === 'amend' && (
+        <Button disabled={!!createdNo || saving || hydrating} onClick={() => openReview('amend')}>
+          {t('myOrders.amend.save')}…
+        </Button>
+      )}
+    </>
+  )
+
+  // Önizleme içindeki asıl kayıt butonları (yalnız seçilen tür; Ctrl+S ile açıldıysa hepsi).
   const saveButtons = (
     <>
       {mode === 'new' && (
         <>
-          <Button variant="secondary" loading={quoteMut.isPending} disabled={!!createdNo || saving} onClick={() => runSave('quote')}>
-            {t('orders.form.teklifiHazirla')}
-          </Button>
-          <Button loading={orderMut.isPending} disabled={!!createdNo || saving} onClick={() => runSave('order')}>
-            {t('orders.form.siparisiHazirla')}
-          </Button>
+          {previewKind !== 'order' && (
+            <Button variant={previewKind === 'quote' ? 'default' : 'secondary'} loading={quoteMut.isPending} disabled={!!createdNo || saving} onClick={() => runSave('quote')}>
+              {t('orders.form.teklifiHazirla')}
+            </Button>
+          )}
+          {previewKind !== 'quote' && (
+            <Button loading={orderMut.isPending} disabled={!!createdNo || saving} onClick={() => runSave('order')}>
+              {t('orders.form.siparisiHazirla')}
+            </Button>
+          )}
         </>
       )}
       {mode === 'revise' && (
@@ -772,10 +829,11 @@ export function NewOrderPage() {
       <PageHeader
         title={title}
         description={mode === 'new' ? t('orders.subtitle') : undefined}
-        meta={dirty ? <Badge variant="warning">{t('orders.unsavedBadge')}</Badge> : undefined}
+        // 3.2 — "Kaydedilmedi" rozeti yerine taslağın ne zaman yazıldığı görünür.
+        meta={dirty ? <SaveStatus kind="draft" savedAt={draftSavedAt} dirty={!draftSavedAt} /> : undefined}
         actions={mode === 'new' && (dirty || createdNo) ? (
           <Button size="sm" variant="ghost" onClick={async () => {
-            if (dirty && !(await confirm({ title: t('orders.confirm.resetTitle'), description: t('orders.confirm.resetDesc'), destructive: true, confirmLabel: t('orders.newForm') }))) return
+            if (dirty && !(await confirm({ title: t('orders.confirm.resetTitle'), description: t('orders.confirm.resetDesc'), destructive: true, confirmLabel: t('orders.clearForm') }))) return
             resetForm()
           }}>
             <FilePlus2 className="h-4 w-4" /> {t('orders.newForm')}
@@ -822,7 +880,7 @@ export function NewOrderPage() {
           <div className="rounded-md border border-warning/40 bg-warning-soft px-4 py-2 text-sm text-warning-soft-foreground">
             <strong>{t('orders.reviseBanner')}:</strong>{' '}
             <span className="font-mono">{reviseFrom}</span>
-            {(reviseLoading || hydrating) && <span className="ml-2 opacity-80">({t('common.loading')})</span>}
+            {(reviseLoading || hydrating) && <span className="ml-2">({t('common.loading')})</span>}
           </div>
         )}
 
@@ -832,7 +890,7 @@ export function NewOrderPage() {
             <div>
               <strong>{t('myOrders.amend.banner')}:</strong>{' '}
               <span className="font-mono">{amendFrom}</span>
-              {(reviseLoading || hydrating) && <span className="ml-2 opacity-80">({t('common.loading')})</span>}
+              {(reviseLoading || hydrating) && <span className="ml-2">({t('common.loading')})</span>}
             </div>
             <FormField
               id="order-amendReason"
@@ -863,13 +921,13 @@ export function NewOrderPage() {
         )}
 
         {/* Bölüm gezintisi (Fiori Object Page çapa çubuğu) — durum işaretli. */}
-        <nav aria-label={t('orders.nav.label')} className="sticky top-0 z-20 -mx-4 flex gap-1 overflow-x-auto border-b bg-card/95 px-4 py-1.5 backdrop-blur lg:-mx-6 lg:px-6">
+        <nav aria-label={t('orders.nav.label')} className="sticky top-0 z-20 -mx-4 flex flex-wrap items-center gap-1 border-b bg-card px-4 py-1.5 lg:-mx-6 lg:px-6">
           {sectionNav.map((s, i) => (
             <a
               key={s.id}
               href={`#${s.id}`}
               onClick={(e) => { e.preventDefault(); document.getElementById(s.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
-              className="flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs hover:bg-accent"
+              className="flex min-h-ctl-xs shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-sm hover:bg-accent"
             >
               <span className="text-muted-foreground">{i + 1}</span>
               <span>{s.label}</span>
@@ -877,6 +935,20 @@ export function NewOrderPage() {
               {s.ok === false && submitted && <CircleAlert className="h-3.5 w-3.5 text-warning" />}
             </a>
           ))}
+          {/* 4.2 — kaydırırken de görünen bağlam: kim, ne kadar, açık bakiyesi var mı. */}
+          <div className="ml-auto flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-sm" aria-live="polite">
+            <span className="min-w-0 truncate"><span className="text-muted-foreground">{t('orders.form.musteri')}:</span>{' '}
+              <span className="font-semibold">{form.musteriAd || '—'}</span></span>
+            {openLines.length > 0 && (
+              <span className="rounded bg-warning-soft px-1.5 py-0.5 text-xs font-medium text-warning-soft-foreground">
+                {t('orders.form.openBalance')}: {openLines.map((l) => formatMoney(l.kalan, l.paraTipi)).join(' · ')}
+              </span>
+            )}
+            {!hideMoney && (
+              <span><span className="text-muted-foreground">{t('orders.form.toplamFiyatLabel')}:</span>{' '}
+                <span className="font-semibold tabular-nums">{formatMoney(totals.toplam, form.paraTipi || 'Euro')}</span></span>
+            )}
+          </div>
         </nav>
 
         {/* Scaling Faz 3 — kab ≥86rem: 3 kolon (müşteri | setler | özet); 56–86rem:
@@ -983,7 +1055,7 @@ export function NewOrderPage() {
                     e.target.value = ''
                   }}
                 />
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-2xs text-muted-foreground">
                   {createdNo ? t('orders.form.ekHint') : t('orders.form.saveFirstHint')}
                 </p>
               </div>
@@ -1001,7 +1073,7 @@ export function NewOrderPage() {
                       const tb = setTabs[i]
                       const filled = tb.kategoriID != null
                       return (
-                        <TabsTrigger key={i} value={`set-${i}`} className="gap-1.5 px-2.5 py-1 text-xs data-[state=inactive]:hover:bg-background/60 data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
+                        <TabsTrigger key={i} value={`set-${i}`} className="gap-1.5 px-3 py-1.5 text-sm data-[state=inactive]:hover:bg-background/60 data-[state=active]:shadow-[inset_0_-2px_0_hsl(var(--primary))]">
                           {filled ? (
                             <>
                               <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
@@ -1016,12 +1088,12 @@ export function NewOrderPage() {
                       )
                     })}
                   </TabsList>
-                  <span className="ml-auto hidden shrink-0 text-[11px] text-muted-foreground md:block">
+                  <span className="ml-auto hidden shrink-0 text-2xs text-muted-foreground md:block">
                     {t('orders.form.setIncludedHint')}
                   </span>
                 </div>
                 {submitted && issues.includes('lineItems') && (
-                  <p role="alert" className="px-4 pt-3 text-xs text-destructive">{t('orders.issues.lineItems')}</p>
+                  <p role="alert" className="px-4 pt-3 text-xs text-danger">{t('orders.issues.lineItems')}</p>
                 )}
                 {Array.from({ length: visibleTabCount }, (_, i) => (
                   <TabsContent key={i} value={`set-${i}`} className="m-0 p-4">
@@ -1198,13 +1270,13 @@ export function NewOrderPage() {
                           return { ...f, extraCosts: next }
                         })} />
                       </FormField>
-                      <Button type="button" size="icon" variant="ghost" className="text-destructive" aria-label={t('common.delete')}
+                      <Button type="button" size="xs" variant="ghost" className="text-danger" aria-label={t('common.delete')}
                         onClick={async () => {
                           const filled = ec.aciklama.trim() || Number(ec.tutar) > 0
                           if (filled && !(await confirm({ title: t('orders.confirm.extraRemoveTitle'), description: ec.aciklama || formatMoney(Number(ec.tutar), form.paraTipi), destructive: true, confirmLabel: t('common.delete') }))) return
                           setForm((f) => ({ ...f, extraCosts: (f.extraCosts ?? []).filter((_, i) => i !== idx) }))
                         }}>
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" aria-hidden /> {t('common.delete')}
                       </Button>
                     </div>
                   ))}
@@ -1251,17 +1323,17 @@ export function NewOrderPage() {
                         data-enter-skip
                       >
                         <span className="text-xs font-medium">{isoSymbol(iso)} {p}</span>
-                        <span className={`text-[10px] tabular-nums ${secili ? 'opacity-90' : 'text-muted-foreground'}`}>
+                        <span className={`text-2xs tabular-nums ${secili ? 'opacity-90' : 'text-muted-foreground'}`}>
                           {iso === 'TRY' ? '—' : kur ? `${formatNumberTR(kur)} ₺` : '?'}
                         </span>
                       </Button>
                     )
                   })}
                 </div>
-                <div className="text-[11px] tabular-nums text-muted-foreground">
+                <div className="text-2xs tabular-nums text-muted-foreground">
                   {tcmb?.tarih
                     ? <>{t('currency.source')}: TCMB {tcmb.tarih.split('-').reverse().join('.')}
-                        {kurZamani ? <span className="opacity-70"> · {t('currency.refreshed')} {new Date(kurZamani).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {t('currency.hourly')}</span> : null}</>
+                        {kurZamani ? <span> · {t('currency.refreshed')} {new Date(kurZamani).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {t('currency.hourly')}</span> : null}</>
                     : <span className="text-warning">{t('currency.sourceUnavailable')}</span>}
                 </div>
               </div>
@@ -1346,9 +1418,9 @@ export function NewOrderPage() {
                   {(form.details ?? []).map((d, i) => isFreeNote(d) ? (
                     <li key={i} className="flex items-start gap-2 text-sm">
                       <span className="flex-1 whitespace-pre-wrap">{d}</span>
-                      <Button type="button" size="icon-sm" variant="ghost" aria-label={t('common.delete')}
+                      <Button type="button" size="xs" variant="ghost" aria-label={t('common.delete')}
                         onClick={() => setForm((f) => ({ ...f, details: f.details.filter((_, j) => j !== i) }))}>
-                        <X className="h-3.5 w-3.5" />
+                        <X className="h-3.5 w-3.5" aria-hidden /> {t('common.delete')}
                       </Button>
                     </li>
                   ) : null)}
@@ -1379,17 +1451,23 @@ export function NewOrderPage() {
           {mode === 'revise' && (
             <Button variant="outline" disabled={saving} onClick={() => nav('/orders/mine')}>{t('common.cancel')}</Button>
           )}
-          {saveButtons}
+          {reviewButtons}
         </div>
 
         <LoadOrderDialog open={getirOpen} onOpenChange={setGetirOpen} onPick={loadFromOrder} loading={getirLoading} />
         <OrderPreviewDialog
           open={previewOpen}
-          onOpenChange={setPreviewOpen}
+          onOpenChange={(o) => { setPreviewOpen(o); if (!o) setPreviewKind(null) }}
           form={form}
           tabs={setTabs}
           totals={totals}
           sym={sym}
+          // K4 — "Ne olacak?": yeni kayıt, revize ve düzenleme siparişi Sipariş Kontrolü'ne gönderir.
+          impact={!createdNo ? [
+            t(mode === 'new' ? (previewKind === 'quote' ? 'orders.impact.quote' : previewKind === 'order' ? 'orders.impact.order' : 'orders.impact.new') : 'orders.impact.revise'),
+            t('orders.impact.infoLines'),
+          ] : undefined}
+          nextStep={!createdNo ? t(stepLabelKey('kontrolOnayi')) : undefined}
           footer={!createdNo ? (
             <>
               {issues.length > 0 && (
@@ -1397,7 +1475,7 @@ export function NewOrderPage() {
                   <CircleAlert className="h-3.5 w-3.5" /> {issues.map((i) => t(`orders.issues.${i}`)).join(' · ')}
                 </p>
               )}
-              <Button variant="outline" onClick={() => setPreviewOpen(false)}>{t('common.back')}</Button>
+              <Button variant="outline" onClick={() => { setPreviewOpen(false); setPreviewKind(null) }}>{t('orders.backToForm')}</Button>
               {saveButtons}
             </>
           ) : undefined}

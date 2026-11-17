@@ -147,7 +147,8 @@ internal sealed class OrderRepository(AppDbContext context)
     public async Task<IReadOnlyList<OrderExtraCost>> GetExtraCostsByOrderIdAsync(int siparisAlID) =>
         await _context.SiparisEkMaliyet
             .AsNoTracking()
-            .Where(c => c.SiparisAlID == siparisAlID)
+            // 40+ ergonomi K5 — yumuşak silinen kalemler hiçbir listede/toplamda yok.
+            .Where(c => c.SiparisAlID == siparisAlID && !c.Silindi)
             .OrderBy(c => c.EkMaliyetID)
             .ToListAsync();
 

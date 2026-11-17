@@ -127,7 +127,7 @@ export function MuhasebeRowDetailDialog({ row: rowProp, onClose }: Props) {
                           }) : undefined}>
                           <td className="px-2 py-1 text-muted-foreground tabular-nums">
                             {tx.iptal
-                              ? <span className="inline-block text-[10px] font-medium text-destructive">{t('accApproval.cancelTx.badge')}</span>
+                              ? <span className="inline-block text-2xs font-medium text-danger">{t('accApproval.cancelTx.badge')}</span>
                               : activeIndex.get(tx.id)}
                           </td>
                           <td className="px-2 py-1">{formatDate(tx.tarih)}</td>

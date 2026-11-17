@@ -16,7 +16,10 @@ public sealed record StockItemListDto(
     string?   KapCinsi,
     string    Durum,            // Bekliyor | Kismen | Tamam
     DateTime  OlusturmaTarihi,
-    DateTime? SonCikisTarihi);
+    DateTime? SonCikisTarihi,
+    // 40+ ergonomi K5 — yalnız ?includeDeleted=true listesinde (ve silinmiş kalemin detayında) true olabilir.
+    bool      Silindi       = false,
+    DateTime? SilinmeTarihi = null);
 
 /// <summary>Konum filtresi sayaçları (arama + "tamamlananlar" filtresi uygulanmış küme üzerinde).</summary>
 public sealed record StockCountsDto(int Tumu, int Antrepo, int Depo);

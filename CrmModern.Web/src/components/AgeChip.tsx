@@ -13,7 +13,7 @@ export function AgeChip({ since, className }: { since?: string | null; className
   return (
     <span
       className={cn(
-        'shrink-0 rounded-full px-2 py-0.5 text-[11px] tabular-nums',
+        'shrink-0 rounded-full px-2 py-0.5 text-2xs tabular-nums',
         age > AGE_WARN_DAYS ? 'bg-warning-soft text-warning-soft-foreground' : 'bg-muted text-muted-foreground',
         className,
       )}

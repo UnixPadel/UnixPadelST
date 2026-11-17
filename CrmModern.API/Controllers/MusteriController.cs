@@ -37,13 +37,14 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
 
     [HttpGet]
     [ProducesResponseType(typeof(ApiResponse<IEnumerable<MusteriDto>>), StatusCodes.Status200OK)]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] bool includeDeleted = false)
     {
         // PROMPT-v2 §7: Servis rol bazlı filtre uygular (Temsilci yalnız kendi
         // yarattığı kayıtları görür). Diğer roller tüm listeyi alır.
         // PROMPT-v4 §1: elshan.rasulov rolü Temsilci olsa bile tam listeyi alır.
+        // 40+ ergonomi K5 — includeDeleted=true: silinen müşteriler de (silindi=true) gelir.
         var role = IsControlUser ? "Yonetici" : CurrentRole;
-        var data = await musteriService.GetAllAsync(CurrentUserId, role);
+        var data = await musteriService.GetAllAsync(CurrentUserId, role, includeDeleted);
         return Ok(ApiResponse<IEnumerable<MusteriDto>>.Ok(data));
     }
 
@@ -92,8 +93,21 @@ public sealed class MusteriController(IMusteriService musteriService) : Controll
     public async Task<IActionResult> Delete(int id)
     {
         if (!IsControlUser) return Forbid();
-        await musteriService.DeleteAsync(id);
+        await musteriService.DeleteAsync(id, CurrentUserId);
         return NoContent();
+    }
+
+    /// <summary>40+ ergonomi K5 — "Geri al / Geri yükle": yumuşak silinen müşteriyi geri getirir.
+    /// Silme ile aynı gate (yalnız elshan.rasulov / süper-admin).</summary>
+    [HttpPost("{id:int}/restore")]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
+    public async Task<IActionResult> Restore(int id)
+    {
+        if (!IsControlUser) return Forbid();
+        await musteriService.RestoreAsync(id, CurrentUserId);
+        return Ok(ApiResponse<object>.Ok(null!, "Müşteri geri yüklendi."));
     }
 
     // ── Ülke endpoints ───────────────────────────────────────────────────────

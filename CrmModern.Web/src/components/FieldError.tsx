@@ -4,5 +4,5 @@
 // role="alert" → ekran okuyucu hatayı göründüğü anda okur.
 export function FieldError({ message, id }: { message?: string; id?: string }) {
   if (!message) return null
-  return <p id={id} role="alert" className="text-xs text-destructive mt-0.5">{message}</p>
+  return <p id={id} role="alert" className="text-xs text-danger mt-0.5">{message}</p>
 }

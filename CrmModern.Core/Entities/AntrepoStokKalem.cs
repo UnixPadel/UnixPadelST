@@ -25,4 +25,9 @@ public sealed class AntrepoStokKalem
     public decimal? KalemFiyati         { get; set; }                 // kutu 42
     public int      OlusturanKullaniciID { get; set; }
     public DateTime OlusturmaTarihi     { get; set; }
+
+    // 40+ ergonomi K5 — yumuşak silme: global query filter ile tüm sorgulardan gizlenir.
+    public bool      Silindi            { get; set; }
+    public DateTime? SilinmeTarihi      { get; set; }
+    public int?      SilenKullaniciID   { get; set; }
 }

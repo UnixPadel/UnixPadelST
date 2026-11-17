@@ -270,7 +270,7 @@ export function SystemSettingsPage() {
             >
               <Cpu className="h-4 w-4 text-primary" />
               <span>Claude (Anthropic)</span>
-              <Badge variant="outline" className="text-[10px] py-0 px-1.5 ml-1 bg-primary/5 text-primary border-primary/20">
+              <Badge variant="outline" className="text-2xs py-0 px-1.5 ml-1 bg-primary/5 text-primary border-primary/20">
                 Önerilen
               </Badge>
               {currentProvider === 'Claude' && (
@@ -306,7 +306,7 @@ export function SystemSettingsPage() {
                     Anthropic Claude Ayarları
                   </h3>
                   {currentProvider === 'Claude' ? (
-                    <Badge variant="success" className="text-[11px]">
+                    <Badge variant="success" className="text-2xs">
                       Şu Anda Kullanılan Motor
                     </Badge>
                   ) : (
@@ -358,7 +358,7 @@ export function SystemSettingsPage() {
                 <span className="text-foreground font-medium text-xs mt-1 block">
                   {claudeStatus?.guncellemeZamani ? formatDate(claudeStatus.guncellemeZamani) : '—'}
                   {claudeStatus?.guncelleyenAd && (
-                    <span className="text-muted-foreground block text-[11px] truncate">
+                    <span className="text-muted-foreground block text-2xs truncate">
                       ({claudeStatus.guncelleyenAd})
                     </span>
                   )}
@@ -375,13 +375,13 @@ export function SystemSettingsPage() {
 
             {/* Varsa Son Hata */}
             {claudeStatus?.sonHata && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3.5 text-xs text-destructive flex items-start gap-2.5">
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3.5 text-xs text-danger flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Son İstek Hatası:</p>
                   <p className="mt-0.5">{claudeStatus.sonHata}</p>
                   {claudeStatus.sonHataZamani && (
-                    <p className="text-[11px] opacity-75 mt-1">Zaman: {formatDate(claudeStatus.sonHataZamani)}</p>
+                    <p className="text-2xs opacity-75 mt-1">Zaman: {formatDate(claudeStatus.sonHataZamani)}</p>
                   )}
                 </div>
               </div>
@@ -420,8 +420,10 @@ export function SystemSettingsPage() {
                       <button
                         type="button"
                         onClick={() => setClaudeShowKey(!claudeShowKey)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        tabIndex={-1}
+                        className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                        aria-label={claudeShowKey ? t('common.hideValue') : t('common.showValue')}
+                        title={claudeShowKey ? t('common.hideValue') : t('common.showValue')}
+                        aria-pressed={claudeShowKey}
                       >
                         {claudeShowKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
@@ -459,7 +461,7 @@ export function SystemSettingsPage() {
                   className={`rounded-lg p-3 text-xs flex items-start gap-2.5 border ${
                     claudeTestResult.success
                       ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                      : 'bg-destructive/10 text-destructive border-destructive/30'
+                      : 'bg-destructive/10 text-danger border-destructive/30'
                   }`}
                 >
                   {claudeTestResult.success ? (
@@ -518,7 +520,7 @@ export function SystemSettingsPage() {
                     Google Gemini Ayarları
                   </h3>
                   {currentProvider === 'Gemini' ? (
-                    <Badge variant="success" className="text-[11px]">
+                    <Badge variant="success" className="text-2xs">
                       Şu Anda Kullanılan Motor
                     </Badge>
                   ) : (
@@ -563,7 +565,7 @@ export function SystemSettingsPage() {
                 <span className="text-foreground font-medium text-xs mt-1 block">
                   {geminiStatus?.guncellemeZamani ? formatDate(geminiStatus.guncellemeZamani) : '—'}
                   {geminiStatus?.guncelleyenAd && (
-                    <span className="text-muted-foreground block text-[11px] truncate">
+                    <span className="text-muted-foreground block text-2xs truncate">
                       ({geminiStatus.guncelleyenAd})
                     </span>
                   )}
@@ -580,13 +582,13 @@ export function SystemSettingsPage() {
 
             {/* Varsa Son Hata */}
             {geminiStatus?.sonHata && (
-              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3.5 text-xs text-destructive flex items-start gap-2.5">
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3.5 text-xs text-danger flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-semibold">Son İstek Hatası:</p>
                   <p className="mt-0.5">{geminiStatus.sonHata}</p>
                   {geminiStatus.sonHataZamani && (
-                    <p className="text-[11px] opacity-75 mt-1">Zaman: {formatDate(geminiStatus.sonHataZamani)}</p>
+                    <p className="text-2xs opacity-75 mt-1">Zaman: {formatDate(geminiStatus.sonHataZamani)}</p>
                   )}
                 </div>
               </div>
@@ -613,8 +615,10 @@ export function SystemSettingsPage() {
                   <button
                     type="button"
                     onClick={() => setGeminiShowKey(!geminiShowKey)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                    tabIndex={-1}
+                    className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+                    aria-label={geminiShowKey ? t('common.hideValue') : t('common.showValue')}
+                    title={geminiShowKey ? t('common.hideValue') : t('common.showValue')}
+                    aria-pressed={geminiShowKey}
                   >
                     {geminiShowKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -627,7 +631,7 @@ export function SystemSettingsPage() {
                   className={`rounded-lg p-3 text-xs flex items-start gap-2.5 border ${
                     geminiTestResult.success
                       ? 'bg-emerald-50 text-emerald-800 border-emerald-300 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800'
-                      : 'bg-destructive/10 text-destructive border-destructive/30'
+                      : 'bg-destructive/10 text-danger border-destructive/30'
                   }`}
                 >
                   {geminiTestResult.success ? (

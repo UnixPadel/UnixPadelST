@@ -7,7 +7,7 @@ import { getReadyForShipment, createShipment } from '@/api/logistics'
 import { INCOTERMS } from '@/lib/constants'
 import { stageLabel } from '@/lib/status'
 import { PageHeader } from '@/components/PageHeader'
-import { FillPage, FillRegion } from '@/components/FillPage'
+import { FillPage } from '@/components/FillPage'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { Badge } from '@/components/ui/badge'
@@ -20,8 +20,11 @@ import { KeyValue } from '@/components/ui/key-value'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CarrierPicker } from '@/components/CarrierPicker'
-import { FilterBar, FilterField, ALL, useFilterState } from '@/components/FilterBar'
+import { FilterBar, FilterField, ALL, useFilterState, moreFilterCount } from '@/components/FilterBar'
 import { OrderDetailModal } from '@/components/OrderDetailModal'
+import { OrderWorkPanel } from '@/components/order/OrderWorkPanel'
+import { MasterDetailLayout } from '@/components/MasterDetailLayout'
+import { useAutoSelectFirst } from '@/hooks/useAutoSelectFirst'
 import { WaitingUpstreamPanel } from '@/components/WaitingUpstreamPanel'
 import { useNotHereHint } from '@/hooks/useNotHereHint'
 import { useShortcutHints } from '@/components/StatusBar'
@@ -53,6 +56,8 @@ export function LogisticsReadyPage() {
   const [target, setTarget] = useState<LogisticsOrderListDto | null>(null)
   const [form, setForm] = useState(blank())
   const [activeNo, setActiveNo] = useState<string | null>(() => params.get('sel'))
+  // 4.1 — "Tam ekran": aynı sipariş büyük pencerede.
+  const [expandedNo, setExpandedNo] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
   const { values: f, set, setAll, reset } = useFilterState(FILTER_DEFAULTS)
   const onEnterNav = useEnterNavigation()
@@ -85,7 +90,7 @@ export function LogisticsReadyPage() {
   const createMut = useAppMutation({
     mutationFn: (_: void) => createShipment({ siparisNo: target!.siparisNo, ...form }),
     // Paket 3: yeni akış — sevk talebi muhasebe onayını bekler.
-    successTitle: t('logistics.toast.created'),
+    successTitle: t('logistics.toast.created'), notify: 'toast',
     successDescription: () => target?.siparisNo,
     errorTitle: t('logistics.toast.error'),
     onSuccess: () => { setTarget(null); setForm(blank()); setSubmitted(false) },
@@ -109,8 +114,8 @@ export function LogisticsReadyPage() {
   // sevkiyat oluşturulurken girilir.
   const cols: Column<Row>[] = [
     { key: 'siparisNo', pin: 'left', header: t('common.orderNo'), sortable: true, hideable: false, render: (r) => <span className="font-mono text-xs">{r.siparisNo}</span> },
-    { key: 'musteriAd', truncate: '16rem', header: t('common.customer'), sortable: true },
-    { key: 'mUlke',             header: t('common.country'), sortable: true },
+    { key: 'musteriAd', truncate: '10rem', header: t('common.customer'), sortable: true },
+    { key: 'mUlke',             header: t('common.country'), sortable: true, defaultHidden: true },
     { key: 'siparisMiTeklifMi', header: t('common.stage'), sortable: true, render: (r) => (
       // Üretimdeki sipariş lojistikte "Hazırlanıyor" olarak yansır (gerçek aşama 'Uretim').
       r.siparisMiTeklifMi === 'Uretim'
@@ -118,25 +123,21 @@ export function LogisticsReadyPage() {
         : <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
     ) },
     { key: 'onayliFirma',       header: t('logistics.approvedOffer'), render: (r) => r.onayliFirma ? `${r.onayliFirma}${r.onayliCesit ? ` · ${r.onayliCesit}` : ''}` : '—' },
-    { key: 'tarih',             header: t('common.date'), sortable: true, type: 'date', render: (r) => formatDate((r.tarih as string) ?? '-') },
-    {
-      key: 'actions', pin: 'right', header: t('common.actions'), hideable: false, exportValue: false,
-      render: (r) => {
-        // Sevk yalnız 'Hazir' aşamasında yapılabilir; 'Hazırlanıyor' (Uretim) için pasif.
-        const canShip = r.siparisMiTeklifMi === 'Hazir'
-        return (
-          <div className="flex flex-wrap gap-1.5">
-            <Button size="xs" variant="outline" onClick={() => setActiveNo(r.siparisNo)}>
-              <Eye className="h-3.5 w-3.5" /> {t('common.openOrder')}
-            </Button>
-            <Button size="xs" disabled={!canShip} title={canShip ? undefined : t('logistics.preparingHint')} onClick={() => openShipment(r)}>
-              <Truck className="h-3.5 w-3.5" /> {t('logistics.createShipment')}
-            </Button>
-          </div>
-        )
-      },
-    },
+    { key: 'tarih',             header: t('common.date'), sortable: true, type: 'date', defaultHidden: true, render: (r) => formatDate((r.tarih as string) ?? '-') },
+    // Satır başına buton yok: seçili siparişin işi sağ panelin altında (tek ana buton).
   ]
+
+  // Liste yüklenince ilk sipariş seçilir; sağ panel hep dolu.
+  useAutoSelectFirst(filtered.map((r) => r.siparisNo), activeNo, setActiveNo, isLoading)
+  const activeRow = filtered.find((r) => r.siparisNo === activeNo) ?? null
+  // Sevk yalnız 'Hazir' aşamasında yapılabilir; 'Hazırlanıyor' (Uretim) için pasif.
+  const canShip = activeRow?.siparisMiTeklifMi === 'Hazir'
+  const panelFooter = activeRow ? (
+    <Button size="lg" className="w-full" wrapperClassName="w-full" disabled={!canShip}
+      disabledReason={canShip ? null : t('logistics.preparingHint')} onClick={() => openShipment(activeRow)}>
+      <Truck className="h-4 w-4" aria-hidden /> {t('logistics.createShipment')}
+    </Button>
+  ) : undefined
 
   useShortcutHints([
     { keys: '↑↓', label: t('shortcuts.moveRow') },
@@ -148,8 +149,18 @@ export function LogisticsReadyPage() {
     // (başlık + araç çubuğu yerinde kalır).
     <FillPage>
       <PageHeader density="compact" actions={<WaitingUpstreamPanel screen="logistics-ready" variant="button" />} title={t('logistics.readyTitle')} description={t('logistics.readyDescription')} />
-      <div className="space-y-2 px-4 pt-2">
-        <FilterBar onReset={reset} tableId="logistics-ready" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}>
+      {/* 4.1 (K7) — liste solda, sipariş detayı sağda (önceden modal listeyi kapatıyordu). */}
+      <MasterDetailLayout
+        pageId="logistics-ready"
+        open
+        defaultShare={0.42}
+        onExpand={activeNo ? () => setExpandedNo(activeNo) : undefined}
+        title={activeNo ? t('orderDetail.title', { no: activeNo }) : t('masterDetail.panel')}
+        detail={<OrderWorkPanel siparisNo={activeNo} emptyText={t(filtered.length ? 'masterDetail.selectHint' : 'masterDetail.emptyList')} logisticsView footer={panelFooter} />}
+        list={<>
+        {/* Filtreler yalnız listeyi süzer: liste sütununun üstünde durur, sağ panel sayfa başlığının hemen altından başlar. */}
+        <FilterBar className="mb-2 shrink-0" onReset={reset} tableId="logistics-ready" values={f} onApplyView={(v) => setAll(v as typeof FILTER_DEFAULTS)}
+          primaryCount={2} moreActiveCount={moreFilterCount(f, FILTER_DEFAULTS, ['siparisNo', 'musteri'])}>
           <FilterField label={t('common.orderNo')}>
             <Input inputSize="sm" value={f.siparisNo} onChange={(e) => set('siparisNo', e.target.value)} />
           </FilterField>
@@ -158,7 +169,7 @@ export function LogisticsReadyPage() {
           </FilterField>
           <FilterField label={t('common.stage')}>
             <Select value={f.asama} onValueChange={(v) => set('asama', v)}>
-              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectTrigger size="sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL}>{t('myOrders.filter.all')}</SelectItem>
                 {stageOptions.map((s) => <SelectItem key={s} value={s}>{stageLabel(t, s)}</SelectItem>)}
@@ -166,11 +177,10 @@ export function LogisticsReadyPage() {
             </Select>
           </FilterField>
         </FilterBar>
-      </div>
-      <FillRegion className="pt-2">
         <DataTable
           fill
-          tableId="logistics-ready"
+          tableId="logistics-ready-v2"
+          rowGoneNotice={false}
           exportFileName="lojistik-hazir"
           columns={cols}
           data={filtered as Row[]}
@@ -178,18 +188,19 @@ export function LogisticsReadyPage() {
           loading={isLoading}
           error={isError}
           emptyMessage={notHere}
-          density="compact"
           activeRowKey={activeNo}
           // Satıra tıklama (ve Enter) "Siparişi Aç" ile aynı: Sipariş Detayı penceresi.
           onRowClick={(r) => setActiveNo(r.siparisNo)}
+          actionBar={false}
           rowActions={[
             { key: 'detail', label: t('common.openOrder'), shortcut: 'Enter', icon: <Eye className="h-3.5 w-3.5" />, onSelect: (r) => setActiveNo(r.siparisNo) },
             { key: 'ship', label: t('logistics.createShipment'), disabled: (r) => r.siparisMiTeklifMi !== 'Hazir', onSelect: (r) => openShipment(r) },
           ]}
         />
-      </FillRegion>
+        </>}
+      />
 
-      <OrderDetailModal siparisNo={activeNo} onClose={() => setActiveNo(null)} logisticsView />
+      <OrderDetailModal siparisNo={expandedNo} onClose={() => setExpandedNo(null)} logisticsView />
 
       <Dialog open={!!target} onOpenChange={(o) => { if (!o) setTarget(null) }}>
         <DialogContent size="md">

@@ -33,8 +33,6 @@ public interface IAccountingService
     /// <summary>ClosedXML fallback xlsx (ExcelIndir BLOB template Faz 8'e).</summary>
     Task<byte[]> GenerateAccountingExcelAsync(TransactionFilterDto filter);
 
-    /// <summary>SiparisAlTablo.MuhasebeEk = byte[]. Faz 3'teki blok bu metodla kaldırıldı.</summary>
-    Task UploadMuhasebeEkAsync(string siparisNo, byte[] data, int currentUserId);
 
     // ── PROMPT.md ACCOUNTING #14 ─────────────────────────────────────────────
 
@@ -98,6 +96,11 @@ public interface IAccountingService
     /// </summary>
     Task<OrderExtraCostDto> AddExtraCostAsync(string siparisNo, CreateExtraCostDto dto, int currentUserId);
 
-    /// <summary>Ekstra maliyet kalemini siler; tutarını sipariş toplamından düşer.</summary>
+    /// <summary>Ekstra maliyet kalemini siler; tutarını sipariş toplamından düşer.
+    /// 40+ ergonomi K5 — yumuşak silme (Silindi bayrağı).</summary>
     Task DeleteExtraCostAsync(int ekMaliyetId, int currentUserId);
+
+    /// <summary>Yumuşak silinen kalemi geri yükler; tutarını sipariş toplamına geri ekler.
+    /// Silme ile aynı aşama penceresi (Siparis/Planlama/Hazir).</summary>
+    Task<OrderExtraCostDto> RestoreExtraCostAsync(int ekMaliyetId, int currentUserId);
 }

@@ -127,7 +127,7 @@ function WaitingList({ rows, loading, error, className, onOpenOrder }: {
       {loading && Array.from({ length: 2 }).map((_, i) => (
         <li key={i} className="px-2 py-2"><div className="h-4 animate-pulse rounded bg-muted" /></li>
       ))}
-      {!loading && error && <li className="px-2 py-3 text-center text-xs text-destructive">{t('workflow.loadError')}</li>}
+      {!loading && error && <li className="px-2 py-3 text-center text-xs text-danger">{t('workflow.loadError')}</li>}
       {!loading && !error && rows.length === 0 && (
         <li className="px-2 py-3 text-center text-xs text-muted-foreground">{t('workflow.empty')}</li>
       )}

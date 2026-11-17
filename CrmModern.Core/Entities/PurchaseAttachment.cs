@@ -14,4 +14,9 @@ public sealed class PurchaseAttachment
     public byte[]   Veri                 { get; set; } = Array.Empty<byte>();
     public DateTime Tarih                { get; set; }
     public string?  YukleyenKullaniciAdi { get; set; }
+
+    // 40+ ergonomi K5 — yumuşak silme: blob korunur, işaretli ek "yok" sayılır.
+    public bool      Silindi             { get; set; }
+    public DateTime? SilinmeTarihi       { get; set; }
+    public int?      SilenKullaniciID    { get; set; }
 }

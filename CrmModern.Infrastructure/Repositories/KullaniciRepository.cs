@@ -24,10 +24,11 @@ internal sealed class KullaniciRepository(AppDbContext context)
     // §26 — Aktif kullanıcılar (Durum != 'Pasif'). Seçim/lookup/roster/arama
     // bağlamlarının merkezî kaynağı; pasif kullanıcılar hiçbir seçilebilir
     // listede görünmez. Tarihsel kayıtlar GetAllAsync ile çözülmeye devam eder.
+    // 40+ ergonomi K5 — yumuşak silinen kullanıcılar da hariç.
     public async Task<IReadOnlyList<Kullanici>> GetActiveAsync() =>
         await _dbSet
             .AsNoTracking()
-            .Where(k => k.Durum != "Pasif")
+            .Where(k => k.Durum != "Pasif" && !k.Silindi)
             .ToListAsync();
 
     public async Task<int> UpdateSifreAsync(int kullaniciID, string newSifre) =>
@@ -40,8 +41,8 @@ internal sealed class KullaniciRepository(AppDbContext context)
         var q = $"%{query}%";
         return await _context.KullaniciBilgileri
             .AsNoTracking()
-            // §26 — pasif kullanıcılar global aramada da görünmez.
-            .Where(k => k.Durum != "Pasif"
+            // §26 — pasif kullanıcılar global aramada da görünmez (K5: silinenler de).
+            .Where(k => k.Durum != "Pasif" && !k.Silindi
                      && (EF.Functions.Like(k.KullaniciAdi, q)
                      || EF.Functions.Like(k.Ad, q)
                      || EF.Functions.Like(k.Soyad, q)

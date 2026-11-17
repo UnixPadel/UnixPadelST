@@ -115,7 +115,7 @@ export function StockExitDialog({
                 Araca Yükle / Çıkış İşaretle
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {item.malAdi} · <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{item.konum}</Badge>
+                {item.malAdi} · <Badge variant="outline" className="px-1.5 py-0 text-2xs">{item.konum}</Badge>
               </p>
             </div>
           </div>
@@ -216,7 +216,7 @@ export function StockExitDialog({
                     value={kapAdedi}
                     onValueChange={(val) => { setKapAdedi(val); setError(null) }}
                     placeholder={`Örn: 1`}
-                    className="h-9 tabular-nums"
+                    className="tabular-nums"
                   />
                 </FormField>
               )}
@@ -230,7 +230,7 @@ export function StockExitDialog({
                 type="date"
                 value={tarih}
                 onChange={(e) => setTarih(e.target.value)}
-                className="h-9 text-xs"
+                className="text-xs"
               />
             </FormField>
 
@@ -239,13 +239,13 @@ export function StockExitDialog({
                 value={not}
                 onChange={(e) => setNot(e.target.value)}
                 placeholder="Plaka veya teslim notu"
-                className="h-9 text-xs"
+                className="text-xs"
               />
             </FormField>
           </div>
 
           {error && (
-            <div className="rounded-md bg-destructive/10 p-2.5 text-xs text-destructive font-medium border border-destructive/20 animate-in fade-in-50">
+            <div className="rounded-md bg-destructive/10 p-2.5 text-xs text-danger font-medium border border-destructive/20 animate-in fade-in-50">
               {error}
             </div>
           )}

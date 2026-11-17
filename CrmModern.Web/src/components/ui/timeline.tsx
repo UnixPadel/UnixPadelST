@@ -22,7 +22,7 @@ export function Timeline({ items, className }: { items: TimelineItem[]; classNam
   return (
     <ol className={cn('relative ml-2 space-y-3 border-l pl-4', className)}>
       {items.map((it) => (
-        <li key={it.key} className={cn('relative text-sm', it.muted && 'opacity-60')}>
+        <li key={it.key} className={cn('relative text-sm', it.muted && 'text-muted-foreground')}>
           <span className="absolute -left-[1.4rem] top-1 flex h-3 w-3 items-center justify-center rounded-full border-2 border-background bg-border">
             {it.icon}
           </span>

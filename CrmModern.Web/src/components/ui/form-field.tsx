@@ -43,8 +43,8 @@ export function FormField({
   } as Record<string, unknown>)
 
   const labelEl = (
-    <Label htmlFor={id} className={cn('text-xs font-medium text-field-label', layout === 'inline' && 'w-28 shrink-0 pt-2', labelClassName)}>
-      {label}{required && <span className="text-destructive" aria-hidden> *</span>}
+    <Label htmlFor={id} className={cn('text-sm font-semibold text-field-label', layout === 'inline' && 'w-32 shrink-0 pt-2', labelClassName)}>
+      {label}{required && <span className="text-danger" aria-hidden> *</span>}
     </Label>
   )
 
@@ -55,8 +55,8 @@ export function FormField({
         <div className="min-w-0 flex-1">{control}</div>
         {suffix && <span className="w-5 shrink-0 text-center text-sm text-muted-foreground">{suffix}</span>}
       </div>
-      {hint && !error && <p id={hintId} className="text-[11px] text-muted-foreground">{hint}</p>}
-      {error && <p id={errId} role="alert" className="text-xs text-destructive">{error}</p>}
+      {hint && !error && <p id={hintId} className="text-xs text-muted-foreground">{hint}</p>}
+      {error && <p id={errId} role="alert" className="text-sm font-medium text-danger">{error}</p>}
     </div>
   )
 

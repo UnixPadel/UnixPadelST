@@ -10,6 +10,7 @@ import { ToastProvider } from '@/components/ToastProvider'
 import { ConfirmProvider } from '@/components/ui/confirm-dialog'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { router } from './App'
+import { applyUiScale, getPreferences } from '@/lib/preferences'
 import './i18n/i18n'
 import './index.css'
 
@@ -21,6 +22,8 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+applyUiScale(getPreferences().uiScale)
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

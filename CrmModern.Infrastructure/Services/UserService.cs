@@ -16,12 +16,16 @@ namespace CrmModern.Infrastructure.Services;
 ///     (lazy migration). Sifre kolonu Faz 8'de varchar(255) yapıldı
 ///     (DatabaseSchemaMigrator).
 /// </summary>
-internal sealed class UserService(IUnitOfWork uow) : IUserService
+internal sealed class UserService(IUnitOfWork uow, IAuditService audit) : IUserService
 {
-    public async Task<IReadOnlyList<UserListDto>> GetAllAsync()
+    private const string AuditEntity = "Kullanici";
+
+    public async Task<IReadOnlyList<UserListDto>> GetAllAsync(bool includeDeleted = false)
     {
         var users = await uow.Kullanicilar.GetAllAsync();
         return users
+            // 40+ ergonomi K5 — silinen kullanıcılar yalnız "Silinenleri göster" ile.
+            .Where(u => includeDeleted || !u.Silindi)
             .Select(ToDto)
             .ToList()
             .AsReadOnly();
@@ -51,8 +55,13 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
 
     public async Task CreateAsync(CreateUserDto dto)
     {
-        bool exists = await uow.Kullanicilar.KullaniciAdiExistsAsync(dto.KullaniciAdi);
-        if (exists)
+        var existing = await uow.Kullanicilar.GetByKullaniciAdiAsync(dto.KullaniciAdi);
+        // 40+ ergonomi K5 — ad silinmiş bir kullanıcıya aitse yenisi açılmaz; geri yüklenmeli.
+        if (existing is { Silindi: true })
+            throw new BusinessException(
+                $"Bu kullanıcı adı silinmiş bir kullanıcıya ait: {dto.KullaniciAdi}. Silinenlerden geri yükle.",
+                "userDeletedExists", new { username = dto.KullaniciAdi });
+        if (existing is not null)
             throw new BusinessException($"Bu kullanıcı adı zaten var: {dto.KullaniciAdi}.", "usernameExists", new { username = dto.KullaniciAdi });
 
         var entity = new Kullanici
@@ -87,13 +96,38 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
         await uow.SaveChangesAsync();
     }
 
-    public async Task DeleteAsync(int kullaniciId)
+    public async Task DeleteAsync(int kullaniciId, int silenKullaniciId)
     {
         var entity = await uow.Kullanicilar.GetByIdAsync(kullaniciId)
             ?? throw new NotFoundException("Kullanici", kullaniciId);
+        if (entity.Silindi)
+            throw new NotFoundException("Kullanici", kullaniciId);
 
-        uow.Kullanicilar.Remove(entity);
+        // 40+ ergonomi K5 — yumuşak silme: satır kalır (tarihsel ad çözümlemesi),
+        // giriş ve seçim listeleri silinen kullanıcıyı dışlar.
+        entity.Silindi          = true;
+        entity.SilinmeTarihi    = DateTime.Now;
+        entity.SilenKullaniciID = silenKullaniciId;
+        uow.Kullanicilar.Update(entity);
         await uow.SaveChangesAsync();
+
+        await audit.LogAsync("Delete", AuditEntity, kullaniciId.ToString(), silenKullaniciId, entity.KullaniciAdi);
+    }
+
+    public async Task RestoreAsync(int kullaniciId, int geriYukleyenKullaniciId)
+    {
+        var entity = await uow.Kullanicilar.GetByIdAsync(kullaniciId)
+            ?? throw new NotFoundException("Kullanici", kullaniciId);
+        if (!entity.Silindi)
+            throw new BusinessException("Bu kullanıcı silinmemiş.", "userNotDeleted", new { username = entity.KullaniciAdi });
+
+        entity.Silindi          = false;
+        entity.SilinmeTarihi    = null;
+        entity.SilenKullaniciID = null;
+        uow.Kullanicilar.Update(entity);
+        await uow.SaveChangesAsync();
+
+        await audit.LogAsync("Restore", AuditEntity, kullaniciId.ToString(), geriYukleyenKullaniciId, entity.KullaniciAdi);
     }
 
     public async Task ChangePasswordAsync(int kullaniciId, string newPassword)
@@ -108,5 +142,6 @@ internal sealed class UserService(IUnitOfWork uow) : IUserService
 
     private static UserListDto ToDto(Kullanici u) => new(
         u.KullaniciID, u.KullaniciAdi, u.Ad, u.Soyad,
-        u.Email, u.Telefon, u.YetkiTuru, u.Durum);
+        u.Email, u.Telefon, u.YetkiTuru, u.Durum,
+        u.Silindi, u.SilinmeTarihi);
 }

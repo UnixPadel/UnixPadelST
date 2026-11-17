@@ -13,7 +13,7 @@ import type { CreateOrderDto } from '@/types'
  * kaydet akışı, yanlışlıkla tek tuşla sipariş oluşmaz).
  */
 export function OrderPreviewDialog({
-  open, onOpenChange, form, tabs, totals, sym, footer,
+  open, onOpenChange, form, tabs, totals, sym, footer, impact, nextStep,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
@@ -22,6 +22,9 @@ export function OrderPreviewDialog({
   totals: OrderTotals
   sym: string
   footer?: React.ReactNode
+  /** K4 — kaydetmeden önce "Ne olacak?" maddeleri. */
+  impact?: string[]
+  nextStep?: string
 }) {
   const { t } = useTranslation()
   const m = (n: number) => `${formatNumberTR(n)} ${sym}`
@@ -62,7 +65,8 @@ export function OrderPreviewDialog({
                 <span className="tabular-nums">{tb.adet} × {m(tb.kategoriFiyat)} = {m(tb.kategoriFiyat * tb.adet)}</span>
               </div>
               {tb.components.length > 0 && (
-                <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground" aria-label={t('orders.form.infoOnly')}>
+                  <li className="text-2xs font-semibold uppercase tracking-wide">{t('orders.form.infoOnly')}</li>
                   {tb.components.map((c, j) => (
                     <li key={j} className="flex justify-between gap-4">
                       <span>• {c.bilesenAdi}{c.oznitelikSecili ? ` (${c.oznitelikSecili})` : ''}</span>
@@ -128,7 +132,17 @@ export function OrderPreviewDialog({
           </section>
         )}
 
-        {footer && <DialogFooter className="gap-2 border-t pt-3">{footer}</DialogFooter>}
+        {(!!impact?.length || nextStep) && (
+          <section className="rounded-md border bg-muted p-3 text-sm">
+            <p className="font-semibold">{t('confirm.impactTitle')}</p>
+            {!!impact?.length && (
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">{impact.map((x, i) => <li key={i}>{x}</li>)}</ul>
+            )}
+            {nextStep && <p className="mt-2"><span className="font-semibold">{t('confirm.nextStep')}:</span> {nextStep}</p>}
+          </section>
+        )}
+
+        {footer && <DialogFooter className="flex-wrap gap-2 border-t pt-3">{footer}</DialogFooter>}
       </DialogContent>
     </Dialog>
   )

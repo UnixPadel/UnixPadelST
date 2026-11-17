@@ -23,6 +23,12 @@ public sealed class Musteri
     /// </summary>
     public int? CreatedByKullaniciID { get; set; }
 
+    // 40+ ergonomi K5 — yumuşak silme: silinen müşteri liste/arama/seçimlerde görünmez,
+    // geri yüklenebilir; id ile tekil okuma (detay/bakiye) çalışmaya devam eder.
+    public bool      Silindi          { get; set; }
+    public DateTime? SilinmeTarihi    { get; set; }
+    public int?      SilenKullaniciID { get; set; }
+
     // Navigation property
     public Ulke? Ulke { get; set; }
 }

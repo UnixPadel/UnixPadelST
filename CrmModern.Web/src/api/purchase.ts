@@ -146,6 +146,11 @@ export const deletePurchaseAttachment = async (talepId: number): Promise<void> =
   await api.delete(`/api/purchase/${talepId}/attachment`)
 }
 
+/** K5 — silinen talep ekini geri yükler. */
+export const restorePurchaseAttachment = async (talepId: number): Promise<void> => {
+  await api.post(`/api/purchase/${talepId}/attachment/restore`)
+}
+
 export interface SetPaymentDetailsRequest {
   odemeTuru: string
   odenenTutar?: number

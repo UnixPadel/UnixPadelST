@@ -50,9 +50,10 @@ internal sealed class WorkflowService(IUnitOfWork uow) : IWorkflowService
             return new OrderWorkflowStatusDto(order.SiparisNo, order.SiparisMiTeklifMi, null, null, null);
 
         var since = await LoadApprovalDatesAsync([order], step);
+        var next = OrderWorkflow.NextStep(order);
         return new OrderWorkflowStatusDto(
             order.SiparisNo, order.SiparisMiTeklifMi, step.Code, step.Department,
-            WaitingSince(order, step, since));
+            WaitingSince(order, step, since), next?.Code, next?.Department);
     }
 
     private async Task<IReadOnlyDictionary<string, DateTime?>> LoadApprovalDatesAsync(

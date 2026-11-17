@@ -45,6 +45,11 @@ export const deleteExtraCost = async (ekMaliyetId: number): Promise<void> => {
   await api.delete(`/api/accounting/extra-costs/${ekMaliyetId}`)
 }
 
+/** K5 — silinen ek maliyeti geri yükler. */
+export const restoreExtraCost = async (ekMaliyetId: number): Promise<void> => {
+  await api.post(`/api/accounting/extra-costs/${ekMaliyetId}/restore`)
+}
+
 export const getTransactions = async (): Promise<AccountingTransactionDto[]> => {
   const res = await api.get<ApiResponse<AccountingTransactionDto[]>>('/api/accounting/transactions')
   return res.data.data

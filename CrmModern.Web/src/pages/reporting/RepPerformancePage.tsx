@@ -168,7 +168,7 @@ export function RepPerformancePage() {
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />{t('common.loading')}
           </CardContent></Card>
         ) : detailError || !detail ? (
-          <Card><CardContent className="py-10 text-center text-destructive text-sm">
+          <Card><CardContent className="py-10 text-center text-danger text-sm">
             {t('reporting.detail.loadError')}
           </CardContent></Card>
         ) : (
@@ -279,7 +279,6 @@ export function RepPerformancePage() {
           data={reps as (RepPerformance & Record<string, unknown>)[]}
           keyField="kullaniciID"
           loading={isLoading}
-          density="compact"
           emptyMessage={t('reporting.empty')}
         />
 

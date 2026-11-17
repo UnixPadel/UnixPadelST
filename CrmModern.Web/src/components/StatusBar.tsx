@@ -15,7 +15,7 @@ const ICON: Record<ToastVariant, React.ReactNode> = {
   default: <Info className="h-3.5 w-3.5 text-info" />,
   success: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
   warning: <AlertTriangle className="h-3.5 w-3.5 text-warning" />,
-  destructive: <XCircle className="h-3.5 w-3.5 text-destructive" />,
+  destructive: <XCircle className="h-3.5 w-3.5 text-danger" />,
 }
 
 export interface ShortcutHint { keys: string; label: string }
@@ -53,20 +53,32 @@ export function StatusBar({ onShowHelp }: { onShowHelp: () => void }) {
 
   const last: LoggedMessage | undefined = messages[0]
   const errors = messages.filter((m) => m.variant === 'destructive').length
+  // K6 — başarı mesajları artık açılır pencere değil; yeni mesaj 6 sn vurgulanır ki fark edilsin.
+  const [fresh, setFresh] = useState(false)
+  useEffect(() => {
+    if (!last) return
+    setFresh(true)
+    const h = setTimeout(() => setFresh(false), 6000)
+    return () => clearTimeout(h)
+  }, [last?.id])
 
   return (
-    <footer className="flex h-7 shrink-0 items-center gap-3 border-t bg-muted/40 px-3 text-[11px] text-muted-foreground">
+    <footer className="flex min-h-ctl-xs shrink-0 items-center gap-3 border-t bg-muted px-3 text-xs text-foreground">
+      {/* K6 — durum çubuğu mesajları ekran okuyucuya da duyurulur. */}
+      <span className="sr-only" aria-live="polite">{last && last.variant !== 'destructive' ? last.title : ''}</span>
       <button
         ref={btn}
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex min-w-0 items-center gap-1.5 rounded px-1 hover:bg-accent hover:text-foreground"
+        className={cn('flex min-h-ctl-xs min-w-0 items-center gap-1.5 rounded px-1.5 transition-colors hover:bg-accent',
+          fresh && last?.variant === 'success' && 'bg-success-soft font-semibold text-success-soft-foreground',
+          fresh && last?.variant === 'destructive' && 'bg-danger-soft font-semibold text-danger-soft-foreground')}
         aria-label={t('statusBar.messages')}
         aria-haspopup="dialog"
         aria-expanded={open}
       >
         {last ? ICON[last.variant] : <MessageSquare className="h-3.5 w-3.5" />}
-        <span className={cn('truncate', last?.variant === 'destructive' && 'text-destructive')}>
+        <span className={cn('truncate', last?.variant === 'destructive' && 'text-danger')}>
           {last ? `${last.at.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${last.title}${last.description ? ` — ${last.description}` : ''}` : t('statusBar.ready')}
         </span>
         {messages.length > 0 && (
@@ -101,7 +113,7 @@ export function StatusBar({ onShowHelp }: { onShowHelp: () => void }) {
         <div className="ml-auto hidden min-w-0 items-center gap-3 overflow-hidden md:flex">
           {[...hints, { keys: 'Ctrl+K', label: t('shortcuts.palette') }, { keys: 'F1', label: t('shortcuts.help') }].map((h) => (
             <span key={h.keys + h.label} className="flex shrink-0 items-center gap-1">
-              <kbd className="rounded border bg-background px-1 font-mono text-[10px]">{h.keys}</kbd>
+              <kbd className="rounded border bg-background px-1 font-mono text-2xs">{h.keys}</kbd>
               {h.label}
             </span>
           ))}
@@ -110,11 +122,10 @@ export function StatusBar({ onShowHelp }: { onShowHelp: () => void }) {
       <button
         type="button"
         onClick={() => (prefs.showShortcutHints ? onShowHelp() : setPreferences({ showShortcutHints: true }))}
-        className={cn('flex items-center gap-1 rounded px-1 hover:bg-accent hover:text-foreground', !prefs.showShortcutHints && 'ml-auto')}
-        title={t('shortcuts.help')}
-        aria-label={t('shortcuts.help')}
+        className={cn('flex min-h-ctl-xs items-center gap-1.5 rounded px-1.5 hover:bg-accent', !prefs.showShortcutHints && 'ml-auto')}
+        title="F1"
       >
-        <Keyboard className="h-3.5 w-3.5" />
+        <Keyboard className="h-4 w-4" aria-hidden /> {t('shortcuts.help')}
       </button>
     </footer>
   )

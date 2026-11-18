@@ -50,7 +50,7 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
         return Ok(ApiResponse<IReadOnlyList<PurchaseRequestListDto>>.Ok(result));
     }
 
-    /// <summary>SatinAlmaTumTalepForm portu — yetki: elshan veya Yonetici/Gozlemci.</summary>
+    /// <summary>SatinAlmaTumTalepForm portu — yetki: elshan veya Yonetici/Gozlemci/Muhasebe.</summary>
     [HttpGet("all")]
     public async Task<IActionResult> GetAll([FromQuery] PurchaseRequestFilterDto filter)
     {

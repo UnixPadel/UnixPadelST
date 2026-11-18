@@ -22,5 +22,6 @@ public static class ClaimsPrincipalExtensions
     public static bool CanSeeAllPurchaseRequests(this ClaimsPrincipal user) =>
         user.FindFirstValue(ClaimTypes.Name) == AllPurchasesUser
         || user.IsInRole("Yonetici")
-        || user.IsInRole("Gozlemci");
+        || user.IsInRole("Gozlemci")
+        || user.IsInRole("Muhasebe");
 }

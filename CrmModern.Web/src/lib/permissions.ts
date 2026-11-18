@@ -32,7 +32,7 @@ export function isAccountingApprover(
 export function canSeeAllPurchaseRequests(
   user: { yetkiTuru?: string | null; kullaniciAdi?: string | null } | null | undefined,
 ): boolean {
-  return user?.yetkiTuru === 'Yonetici' || user?.yetkiTuru === 'Gozlemci' || user?.kullaniciAdi === 'elshan.rasulov'
+  return ['Yonetici', 'Gozlemci', 'Muhasebe'].includes(user?.yetkiTuru ?? '') || user?.kullaniciAdi === 'elshan.rasulov'
 }
 
 // Muhasebe Klasörü — backend OrderController.CanManageFolder ile aynı küme.

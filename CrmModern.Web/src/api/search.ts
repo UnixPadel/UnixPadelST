@@ -1,20 +1,19 @@
 import api from '@/lib/axios'
-import type { ApiResponse, SearchResultDto, UnifiedSearchResult } from '@/types'
+import type { ApiResponse, OrderSearchResult, UnifiedSearchResult } from '@/types'
 
-export interface SearchParams {
-  siparisNo?: string
-  musteriAd?: string
-  kullaniciID?: number
-  ulke?: string
+export interface OrderSearchParams {
+  q?: string
+  tur?: string
   asama?: string
   kontrol?: string
-  odemeDurum?: string
+  ulke?: string
   baslangic?: string
   bitis?: string
 }
 
-export const searchOrders = async (params: SearchParams): Promise<SearchResultDto[]> => {
-  const res = await api.get<ApiResponse<SearchResultDto[]>>('/api/search', { params })
+/** Tek kutudan sipariş ve teklif araması (Sipariş Ara ekranı). */
+export const findOrders = async (params: OrderSearchParams, signal?: AbortSignal): Promise<OrderSearchResult> => {
+  const res = await api.get<ApiResponse<OrderSearchResult>>('/api/search/orders', { params, signal })
   return res.data.data
 }
 

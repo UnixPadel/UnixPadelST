@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Search;
@@ -13,12 +14,50 @@ namespace CrmModern.API.Controllers;
 [Authorize]
 public sealed class SearchController(ISearchService searchService) : ControllerBase
 {
+    private const string ControlUser = "elshan.rasulov";
+
+    // Round-11 §3 — ad bazlı parasal gizleme (bkz. OrderController, web lib/visibility.ts).
+    private static readonly string[] HideMoneyUsers = { "omur.caliskan" };
+
     private string CurrentRole =>
         User.FindFirstValue(ClaimTypes.Role) ?? "Temsilci";
+
+    private string? CurrentUserName => User.FindFirstValue(ClaimTypes.Name);
 
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("KullaniciID claim missing."));
+
+    /// <summary>Satış Temsilcisi yalnız kendi kayıtlarını arar (WorkflowController kuralı).</summary>
+    private int? OwnOrdersOnly =>
+        User.IsInRole("Temsilci") && CurrentUserName != ControlUser && !User.IsSuperAdmin()
+            ? CurrentUserId
+            : null;
+
+    private bool HidesMoney =>
+        User.IsInRole("Fabrika") || (CurrentUserName is not null && HideMoneyUsers.Contains(CurrentUserName));
+
+    /// <summary>
+    /// Tek kutudan sipariş ve teklif araması. Sonuç, siparişin beklediği adımı taşır.
+    /// Para görmeyen kullanıcıda tutar alanları boş döner ve tutarla eşleşme yapılmaz.
+    /// </summary>
+    [HttpGet("orders")]
+    [ProducesResponseType(typeof(ApiResponse<OrderSearchResultDto>), StatusCodes.Status200OK)]
+    public async Task<IActionResult> FindOrders(
+        [FromQuery] string?   q         = null,
+        [FromQuery] string?   tur       = null,
+        [FromQuery] string?   asama     = null,
+        [FromQuery] string?   kontrol   = null,
+        [FromQuery] string?   ulke      = null,
+        [FromQuery] DateTime? baslangic = null,
+        [FromQuery] DateTime? bitis     = null)
+    {
+        var result = await searchService.FindOrdersAsync(new OrderSearchRequest(
+            q, tur, asama, kontrol, ulke, baslangic, bitis,
+            OnlyKullaniciId: OwnOrdersOnly,
+            CanSeeMoney: !HidesMoney));
+        return Ok(ApiResponse<OrderSearchResultDto>.Ok(result));
+    }
 
     /// <summary>
     /// Searches orders/quotes with optional filters.
@@ -40,8 +79,8 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
     {
         // PROMPT-v2 §6: Temsilci yalnız kendi siparişlerini arar — istemci
         // kullaniciID gönderse bile kendi id'sine zorlanır.
-        if (User.IsInRole("Temsilci"))
-            kullaniciID = CurrentUserId;
+        if (OwnOrdersOnly is int ownId)
+            kullaniciID = ownId;
 
         var filter = new SearchFilterDto(
             siparisNo, musteriAd, kullaniciID, ulke,
@@ -49,9 +88,9 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
 
         var result = await searchService.SearchAsync(filter);
 
-        // PROMPT-v5 §2: Fabrika arama sonuçlarında sipariş parası göremez
-        // (ToplamFiyat/Kaparo/KalanBakiye/OdenenMiktar karartılır).
-        if (User.IsInRole("Fabrika"))
+        // PROMPT-v5 §2 + Round-11 §3: para görmeyen kullanıcı arama sonuçlarında
+        // ToplamFiyat/Kaparo/KalanBakiye/OdenenMiktar göremez.
+        if (HidesMoney)
             result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
 
         return Ok(ApiResponse<IReadOnlyList<SearchResultDto>>.Ok(result));
@@ -65,12 +104,13 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
     [ProducesResponseType(typeof(ApiResponse<UnifiedSearchResultDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UnifiedSearch([FromQuery] string q)
     {
-        // PROMPT-v2 §6/§7: Temsilci için kullanıcı id'sini geçiriyoruz; servis
-        // sipariş + müşteri sonuçlarını rol bazında kısıtlar.
+        // PROMPT-v2 §6/§7: kısıtlı kullanıcının id'sini geçiriyoruz; servis sipariş +
+        // müşteri sonuçlarını buna göre daraltır.
         var result = await searchService.UnifiedSearchAsync(
             q ?? string.Empty,
             CurrentRole,
-            User.IsInRole("Temsilci") ? CurrentUserId : null);
+            OwnOrdersOnly,
+            !HidesMoney);
         return Ok(ApiResponse<UnifiedSearchResultDto>.Ok(result));
     }
 }

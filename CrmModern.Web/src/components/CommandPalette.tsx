@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { Search, Loader2, Clock, CornerDownLeft, FileSearch, FilePlus2, PencilLine, Copy } from 'lucide-react'
+import { Search, Loader2, Clock, CornerDownLeft, FileSearch, FilePlus2, PencilLine, Copy, ListFilter } from 'lucide-react'
 import { unifiedSearch } from '@/api/search'
+import { OrderStatusBadge } from '@/components/order/OrderStatusBadge'
+import { StatusBadge } from '@/components/StatusBadge'
 import { useAuth } from '@/hooks/useAuth'
 import { visibleNavItems, type NavItem } from '@/lib/navigation'
 import { readJSON, userKey, writeJSON } from '@/lib/storage'
+import { stepLabelKey } from '@/lib/workflow'
 import { trLower } from '@/components/ui/combobox'
 import { cn } from '@/lib/utils'
-import type { UnifiedSearchHit } from '@/types'
+import type { OrderHitSummary, UnifiedSearchHit } from '@/types'
 
 /**
  * E-1 — Komut Paleti (Ctrl+K). GlobalSearch'ün yerini alır:
  *  • Kayıt araması (sipariş, müşteri, bileşen…) — 300 ms debounce, önceki istek iptal.
+ *    Sipariş satırı tür, aşama ve bekleyen adımı gösterir; seçince Sipariş Ara açılır.
  *  • SAP işlem kodu mantığı: "YS" → Yeni Sipariş, "KK" → Kontrol … (menüdeki kodlar).
  *  • Belge komutları: "SP 2025-0123" sipariş detayını açar, "RV …" revize, "KP …"
  *    kopyala-ile-yeni. Kod ezberi zorunlu değil — ekran adıyla da bulunur.
@@ -22,9 +26,35 @@ type PaletteItem =
   | { kind: 'nav'; id: string; item: NavItem }
   | { kind: 'doc'; id: string; cmd: 'SP' | 'RV' | 'KP'; no: string }
   | { kind: 'hit'; id: string; hit: UnifiedSearchHit; recent?: boolean }
+  | { kind: 'all'; id: string; count: number }
 
 const RECENT_KEY = 'globalSearchRecent'
 const DOC_RE = /^(sp|rv|kp)\s+(\S+)$/i
+const ORDER_CATEGORY = 'Sipariş'
+const CUSTOMER_CATEGORY = 'Müşteri'
+
+const searchUrl = (q: string, sel?: string) =>
+  `/search?f.q=${encodeURIComponent(q)}${sel ? `&sel=${encodeURIComponent(sel)}` : ''}`
+
+/** Tarayıcıda kayıtlı eski "son aradıkların" adresleri artık olmayan sayfalara gidiyordu. */
+function hitUrl(hit: UnifiedSearchHit): string {
+  if (hit.kategori === ORDER_CATEGORY && hit.navigateUrl.startsWith('/orders/')) return searchUrl(hit.id, hit.id)
+  if (hit.kategori === CUSTOMER_CATEGORY && hit.navigateUrl.startsWith('/customers/')) return searchUrl(hit.baslik)
+  return hit.navigateUrl
+}
+
+function OrderHitLine({ order }: { order: OrderHitSummary }) {
+  const { t } = useTranslation()
+  return (
+    <span className="flex min-w-0 items-center gap-1.5">
+      <StatusBadge value={order.tur} context="stage" className="shrink-0" />
+      <OrderStatusBadge order={order} className="shrink-0" />
+      {order.stepCode && !order.silindi && (
+        <span className="truncate text-xs text-muted-foreground">{t(stepLabelKey(order.stepCode))}</span>
+      )}
+    </span>
+  )
+}
 
 export function CommandPalette() {
   const { t } = useTranslation()
@@ -39,6 +69,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [hits, setHits] = useState<UnifiedSearchHit[]>([])
+  const [orderTotal, setOrderTotal] = useState(0)
   const [active, setActive] = useState(0)
   const recentKey = userKey(RECENT_KEY)
   const [recents, setRecents] = useState<UnifiedSearchHit[]>(() => readJSON(recentKey, readJSON(RECENT_KEY, [])))
@@ -64,15 +95,16 @@ export function CommandPalette() {
   // Debounced + iptal edilebilir kayıt araması
   useEffect(() => {
     const q = query.trim()
-    if (q.length < 2 || DOC_RE.test(q) || /^>/.test(q)) { setHits([]); setLoading(false); return }
+    if (q.length < 2 || DOC_RE.test(q) || /^>/.test(q)) { setHits([]); setOrderTotal(0); setLoading(false); return }
     setLoading(true)
     const ctrl = new AbortController()
     const h = setTimeout(async () => {
       try {
         const result = await unifiedSearch(q, ctrl.signal)
         setHits(result.sonuclar)
+        setOrderTotal(result.siparisToplam ?? 0)
       } catch {
-        if (!ctrl.signal.aborted) setHits([])
+        if (!ctrl.signal.aborted) { setHits([]); setOrderTotal(0) }
       } finally {
         if (!ctrl.signal.aborted) setLoading(false)
       }
@@ -98,28 +130,35 @@ export function CommandPalette() {
     if (!q) {
       recents.forEach((h) => out.push({ kind: 'hit', id: `r-${h.kategori}-${h.id}`, hit: h, recent: true }))
     } else {
-      hits.forEach((h) => out.push({ kind: 'hit', id: `h-${h.kategori}-${h.id}`, hit: h }))
+      const lastOrder = hits.map((h) => h.kategori).lastIndexOf(ORDER_CATEGORY)
+      hits.forEach((h, i) => {
+        out.push({ kind: 'hit', id: `h-${h.kategori}-${h.id}`, hit: h })
+        if (i === lastOrder) out.push({ kind: 'all', id: 'all-orders', count: orderTotal })
+      })
     }
     return out
-  }, [query, navItems, hits, recents, t, canCreate])
+  }, [query, navItems, hits, orderTotal, recents, t, canCreate])
 
   useEffect(() => { setActive(0) }, [query, hits.length])
 
-  const close = () => { setOpen(false); setQuery(''); setHits([]) }
+  const close = () => { setOpen(false); setQuery(''); setHits([]); setOrderTotal(0) }
 
   const run = (it: PaletteItem | undefined) => {
     if (!it) return
     if (it.kind === 'nav') navigate(it.item.path)
+    else if (it.kind === 'all') navigate(searchUrl(query.trim()))
     else if (it.kind === 'doc') {
       if (it.cmd === 'SP') setParams((p) => { const np = new URLSearchParams(p); np.set('order', it.no); return np })
       else if (it.cmd === 'RV') navigate(`/orders/new?revise=${encodeURIComponent(it.no)}`)
       else navigate(`/orders/new?copyFrom=${encodeURIComponent(it.no)}`)
     } else {
       const h = it.hit
-      const next = [h, ...recents.filter((r) => !(r.kategori === h.kategori && r.id === h.id))].slice(0, 6)
+      // Aşama bilgisi eskir; son aradıklarında saklanmaz.
+      const saved: UnifiedSearchHit = { ...h, siparis: undefined }
+      const next = [saved, ...recents.filter((r) => !(r.kategori === h.kategori && r.id === h.id))].slice(0, 6)
       setRecents(next)
       writeJSON(recentKey, next)
-      navigate(h.navigateUrl)
+      navigate(hitUrl(h))
     }
     close()
   }
@@ -127,8 +166,12 @@ export function CommandPalette() {
   const clearRecents = () => { setRecents([]); writeJSON(recentKey, []) }
 
   // Gruplu görünüm için başlıklar
-  const section = (it: PaletteItem) =>
-    it.kind === 'nav' ? t('palette.screens') : it.kind === 'doc' ? t('palette.commands') : it.recent ? t('palette.recent') : it.hit.kategori
+  const section = (it: PaletteItem) => {
+    if (it.kind === 'nav') return t('palette.screens')
+    if (it.kind === 'doc') return t('palette.commands')
+    if (it.kind === 'all') return ORDER_CATEGORY
+    return it.recent ? t('palette.recent') : it.hit.kategori
+  }
 
   return (
     // min-w-0 flex-1: dar ekranda arama kutusu daralır, üst çubuk iki satıra bölünmez.
@@ -217,12 +260,22 @@ export function CommandPalette() {
                           <span className="flex-1 truncate text-sm">{t(`palette.doc.${it.cmd}`, { no: it.no })}</span>
                         </>
                       )}
+                      {it.kind === 'all' && (
+                        <>
+                          <ListFilter className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                          <span className="flex-1 truncate text-sm font-medium text-primary">{t('palette.seeAll', { count: it.count })}</span>
+                        </>
+                      )}
                       {it.kind === 'hit' && (
                         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                           <span className="truncate text-sm font-medium">{it.hit.baslik}</span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {it.recent ? it.hit.kategori : ''}{it.recent && it.hit.altMetin ? ' • ' : ''}{it.hit.altMetin ?? ''}
-                          </span>
+                          {it.hit.siparis && !it.recent
+                            ? <OrderHitLine order={it.hit.siparis} />
+                            : (
+                              <span className="truncate text-xs text-muted-foreground">
+                                {it.recent ? it.hit.kategori : ''}{it.recent && it.hit.altMetin ? ' • ' : ''}{it.hit.altMetin ?? ''}
+                              </span>
+                            )}
                         </span>
                       )}
                       {i === active && <CornerDownLeft className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}

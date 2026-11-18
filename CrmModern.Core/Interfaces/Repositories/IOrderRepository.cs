@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
+using CrmModern.Core.Search;
 
 namespace CrmModern.Core.Interfaces.Repositories;
 
@@ -142,6 +143,15 @@ public interface IOrderRepository : IBaseRepository<Order>
     /// En yeni N sipariş döner.
     /// </summary>
     Task<IReadOnlyList<Order>> QuickFindAsync(string query, int limit);
+
+    /// <summary>
+    /// Sipariş araması için hafif satırlar (dosya ve not kolonları okunmaz), en yeni önce.
+    /// <paramref name="kullaniciID"/> doluysa yalnız o kullanıcının kayıtları.
+    /// </summary>
+    Task<IReadOnlyList<Order>> GetSearchRowsAsync(int? kullaniciID);
+
+    /// <summary>Aranabilir kalem adları (kategori, bileşen, serbest ad, öznitelik).</summary>
+    Task<IReadOnlyList<OrderSearchItemName>> GetSearchItemNamesAsync(int? kullaniciID);
 
     // ── Dashboard (Faz 7) ─────────────────────────────────────────────────────
 

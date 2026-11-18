@@ -11,6 +11,30 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '1.1.3',
+    tarih:    '2026-11-18',
+    baslik: {
+      tr: 'Daha sıkı sipariş erişimi, çalışan arama sonuçları ve tamamlanan İngilizce arayüz',
+      en: 'Tighter order access, working search results and a complete English interface',
+    },
+    maddeler: {
+      tr: [
+        'Satış temsilcileri yalnız kendi siparişlerini açıp değiştirebilir. Fabrika ve tutar görmeyen kullanıcılar sipariş, rapor ve geçmiş ekranlarından tutar almaz.',
+        'Üstteki aramada kullanıcı ve satın alma sonuçları ilgili ekranı açar. Açılacak ekranı olmayan bileşen ve kategori sonuçları kalktı; ürün adlarıyla sipariş aramaya devam edebilirsin.',
+        'Muhasebe, Tüm Talepler listesini görebilir. Siparişlerim’de red notu doğru görünür.',
+        'İngilizce arayüz tamamlandı: Antrepo, Sistem Ayarları ve sipariş kapanışı çevrildi. Tarih, sayı ve para biçimi seçili dile uyar; İngilizcede “1,234.56” doğru okunur.',
+        'İngilizce proformada “Installments” yerine “Deferred Payment”, “Assembly” yerine “Installation” yazar.',
+      ],
+      en: [
+        'Sales reps can open and change only their own orders. Factory users and users who can’t see amounts no longer receive amounts from order, report and history screens.',
+        'In the top search, user and purchase results open the right screen. Part and category results, which had no screen, are gone; you can still find orders by product name.',
+        'Accounting can see the All Requests list. The rejection note now shows correctly in My Orders.',
+        'The English interface is complete: Bonded Warehouse, System Settings and order closing are translated. Dates, numbers and money follow the selected language, and “1,234.56” is read correctly in English.',
+        'The English proforma now says “Deferred Payment” instead of “Installments” and “Installation” instead of “Assembly”.',
+      ],
+    },
+  },
+  {
     versiyon: '1.1.2',
     tarih:    '2026-11-18',
     baslik: {

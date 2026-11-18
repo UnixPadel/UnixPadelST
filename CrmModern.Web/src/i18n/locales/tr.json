@@ -143,7 +143,7 @@
     "addCountry": "Ülke Ekle",
     "addCountryTitle": "Yeni Ülke",
     "deleteTitle": "Müşteriyi Sil",
-    "deleteConfirm": "\"{{name}}\" silinsin mi? Bu geri alınamaz.",
+    "deleteConfirm": "\"{{name}}\" silinsin mi? Hemen ardından geri alabilirsin.",
     "fields": {
       "musteriAd": "Müşteri adı",
       "telefon": "Telefon",
@@ -175,7 +175,7 @@
     "zoomOut": "Küçült",
     "zoomReset": "%100'e dön",
     "search": "Ara…",
-    "searchMinChars": "En az 2 harf yaz…",
+    "searchMinChars": "En az 2 karakter yaz…",
     "view": "Görünüm",
     "viewRahat": "Rahat",
     "viewStandart": "Standart",
@@ -490,7 +490,7 @@
     },
     "confirm": {
       "currencyTitle": "Döviz değişsin mi?",
-      "currencyDesc": "Girdiğin tüm fiyatlar güncel kurla {{from}}'dan {{to}}'ya çevrilecek.",
+      "currencyDesc": "Girdiğin tüm fiyatlar güncel kurla çevrilecek: {{from}} → {{to}}.",
       "currencyOk": "Çevir",
       "customerTitle": "Müşteri bilgileri değişsin mi?",
       "customerDesc": "Müşteri bölümündeki iletişim bilgileri \"{{name}}\" kaydıyla değişecek.",
@@ -517,7 +517,8 @@
   },
   "qc": {
     "title": "Sipariş Kontrolü",
-    "pendingCount": "{{count}} sipariş bekliyor",
+    "pendingCount_one": "{{count}} sipariş bekliyor",
+    "pendingCount_other": "{{count}} sipariş bekliyor",
     "onlyApproved": "Yalnız onaylananlar",
     "approved": "Onaylandı.",
     "approveFailed": "Onaylanamadı",
@@ -663,13 +664,13 @@
     "impact": {
       "approve": "Sipariş onaylanır ve Kontrol listesinden çıkar.",
       "note": "Onay notu kaydedilir: \"{{note}}\"",
-      "reject": "Sipariş reddedilir ve düzeltmesi için satış temsilcisine döner; red sebebini temsilci görür."
+      "reject": "Sipariş reddedilir ve düzeltmesi için satış temsilcisine döner; red sebebini satış temsilcisi görür."
     },
     "panel": "Sipariş ve karar",
     "selectHint": "Soldaki listeden bir sipariş seç.",
     "searchPrompt": "Aramak için alanları doldur ve Ara'ya bas.",
     "noApproved": "Son 30 günde onaylanan sipariş yok.",
-    "cariNewAmount": "Yeni ödenen tutar",
+    "cariNewAmount": "Yeni toplam ödenen",
     "listTabs": {
       "label": "Listeler",
       "pending": "Kontrol bekleyen",
@@ -711,7 +712,7 @@
     "placeholder": "Müşteri, no, tutar, telefon, ürün…",
     "queryLabel": "Ara",
     "noResults": "Sonuç yok. Başka bir kelime dene.",
-    "startHint": "Aramak için en az 2 harf yaz.",
+    "startHint": "Aramak için en az 2 karakter yaz.",
     "startPanel": "Müşteri adı, sipariş no, tutar, telefon veya ürün yaz.",
     "truncated": "İlk {{shown}} sonuç gösteriliyor ({{total}} bulundu). Aramayı daralt.",
     "panel": "Kayıt özeti",
@@ -834,7 +835,7 @@
       "action": "Tahsilatı sil",
       "title": "Tahsilat silinsin mi? — {{no}}",
       "preview": "Kalan bakiye: {{once}} → {{sonra}}",
-      "hint": "Tahsilat toplamlardan ve kalan bakiyeden düşer; kayıt listede üstü çizili ve \"Silindi\" etiketiyle kalır.",
+      "hint": "Tahsilat toplamlardan çıkar, kalan bakiye bu tutar kadar artar; kayıt listede üstü çizili ve \"Silindi\" etiketiyle kalır.",
       "dismiss": "Vazgeç",
       "confirm": "Tahsilatı sil",
       "done": "Tahsilat silindi, bakiye güncellendi.",
@@ -867,7 +868,7 @@
       "pesinatSaved": "Peşinat kaydedildi, bakiye güncellendi."
     },
     "shortcut": {
-      "form": "Siparişi aç"
+      "form": "Siparişi Aç"
     },
     "panel": "Karar paneli",
     "completeDirect": "Siparişi Tamamla (ara adımları atla)",
@@ -1095,7 +1096,8 @@
     "title": "Lojistik · Nakliye Teklifleri",
     "queueEmpty": "Nakliye teklifi bekleyen sipariş yok.",
     "noApproved": "Onaylanan teklif yok",
-    "count": "{{n}} teklif",
+    "count_one": "{{count}} teklif",
+    "count_other": "{{count}} teklif",
     "addTitle": "Yeni nakliye teklifi",
     "approvedTitle": "Onaylanan nakliye teklifi",
     "sendOffer": "Teklif Gönder",
@@ -1238,7 +1240,8 @@
       "enAzBir": "En az bir kalemi eksiksiz gir.",
       "birimOtherName": "Birim adı"
     },
-    "summarySuffix": "+{{count}} kalem",
+    "summarySuffix_one": "+{{count}} kalem",
+    "summarySuffix_other": "+{{count}} kalem",
     "approvalFlowNote": "Talep Bekliyor olarak kaydedilir ve onaya gider.",
     "actionCol": "İşlem",
     "overrideApprove": "Onayla",
@@ -1412,7 +1415,8 @@
   },
   "folder": {
     "button": "Muhasebe Klasörü",
-    "buttonWithCount": "Muhasebe Klasörü · {{count}} dosya",
+    "buttonWithCount_one": "Muhasebe Klasörü · {{count}} dosya",
+    "buttonWithCount_other": "Muhasebe Klasörü · {{count}} dosya",
     "buttonEmpty": "Muhasebe Klasörü · dosya yok",
     "titleWithNo": "Muhasebe Klasörü — {{no}}",
     "column": "Klasör",
@@ -1438,7 +1442,8 @@
     "deleteTitle": "“{{name}}” silinsin mi?",
     "deleteDesc": "Dosya klasörden kalıcı olarak silinir. Bu işlem geri alınamaz.",
     "deleted": "Dosya silindi.",
-    "uploaded": "{{count}} dosya eklendi.",
+    "uploaded_one": "{{count}} dosya eklendi.",
+    "uploaded_other": "{{count}} dosya eklendi.",
     "uploading": "Yükleniyor",
     "uploadFailed": "Yüklenemedi.",
     "tooBig": "25 MB'tan büyük.",
@@ -1507,7 +1512,12 @@
     "montajQty": "Montaj (adet: {{adet}})",
     "teslimatQty": "Teslimat (adet: {{adet}})",
     "extraCosts_one": "Ek maliyet ({{count}})",
-    "extraCosts_other": "Ek maliyetler ({{count}})"
+    "extraCosts_other": "Ek maliyetler ({{count}})",
+    "closedTitle": "Bu sipariş tamamlandı olarak kapatıldı",
+    "closedFromStage": "{{stage}} aşamasından doğrudan kapatıldı",
+    "closedBy": "Kapatan",
+    "closedOn": "Kapanış tarihi",
+    "authorizedUser": "Yetkili"
   },
   "approval": {
     "preTitle": "Onay · Ön Onay",
@@ -1537,7 +1547,9 @@
     "movedToLogistics": "Lojistiğe geçti",
     "completed": "Tamamlandı",
     "planning": "Planlamada",
-    "noHistoryNote": "Aşama değişikliklerinin tamamı kaydedilmiyor; yalnız son işlem tarihi görünür."
+    "noHistoryNote": "Aşama değişikliklerinin tamamı kaydedilmiyor; yalnız son işlem tarihi görünür.",
+    "completedBy": "{{name}} tarafından tamamlandı",
+    "completedByOn": "{{name}} tarafından tamamlandı ({{date}})"
   },
   "status": {
     "stage": {
@@ -1653,7 +1665,8 @@
   },
   "lookup": {
     "searchPlaceholder": "Ad, ülke, vergi no veya telefonla ara",
-    "hint": "{{count}} sonuç · ↑↓ gez · Enter seç · Esc kapat"
+    "hint_one": "{{count}} sonuç · ↑↓ gez · Enter seç · Esc kapat",
+    "hint_other": "{{count}} sonuç · ↑↓ gez · Enter seç · Esc kapat"
   },
   "palette": {
     "title": "Hızlı Erişim",
@@ -1672,6 +1685,14 @@
       "SP": "{{no}} siparişini aç",
       "RV": "{{no}} siparişini revize et",
       "KP": "{{no}} siparişini kopyalayıp yeni oluştur"
+    },
+    "categories": {
+      "order": "Sipariş",
+      "customer": "Müşteri",
+      "part": "Parça",
+      "category": "Kategori",
+      "user": "Kullanıcı",
+      "purchase": "Satın alma talebi"
     }
   },
   "statusBar": {
@@ -1724,7 +1745,7 @@
       "pending": "Bekliyor",
       "accountingApproved": "Muhasebe onayladı",
       "logisticsApproved": "Lojistik onayı verildi",
-      "logisticsOfferApproved": "Lojistik teklifi onaylandı",
+      "logisticsOfferApproved": "Nakliye teklifi onaylandı",
       "deleted": "Silindi",
       "restored": "Geri yüklendi",
       "updated": "Düzenlendi"
@@ -1741,7 +1762,11 @@
     "awaitingProduction": "Üretim bekleniyor",
     "logisticsOffer": "Nakliye teklifi: {{firma}}",
     "shipped": "Sevkiyat yola çıktı",
-    "awaitingShipment": "Sevkiyat bekleniyor"
+    "awaitingShipment": "Sevkiyat bekleniyor",
+    "productionSkipped": "Üretim atlandı (erken kapatıldı)",
+    "shipmentSkipped": "Sevkiyat atlandı (erken kapatıldı)",
+    "closedBy": "Kapatan: {{name}}",
+    "completedFromStage": "{{stage}} aşamasından doğrudan tamamlandı"
   },
   "inbox": {
     "title": "Bekleyen İşler",
@@ -1793,8 +1818,8 @@
       "oldest": "en eski {{age}}",
       "oldestAria": "en eski iş {{age}}dür bekliyor",
       "late": "gecikmiş",
-      "more_one": "+{{count}} kuyruk daha · Bekleyen İşler",
-      "more_other": "+{{count}} kuyruk daha · Bekleyen İşler",
+      "more_one": "+{{count}} iş sırası daha · Bekleyen İşler",
+      "more_other": "+{{count}} iş sırası daha · Bekleyen İşler",
       "summary_one": "{{count}} iş seni bekliyor",
       "summary_other": "{{count}} iş seni bekliyor",
       "summaryAtLeast_one": "en az {{count}} iş seni bekliyor",
@@ -1862,7 +1887,7 @@
   },
   "statement": {
     "title": "Cari Hesap Ekstresi",
-    "description_page": "Müşterinin siparişleri (borç) ve tahsilatları (alacak), döviz başına güncel bakiyeyle.",
+    "description_page": "Müşterinin siparişleri (borç) ve tahsilatları (alacak), döviz başına yürüyen bakiyeyle.",
     "pickCustomer": "Bir müşteri seç (yaz ya da F4).",
     "debit": "Borç",
     "credit": "Alacak",
@@ -1883,7 +1908,7 @@
     "buttonLabel": "Önceki adım",
     "empty": "Önceki adımda bekleyen sipariş yok.",
     "loadError": "Önceki adım yüklenemedi.",
-    "currentStep": "Şu an bekleniyor",
+    "currentStep": "Şu anki adım",
     "notHere": "{{no}} bu ekranda değil: {{reason}}.",
     "notHereDone": "{{no}} bu ekranda değil: sipariş kapandı ({{stage}}).",
     "notFound": "{{no}} numaralı sipariş bulunamadı.",
@@ -1945,14 +1970,32 @@
     "sessionInvalid": "Oturumun geçersiz. Tekrar giriş yap.",
     "fileEmpty": "Dosya boş.",
     "fileTooLarge": "Dosya 25 MB'tan büyük.",
+    "declarationTooLarge": "Belge 10 MB'tan büyük.",
+    "exitUndoNotAllowed": "Bu çıkışı yalnız işlemi yapan kullanıcı veya yönetici geri alabilir.",
     "unsupportedFileType": "Bu dosya türü yüklenemez.",
     "attachmentNotFound": "Ek dosya yok.",
     "cancelReasonTooLong": "İptal sebebi en fazla 500 karakter olabilir.",
-    "geminiKeyMissing": "Gemini API anahtarı tanımlı değil. Yönetim > Sistem Ayarları ekranından anahtarı kaydedebilirsiniz.",
+    "aiUnavailable": "Otomatik okuma servisi şu an kullanılamıyor. Bilgileri elle girebilirsin.",
+    "invalidAiProvider": "Geçersiz yapay zekâ sağlayıcısı. Claude veya Gemini seç.",
+    "geminiKeyMissing": "Gemini API anahtarı tanımlı değil. Yönetim > Sistem Ayarları ekranından kaydedebilirsin.",
+    "geminiKeyEmpty": "Gemini API anahtarı boş olamaz.",
     "geminiKeyInvalid": "Gemini API anahtarı geçersiz veya yetkisiz.",
-    "geminiQuota": "Gemini API kullanım kotası doldu. Lütfen biraz sonra tekrar deneyin veya anahtarı yenileyin.",
-    "geminiFailed": "Gemini servisi ile iletişim kurulamadı.",
-    "geminiUnreadable": "Beyanname belgesi okunamadı. Lütfen bilgileri kontrol ederek elle giriniz.",
+    "geminiQuota": "Gemini API kullanım kotası doldu. Biraz sonra tekrar dene veya anahtarı yenile.",
+    "geminiFailed": "Gemini servisine ulaşılamadı. İnterneti veya API anahtarını kontrol et.",
+    "geminiApiError": "Gemini API hatası ({{status}}){{detail}}.",
+    "geminiUnreadable": "Beyanname okunamadı. Bilgileri kontrol edip elle gir.",
+    "claudeKeyMissing": "Claude API anahtarı tanımlı değil. Yönetim > Sistem Ayarları ekranından kaydedebilirsin.",
+    "claudeKeyEmpty": "Claude API anahtarı boş olamaz.",
+    "claudeKeyInvalid": "Claude API anahtarı geçersiz veya yetkisiz.",
+    "claudeQuota": "Claude API kullanım limiti veya bakiyesi yetersiz. Anthropic konsolundan bakiyeni kontrol et.",
+    "claudeOverloaded": "Anthropic sunucuları şu an çok yoğun. Birkaç saniye sonra tekrar dene.",
+    "claudeBadRequest": "Claude API isteği kabul etmedi{{detail}}.",
+    "claudeFailed": "Claude servisine ulaşılamadı. İnterneti veya API anahtarını kontrol et.",
+    "claudeApiError": "Claude API hatası ({{status}}){{detail}}.",
+    "claudeUnreadable": "Belge okunamadı. Belgenin okunaklı olduğunu kontrol et.",
+    "notAnDeclaration": "Beyanname numarası ({{no}}) standart AN antrepo biçiminde değil. Kontrol edip devam edebilirsin.",
+    "declarationItemCountMismatch": "Beyannamede belirtilen kalem: {{declared}}. Okunan kalem: {{read}}.",
+    "invoiceAmountMismatch": "Kalem fiyatları toplamı ({{sum}}) beyannamedeki fatura bedelinden ({{invoice}}) farklı.",
     "declarationAlreadyExists": "Bu beyanname numarası sistemde zaten kayıtlı.",
     "exitQuantityExceedsRemaining": "Çıkan miktar kalan miktardan fazla olamaz.",
     "exitPackagesExceedsRemaining": "Çıkan kap adedi kalan kaptan fazla olamaz.",
@@ -1962,6 +2005,15 @@
     "itemHasExits": "Çıkışı olan mal doğrudan silinemez. Önce çıkışları geri almalısınız.",
     "quantityLessThanExited": "Yeni miktar, daha önce çıkan miktardan az olamaz.",
     "packagesLessThanExited": "Yeni kap adedi, daha önce çıkan kap adedinden az olamaz.",
+    "invalidLocation": "Geçersiz konum. Antrepo veya Depo seç.",
+    "itemsRequired": "En az bir mal kalemi gir.",
+    "packagesNegative": "Kap adedi eksi olamaz.",
+    "orderDeleted": "Silinmiş sipariş tamamlanamaz.",
+    "quoteCannotBeCompleted": "Teklif aşamasındaki kayıtlar tamamlanamaz.",
+    "orderAlreadyCompleted": "Bu sipariş zaten tamamlanmış.",
+    "orderCancelled": "İptal edilmiş sipariş tamamlanamaz.",
+    "closeFailed": "{{no}} kapatılamadı.",
+    "orderAlreadyClosed": "Tamamlanmış veya iptal edilmiş siparişin teklifi onaylanamaz.",
     "paymentAlreadyVoided": "Bu tahsilat zaten silinmiş.",
     "amountMustBePositive": "Tutar 0'dan büyük olmalı.",
     "costNegative": "Maliyet 0'dan küçük olamaz.",
@@ -1990,7 +2042,7 @@
     "carrierRequired": "Nakliye firması gerekli.",
     "transportModeRequired": "Taşıma türü gerekli.",
     "notInShippingQuoteStage": "{{no}} nakliye teklifi aşamasında değil ({{stage}}).",
-    "quoteNotApproved": "Teklif onaylı değil; geri alınacak onay yok.",
+    "quoteNotApproved": "Nakliye teklifi onaylı değil; geri alınacak onay yok.",
     "rejectReasonRequired": "Red sebebi gerekli.",
     "customerExists": "Bu müşteri adı zaten var.",
     "customerHasOrders": "Bu müşterinin sipariş ya da teklifleri var, silinemez.",
@@ -2001,7 +2053,7 @@
     "deleteReasonRequired": "Silme sebebi gerekli.",
     "onlyQuotesConvert": "Yalnız teklifler siparişe çevrilebilir. Şu anki aşama: {{stage}}.",
     "approveNotAllowed": "Sipariş bulunamadı ya da zaten onaylı.",
-    "rejectNotAllowed": "Reddedilemedi. Sipariş zaten onaylı olabilir ya da teklif/sipariş değil.",
+    "rejectNotAllowed": "Reddedilemedi. Sipariş zaten onaylı olabilir ya da Teklif veya Sipariş aşamasında değil.",
     "invalidPaidAmount": "Geçerli bir ödenen tutar gir.",
     "stageRequired": "Aşama boş olamaz.",
     "qtyMin1": "Adet en az 1 olmalı.",
@@ -2056,8 +2108,8 @@
     "kapanisNotuPh": "Örn: Erken teslim edildi, müşteri isteğiyle kapatıldı",
     "pesinat": "Tahsilat / Peşinat",
     "pesinatTarihi": "Tahsilat tarihi",
-    "finalMaliyet": "Final maliyet",
-    "finalMaliyetHint": "Maliyet reçetesine yazılır.",
+    "finalMaliyet": "Son maliyet",
+    "finalMaliyetHint": "Maliyet tablosuna yazılır.",
     "maliyetDetayi": "Maliyet detayı",
     "maliyetDetayiPh": "Maliyet açıklaması",
     "optional": "İsteğe bağlı.",
@@ -2088,8 +2140,10 @@
     "manualEntry": "Belge olmadan elle gir",
     "aiUnavailable": "Otomatik okuma servisi kullanılamadı. Belge ekte duruyor; kalemleri elle gir.",
     "aiFailed": "Otomatik okuma başarısız oldu. Belge ekte duruyor; bilgileri elle girebilirsin.",
-    "aiFilledBanner": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları soldaki belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
-    "aiFilledBannerNoPreview": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
+    "aiFilledBanner_one": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları soldaki belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
+    "aiFilledBanner_other": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları soldaki belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
+    "aiFilledBannerNoPreview_one": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
+    "aiFilledBannerNoPreview_other": "Yapay zekâ {{count}} alanı doldurdu. \"YZ doldurdu\" işaretli alanları belgeyle karşılaştır; düzelttiğin alanın işareti kalkar.",
     "aiChip": "YZ doldurdu · kontrol et",
     "warningsTitle": "Okuma uyarıları",
     "konum": "Malın konumu",
@@ -2154,5 +2208,228 @@
     "deleted": "Stok kalemi silindi.",
     "deleteFailed": "Silinemedi.",
     "deleteAction": "Kalemi sil"
+  },
+  "warehouse": {
+    "packageUnit_one": "kap",
+    "packageUnit_other": "kap",
+    "location": {
+      "antrepo": "Antrepo",
+      "depo": "Depo"
+    },
+    "status": {
+      "waiting": "Bekliyor",
+      "partial": "Kısmen Çıktı",
+      "partialQuantity": "{{quantity}} Çıktı",
+      "done": "Tamamı Çıktı"
+    },
+    "source": {
+      "auto": "Otomatik",
+      "manual": "Elle"
+    },
+    "page": {
+      "title": "Antrepo & Depo Stokları",
+      "exportFileName": "antrepo-depo-stoklari",
+      "addGoods": "Mal Ekle",
+      "uploadDeclaration": "Beyanname Yükle",
+      "uploadDeclarationHint": "Yapay zekâ ile otomatik oku",
+      "manualEntry": "Elle Bilgi Gir",
+      "manualEntryHint": "Form üzerinden doğrudan ekle",
+      "searchPlaceholder": "Mal veya beyanname no ara…",
+      "showFullyExited": "Tamamı çıkanları göster",
+      "empty": "Antrepoda veya depoda bekleyen stok yok.",
+      "tabs": {
+        "all_one": "Tümü ({{count}})",
+        "all_other": "Tümü ({{count}})",
+        "antrepo_one": "Antrepo ({{count}})",
+        "antrepo_other": "Antrepo ({{count}})",
+        "depo_one": "Kendi Deposu ({{count}})",
+        "depo_other": "Kendi Deposu ({{count}})"
+      }
+    },
+    "columns": {
+      "declarationNo": "Beyanname No",
+      "location": "Konum",
+      "goods": "Mal",
+      "quantity": "Kalan / Toplam Miktar",
+      "packages": "Kap"
+    },
+    "actions": {
+      "loadOntoVehicle": "Araca Yükle",
+      "details": "Detay",
+      "detailsAndHistory": "Detay & Çıkış Geçmişi",
+      "loadAndExit": "Araca Yükle (Çıkış Yap)"
+    },
+    "toast": {
+      "exitSavedTitle": "{{name}}: {{quantity}} araca yüklendi",
+      "exitSaved": "Çıkış kaydedildi.",
+      "exitSaveFailed": "Çıkış kaydedilemedi.",
+      "exitUndone": "Çıkış geri alındı.",
+      "exitUndoneDescription": "Miktar stoğa tekrar eklendi.",
+      "exitUndoFailed": "Çıkış geri alınamadı.",
+      "stockSaved": "Yeni stok girişi kaydedildi.",
+      "stockSaveFailed": "Stok kaydedilemedi."
+    },
+    "drawer": {
+      "declarationNo": "Beyanname No:",
+      "remainingStock": "Kalan Stok",
+      "goodsDetails": "Mal Özellikleri",
+      "unit": "Ölçü Birimi:",
+      "packageType": "Kap Cinsi:",
+      "hsCode": "GTİP Kodu:",
+      "originCountry": "Menşe Ülke:",
+      "weight": "Ağırlık (Net / Brüt):",
+      "commercialDescription": "Ticari Tanım:",
+      "declarationAndDocument": "Beyanname & Belge",
+      "registrationDate": "Tescil Tarihi:",
+      "customsOffice": "Gümrük İdaresi:",
+      "consignor": "Gönderici:",
+      "entryType": "Giriş Türü:",
+      "openOriginal": "Orijinal Beyannameyi Aç ({{name}})",
+      "noDeclaration": "Bu kalem elle kaydedildi. Bağlı gümrük beyannamesi yok.",
+      "exitMovements_one": "Çıkış Hareketleri ({{count}})",
+      "exitMovements_other": "Çıkış Hareketleri ({{count}})",
+      "undoWindow_one": "Geri alma süresi: {{count}} gün",
+      "undoWindow_other": "Geri alma süresi: {{count}} gün",
+      "noExits": "Bu mal için henüz çıkış yok.",
+      "exitedQuantity": "Çıkan Miktar",
+      "exitedPackages": "Çıkan Kap",
+      "plateNote": "Plaka / Not",
+      "doneBy": "İşlemi Yapan",
+      "unknownUser": "Kullanıcı",
+      "undone": "Geri Alındı",
+      "undoTitle": "Çıkışı geri al (stok tekrar artar)",
+      "undo": "Geri Al",
+      "loadOrExit": "Araca Yükle / Çıkış Yap"
+    },
+    "exit": {
+      "title": "Araca Yükle / Çıkış İşaretle",
+      "remainingStock": "Mevcut Kalan Stok:",
+      "howMuch": "Ne kadar mal çıktı?",
+      "allExited": "Tamamı çıktı",
+      "allRemaining": "Kalanın tamamı: {{quantity}} {{unit}}",
+      "partExited": "Bir kısmı çıktı",
+      "partHint": "Miktarı belirterek düş",
+      "quantityLabel": "Çıkan Miktar ({{unit}})",
+      "quantityHint": "En fazla {{quantity}} {{unit}} girebilirsin.",
+      "examplePlaceholder": "Örn: {{value}}",
+      "packageLabel": "Çıkan Kap Adedi ({{unit}})",
+      "packageHint": "İsteğe bağlı. En fazla {{max}} {{unit}}.",
+      "date": "Çıkış Tarihi",
+      "noteLabel": "Not / Araç Plakası",
+      "noteHint": "İsteğe bağlı (örn: 34 AB 1234)",
+      "notePlaceholder": "Plaka veya teslim notu",
+      "save": "Çıkışı Kaydet",
+      "errors": {
+        "quantityRequired": "Çıkan miktar 0'dan büyük olmalı.",
+        "quantityTooHigh": "Çıkan miktar kalan miktardan ({{quantity}} {{unit}}) fazla olamaz.",
+        "packageNegative": "Kap adedi eksi olamaz.",
+        "packageTooHigh": "Çıkan kap kalan kaptan ({{max}}) fazla olamaz."
+      }
+    }
+  },
+  "systemSettings": {
+    "header": {
+      "title": "Yapay Zekâ ile Belge Tarama",
+      "description": "Antrepo modülünde gümrük beyannamelerinin (PDF / Görsel) taranıp otomatik doldurulmasını yönetir.",
+      "activeProviderLabel": "Aktif Sağlayıcı:"
+    },
+    "provider": {
+      "recommended": "Önerilen",
+      "active": "Aktif Sağlayıcı",
+      "inUse": "Şu Anda Kullanılan Sağlayıcı"
+    },
+    "claude": {
+      "title": "Anthropic Claude Ayarları",
+      "description": "Sonnet 5.5 / Haiku modelleri ile Kutu 31, 41, 40 ve gümrük kalemlerini yüksek doğrulukla analiz eder.",
+      "makeActive": "Claude'u Aktif Sağlayıcı Yap",
+      "apiKeyLabel": "Claude API Anahtarı",
+      "apiKeyHint": "sk-ant-usr-... veya sk-ant-api03-... ile başlayan Anthropic API anahtarın",
+      "modelLabel": "Model Seçimi",
+      "modelHint": "Gümrük beyannameleri için Sonnet önerilir",
+      "keySavedDescription": "Anahtar şifrelendi ve tüm kullanıcı bilgisayarlarında anında aktifleşti.",
+      "testSuccess": "Claude API bağlantısı kuruldu. Model yanıt verdi."
+    },
+    "gemini": {
+      "title": "Google Gemini Ayarları",
+      "description": "Google Gemini 3.8 Flash modeli ile beyanname belgelerini analiz eder.",
+      "makeActive": "Gemini'yi Aktif Sağlayıcı Yap",
+      "apiKeyLabel": "Gemini API Anahtarı",
+      "apiKeyHint": "Google AI Studio'dan aldığın API anahtarı",
+      "keySavedDescription": "Yeni anahtar tüm kullanıcılar için hemen aktifleşti.",
+      "testSuccess": "Gemini API bağlantısı kuruldu."
+    },
+    "models": {
+      "sonnet55": {
+        "name": "Claude Sonnet 5.5 (Önerilen — En Yüksek OCR Doğruluğu)",
+        "description": "Gümrük beyannameleri için en yüksek doğruluk ve stabilite"
+      },
+      "haiku55": {
+        "name": "Claude Haiku 5.5 (Ultra Düşük Maliyet & Yüksek Hız)",
+        "description": "Ekonomik token tüketimi, hızlı okuma"
+      },
+      "opus55": {
+        "name": "Claude Opus 5.5 (Maksimum Muhakeme)",
+        "description": "En karmaşık çok sayfalı belgeler"
+      },
+      "sonnet35": {
+        "name": "Claude 3.5 Sonnet (Standart)",
+        "description": "Standart Anthropic API modeli"
+      },
+      "haiku35": {
+        "name": "Claude 3.5 Haiku (Standart)",
+        "description": "Standart Anthropic Haiku modeli"
+      }
+    },
+    "status": {
+      "keySet": "Anahtar Tanımlı",
+      "keyNotSet": "Tanımlı Değil",
+      "activeKey": "Aktif Anahtar:",
+      "noKey": "Henüz kayıtlı anahtar yok.",
+      "model": "Model:",
+      "lastUpdated": "Son Güncelleme:",
+      "lastScan": "Son Başarılı Tarama:",
+      "noScan": "Henüz tarama yok.",
+      "lastError": "Son İstek Hatası:",
+      "errorTime": "Zaman: {{time}}"
+    },
+    "security": {
+      "title": "Merkezi ve Güvenli Yönetim:",
+      "body": "Claude API anahtarı Clever Cloud veritabanında AES-256 ile şifreli tutulur. Buradan kaydedildiğinde şirketteki <strong>tüm kullanıcıların bilgisayarlarında anında aktifleşir</strong>. İstemci tarayıcılarında açık anahtar saklanmaz."
+    },
+    "form": {
+      "currentKey": "Mevcut: {{mask}}",
+      "testing": "Bağlantı Test Ediliyor…",
+      "testNewKey": "Yeni Anahtarı Test Et",
+      "testSavedKey": "Kayıtlı Anahtarı Test Et",
+      "saveAndActivate": "Kaydet ve Aktifleştir"
+    },
+    "toast": {
+      "providerChanged": "Aktif sağlayıcı değiştirildi.",
+      "providerChangedDescription": "Gümrük beyannameleri artık {{provider}} ile taranacak.",
+      "providerChangeFailed": "Aktif sağlayıcı değiştirilemedi.",
+      "tryAgain": "Tekrar dene.",
+      "keyRequired": "API anahtarı gerekli.",
+      "keyRequiredDescription": "Geçerli bir {{provider}} API anahtarı gir.",
+      "keySaved": "{{provider}} API anahtarı kaydedildi.",
+      "keySaveFailed": "{{provider}} API anahtarı kaydedilemedi."
+    },
+    "test": {
+      "failed": "Bağlantı test edilemedi. Tekrar dene."
+    }
+  },
+  "units": {
+    "adet": "Adet",
+    "set": "Set",
+    "m2": "m²",
+    "m3": "m³",
+    "kg": "kg",
+    "gram": "Gram",
+    "ton": "Ton",
+    "metre": "Metre",
+    "litre": "Litre",
+    "paket": "Paket",
+    "kutu": "Kutu",
+    "koli": "Koli",
+    "rulo": "Rulo"
   }
 }

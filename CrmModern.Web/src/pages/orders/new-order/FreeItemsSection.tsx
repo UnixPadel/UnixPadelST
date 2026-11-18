@@ -10,9 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DecimalInput } from '@/components/DecimalInput'
 import { useConfirm } from '@/components/ui/confirm-dialog'
-import { formatNumberTR } from '@/lib/number'
+import { formatNumber } from '@/lib/number'
 import type { FreeItemInput } from '@/types'
 
+import { unitLabel } from '@/lib/units'
 const BIRIMLER = ['Adet', 'Set', 'm²', 'kg', 'Metre', 'Paket']
 
 /**
@@ -87,10 +88,10 @@ export function FreeItemsSection({
                     <Badge variant="warning" className="ml-1 px-1.5 py-0 text-2xs">{t('orderDetail.ozelBadge')}</Badge>
                   </td>
                   <td className="px-2 py-1">{fi.oznitelikAdi || '—'}</td>
-                  <td className="px-2 py-1">{fi.birim || '—'}</td>
+                  <td className="px-2 py-1">{unitLabel(t, fi.birim) || '—'}</td>
                   <td className="px-2 py-1 text-right tabular-nums">{fi.adet}</td>
-                  <td className="px-2 py-1 text-right tabular-nums">{formatNumberTR(fi.fiyat ?? 0)} {sym}</td>
-                  <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{formatNumberTR((fi.adet ?? 0) * (fi.fiyat ?? 0))}</td>
+                  <td className="px-2 py-1 text-right tabular-nums">{formatNumber(fi.fiyat ?? 0)} {sym}</td>
+                  <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">{formatNumber((fi.adet ?? 0) * (fi.fiyat ?? 0))}</td>
                   <td className="px-1 py-1 text-right">
                     <Button type="button" variant="ghost" size="xs" aria-label={t('common.edit')} onClick={() => openDialog(idx)}>
                       <Pencil className="h-3.5 w-3.5" aria-hidden /> {t('common.edit')}
@@ -131,7 +132,7 @@ export function FreeItemsSection({
               <FormField label={t('orders.form.birim')}>
                 <Select value={draft.birim ?? ''} onValueChange={(v) => setDraft((d) => ({ ...d, birim: v || undefined }))}>
                   <SelectTrigger><SelectValue placeholder={t('orders.form.birimSecin')} /></SelectTrigger>
-                  <SelectContent>{BIRIMLER.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}</SelectContent>
+                  <SelectContent>{BIRIMLER.map((b) => <SelectItem key={b} value={b}>{unitLabel(t, b)}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
               <FormField label={t('orders.form.adet')}>
@@ -150,7 +151,7 @@ export function FreeItemsSection({
             </div>
             <DialogFooter className="items-center gap-2 border-t pt-3 sm:justify-between">
               <span className="text-sm font-medium tabular-nums">
-                {t('orders.form.toplam')}: {formatNumberTR((draft.adet ?? 0) * (draft.fiyat ?? 0))} {sym}
+                {t('orders.form.toplam')}: {formatNumber((draft.adet ?? 0) * (draft.fiyat ?? 0))} {sym}
               </span>
               <Button type="submit" size="sm">
                 {editIdx !== null ? t('common.save') : t('orders.form.ozelKalemEkle')}

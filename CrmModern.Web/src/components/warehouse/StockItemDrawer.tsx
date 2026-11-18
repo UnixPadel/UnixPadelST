@@ -46,6 +46,8 @@ export function StockItemDrawer({
   canMutate = false,
 }: StockItemDrawerProps) {
   const { t } = useTranslation()
+  const konumLabel = (value: string) =>
+    value === 'Antrepo' ? t('warehouse.location.antrepo') : value === 'Depo' ? t('warehouse.location.depo') : value
 
   if (!open || !detail) return null
 
@@ -70,7 +72,7 @@ export function StockItemDrawer({
                   variant={item.konum === 'Antrepo' ? 'info' : 'secondary'}
                   className="px-2 py-0.5 text-xs font-semibold"
                 >
-                  {item.konum}
+                  {konumLabel(item.konum)}
                 </Badge>
                 <StockStatusBadge
                   status={item.durum}
@@ -83,7 +85,7 @@ export function StockItemDrawer({
               </DialogTitle>
               {item.beyannameNo && (
                 <p className="text-xs font-mono text-muted-foreground mt-0.5">
-                  Beyanname No: <span className="text-foreground font-semibold">{item.beyannameNo}</span>
+                  {t('warehouse.drawer.declarationNo')} <span className="text-foreground font-semibold">{item.beyannameNo}</span>
                 </p>
               )}
             </div>
@@ -91,14 +93,14 @@ export function StockItemDrawer({
             {/* Kalan Stok Göstergesi */}
             <div className="text-right shrink-0 bg-muted/60 px-4 py-2 rounded-lg border">
               <span className="text-2xs uppercase tracking-wide text-muted-foreground block font-medium">
-                Kalan Stok
+                {t('warehouse.drawer.remainingStock')}
               </span>
               <span className="text-base font-bold text-foreground tabular-nums">
                 {item.kalan} / {item.miktar} {item.birim}
               </span>
               {item.kapAdedi != null && (
                 <span className="text-xs text-muted-foreground block font-normal">
-                  {item.kalanKap ?? 0} / {item.kapAdedi} {item.kapCinsi ?? 'kap'}
+                  {item.kalanKap ?? 0} / {item.kapAdedi} {item.kapCinsi ?? t('warehouse.packageUnit', { count: item.kapAdedi })}
                 </span>
               )}
             </div>
@@ -112,34 +114,34 @@ export function StockItemDrawer({
             <div className="rounded-lg border bg-card p-3.5 space-y-2">
               <span className="font-semibold text-foreground flex items-center gap-1.5 pb-1 border-b">
                 <Package className="h-3.5 w-3.5 text-primary" />
-                Mal Özellikleri
+                {t('warehouse.drawer.goodsDetails')}
               </span>
               <div className="space-y-1.5 text-muted-foreground">
                 <div className="flex justify-between">
-                  <span>Ölçü Birimi:</span>
+                  <span>{t('warehouse.drawer.unit')}</span>
                   <span className="font-medium text-foreground">{item.birim}</span>
                 </div>
                 {item.kapCinsi && (
                   <div className="flex justify-between">
-                    <span>Kap Cinsi:</span>
+                    <span>{t('warehouse.drawer.packageType')}</span>
                     <span className="font-medium text-foreground">{item.kapCinsi}</span>
                   </div>
                 )}
                 {detail.gtip && (
                   <div className="flex justify-between">
-                    <span>GTİP Kodu:</span>
+                    <span>{t('warehouse.drawer.hsCode')}</span>
                     <span className="font-medium font-mono text-foreground">{detail.gtip}</span>
                   </div>
                 )}
                 {detail.menseUlke && (
                   <div className="flex justify-between">
-                    <span>Menşe Ülke:</span>
+                    <span>{t('warehouse.drawer.originCountry')}</span>
                     <span className="font-medium text-foreground">{detail.menseUlke}</span>
                   </div>
                 )}
                 {(detail.netKg != null || detail.brutKg != null) && (
                   <div className="flex justify-between">
-                    <span>Ağırlık (Net / Brüt):</span>
+                    <span>{t('warehouse.drawer.weight')}</span>
                     <span className="font-medium text-foreground">
                       {detail.netKg ?? '—'} kg / {detail.brutKg ?? '—'} kg
                     </span>
@@ -147,7 +149,7 @@ export function StockItemDrawer({
                 )}
                 {item.ticariTanim && (
                   <div className="pt-1 text-2xs text-muted-foreground border-t">
-                    <span className="font-medium text-foreground block">Ticari Tanım:</span>
+                    <span className="font-medium text-foreground block">{t('warehouse.drawer.commercialDescription')}</span>
                     {item.ticariTanim}
                   </div>
                 )}
@@ -158,33 +160,39 @@ export function StockItemDrawer({
             <div className="rounded-lg border bg-card p-3.5 space-y-2">
               <span className="font-semibold text-foreground flex items-center gap-1.5 pb-1 border-b">
                 <Building className="h-3.5 w-3.5 text-primary" />
-                Beyanname &amp; Belge
+                {t('warehouse.drawer.declarationAndDocument')}
               </span>
               {beyanname ? (
                 <div className="space-y-1.5 text-muted-foreground">
                   <div className="flex justify-between">
-                    <span>Tescil Tarihi:</span>
+                    <span>{t('warehouse.drawer.registrationDate')}</span>
                     <span className="font-medium text-foreground">
                       {beyanname.tescilTarihi ? formatDate(beyanname.tescilTarihi) : '—'}
                     </span>
                   </div>
                   {beyanname.gumrukIdaresi && (
                     <div className="flex justify-between">
-                      <span>Gümrük İdaresi:</span>
+                      <span>{t('warehouse.drawer.customsOffice')}</span>
                       <span className="font-medium text-foreground">{beyanname.gumrukIdaresi}</span>
                     </div>
                   )}
                   {beyanname.gonderici && (
                     <div className="flex justify-between">
-                      <span>Gönderici:</span>
+                      <span>{t('warehouse.drawer.consignor')}</span>
                       <span className="font-medium text-foreground truncate max-w-[150px]">
                         {beyanname.gonderici}
                       </span>
                     </div>
                   )}
                   <div className="flex justify-between">
-                    <span>Giriş Türü:</span>
-                    <span className="font-medium text-foreground">{beyanname.kaynak}</span>
+                    <span>{t('warehouse.drawer.entryType')}</span>
+                    <span className="font-medium text-foreground">
+                      {beyanname.kaynak === 'Otomatik'
+                        ? t('warehouse.source.auto')
+                        : beyanname.kaynak === 'Elle'
+                          ? t('warehouse.source.manual')
+                          : beyanname.kaynak}
+                    </span>
                   </div>
 
                   {beyanname.belgeVar && (
@@ -197,14 +205,14 @@ export function StockItemDrawer({
                         className="w-full gap-1.5 text-xs text-primary hover:text-primary"
                       >
                         <Download className="h-3.5 w-3.5" />
-                        <span>Orijinal Beyannameyi Aç ({beyanname.belgeAdi || 'PDF'})</span>
+                        <span>{t('warehouse.drawer.openOriginal', { name: beyanname.belgeAdi || 'PDF' })}</span>
                       </Button>
                     </div>
                   )}
                 </div>
               ) : (
                 <p className="text-muted-foreground py-2 text-xs">
-                  Bu kalem doğrudan elle kaydedilmiştir; bağlı gümrük beyannamesi bulunmamaktadır.
+                  {t('warehouse.drawer.noDeclaration')}
                 </p>
               )}
             </div>
@@ -215,28 +223,28 @@ export function StockItemDrawer({
             <div className="flex items-center justify-between">
               <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
                 <Truck className="h-3.5 w-3.5" />
-                Çıkış Hareketleri ({cikislar.length})
+                {t('warehouse.drawer.exitMovements', { count: cikislar.length })}
               </h4>
               <span className="text-2xs text-muted-foreground">
-                Geri alma süresi: 30 gün
+                {t('warehouse.drawer.undoWindow', { count: 30 })}
               </span>
             </div>
 
             {cikislar.length === 0 ? (
               <div className="rounded-lg border border-dashed p-6 text-center text-xs text-muted-foreground">
-                Bu maldan henüz herhangi bir yola çıkış hareketi yapılmamıştır.
+                {t('warehouse.drawer.noExits')}
               </div>
             ) : (
               <div className="border rounded-lg overflow-hidden">
                 <table className="w-full text-xs text-left">
                   <thead className="bg-muted/50 border-b text-2xs uppercase tracking-wider text-muted-foreground">
                     <tr>
-                      <th className="py-2 px-3 font-semibold">Tarih</th>
-                      <th className="py-2 px-3 font-semibold">Çıkan Miktar</th>
-                      <th className="py-2 px-3 font-semibold">Çıkan Kap</th>
-                      <th className="py-2 px-3 font-semibold">Plaka / Not</th>
-                      <th className="py-2 px-3 font-semibold">İşlemi Yapan</th>
-                      <th className="py-2 px-3 font-semibold text-right">İşlem</th>
+                      <th className="py-2 px-3 font-semibold">{t('common.date')}</th>
+                      <th className="py-2 px-3 font-semibold">{t('warehouse.drawer.exitedQuantity')}</th>
+                      <th className="py-2 px-3 font-semibold">{t('warehouse.drawer.exitedPackages')}</th>
+                      <th className="py-2 px-3 font-semibold">{t('warehouse.drawer.plateNote')}</th>
+                      <th className="py-2 px-3 font-semibold">{t('warehouse.drawer.doneBy')}</th>
+                      <th className="py-2 px-3 font-semibold text-right">{t('common.actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -256,18 +264,18 @@ export function StockItemDrawer({
                             </span>
                           </td>
                           <td className="py-2.5 px-3 tabular-nums">
-                            {c.kapAdedi != null ? `${c.kapAdedi} ${item.kapCinsi ?? 'kap'}` : '—'}
+                            {c.kapAdedi != null ? `${c.kapAdedi} ${item.kapCinsi ?? t('warehouse.packageUnit', { count: c.kapAdedi })}` : '—'}
                           </td>
                           <td className="py-2.5 px-3 max-w-[140px] truncate" title={c.not ?? ''}>
                             {c.not ?? '—'}
                           </td>
                           <td className="py-2.5 px-3 whitespace-nowrap">
-                            {c.girenAd ?? 'Kullanıcı'}
+                            {c.girenAd ?? t('warehouse.drawer.unknownUser')}
                           </td>
                           <td className="py-2.5 px-3 text-right">
                             {isUndone ? (
                               <Badge variant="outline" className="text-2xs text-muted-foreground">
-                                Geri Alındı
+                                {t('warehouse.drawer.undone')}
                               </Badge>
                             ) : c.geriAlinabilir && canMutate ? (
                               <Button
@@ -277,10 +285,10 @@ export function StockItemDrawer({
                                 loading={undoingId === c.id}
                                 onClick={() => onUndoExit?.(c.id)}
                                 className="h-6 px-2 text-2xs gap-1 text-danger hover:bg-destructive/10 hover:text-danger"
-                                title="Çıkışı geri al (stok tekrar artar)"
+                                title={t('warehouse.drawer.undoTitle')}
                               >
                                 <RotateCcw className="h-3 w-3" />
-                                Geri Al
+                                {t('warehouse.drawer.undo')}
                               </Button>
                             ) : (
                               <span className="text-muted-foreground text-2xs">
@@ -313,7 +321,7 @@ export function StockItemDrawer({
               className="gap-1.5 font-semibold"
             >
               <Truck className="h-4 w-4" />
-              <span>Araca Yükle / Çıkış Yap</span>
+              <span>{t('warehouse.drawer.loadOrExit')}</span>
             </Button>
           )}
         </DialogFooter>

@@ -15,6 +15,7 @@ import { useToast } from '@/components/ToastProvider'
 import { formatCurrency } from '@/lib/utils'
 import type { RepPerformance, RepDetail } from '@/types'
 
+import { appLocale } from '@/lib/format'
 type Period = 'day' | 'week' | 'month'
 type Currency = 'Euro' | 'Dolar' | 'TL' | 'Sterlin'
 
@@ -207,7 +208,7 @@ export function RepPerformancePage() {
                         <XAxis dataKey="ay" fontSize={12} />
                         {/* Kısa eksen etiketi (1,2 Mn) — tam tutar tooltip'te; büyük tutarlar kesilmez. */}
                         <YAxis fontSize={12} width={56}
-                          tickFormatter={(v) => COMPACT.format(Number(v))} />
+                          tickFormatter={(v) => formatCompact(Number(v))} />
                         <Tooltip formatter={(v) => formatCurrency(Number(v), cur)} />
                         <Bar dataKey="ciro" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                       </BarChart>
@@ -293,7 +294,7 @@ export function RepPerformancePage() {
   )
 }
 
-const COMPACT = new Intl.NumberFormat('tr-TR', { notation: 'compact', maximumFractionDigits: 1 })
+const formatCompact = (n: number) => new Intl.NumberFormat(appLocale(), { notation: 'compact', maximumFractionDigits: 1 }).format(n)
 
 function Kpi({ icon, label, value, small }: { icon: React.ReactNode; label: string; value: React.ReactNode; small?: boolean }) {
   return (

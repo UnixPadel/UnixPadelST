@@ -37,6 +37,7 @@ import { formatDateShort, formatCurrency, cn } from '@/lib/utils'
 import { statusLabel } from '@/lib/status'
 import type { OrderListDto, QualityControlListDto } from '@/types'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * Sipariş Kontrolü (elshan.rasulov). Tek iş: siparişi incele, onayla ya da reddet.
  * Düzen Muhasebe · Onaylar ile aynı sırayı izler (40+ ergonomi, 2026-11):
@@ -297,7 +298,7 @@ export function QualityControlPage() {
     { key: 'pesinYuzde', header: t('qc.grid.pesinYuzde'), sortable: true, type: 'number', defaultHidden: true },
     { key: 'teslimatCesiti', header: t('qc.grid.teslimatCesiti'), defaultHidden: true,
       render: (r) => r.teslimatCesiti || t('qc.grid.veriYok') },
-    { key: 'paraTipi', header: t('qc.grid.paraTipi'), sortable: true, defaultHidden: true },
+    { key: 'paraTipi', header: t('qc.grid.paraTipi'), sortable: true, defaultHidden: true, render: (r) => currencyLabel(t, r.paraTipi) },
     { key: 'odemeDurum', header: t('qc.grid.odemeDurumu'), sortable: true, defaultHidden: true,
       render: (r) => <StatusBadge value={r.odemeDurum} context="odeme" /> },
     { key: 'siparisMiTeklifMi', header: t('qc.grid.asama'), sortable: true,

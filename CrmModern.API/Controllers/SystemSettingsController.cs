@@ -76,7 +76,7 @@ public sealed class SystemSettingsController(
         catch (CrmModern.Core.Exceptions.BusinessException ex)
         {
             return Ok(ApiResponse<ClaudeTestResultDto>.Ok(
-                new ClaudeTestResultDto(false, ex.Code, ex.Message)));
+                new ClaudeTestResultDto(false, ex.Code, ex.Message, ex.Args)));
         }
         catch (Exception ex)
         {
@@ -119,7 +119,7 @@ public sealed class SystemSettingsController(
         catch (CrmModern.Core.Exceptions.BusinessException ex)
         {
             return Ok(ApiResponse<GeminiTestResultDto>.Ok(
-                new GeminiTestResultDto(false, ex.Code, ex.Message)));
+                new GeminiTestResultDto(false, ex.Code, ex.Message, ex.Args)));
         }
         catch (Exception ex)
         {

@@ -15,7 +15,7 @@ public sealed record SaveClaudeKeyRequest(string ApiKey, string? Model = null);
 
 public sealed record TestClaudeKeyRequest(string? ApiKey = null, string? Model = null);
 
-public sealed record ClaudeTestResultDto(bool Basarili, string? HataKodu, string? HataMesaji);
+public sealed record ClaudeTestResultDto(bool Basarili, string? HataKodu, string? HataMesaji, object? HataArgs = null);
 
 /// <summary>Tüm AI sağlayıcılarının (Claude &amp; Gemini) merkezi durum özeti</summary>
 public sealed record AiSettingsOverviewDto(

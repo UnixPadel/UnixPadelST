@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { getToken, clearAuth } from '@/lib/authStore'
 import i18n from '@/i18n/i18n'
+import { formatNumber } from '@/lib/number'
 import { kontrolLabel, purchaseStatusLabel, stageLabel } from '@/lib/status'
 
 const api = axios.create({
@@ -39,12 +40,25 @@ function localizeArgs(code: string, args: Record<string, unknown> | null | undef
   if (typeof out.status === 'string') out.status = purchaseStatusLabel(t, out.status)
   if (typeof out.kontrol === 'string') out.kontrol = kontrolLabel(t, out.kontrol)
   if (code === 'notFound' && typeof out.entity === 'string') out.entity = t(`apiErrors.entities.${out.entity}`, { defaultValue: out.entity })
+  if (code === 'invoiceAmountMismatch') {
+    if (typeof out.sum === 'number') out.sum = formatNumber(out.sum)
+    if (typeof out.invoice === 'number') out.invoice = formatNumber(out.invoice)
+  }
   return out
 }
 
 export function messageFromEnvelope(data: ErrorEnvelope | undefined): string | undefined {
   if (data?.code && i18n.exists(`apiErrors.${data.code}`)) return i18n.t(`apiErrors.${data.code}`, localizeArgs(data.code, data.args))
   return data?.message || undefined
+}
+
+/** HTTP 200 içinde dönen hata sonuçları (yapay zekâ testi, beyanname okuma) için aynı çeviri yolu. */
+export function messageFromResult(result: {
+  hataKodu?: string | null
+  hataMesaji?: string | null
+  hataArgs?: Record<string, unknown> | null
+}): string | undefined {
+  return messageFromEnvelope({ code: result.hataKodu, message: result.hataMesaji ?? undefined, args: result.hataArgs })
 }
 
 api.interceptors.response.use(

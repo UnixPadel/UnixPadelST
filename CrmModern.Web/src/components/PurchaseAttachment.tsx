@@ -12,6 +12,7 @@ import {
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ToastProvider'
+import { toastApiError } from '@/lib/apiError'
 
 // Backend ile aynı izinli uzantı listesi.
 const ACCEPT = '.png,.jpg,.jpeg,.gif,.webp,.pdf,.doc,.docx,.txt,.xls,.xlsx,.csv,.rtf,.odt,.zip,.rar'
@@ -21,8 +22,6 @@ interface Props {
   /** true ise yükle / değiştir / kaldır gösterilir (talep sahibi). Onay basamakları false. */
   canManage?: boolean
 }
-
-interface ApiErr { response?: { data?: { message?: string } } }
 
 /**
  * Satın alma talebi ek dosyası — kendi kendine yeten bileşen.
@@ -46,11 +45,7 @@ export function PurchaseAttachment({ talepId, canManage = false }: Props) {
   const uploadMut = useMutation({
     mutationFn: (file: File) => uploadPurchaseAttachment(talepId, file),
     onSuccess: () => { invalidate(); toast({ title: t('purchase.attachment.uploaded') }) },
-    onError: (e: unknown) => toast({
-      title: t('purchase.attachment.error'),
-      description: (e as ApiErr)?.response?.data?.message,
-      variant: 'destructive',
-    }),
+    onError: (e: unknown) => toastApiError(toast, t('purchase.attachment.error'), e),
   })
 
   const undoable = useUndoableDelete()

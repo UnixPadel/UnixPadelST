@@ -23,6 +23,24 @@ let mainWindow;
 // dağıtım sistemiyle (latest.yml + NSIS installer) tam uyumludur.
 const UPDATE_CHECK_INTERVAL_MS = 30 * 60 * 1000; // 30 dk
 let updatePromptShown = false; // aynı indirme için tekrar tekrar sormayalım
+let uiLanguage = 'tr'; // arayüz dili; renderer 'desktop:set-language' ile bildirir
+
+const UPDATE_TEXT = {
+  tr: {
+    restart: 'Şimdi yeniden başlat',
+    later: 'Daha sonra',
+    title: 'Güncelleme hazır',
+    message: (version) => `Yeni sürüm (${version}) indirildi.`,
+    detail: 'Şimdi yeniden başlatıp güncellemeyi tamamlayabilirsin. Sonraya bırakırsan uygulamayı kapattığında otomatik kurulur.',
+  },
+  en: {
+    restart: 'Restart now',
+    later: 'Later',
+    title: 'Update ready',
+    message: (version) => `Version ${version} has been downloaded.`,
+    detail: 'Restart now to finish the update. If you choose later, it installs automatically when you close the app.',
+  },
+};
 
 function setupAutoUpdater() {
   autoUpdater.autoDownload = true;          // yeni sürümü arka planda sessizce indir
@@ -48,14 +66,15 @@ function setupAutoUpdater() {
     // Zorlamayan teklif: "Şimdi yeniden başlat" → hemen kur; "Daha sonra" →
     // autoInstallOnAppQuit kapanışta halleder. Pencere yoksa sessizce beklet.
     const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
+    const text = UPDATE_TEXT[uiLanguage];
     dialog.showMessageBox(win, {
       type: 'info',
-      buttons: ['Şimdi yeniden başlat', 'Daha sonra'],
+      buttons: [text.restart, text.later],
       defaultId: 0,
       cancelId: 1,
-      title: 'Güncelleme hazır',
-      message: `Yeni sürüm (${info?.version ?? ''}) indirildi.`,
-      detail: 'Şimdi yeniden başlatarak güncellemeyi tamamlayabilir veya daha sonra (uygulamayı kapattığınızda otomatik kurulur) devam edebilirsiniz.',
+      title: text.title,
+      message: text.message(info?.version ?? ''),
+      detail: text.detail,
     }).then(({ response }) => {
       if (response === 0) {
         // isSilent=true (sessiz kur), isForceRunAfter=true (kurunca yeniden aç)
@@ -132,6 +151,9 @@ function restoredBounds() {
   return visible ? b : null;
 }
 
+ipcMain.on('desktop:set-language', (_e, language) => {
+  uiLanguage = language === 'en' ? 'en' : 'tr';
+});
 ipcMain.handle('desktop:get-zoom', (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
   return { setting: readState().zoom ?? 'auto', factor: win ? win.webContents.getZoomFactor() : 1 };

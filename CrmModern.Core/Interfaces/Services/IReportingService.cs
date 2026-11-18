@@ -9,7 +9,7 @@ namespace CrmModern.Core.Interfaces.Services;
 /// </summary>
 public interface IReportingService
 {
-    Task<byte[]> ExportAccountingOrdersAsync();
+    Task<byte[]> ExportAccountingOrdersAsync(string lang = "tr");
     /// <summary>
     /// Sipariş proforması. <paramref name="lang"/> ("tr"|"en") standart şart
     /// kodlarının (#DETAY) hangi dilde yazılacağını belirler (Round-8 §4).
@@ -50,5 +50,5 @@ public interface IReportingService
 
     /// <summary>§19 — Temsilci için 5-sayfalık markalı Excel raporu (Yönetici özeti,
     /// Ülke analizi, Ürün analizi, Sipariş detayı, Aylık ciro trendi).</summary>
-    Task<byte[]> ExportRepReportAsync(int kullaniciID, DateTime start, DateTime end);
+    Task<byte[]> ExportRepReportAsync(int kullaniciID, DateTime start, DateTime end, string lang = "tr");
 }

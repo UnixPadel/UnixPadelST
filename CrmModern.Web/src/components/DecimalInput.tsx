@@ -1,6 +1,7 @@
 import * as React from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input, type InputProps } from '@/components/ui/input'
-import { formatDecimalInput, parseDecimalTR } from '@/lib/number'
+import { formatDecimalInput, localizeNumberPlaceholder, parseDecimal, type NumberLang } from '@/lib/number'
 
 /**
  * Decimal-as-text input.
@@ -12,7 +13,7 @@ import { formatDecimalInput, parseDecimalTR } from '@/lib/number'
  *   side-effects from browsers disappear.
  * - Keystroke filter: digits, '.' and ',' only. Anything else is blocked.
  * - Emits a numeric value via onValueChange — '' when the field is empty,
- *   otherwise the TR-aware parse from lib/number (F0-1: "1.234,56" = 1234.56).
+ *   otherwise the language-aware parse from lib/number (TR "1,5" and EN "1.5" = 1.5).
  * - Holds a local string so the user can type '12.' or '12,' mid-edit without
  *   the parsed number snapping the caret. On blur the text is normalised to the
  *   parsed value ("1.500" → "1500", "1,50" → "1,5") so the operator sees what
@@ -33,14 +34,26 @@ function toDisplay(v: number | string): string {
 }
 
 export const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps>(
-  ({ value, onValueChange, onKeyDown, onBlur, onFocus, ...rest }, ref) => {
+  ({ value, onValueChange, onKeyDown, onBlur, onFocus, placeholder, ...rest }, ref) => {
+    const { i18n } = useTranslation()
+    const lang: NumberLang = i18n.language?.toLowerCase().startsWith('en') ? 'en' : 'tr'
+    const previousLang = React.useRef(lang)
     const [text, setText] = React.useState<string>(toDisplay(value))
+
+    // Dil değişince yazılı metin eski ayırıcıyla kalırsa "1,125" EN'de 1125 okunur.
+    React.useEffect(() => {
+      if (previousLang.current === lang) return
+      const current = typeof value === 'number' ? value : parseDecimal(text, previousLang.current)
+      previousLang.current = lang
+      setText(formatDecimalInput(current, lang))
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lang])
 
     // Keep local text in sync if the bound value changes from outside (e.g. form reset),
     // but only when the parsed view differs — avoids fighting the user mid-edit.
     React.useEffect(() => {
-      const parsed = parseDecimalTR(text)
-      if (parsed !== value && !(parsed === '' && (value === '' || value === undefined || value === null))) {
+      const parsed = parseDecimal(text, lang)
+      if (parsed !== value &&!(parsed === '' && (value === '' || value === undefined || value === null))) {
         setText(toDisplay(value))
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -52,6 +65,7 @@ export const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps
         type="text"
         inputMode="decimal"
         value={text}
+        placeholder={placeholder ? localizeNumberPlaceholder(placeholder, lang) : placeholder}
         onKeyDown={(e) => {
           // Allow control keys; block any other non-allowed character.
           if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -67,11 +81,11 @@ export const DecimalInput = React.forwardRef<HTMLInputElement, DecimalInputProps
           // Defensive: strip anything not allowed even from paste.
           const cleaned = e.target.value.replace(/[^0-9.,]/g, '')
           setText(cleaned)
-          onValueChange(parseDecimalTR(cleaned))
+          onValueChange(parseDecimal(cleaned, lang))
         }}
         onBlur={(e) => {
-          const parsed = parseDecimalTR(text)
-          const normalized = formatDecimalInput(parsed)
+          const parsed = parseDecimal(text, lang)
+          const normalized = formatDecimalInput(parsed, lang)
           if (normalized !== text) {
             setText(normalized)
             onValueChange(parsed)

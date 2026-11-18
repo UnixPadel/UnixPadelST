@@ -50,7 +50,7 @@ export function OrderStageTimeline({ tarih, sTarih, currentStage, completedAt, c
       <span className="font-medium text-foreground">
         {stageLabel(t, currentStage)}
         {currentStage === 'Tamamlandi' && completedBy && (
-          <span className="block text-xs font-normal text-muted-foreground">Kapatan: {completedBy}</span>
+          <span className="block text-xs font-normal text-muted-foreground">{t('docFlow.closedBy', { name: completedBy })}</span>
         )}
       </span>
     ),

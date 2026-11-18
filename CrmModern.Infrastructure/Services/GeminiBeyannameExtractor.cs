@@ -160,7 +160,7 @@ internal sealed class GeminiBeyannameExtractor : IGeminiBeyannameExtractor
                 var errMsg = $"Gemini API hatası ({response.StatusCode}): {ExtractApiErrorMessage(content)}";
                 _logger.LogWarning("Gemini API call failed: {Status} - {Content}", response.StatusCode, content);
                 await _settings.RecordGeminiUsageAsync(false, errMsg);
-                throw new BusinessException(errMsg, errCode);
+                throw new BusinessException(errMsg, errCode, ErrorArgs(response.StatusCode, content));
             }
 
             jsonResponse = content;
@@ -206,7 +206,7 @@ internal sealed class GeminiBeyannameExtractor : IGeminiBeyannameExtractor
         {
             var code = MapHttpError(response.StatusCode, content);
             var msg = ExtractApiErrorMessage(content);
-            throw new BusinessException($"Bağlantı testi başarısız: {msg}", code);
+            throw new BusinessException($"Bağlantı testi başarısız: {msg}", code, ErrorArgs(response.StatusCode, content));
         }
     }
 
@@ -225,10 +225,24 @@ internal sealed class GeminiBeyannameExtractor : IGeminiBeyannameExtractor
         if (content.Contains("RESOURCE_EXHAUSTED", StringComparison.OrdinalIgnoreCase))
             return "geminiQuota";
 
-        return "geminiFailed";
+        return "geminiApiError";
     }
 
-    private static string ExtractApiErrorMessage(string json)
+    // İstemci metni dile göre kurar; sağlayıcının özgün açıklaması `detail` ile korunur.
+    private static object ErrorArgs(HttpStatusCode status, string content)
+    {
+        var message = TryExtractApiErrorMessage(content);
+        return new
+        {
+            status = (int)status,
+            detail = message is null ? string.Empty : $" ({message})",
+        };
+    }
+
+    private static string ExtractApiErrorMessage(string json) =>
+        TryExtractApiErrorMessage(json) ?? "Bilinmeyen hata.";
+
+    private static string? TryExtractApiErrorMessage(string json)
     {
         try
         {
@@ -237,7 +251,7 @@ internal sealed class GeminiBeyannameExtractor : IGeminiBeyannameExtractor
             if (!string.IsNullOrWhiteSpace(msg)) return msg;
         }
         catch { }
-        return "Bilinmeyen hata.";
+        return null;
     }
 
     private BeyannameDraftDto ParseGeminiResponse(string rawJson)

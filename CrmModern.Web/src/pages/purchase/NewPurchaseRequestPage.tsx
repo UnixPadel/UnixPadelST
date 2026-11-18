@@ -21,6 +21,7 @@ import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard'
 import { formatCurrency } from '@/lib/utils'
 import type { CreatePurchaseRequestLine } from '@/types'
 
+import { unitLabel } from '@/lib/units'
 // Round-9 §9 — birim dropdown'u + "Diğer" serbest-metin alternatifi.
 const UNITS = ['Adet', 'Kg', 'Gram', 'Ton', 'Metre', 'm²', 'm³', 'Litre', 'Paket', 'Kutu', 'Koli', 'Rulo', 'Set'] as const
 const OTHER_UNIT = '__other__'
@@ -231,7 +232,7 @@ export function NewPurchaseRequestPage() {
                         <Select value={r.birimChoice} onValueChange={(v) => patchRow(r.id, { birimChoice: v })}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                            {UNITS.map((u) => <SelectItem key={u} value={u}>{unitLabel(t, u)}</SelectItem>)}
                             <SelectItem value={OTHER_UNIT}>{t('purchase.lines.birimOther')}</SelectItem>
                           </SelectContent>
                         </Select>

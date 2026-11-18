@@ -15,4 +15,4 @@ public sealed record SaveGeminiKeyRequest(string ApiKey);
 /// <summary>Bağlantı testi; <c>ApiKey</c> verilmezse kayıtlı anahtar denenir.</summary>
 public sealed record TestGeminiKeyRequest(string? ApiKey);
 
-public sealed record GeminiTestResultDto(bool Basarili, string? HataKodu, string? HataMesaji);
+public sealed record GeminiTestResultDto(bool Basarili, string? HataKodu, string? HataMesaji, object? HataArgs = null);

@@ -410,19 +410,20 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
         return new CustomerBalanceDto(musteri.MusteriID, musteri.MusteriAd, lines);
     }
 
-    public async Task<byte[]> GenerateAccountingExcelAsync(TransactionFilterDto filter)
+    public async Task<byte[]> GenerateAccountingExcelAsync(TransactionFilterDto filter, string lang = "tr")
     {
+        var text = new ExportText(lang);
         var page = await GetTransactionHistoryPagedAsync(filter with { Page = 1, PageSize = 1000 });
 
         using var wb = new XLWorkbook();
-        var ws = wb.Worksheets.Add("Muhasebe");
+        var ws = wb.Worksheets.Add(text.T("Muhasebe", "Accounting"));
         ws.Cell(1, 1).Value = "ID";
-        ws.Cell(1, 2).Value = "Sipariş No";
-        ws.Cell(1, 3).Value = "Müşteri";
-        ws.Cell(1, 4).Value = "Kullanıcı";
-        ws.Cell(1, 5).Value = "Para Tipi";
-        ws.Cell(1, 6).Value = "Ödenen";
-        ws.Cell(1, 7).Value = "Tarih";
+        ws.Cell(1, 2).Value = text.T("Sipariş No", "Order No");
+        ws.Cell(1, 3).Value = text.T("Müşteri", "Customer");
+        ws.Cell(1, 4).Value = text.T("Kullanıcı", "User");
+        ws.Cell(1, 5).Value = text.T("Döviz", "Currency");
+        ws.Cell(1, 6).Value = text.T("Ödenen", "Paid");
+        ws.Cell(1, 7).Value = text.T("Tarih", "Date");
         ws.Range("A1:G1").Style.Font.Bold = true;
 
         int row = 2;
@@ -432,7 +433,7 @@ internal sealed class AccountingService(IUnitOfWork uow, IAuditService audit) : 
             ws.Cell(row, 2).Value = t.SiparisNo;
             ws.Cell(row, 3).Value = t.MusteriAd ?? "";
             ws.Cell(row, 4).Value = t.Kullanici ?? "";
-            ws.Cell(row, 5).Value = t.ParaTipi ?? "";
+            ws.Cell(row, 5).Value = text.Value(t.ParaTipi);
             ws.Cell(row, 6).Value = (double)(t.OdenenMiktar ?? 0m);
             ws.Cell(row, 7).Value = t.Tarih.ToString("yyyy-MM-dd");
             row++;

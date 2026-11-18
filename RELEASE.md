@@ -92,6 +92,8 @@ alanı package.json ile **birebir aynı** olan TR + EN bir kayıt ekle:
   atladıkları sürümlerin notları da birlikte gösterilir).
 - Kayıt unutulursa yayın durmaz; Actions'ta **"Sürüm notu eksik"** uyarısı çıkar ve o sürümde
   pencere açılmaz. Lokal kontrol: `node CrmModern.Web/scripts/check-release-notes.mjs`
+- `npm run release` önce dil kontrolünü çalıştırır (`npm run check:i18n`). TR/EN anahtar, yer tutucu,
+  sunucu hata kodu veya tutar girişi hatası varsa yayın durur.
 
 ### 3. Commit + tag + push
 

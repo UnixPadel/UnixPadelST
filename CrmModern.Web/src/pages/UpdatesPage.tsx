@@ -26,7 +26,8 @@ export function UpdatesPage() {
             </CardContent>
           </Card>
         ))}
-        <CollapsibleSection title={t('whatsNew.legacyTitle')} summary={t('whatsNew.legacyHint')}>
+        {/* Eski "Faz" kayıtları yalnız Türkçedir. */}
+        {!i18n.language?.toLowerCase().startsWith('en') && <CollapsibleSection title={t('whatsNew.legacyTitle')} summary={t('whatsNew.legacyHint')}>
           <div className="space-y-4 px-3 pb-3">
             {LEGACY_CHANGELOG.map((e) => (
               <section key={e.versiyon} className="space-y-1">
@@ -37,7 +38,7 @@ export function UpdatesPage() {
               </section>
             ))}
           </div>
-        </CollapsibleSection>
+        </CollapsibleSection>}
       </div>
     </div>
   )

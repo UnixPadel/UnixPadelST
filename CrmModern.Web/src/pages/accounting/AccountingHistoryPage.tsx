@@ -25,6 +25,7 @@ import { toastApiError } from '@/lib/apiError'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { formatDate, formatCurrency } from '@/lib/utils'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * PROMPT.md ACCOUNTING #15 + PROMPT-v2 §10 — Muhasebe Geçmiş.
  *
@@ -152,7 +153,7 @@ export function AccountingHistoryPage() {
     { key: 'siparisNo',    header: t('common.orderNo') },
     { key: 'musteriAd',    header: t('common.customer') },
     { key: 'kullanici',    header: t('common.representative') },
-    { key: 'paraTipi',     header: t('common.currency') },
+    { key: 'paraTipi',     header: t('common.currency'), render: (r) => currencyLabel(t, r.paraTipi) },
     ...(!hideMoney ? [
       { key: 'odenenMiktar', header: t('common.amount'),
         render: (r) => formatCurrency((r.odenenMiktar as number) ?? 0, r.paraTipi as string) },
@@ -375,7 +376,7 @@ function InstallmentTable({
                 <td className="whitespace-nowrap px-2 py-1 font-mono text-xs">{r.siparisNo}</td>
                 <td className="max-w-48 px-2 py-1"><span className="line-clamp-2" title={r.musteriAd ?? undefined}>{r.musteriAd ?? '—'}</span></td>
                 <td className="whitespace-nowrap px-2 py-1">{r.kullanici ?? '—'}</td>
-                <td className="px-2 py-1">{r.paraTipi ?? '—'}</td>
+                <td className="px-2 py-1">{currencyLabel(t, r.paraTipi) || '—'}</td>
                 {Array.from({ length: maxN }, (_, i) => {
                   const inst = visible[i]
                   if (!inst) return <td key={i} className="px-2 py-1 text-right text-muted-foreground">—</td>

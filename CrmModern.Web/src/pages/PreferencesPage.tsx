@@ -13,6 +13,7 @@ import { visibleNavItems } from '@/lib/navigation'
 import { DEFAULT_PREFERENCES, applyUiScale, roleStartPage, setPreferences, usePreferences, type UiScale } from '@/lib/preferences'
 import { desktop, useDesktopZoom, ZOOM_STEPS } from '@/lib/desktop'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * E-13 — Tercihlerim (SAP kullanıcı parametreleri / LOGO kullanıcı tercihleri).
  * Değişiklik anında kaydedilir; yeni sipariş formu bu varsayılanlarla açılır.
@@ -52,7 +53,7 @@ export function PreferencesPage() {
           <FormField label={t('orders.form.paraTipi')}>
             <Select value={prefs.defaultParaTipi} onValueChange={(v) => save({ defaultParaTipi: v })}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>{PARA_TIPLERI.map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+              <SelectContent>{PARA_TIPLERI.map((p) => <SelectItem key={p} value={p}>{currencyLabel(t, p)}</SelectItem>)}</SelectContent>
             </Select>
           </FormField>
           <FormField label={t('orders.form.odemeSekli')}>

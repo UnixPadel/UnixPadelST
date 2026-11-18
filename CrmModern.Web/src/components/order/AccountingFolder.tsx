@@ -26,6 +26,7 @@ import { hideMoneyFor } from '@/lib/visibility'
 import { cn, formatDate } from '@/lib/utils'
 import type { AuthUser } from '@/types'
 
+import { appLocale } from '@/lib/format'
 /**
  * Muhasebe Klasörü — "her siparişin bir klasörü vardır".
  *
@@ -146,7 +147,7 @@ function FolderBody({ siparisNo, autoPick }: { siparisNo: string; autoPick: bool
   }, [autoPick, folder?.canManage])
 
   const fmtSize = (b: number) => {
-    const nf = (n: number, d: number) => n.toLocaleString(i18n.language, { maximumFractionDigits: d })
+    const nf = (n: number, d: number) => n.toLocaleString(appLocale(), { maximumFractionDigits: d })
     if (b < 1024) return `${b} B`
     if (b < 1024 * 1024) return `${nf(b / 1024, 0)} KB`
     return `${nf(b / (1024 * 1024), 1)} MB`

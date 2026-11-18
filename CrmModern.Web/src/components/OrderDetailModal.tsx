@@ -30,6 +30,8 @@ import { invalidateOrderGraph } from '@/lib/queryKeys'
 import { usePanelHeaderSlot } from '@/components/MasterDetailLayout'
 import { AccountingFolderButton, AccountingFolderDialog, canSeeAccountingFolder } from '@/components/order/AccountingFolder'
 
+import { stageLabel } from '@/lib/status'
+import { currencyLabel } from '@/lib/currency'
 interface Props {
   siparisNo: string | null
   onClose: () => void
@@ -356,16 +358,16 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
                 <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
                 <div className="space-y-1 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5 font-semibold text-orange-950 dark:text-orange-200">
-                    <span>Bu sipariş tamamlandı olarak kapatıldı</span>
+                    <span>{t('orderDetail.closedTitle')}</span>
                     {order.tamamlanmaOncekiAsama && order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' && (
                       <span className="rounded bg-orange-100 px-1.5 py-0.5 text-2xs font-medium text-orange-900 dark:bg-orange-950/60 dark:text-orange-200">
-                        {order.tamamlanmaOncekiAsama} aşamasından doğrudan kapatıldı
+                        {t('orderDetail.closedFromStage', { stage: stageLabel(t, order.tamamlanmaOncekiAsama) })}
                       </span>
                     )}
                   </div>
                   <div className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-2xs">
-                    <span>Kapatan: <strong>{order.tamamlayanAdSoyad || order.tamamlayanKullaniciAdi || 'Yetkili'}</strong></span>
-                    {order.tamamlanmaTarihi && <span>· Kapanış Tarihi: <strong>{formatDate(order.tamamlanmaTarihi)}</strong></span>}
+                    <span>{t('orderDetail.closedBy')}: <strong>{order.tamamlayanAdSoyad || order.tamamlayanKullaniciAdi || t('orderDetail.authorizedUser')}</strong></span>
+                    {order.tamamlanmaTarihi && <span>· {t('orderDetail.closedOn')}: <strong>{formatDate(order.tamamlanmaTarihi)}</strong></span>}
                   </div>
                   {order.tamamlanmaNotu && (
                     <div className="mt-1 rounded border border-orange-500/20 bg-background/80 p-2 text-foreground italic">
@@ -455,7 +457,7 @@ export function OrderDetailPanel({ siparisNo, hideNotes = false, logisticsView =
             <div className="space-y-2 rounded-md border p-3">
               <SectionTitle>{t('orderDetail.pricing')}</SectionTitle>
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-                <PriceBox label={t('orderDetail.paraBirimi')} value={order.paraTipi} />
+                <PriceBox label={t('orderDetail.paraBirimi')} value={currencyLabel(t, order.paraTipi)} />
                 <PriceBox label={t('orderDetail.brut')} value={formatCurrency(order.brutToplamFiyat, order.paraTipi)} />
                 {(order.indirim ?? 0) > 0 && <PriceBox label={t('orderDetail.indirim')} value={`%${order.indirim}`} />}
                 {(order.kdv ?? 0) > 0 && <PriceBox label={t('orderDetail.kdv')} value={`%${order.kdv}`} />}

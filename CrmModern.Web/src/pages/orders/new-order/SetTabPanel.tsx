@@ -8,9 +8,10 @@ import { Combobox, trLower, type ComboOption } from '@/components/ui/combobox'
 import { FormField } from '@/components/ui/form-field'
 import { DecimalInput } from '@/components/DecimalInput'
 import { isoSymbol, type IsoCurrency } from '@/lib/currency'
-import { formatNumberTR } from '@/lib/number'
+import { formatNumber } from '@/lib/number'
 import type { ComponentRow, SetTabState } from '@/lib/orderForm'
 
+import { unitLabel } from '@/lib/units'
 /**
  * SR-1 — tek set sekmesinin içeriği (eski NewOrderPage 1201-1366).
  * F0-4: "Çarp" kaldırıldı — kategorisi seçili sekme zaten kayda girer; sekme
@@ -88,7 +89,7 @@ export function SetTabPanel({
 
       <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted px-3 py-2 text-sm">
         <span className="text-muted-foreground">{t('orders.form.setFiyati')}</span>
-        <span className="font-semibold tabular-nums">{formatNumberTR(tab.kategoriFiyat * tab.adet)} {sym}</span>
+        <span className="font-semibold tabular-nums">{formatNumber(tab.kategoriFiyat * tab.adet)} {sym}</span>
         {createdNo && tab.kategoriID != null && (
           // Kayıt sonrası (legacy davranış): reçeteyi siparişe aç.
           <Button type="button" size="xs" variant="outline" loading={expandPending} onClick={onExpandRecipe}>
@@ -175,7 +176,7 @@ export function SetTabPanel({
                         </select>
                       ) : '—'}
                     </td>
-                    <td className="px-2 py-1">{cmp.birim || '—'}</td>
+                    <td className="px-2 py-1">{unitLabel(t, cmp.birim) || '—'}</td>
                     <td className="px-2 py-1 text-right">
                       <Input
                         type="number" min={1}
@@ -209,7 +210,7 @@ export function SetTabPanel({
                       </div>
                     </td>
                     <td className="px-2 py-1 text-right tabular-nums text-muted-foreground">
-                      {formatNumberTR(cmp.adet * (shown ?? cmp.kaynakFiyat))}
+                      {formatNumber(cmp.adet * (shown ?? cmp.kaynakFiyat))}
                     </td>
                   </tr>
                 )

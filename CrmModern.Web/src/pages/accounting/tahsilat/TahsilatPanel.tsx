@@ -10,6 +10,7 @@ import { formatCurrency } from '@/lib/utils'
 import type { AccountingOrderListDto, AccountingTransactionDto } from '@/types'
 import { PaymentSummary, PaymentsList } from '../approval/PaymentSummary'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * Muhasebe · Tahsilat paneli (sağda, hep açık) — Muhasebe · Onaylar'daki karar
  * paneliyle aynı düzen:
@@ -80,7 +81,7 @@ export function TahsilatPanel({
       <form aria-label={t('accounting.tahsilat.formTitle')} className="shrink-0 space-y-2 border-t bg-card px-4 py-2"
         onSubmit={(e) => { e.preventDefault(); if (!blocked && !pending) onSave() }}>
         <div className="grid grid-cols-2 gap-3">
-          <FormField label={`${t('accounting.tahsilat.tutar')} (${row.paraTipi ?? ''})`}>
+          <FormField label={`${t('accounting.tahsilat.tutar')} (${currencyLabel(t, row.paraTipi)})`}>
             <DecimalInput ref={amountRef} value={tutar ?? ''} placeholder="0,00"
               onValueChange={(v) => onTutar(v === '' ? null : v)} />
           </FormField>

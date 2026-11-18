@@ -35,7 +35,7 @@ internal sealed class WarehouseStockService : IWarehouseStockService
             throw new BusinessException("Belge verisi boş.", "fileEmpty");
 
         if (data.Length > WarehouseStockRules.MaxBelgeBayt)
-            throw new BusinessException("Belge boyutu 10 MB'tan büyük olamaz.", "fileTooLarge");
+            throw new BusinessException("Belge 10 MB'tan büyük.", "declarationTooLarge");
 
         try
         {
@@ -72,17 +72,18 @@ internal sealed class WarehouseStockService : IWarehouseStockService
             _logger.LogInformation("Beyanname analizi hata döndü ({Code}): {Message}", ex.Code, ex.Message);
             return new AnalyzeResultDto(
                 Basarili: false,
-                HataKodu: ex.Code ?? "geminiFailed",
+                HataKodu: ex.Code ?? "aiUnavailable",
                 HataMesaji: ex.Message,
                 Taslak: null,
-                MevcutBeyannameId: null);
+                MevcutBeyannameId: null,
+                HataArgs: ex.Args);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Beyanname analizi sırasında beklenmeyen hata.");
             return new AnalyzeResultDto(
                 Basarili: false,
-                HataKodu: "geminiFailed",
+                HataKodu: "aiUnavailable",
                 HataMesaji: "Otomatik okuma servisi şu an kullanılamıyor. Bilgileri elle girebilirsiniz.",
                 Taslak: null,
                 MevcutBeyannameId: null);
@@ -624,7 +625,7 @@ internal sealed class WarehouseStockService : IWarehouseStockService
 
         // Permission: creator or manager
         if (exit.GirenKullaniciID != currentUserId && !isManager)
-            throw new UnauthorizedException("Bu çıkışı yalnızca işlemi yapan kullanıcı veya Yönetici geri alabilir.");
+            throw new BusinessException("Bu çıkışı yalnız işlemi yapan kullanıcı veya yönetici geri alabilir.", "exitUndoNotAllowed");
 
         // Time limit check: 30 days
         var age = (DateTime.Now - exit.KayitZamani).TotalDays;

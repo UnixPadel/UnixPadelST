@@ -20,6 +20,7 @@ import { formatDate } from '@/lib/utils'
 import { downloadCsv } from '@/lib/export'
 import { cn } from '@/lib/utils'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * E-15 — LOGO/ETA "Cari Hesap Ekstresi". Önceden yalnız döviz başına bakiye
  * kartları vardı; artık seçilen müşteri için tarih aralıklı hareket dökümü:
@@ -171,7 +172,7 @@ export function CustomerBalancePage() {
             {balance?.lines.map((l) => (
               <div key={l.paraTipi} className="space-y-1.5 rounded-md border bg-card p-4">
                 <SectionTitle actions={<Badge variant={l.kalan > 0.005 ? 'warning' : 'success'}>{l.kalan > 0.005 ? t('statement.open') : t('statement.closed')}</Badge>}>
-                  {l.paraTipi}
+                  {currencyLabel(t, l.paraTipi)}
                 </SectionTitle>
                 <KeyValue label={t('statement.debit')} value={<span className="tabular-nums">{formatMoney(l.toplam, l.paraTipi)}</span>} />
                 <KeyValue label={t('statement.credit')} value={<span className="tabular-nums text-success">{formatMoney(l.odenen, l.paraTipi)}</span>} />

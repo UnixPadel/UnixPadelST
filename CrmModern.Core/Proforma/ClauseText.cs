@@ -80,12 +80,12 @@ public static class ClauseText
         {
             var rest = s["@@ODEME:".Length..].Trim();
             if (rest.StartsWith("Pesin", StringComparison.OrdinalIgnoreCase))
-                return en ? "Payment Method: Upfront" : "Ödeme Şekli: Peşin";
+                return en ? "Payment Method: Advance Payment" : "Ödeme Şekli: Peşin";
             var parts = rest.Split(':', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
             if (parts.Length >= 2 && int.TryParse(parts[1], out var p))
-                return en ? $"Payment Method: Installments — {p}% upfront"
+                return en ? $"Payment Method: Deferred Payment — {p}% upfront"
                           : $"Ödeme Şekli: Vadeli — %{p} peşin";
-            return en ? "Payment Method: Installments" : "Ödeme Şekli: Vadeli";
+            return en ? "Payment Method: Deferred Payment" : "Ödeme Şekli: Vadeli";
         }
 
         return s switch
@@ -93,7 +93,7 @@ public static class ClauseText
             "@@FIYAT"  => en ? "Prices are valid for 2 weeks." : "Fiyatlar 2 hafta geçerlidir.",
             "@@KDV"    => en ? "VAT is not included in the prices." : "Fiyatlara KDV dahil değildir.",
             "@@KARGO"  => en ? "Shipping is not included in the prices." : "Fiyatlara nakliye dahil değildir.",
-            "@@MONTAJ" => en ? "Assembly is not included in the prices." : "Fiyatlara montaj dahil değildir.",
+            "@@MONTAJ" => en ? "Installation is not included in the prices." :"Fiyatlara montaj dahil değildir.",
             "@@HAKLAR" => en
                 ? "All rights to the prices and information in this document are reserved."
                 : "Bu belgedeki fiyat ve bilgiler üzerindeki tüm haklar saklıdır.",

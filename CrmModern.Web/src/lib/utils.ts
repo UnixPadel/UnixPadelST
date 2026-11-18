@@ -2,13 +2,14 @@ import { type ClassValue, clsx } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { formatMoney } from '@/lib/currency'
 
+import { appLocale } from '@/lib/format'
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
 export function formatDate(date: string | Date | null | undefined): string {
   if (date == null) return '-'
-  return new Date(date).toLocaleDateString('tr-TR', {
+  return new Date(date).toLocaleDateString(appLocale(), {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
@@ -38,7 +39,7 @@ export function formatPhone(
 /** PROMPT-v6 §6 — yoğun gridlerde kısa tarih (dd.MM.yy). */
 export function formatDateShort(date: string | Date | null | undefined): string {
   if (date == null) return '-'
-  return new Date(date).toLocaleDateString('tr-TR', {
+  return new Date(date).toLocaleDateString(appLocale(), {
     day: '2-digit',
     month: '2-digit',
     year: '2-digit',

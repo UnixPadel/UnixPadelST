@@ -11,6 +11,28 @@ import type { ChangelogEntry, ReleaseNote } from '@/types'
  */
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    versiyon: '1.1.2',
+    tarih:    '2026-11-18',
+    baslik: {
+      tr: 'Teklif ve siparişleri tek kutudan bul',
+      en: 'Find quotes and orders from one box',
+    },
+    maddeler: {
+      tr: [
+        'Sipariş Ara ve üstteki arama kutusu müşteri adı, sipariş veya teklif no, tutar, telefon, e-posta, adres, satış temsilcisi ve ürünle arar. Birden çok kelime yazabilirsin: “ibrahim irak 12500”.',
+        'Sağ panel kaydın teklif mi sipariş mi olduğunu, kimde beklediğini, ne kadar süredir beklediğini, sonraki adımı ve hangi ekranda bulunduğunu gösterir. “Ekrana git” seni o ekrana götürür.',
+        '“Siparişi Aç” tüm ayrıntıları pencerede açar. Arama kutusundayken ↑/↓ sonuçlar arasında gezer, Enter seçili kaydı açar.',
+        'Üstteki arama kutusunda sipariş ve müşteri sonuçlarına tıklayınca artık hata sayfası açılmaz.',
+      ],
+      en: [
+        'Search Orders and the top search box now search by customer name, order or quote number, amount, phone, email, address, sales rep and product. You can type several words: “ibrahim iraq 12500”.',
+        'The right panel shows whether a record is a quote or an order, who it is waiting on, for how long, the next step and which screen it is on. “Go to screen” takes you there.',
+        '“Open Order” shows every detail in a window. In the search box, ↑/↓ moves through the results and Enter opens the selected record.',
+        'Clicking an order or customer result in the top search box no longer opens an error page.',
+      ],
+    },
+  },
+  {
     versiyon: '1.1.1',
     tarih:    '2026-11-17',
     baslik: {

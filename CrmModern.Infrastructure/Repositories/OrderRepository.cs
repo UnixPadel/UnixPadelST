@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using CrmModern.Core.DTOs.Dashboard;
 using CrmModern.Core.Entities;
 using CrmModern.Core.Interfaces.Repositories;
+using CrmModern.Core.Search;
 using CrmModern.Core.Workflow;
 using CrmModern.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -365,6 +366,71 @@ internal sealed class OrderRepository(AppDbContext context)
                      || (o.MAdres != null && EF.Functions.Like(o.MAdres, q)))
             .OrderByDescending(o => o.SiparisAlID)
             .Take(limit)
+            .ToListAsync();
+    }
+
+    // Arama satırı: Ek / MuhasebeEk dosyaları ve notlar okunmaz.
+    private static readonly Expression<Func<Order, Order>> SearchRow = o => new Order
+    {
+        SiparisAlID       = o.SiparisAlID,
+        SiparisNo         = o.SiparisNo,
+        TeklifNo          = o.TeklifNo,
+        MusteriAd         = o.MusteriAd,
+        KullaniciID       = o.KullaniciID,
+        MTelefon          = o.MTelefon,
+        MMail             = o.MMail,
+        MUlke             = o.MUlke,
+        MVATNumarasi      = o.MVATNumarasi,
+        MZipKod           = o.MZipKod,
+        MAdres            = o.MAdres,
+        TTeslimAlanAdi    = o.TTeslimAlanAdi,
+        TIlgiliKisi       = o.TIlgiliKisi,
+        TTelefon          = o.TTelefon,
+        TAltTelefon       = o.TAltTelefon,
+        TE_Mail           = o.TE_Mail,
+        TVATNumarasi      = o.TVATNumarasi,
+        TZipKod           = o.TZipKod,
+        TUlke             = o.TUlke,
+        TAdres            = o.TAdres,
+        OdenenMiktar      = o.OdenenMiktar,
+        OdemeDurum        = o.OdemeDurum,
+        ParaTipi          = o.ParaTipi,
+        PesinYüzde        = o.PesinYüzde,
+        ToplamFiyat       = o.ToplamFiyat,
+        BrutToplamFiyat   = o.BrutToplamFiyat,
+        SiparisMiTeklifMi = o.SiparisMiTeklifMi,
+        Kontrol           = o.Kontrol,
+        LojistikOnay      = o.LojistikOnay,
+        Sirket            = o.Sirket,
+        Tarih             = o.Tarih,
+        Silindi           = o.Silindi,
+    };
+
+    public async Task<IReadOnlyList<Order>> GetSearchRowsAsync(int? kullaniciID)
+    {
+        var q = _context.SiparisAlTablo.AsNoTracking();
+        if (kullaniciID is int uid) q = q.Where(o => o.KullaniciID == uid);
+        return await q.OrderByDescending(o => o.SiparisAlID).Select(SearchRow).ToListAsync();
+    }
+
+    public async Task<IReadOnlyList<OrderSearchItemName>> GetSearchItemNamesAsync(int? kullaniciID)
+    {
+        var items = _context.SiparisIslemTablo.AsNoTracking();
+        if (kullaniciID is int uid)
+            items = items.Where(i => _context.SiparisAlTablo.Any(o => o.SiparisNo == i.SiparisNo && o.KullaniciID == uid));
+
+        return await (
+            from i in items
+            join c in _context.UrunKategorileri.AsNoTracking() on i.KategoriID equals (int?)c.KategoriID into cats
+            from c in cats.DefaultIfEmpty()
+            join b in _context.BilesenBilgileri.AsNoTracking() on i.BilesenID equals (int?)b.BilesenID into comps
+            from b in comps.DefaultIfEmpty()
+            select new OrderSearchItemName(
+                i.SiparisNo,
+                c != null ? c.KategoriAdi : null,
+                b != null ? b.BilesenAdi : null,
+                i.SBilesenAdi,
+                i.OznitelikAdi))
             .ToListAsync();
     }
 

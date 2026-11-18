@@ -586,23 +586,51 @@ export interface UpdateUserDto {
 
 // ── Search ────────────────────────────────────────────────────────────────────
 
-export interface SearchResultDto {
+/** Tek kutudan sipariş ve teklif araması. Para görmeyen kullanıcıda tutarlar null gelir. */
+export interface OrderSearchHit {
   siparisNo: string
   teklifNo: string
+  belgeNo: string
+  tur: 'Teklif' | 'Siparis'
+  asama: string
+  kontrol: string
+  silindi: boolean
+  stepCode: WorkflowStepCode | null
+  department: WorkflowDepartment | null
   musteriAd: string
-  mUlke?: string
+  ulke: string | null
+  telefon: string | null
+  eposta: string | null
+  vergiNo: string | null
+  adres: string | null
   kullaniciID: number
-  kullaniciAdi?: string   // siparişi oluşturan kullanıcı ("Oluşturan" kolonu)
+  temsilci: string | null
+  sirket: string | null
+  tarih: string
   paraTipi: string
   toplamFiyat: number | null
-  kaparoFiyat: number | null
+  brutToplamFiyat: number | null
+  odenenMiktar: number | null
   kalanBakiye: number | null
-  odenenMiktar?: number | null
-  odemeDurum?: string
-  siparisMiTeklifMi: string
+  pesinYuzde: number | null
+  odemeDurum: string | null
+  eslesen: string[]
+}
+
+export interface OrderSearchResult {
+  query: string
+  toplam: number
+  sonuclar: OrderSearchHit[]
+}
+
+/** Üst arama kutusundaki sipariş satırının özeti (parasal alan yok). */
+export interface OrderHitSummary {
+  tur: 'Teklif' | 'Siparis'
+  asama: string
   kontrol: string
-  tarih: string
-  sirket?: string
+  silindi: boolean
+  stepCode: WorkflowStepCode | null
+  department: WorkflowDepartment | null
 }
 
 // ── Dashboard (Faz 7) ─────────────────────────────────────────────────────────
@@ -692,12 +720,14 @@ export interface UnifiedSearchHit {
   baslik: string
   altMetin?: string | null
   navigateUrl: string
+  siparis?: OrderHitSummary | null
 }
 
 export interface UnifiedSearchResult {
   query: string
   toplamSonuc: number
   sonuclar: UnifiedSearchHit[]
+  siparisToplam?: number
 }
 
 // ── Changelog (Faz 7) ─────────────────────────────────────────────────────────

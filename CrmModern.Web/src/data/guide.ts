@@ -37,6 +37,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
         'For individual records, go to “Pending Tasks” (the number in the menu is your total). “Open” takes you to the screen with that record selected.'),
       L('Ctrl+K ile Hızlı Erişim’i aç: ekran kodu (YS Yeni Sipariş, KK Sipariş Kontrolü, FB Fabrika, LH Lojistik, TH Tahsilat, BI Bekleyen İşler, KL Kılavuz) ya da “SP <sipariş no>” yaz, Enter’a bas.',
         'Press Ctrl+K for Quick Open: type a screen code (YS New Order, KK Order Review, FB Factory, LH Logistics, TH Payments, BI Pending Tasks, KL Guide) or “SP <order no>” and press Enter.'),
+      L('Bir teklif ya da siparişi bulmak için üstteki arama kutusuna veya Sipariş Ara ekranına müşteri adı, no, tutar, telefon ya da ürün yaz. Sağ panel kaydın türünü, aşamasını, kimde beklediğini ve hangi ekranda olduğunu gösterir. “Ekrana git” seni o ekrana götürür, “Siparişi Aç” tüm ayrıntıları pencerede açar.',
+        'To find a quote or order, type a customer name, number, amount, phone or product in the top search box or on Search Orders. The right panel shows its type, stage, who it is waiting on and which screen it is on. “Go to screen” takes you there, and “Open Order” shows every detail in a window.'),
       L('Tercihlerim’de varsayılan şirketi, dövizi, peşinat yüzdesini, görünümü ve açılış sayfasını seç. Yeni formlar bu değerlerle açılır.',
         'In Preferences, choose your default company, currency, down payment %, view and start page. New forms open with these values.'),
       L('Üst çubuktaki “Görünüm: Rahat | Standart” ile yazı ve buton boyutunu seç. Rahat büyük yazı ve geniş satır gösterir; Standart aynı ekrana daha çok satır sığdırır. Ctrl+ / Ctrl- ile yakınlaştırıp uzaklaştırabilir, Ctrl+0 ile %100’e dönebilirsin.',

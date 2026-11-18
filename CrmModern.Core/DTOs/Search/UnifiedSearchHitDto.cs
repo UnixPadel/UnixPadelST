@@ -4,10 +4,12 @@ namespace CrmModern.Core.DTOs.Search;
 /// Topbar global arama tek sonucu.
 /// Kategori: "Sipariş" | "Müşteri" | "Bileşen" | "Kategori" | "Kullanıcı" | "Satın Alma Talep"
 /// NavigateUrl: frontend React Router push hedefi.
+/// Siparis: yalnız sipariş sonucunda dolu (tür, aşama, bekleyen adım).
 /// </summary>
 public sealed record UnifiedSearchHitDto(
     string  Kategori,
     string  Id,
     string  Baslik,
     string? AltMetin,
-    string  NavigateUrl);
+    string  NavigateUrl,
+    OrderHitSummaryDto? Siparis = null);

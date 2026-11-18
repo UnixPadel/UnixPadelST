@@ -97,7 +97,7 @@ export function LogisticsOffersPage() {
                         {r.onayliFirma
                           ? <Badge variant="success">{r.onayliFirma}{r.onayliFiyat != null ? ` · ${formatCurrency(r.onayliFiyat, r.onayliParaBirimi ?? undefined)}` : ''}</Badge>
                           : <span className="text-xs text-muted-foreground">{t('logisticsOffer.noApproved')}</span>}
-                        <Badge variant={r.teklifSayisi > 0 ? 'info' : 'neutral'}>{t('logisticsOffer.count', { n: r.teklifSayisi })}</Badge>
+                        <Badge variant={r.teklifSayisi > 0 ? 'info' : 'neutral'}>{t('logisticsOffer.count', { count: r.teklifSayisi })}</Badge>
                       </span>
                     </button>
                     <Button size="xs" variant="ghost" aria-label={t('common.details')} onClick={() => openDetail(r.siparisNo)}>

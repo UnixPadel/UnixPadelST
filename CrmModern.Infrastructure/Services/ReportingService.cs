@@ -37,22 +37,23 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
     // EXPORT 1: Accounting orders list  (Muhasebe form — özet liste)
     // ─────────────────────────────────────────────────────────────────────────────
 
-    public async Task<byte[]> ExportAccountingOrdersAsync()
+    public async Task<byte[]> ExportAccountingOrdersAsync(string lang = "tr")
     {
+        var text = new ExportText(lang);
         var orders = await uow.Orders.GetAccountingOrdersAsync();
         var muhasebeMap = await uow.PurchaseRequests.GetMuhasebeBySiparisNolarAsync(
             orders.Select(o => o.SiparisNo).Where(s => !string.IsNullOrEmpty(s)).Distinct().ToList());
 
         using var wb = new XLWorkbook();
-        var ws = wb.AddWorksheet("Muhasebe");
+        var ws = wb.AddWorksheet(text.T("Muhasebe", "Accounting"));
 
         // ── Header row ─────────────────────────────────────────────────────────
         var headers = new[]
         {
-            "Sipariş No", "Müşteri Adı", "Ülke", "Para Birimi",
-            "Toplam Fiyat", "Kapora Bakiyesi", "Kalan Bakiye",
-            "Ödenen Miktar", "Ödeme Durumu", "Maliyet", "Kâr",
-            "Muhasebe Durumu", "Tarih"
+            text.T("Sipariş No", "Order No"), text.T("Müşteri Adı", "Customer Name"), text.T("Ülke", "Country"), text.T("Döviz", "Currency"),
+            text.T("Toplam Fiyat", "Total Price"), text.T("Kalan Peşinat", "Down Payment Due"), text.T("Kalan Bakiye", "Balance Due"),
+            text.T("Ödenen", "Paid"), text.T("Ödeme Durumu", "Payment Status"), text.T("Maliyet", "Cost"), text.T("Kâr", "Profit"),
+            text.T("Muhasebe Durumu", "Accounting Status"), text.T("Tarih", "Date")
         };
 
         for (int c = 0; c < headers.Length; c++)
@@ -86,16 +87,16 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             ws.Cell(row, 1).Value  = o.SiparisNo;
             ws.Cell(row, 2).Value  = o.MusteriAd;
             ws.Cell(row, 3).Value  = o.MUlke ?? "";
-            ws.Cell(row, 4).Value  = o.ParaTipi;
+            ws.Cell(row, 4).Value  = text.Value(o.ParaTipi);
             ws.Cell(row, 5).Value  = (double)toplam;
             ws.Cell(row, 6).Value  = (double)kaparo;
             ws.Cell(row, 7).Value  = (double)kalanBakiye;
             ws.Cell(row, 8).Value  = (double)odenen;
-            ws.Cell(row, 9).Value  = o.OdemeDurum ?? "";
+            ws.Cell(row, 9).Value  = text.Value(o.OdemeDurum);
             ws.Cell(row, 10).Value = maliyet.HasValue ? (double)maliyet.Value : 0d;
             ws.Cell(row, 11).Value = kar.HasValue ? (double)kar.Value : 0d;
-            ws.Cell(row, 12).Value = pr?.Durum ?? "";
-            ws.Cell(row, 13).Value = o.Tarih.ToString("dd.MM.yyyy");
+            ws.Cell(row, 12).Value = text.Value(pr?.Durum);
+            ws.Cell(row, 13).Value = text.Date(o.Tarih);
 
             // Color coding: Onaylandı=green, Reddedildi=red, Onay Bekliyor=yellow
             if (pr != null)
@@ -236,8 +237,6 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
     // hard-coded ClosedXML akışına dönülür.
     // ─────────────────────────────────────────────────────────────────────────────
 
-    private static readonly CultureInfo TrTR = CultureInfo.GetCultureInfo("tr-TR");
-
     private static string SirketDisplay(string? sirket) => (sirket ?? string.Empty).Trim() switch
     {
         "ArsSport"  => "ARS SPORT",
@@ -246,12 +245,12 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         _ => "UNIXPADEL KORT VE ZEMINLERI URETIMI INSAATI VE SANAYI A.S.",
     };
 
-    private static string ToplamParaBirimi(string paraTipi) => paraTipi switch
+    private static string ToplamParaBirimi(string paraTipi, bool en) => paraTipi switch
     {
         "Euro"    => "TOTAL EURO",
-        "Dolar"   => "TOTAL DOLAR",
-        "TL"      => "TOTAL TL",
-        "Sterlin" => "TOTAL STERLIN",
+        "Dolar"   => en ? "TOTAL DOLLAR" : "TOTAL DOLAR",
+        "TL"      => en ? "TOTAL TRY" : "TOTAL TL",
+        "Sterlin" => en ? "TOTAL STERLING" : "TOTAL STERLIN",
         _         => "TOTAL " + paraTipi,
     };
 
@@ -368,6 +367,10 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         using var wb   = new XLWorkbook(inMs);
         var ws = wb.Worksheets.First();
 
+        // Şablon etiketleri İngilizcedir; sayı, tarih ve standart şartlar çıktı dilini izler.
+        var text    = new ExportText(lang);
+        var culture = text.Culture;
+
         string sym        = CurrencySymbol(order.ParaTipi);
         string paraBirimi = sym + " ";
 
@@ -435,7 +438,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     else
                     {
                         // Serbest kalem (Özel Kalem) — master tabloya bağlı değil
-                        bname = item.SBilesenAdi ?? "Özel Kalem";
+                        bname = item.SBilesenAdi ?? text.T("Özel Kalem", "Extra item");
                         bunit = item.SBirim ?? string.Empty;
                     }
                     urunText = string.IsNullOrEmpty(item.OznitelikAdi)
@@ -445,13 +448,13 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                 }
 
                 bool fiyatsiz = nameOnly.Contains(item.SiparisIslemID);
-                string birimFiyatText = fiyatsiz ? string.Empty : paraBirimi + birimFiyat.ToString("N2", TrTR);
-                string fiyatText      = fiyatsiz ? string.Empty : paraBirimi + toplam.ToString("N2", TrTR);
+                string birimFiyatText = fiyatsiz ? string.Empty : paraBirimi + birimFiyat.ToString("N2", culture);
+                string fiyatText      = fiyatsiz ? string.Empty : paraBirimi + toplam.ToString("N2", culture);
 
                 rowMaps.Add(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["#URUN"]       = urunText,
-                    ["#MIKTAR"]     = item.Adet.ToString(TrTR),
+                    ["#MIKTAR"]     = item.Adet.ToString(culture),
                     ["#BIRIM"]      = birimText,
                     ["#BIRIMFIYAT"] = birimFiyatText,
                     ["#FIYAT"]      = fiyatText,
@@ -461,7 +464,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             // Ekstra maliyet kalemleri — kategori satırı gibi fiyatlı tek-adet satırlar.
             foreach (var ex in extras)
             {
-                string tutarText = paraBirimi + ex.Tutar.ToString("N2", TrTR);
+                string tutarText = paraBirimi + ex.Tutar.ToString("N2", culture);
                 rowMaps.Add(new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
                 {
                     ["#URUN"]       = ex.Aciklama,
@@ -499,7 +502,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         var headerMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             ["#SIPARISNO"]        = siparisNo,
-            ["#TARIH"]            = order.Tarih.ToString("dd.MM.yyyy", TrTR),
+            ["#TARIH"]            = text.Date(order.Tarih),
             ["#MUSTERI"]          = order.MusteriAd,
             ["#MUSTERIADRES"]     = order.MAdres ?? string.Empty,
             ["#MUSTERINUMBER"]    = order.MTelefon ?? string.Empty,
@@ -508,11 +511,11 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             ["#MUSTERIZIPKODU"]   = order.MZipKod ?? string.Empty,
             ["#SIRKET"]           = SirketDisplay(order.Sirket),
             ["#SIRKETALT"]        = SirketDisplay(order.Sirket),
-            ["#TOPLAMPARABIRIMI"] = ToplamParaBirimi(order.ParaTipi),
-            ["#BRUTTOPLAMFIYAT"]  = paraBirimi + (order.BrutToplamFiyat ?? 0m).ToString("N2", TrTR),
-            ["#TOPLAMFIYAT"]      = paraBirimi + (order.ToplamFiyat ?? 0m).ToString("N2", TrTR),
-            ["#LUTFENSADECEORAN"] = $"PLEASE PAY ONLY: %{order.PesinYüzde}",
-            ["#ODEMEORANI"]       = $"payment: %{order.PesinYüzde} cash, %{100 - order.PesinYüzde} before loading",
+            ["#TOPLAMPARABIRIMI"] = ToplamParaBirimi(order.ParaTipi, text.En),
+            ["#BRUTTOPLAMFIYAT"]  = paraBirimi + (order.BrutToplamFiyat ?? 0m).ToString("N2", culture),
+            ["#TOPLAMFIYAT"]      = paraBirimi + (order.ToplamFiyat ?? 0m).ToString("N2", culture),
+            ["#LUTFENSADECEORAN"] = $"PLEASE PAY ONLY: {text.Percent(order.PesinYüzde)}",
+            ["#ODEMEORANI"]       = $"payment: {text.Percent(order.PesinYüzde)} cash, {text.Percent(100 - order.PesinYüzde)} before loading",
         };
 
         bool teslimatVar = order.Teslimat == "Var" && (order.TeslimatFiyat ?? 0m) > 0m;
@@ -556,11 +559,11 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     break;
                 case "#TESLIMATBIRIMFIYAT":
                     if (teslimatVar && order.MTeslimat > 0)
-                        cell.Value = paraBirimi + ((order.TeslimatFiyat ?? 0m) / order.MTeslimat).ToString("N2", TrTR);
+                        cell.Value = paraBirimi + ((order.TeslimatFiyat ?? 0m) / order.MTeslimat).ToString("N2", culture);
                     break;
                 case "#TESLIMATFIYAT":
                     if (teslimatVar)
-                        cell.Value = paraBirimi + (order.TeslimatFiyat ?? 0m).ToString("N2", TrTR);
+                        cell.Value = paraBirimi + (order.TeslimatFiyat ?? 0m).ToString("N2", culture);
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
                 case "#TESLIMATCESITI":
@@ -579,23 +582,23 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     break;
                 case "#MONTAJBIRIMFIYAT":
                     if (montajVar && order.MAdet > 0)
-                        cell.Value = paraBirimi + ((order.MontajFiyat ?? 0m) / order.MAdet).ToString("N2", TrTR);
+                        cell.Value = paraBirimi + ((order.MontajFiyat ?? 0m) / order.MAdet).ToString("N2", culture);
                     break;
                 case "#MONTAJFIYAT":
                     if (montajVar)
-                        cell.Value = paraBirimi + (order.MontajFiyat ?? 0m).ToString("N2", TrTR);
+                        cell.Value = paraBirimi + (order.MontajFiyat ?? 0m).ToString("N2", culture);
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
 
                 // ── İndirim / KDV ───────────────────────────────────────────
                 case "#INDIRIM":
                     if (indirim > 0)
-                        cell.Value = "Discount: -" + indirim.ToString("N2", TrTR);
+                        cell.Value = "Discount: -" + indirim.ToString("N2", culture);
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
                 case "#EKSIINDIRIM":
                     if (indirim > 0)
-                        cell.Value = "-" + paraBirimi + indirim.ToString("N2", TrTR);
+                        cell.Value = "-" + paraBirimi + indirim.ToString("N2", culture);
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
                 case "#KDV":
@@ -605,7 +608,7 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                     // hesaplıyordu → 6000 değeri için "+ 4.920.000,00 % 6000" gibi saçma
                     // satır üretiyordu. Orijinal çıktı: "+<sembol> <tutar>".
                     if (kdv > 0)
-                        cell.Value = "+" + paraBirimi + kdv.ToString("N2", TrTR);
+                        cell.Value = "+" + paraBirimi + kdv.ToString("N2", culture);
                     else rowsToDelete.Add(cell.Address.RowNumber);
                     break;
 
@@ -629,8 +632,8 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
                         // (eski CRM 17 İngilizce standart şart + kullanıcı serbest notları) yazılır.
                         if (ClauseText.NormalizeToCode(d.Text).StartsWith(ClauseText.Prefix, StringComparison.Ordinal))
                             continue;
-                        var text = ClauseText.Resolve(d.Text, lang);
-                        ws.Cell(baseR + rowIdx, baseC + colIdx).Value = $"{count}. {text}";
+                        var clause = ClauseText.Resolve(d.Text, lang);
+                        ws.Cell(baseR + rowIdx, baseC + colIdx).Value = $"{count}. {clause}";
                         rowIdx++;
                         count++;
                         wroteAny = true;
@@ -878,14 +881,15 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             AylikCiro:     aylik);
     }
 
-    public async Task<byte[]> ExportRepReportAsync(int kullaniciID, DateTime start, DateTime end)
+    public async Task<byte[]> ExportRepReportAsync(int kullaniciID, DateTime start, DateTime end, string lang = "tr")
     {
+        var text   = new ExportText(lang);
         var d      = await GetRepDetailAsync(kullaniciID, start, end);
         var orders = await uow.Orders.GetRepReportOrdersAsync(kullaniciID, start, end);
 
         var brand     = XLColor.FromArgb(68, 114, 196);
         var brandDark = XLColor.FromArgb(31, 56, 100);
-        string period = $"{start:dd.MM.yyyy} – {end:dd.MM.yyyy}";
+        string period = $"{text.Date(start)} – {text.Date(end)}";
 
         static void HeaderRow(IXLWorksheet ws, int row, XLColor brand, params string[] headers)
         {
@@ -923,26 +927,26 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         using var wb = new XLWorkbook();
 
         // ── Sheet 1: Executive Summary ───────────────────────────────────────────
-        var s1 = wb.AddWorksheet("Executive Summary");
-        BrandTitle(s1, $"Temsilci Performans Raporu · {d.AdSoyad} · {period}", 4);
+        var s1 = wb.AddWorksheet(text.T("Özet", "Executive Summary"));
+        BrandTitle(s1, $"{text.T("Satış Temsilcisi Performans Raporu", "Sales Rep Performance Report")} · {d.AdSoyad} · {period}", 4);
         int r = 4;
         void Kv(string k, XLCellValue v)
         {
             s1.Cell(r, 1).Value = k; s1.Cell(r, 1).Style.Font.Bold = true;
             s1.Cell(r, 2).Value = v; r++;
         }
-        Kv("Temsilci",        d.AdSoyad);
-        Kv("Kullanıcı Adı",   d.KullaniciAdi ?? "—");
-        Kv("Dönem",           period);
+        Kv(text.T("Satış Temsilcisi", "Sales Rep"), d.AdSoyad);
+        Kv(text.T("Kullanıcı Adı", "Username"), d.KullaniciAdi ?? "—");
+        Kv(text.T("Dönem", "Period"), period);
         r++;
-        Kv("Sipariş Sayısı",  d.SiparisSayisi);
-        Kv("Teklif Sayısı",   d.TeklifSayisi);
-        Kv("Dönüşüm Oranı",   $"%{d.DonusumOrani}");
-        Kv("Satılan Ürün Adedi", d.ToplamAdet);
-        Kv("Satış Yapılan Ülke", d.UlkeSayisi);
+        Kv(text.T("Sipariş Sayısı", "Orders"), d.SiparisSayisi);
+        Kv(text.T("Teklif Sayısı", "Quotes"), d.TeklifSayisi);
+        Kv(text.T("Dönüşüm Oranı", "Conversion Rate"), text.Percent(d.DonusumOrani));
+        Kv(text.T("Satılan Ürün Adedi", "Units Sold"), d.ToplamAdet);
+        Kv(text.T("Satış Yapılan Ülke", "Countries Sold To"), d.UlkeSayisi);
         r++;
-        s1.Cell(r, 1).Value = "Ciro (Para Birimi Bazında)"; s1.Cell(r, 1).Style.Font.Bold = true; r++;
-        HeaderRow(s1, r, brand, "Para Birimi", "Ciro", "Ort. Sipariş Değeri (AOV)"); r++;
+        s1.Cell(r, 1).Value = text.T("Ciro (Döviz Bazında)", "Revenue by Currency"); s1.Cell(r, 1).Style.Font.Bold = true; r++;
+        HeaderRow(s1, r, brand, text.T("Döviz", "Currency"), text.T("Ciro", "Revenue"), text.T("Ort. Sipariş Değeri (AOV)", "Average Order Value (AOV)")); r++;
         void Cur(string name, decimal ciro, decimal aov)
         {
             if (ciro == 0m && aov == 0m) return;
@@ -951,18 +955,18 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
             s1.Cell(r, 3).Value = (double)aov;
             r++;
         }
-        Cur("Euro", d.CiroEuro, d.AovEuro);
-        Cur("Dolar", d.CiroDolar, d.AovDolar);
-        Cur("TL", d.CiroTL, d.AovTL);
-        Cur("Sterlin", d.CiroSterlin, d.AovSterlin);
+        Cur(text.Value("Euro"), d.CiroEuro, d.AovEuro);
+        Cur(text.Value("Dolar"), d.CiroDolar, d.AovDolar);
+        Cur(text.Value("TL"), d.CiroTL, d.AovTL);
+        Cur(text.Value("Sterlin"), d.CiroSterlin, d.AovSterlin);
         Currency(s1, 2, 3);
         s1.Columns().AdjustToContents();
         s1.Column(1).Width = Math.Max(s1.Column(1).Width, 24);
 
         // ── Sheet 2: Country Analysis ────────────────────────────────────────────
-        var s2 = wb.AddWorksheet("Country Analysis");
-        BrandTitle(s2, $"Ülke Analizi · {d.AdSoyad} · {period}", 7);
-        HeaderRow(s2, 4, brand, "Ülke", "Sipariş", "Adet", "Ciro €", "Ciro $", "Ciro ₺", "Ciro £");
+        var s2 = wb.AddWorksheet(text.T("Ülke Analizi", "Country Analysis"));
+        BrandTitle(s2, $"{text.T("Ülke Analizi", "Country Analysis")} · {d.AdSoyad} · {period}", 7);
+        HeaderRow(s2, 4, brand, text.T("Ülke", "Country"), text.T("Sipariş", "Orders"), text.T("Adet", "Qty"), text.T("Ciro €", "Revenue €"), text.T("Ciro $", "Revenue $"), text.T("Ciro ₺", "Revenue ₺"), text.T("Ciro £", "Revenue £"));
         int row2 = 5;
         foreach (var u in d.Ulkeler)
         {
@@ -980,9 +984,9 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         s2.SheetView.FreezeRows(4);
 
         // ── Sheet 3: Product Analysis ────────────────────────────────────────────
-        var s3 = wb.AddWorksheet("Product Analysis");
-        BrandTitle(s3, $"Ürün Analizi · {d.AdSoyad} · {period}", 3);
-        HeaderRow(s3, 4, brand, "Ürün (Kategori)", "Satılan Adet", "Sipariş Sayısı");
+        var s3 = wb.AddWorksheet(text.T("Ürün Analizi", "Product Analysis"));
+        BrandTitle(s3, $"{text.T("Ürün Analizi", "Product Analysis")} · {d.AdSoyad} · {period}", 3);
+        HeaderRow(s3, 4, brand, text.T("Ürün (Kategori)", "Product (Category)"), text.T("Satılan Adet", "Units Sold"), text.T("Sipariş Sayısı", "Orders"));
         int row3 = 5;
         foreach (var p in d.Urunler)
         {
@@ -995,20 +999,20 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         s3.SheetView.FreezeRows(4);
 
         // ── Sheet 4: Order Details ───────────────────────────────────────────────
-        var s4 = wb.AddWorksheet("Order Details");
-        BrandTitle(s4, $"Sipariş Detayı · {d.AdSoyad} · {period}", 8);
-        HeaderRow(s4, 4, brand, "No", "Müşteri", "Ülke", "Aşama", "Kontrol", "Para Birimi", "Toplam", "Tarih");
+        var s4 = wb.AddWorksheet(text.T("Sipariş Detayı", "Order Details"));
+        BrandTitle(s4, $"{text.T("Sipariş Detayı", "Order Details")} · {d.AdSoyad} · {period}", 8);
+        HeaderRow(s4, 4, brand, "No", text.T("Müşteri", "Customer"), text.T("Ülke", "Country"), text.T("Aşama", "Stage"), text.T("Kontrol", "Review"), text.T("Döviz", "Currency"), text.T("Toplam", "Total"), text.T("Tarih", "Date"));
         int row4 = 5;
         foreach (var o in orders)
         {
             s4.Cell(row4, 1).Value = string.IsNullOrEmpty(o.SiparisNo) ? o.TeklifNo : o.SiparisNo;
             s4.Cell(row4, 2).Value = o.MusteriAd;
             s4.Cell(row4, 3).Value = o.MUlke ?? "";
-            s4.Cell(row4, 4).Value = o.SiparisMiTeklifMi;
-            s4.Cell(row4, 5).Value = o.Kontrol ?? "";
-            s4.Cell(row4, 6).Value = o.ParaTipi;
+            s4.Cell(row4, 4).Value = text.Value(o.SiparisMiTeklifMi);
+            s4.Cell(row4, 5).Value = text.Value(o.Kontrol);
+            s4.Cell(row4, 6).Value = text.Value(o.ParaTipi);
             s4.Cell(row4, 7).Value = (double)(o.ToplamFiyat ?? 0m);
-            s4.Cell(row4, 8).Value = o.Tarih.ToString("dd.MM.yyyy");
+            s4.Cell(row4, 8).Value = text.Date(o.Tarih);
             row4++;
         }
         Currency(s4, 7);
@@ -1016,9 +1020,9 @@ internal sealed class ReportingService(IUnitOfWork uow, IMemoryCache cache) : IR
         s4.SheetView.FreezeRows(4);
 
         // ── Sheet 5: Monthly Revenue Trend ───────────────────────────────────────
-        var s5 = wb.AddWorksheet("Monthly Revenue Trend");
-        BrandTitle(s5, $"Aylık Ciro Trendi · {d.AdSoyad} · {period}", 6);
-        HeaderRow(s5, 4, brand, "Ay", "Sipariş", "Ciro €", "Ciro $", "Ciro ₺", "Ciro £");
+        var s5 = wb.AddWorksheet(text.T("Aylık Ciro Trendi", "Monthly Revenue Trend"));
+        BrandTitle(s5, $"{text.T("Aylık Ciro Trendi", "Monthly Revenue Trend")} · {d.AdSoyad} · {period}", 6);
+        HeaderRow(s5, 4, brand, text.T("Ay", "Month"), text.T("Sipariş", "Orders"), text.T("Ciro €", "Revenue €"), text.T("Ciro $", "Revenue $"), text.T("Ciro ₺", "Revenue ₺"), text.T("Ciro £", "Revenue £"));
         int row5 = 5;
         foreach (var m in d.AylikCiro)
         {

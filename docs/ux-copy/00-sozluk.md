@@ -13,6 +13,10 @@ Tüm ekran metinleri, kılavuz, sürüm notları ve hata mesajları bu sözlüğ
 - **Onay pencereleri (2026-11):** başlık soru ("… silinsin mi?"), açıklamada kayıt adı, "Ne olacak?" maddeleri ve varsa "Sonraki adım". Buton etiketi eylem fiilidir ("Hazır olarak işaretle", "Formu temizle"); "Evet/Tamam" kullanılmaz.
 - **Etiketler:** her ikon butonun yanında adı yazar; devre dışı butonun sebebi butonun altında görünür metindir (yalnız ipucu değil)."
 - **Yasak:** "optimize", "entegre", "sinerji", "kesintisiz", "mükemmel çözüm", "dijital dünya", "harmanla", "gerçekleştirilmektedir", "temin edilmektedir", "başarıyla", "lütfen" / "please", "successfully".
+- **Büyük harf (EN):** menü, sayfa ve bu sözlükteki özel adlar Title Case ("Order History"); diğer tüm metinler sentence case ("Save changes").
+- **Sayı ve tarih (EN, 2026-11-18):** `en-GB` biçimi: `1,234.56`, `18/11/2026`. Tutar alanları etkin dilin ondalık ayırıcısına göre okunur.
+- **Veri çevrilmez:** katalog, ülke ve serbest metin değerleri Türkçe kalır. Sabit listelerde (birim, para tipi) kayıtlı değer aynı kalır, yalnız ekrandaki ad çevrilir.
+- **Dosya çıktıları:** Excel ve proforma arayüz dilini izler. Liste indirme (CSV) başlık ve durumları çevirir, sayı biçimi Excel'in Türkçe ayarına uygun kalır.
 - **Adım ve aşama farkı:**
   - **Aşama** (Stage): siparişin durumu; Teklif, Sipariş, Planlama, Üretim, Hazır, Lojistik, Tamamlandı.
   - **Adım** (Step): iş sırasında bekleyen iş; "Önceki adımda bekleyenler".
@@ -74,8 +78,18 @@ Tüm ekran metinleri, kılavuz, sürüm notları ve hata mesajları bu sözlüğ
 | Sipariş detayının sağ paneli | Sipariş detayı | Order details |
 | Siparişi kapatma (muhasebe) | Siparişi Kapat | Close Order |
 | Teklifi siparişe çevirme | Siparişe Çevir | Turn into Order |
+| Peşin ödeme koşulu | Peşin | Advance payment |
+| Vadeli ödeme koşulu ("taksit" değildir) | Vadeli | Deferred payment |
+| Taksit | Taksit | Installments |
+| Sipariş veya talep satırı | Kalem | Item |
+| Reddetme gerekçesi | Red sebebi | Reason for rejection |
+| Maliyet reçetesi / tablosu | Maliyet tablosu | Cost sheet |
+| Gümrüklü depo | Antrepo | Bonded warehouse |
+| Beyannamedeki gönderen | Gönderici | Consignor |
+| Beyannamedeki alan | Alıcı | Consignee |
+| Gümrük rejimi kodu | Rejim kodu | Customs procedure code |
 
-**Fiiller:** Kaydet/Save, Ekle/Add, Sil/Delete, Düzenle/Edit, Onayla/Approve, Reddet/Reject, Kapat/Close, Sıfırla/Reset, Yenile/Refresh, Revize Et/Revise.
+**Fiiller:** Kaydet/Save, Ekle/Add, Sil/Delete, Düzenle/Edit, Onayla/Approve, Reddet/Reject, Kapat/Close, Sıfırla/Reset, Yenile/Refresh, Revize Et/Revise, Seç/Select, Kaldır/Remove.
 
 ## Kapsam dışı
-Proforma sözleşme maddeleri (`clauses.*`, `lib/clauses.ts`) hukuki metin olduğu için değiştirilmedi.
+Proforma sözleşme maddeleri (`clauses.*`, `lib/clauses.ts`, `ClauseText.cs`) hukuki metindir; üslup için değiştirilmez. İstisna (2026-11-18): anlamı yanlış olan EN "Installments" → "Deferred Payment" ve "Assembly" → "Installation". Bu iki değişiklik yayından önce hukuk/finans onayı ister.

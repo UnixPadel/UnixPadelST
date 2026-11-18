@@ -1,7 +1,7 @@
 namespace CrmModern.Core.DTOs.WarehouseStock;
 
 /// <summary>Okuma sonrası uyarı — <c>Kod</c> istemcide çevrilir, <c>Mesaj</c> Türkçe yedektir.</summary>
-public sealed record DraftWarningDto(string Kod, string Mesaj);
+public sealed record DraftWarningDto(string Kod, string Mesaj, object? Args = null);
 
 /// <summary>Okunan tek kalem (kontrol ekranında düzenlenebilir taslak).</summary>
 public sealed record DraftItemDto(
@@ -46,4 +46,5 @@ public sealed record AnalyzeResultDto(
     string?              HataKodu,
     string?              HataMesaji,
     BeyannameDraftDto?   Taslak,
-    int?                 MevcutBeyannameId);
+    int?                 MevcutBeyannameId,
+    object?              HataArgs = null);

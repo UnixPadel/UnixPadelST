@@ -145,9 +145,9 @@ public sealed class AccountingController(
 
     [HttpGet("excel")]
     [Authorize(Roles = "Yonetici,Muhasebe")]
-    public async Task<IActionResult> Excel([FromQuery] TransactionFilterDto filter)
+    public async Task<IActionResult> Excel([FromQuery] TransactionFilterDto filter, [FromQuery] string lang = "tr")
     {
-        var bytes = await accountingService.GenerateAccountingExcelAsync(filter);
+        var bytes = await accountingService.GenerateAccountingExcelAsync(filter, lang);
         return File(bytes,
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "muhasebe.xlsx");

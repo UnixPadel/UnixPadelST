@@ -6,6 +6,7 @@ import { Popover } from '@/components/ui/popover'
 import { usePreferences, setPreferences } from '@/lib/preferences'
 import { cn } from '@/lib/utils'
 
+import { formatTime } from '@/lib/format'
 /**
  * E-5 — SAP GUI durum çubuğu: ekranın altında son mesaj + oturum mesaj günlüğü
  * (toast kaybolsa da hata okunabilir) ve sağda bağlama göre kısayol ipuçları
@@ -79,7 +80,7 @@ export function StatusBar({ onShowHelp }: { onShowHelp: () => void }) {
       >
         {last ? ICON[last.variant] : <MessageSquare className="h-3.5 w-3.5" />}
         <span className={cn('truncate', last?.variant === 'destructive' && 'text-danger')}>
-          {last ? `${last.at.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · ${last.title}${last.description ? ` — ${last.description}` : ''}` : t('statusBar.ready')}
+          {last ? `${formatTime(last.at)} · ${last.title}${last.description ? ` — ${last.description}` : ''}` : t('statusBar.ready')}
         </span>
         {messages.length > 0 && (
           <span className={cn('rounded-full px-1.5 tabular-nums', errors ? 'bg-danger-soft text-danger-soft-foreground' : 'bg-muted')}>
@@ -103,7 +104,7 @@ export function StatusBar({ onShowHelp }: { onShowHelp: () => void }) {
                 <span className="font-medium">{m.title}</span>
                 {m.description && <span className="block break-words text-muted-foreground">{m.description}</span>}
               </span>
-              <span className="shrink-0 tabular-nums text-muted-foreground">{m.at.toLocaleTimeString('tr-TR')}</span>
+              <span className="shrink-0 tabular-nums text-muted-foreground">{formatTime(m.at, true)}</span>
             </li>
           ))}
         </ul>

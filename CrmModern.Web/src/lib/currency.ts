@@ -1,3 +1,6 @@
+import type { TFunction } from 'i18next'
+import { appLang, appLocale } from '@/lib/format'
+
 /**
  * Para birimi çevirisi — TL bazlı kurlar (1 birim döviz = N TL, TCMB "Döviz Satış").
  *
@@ -69,10 +72,20 @@ export function currencySymbolOf(c?: string | null): string {
   return s
 }
 
-/** "1.234,56 €" — TR biçimi, sembol sonda. null/undefined → '-'. */
+/** Para tipinin ekrandaki adı (Dolar → Dollar). Kayıtlı değer değişmez; bilinmeyen değer aynen döner. */
+export function currencyLabel(t: TFunction, value: unknown): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const upper = raw.toUpperCase()
+  const iso = PARA_TIPI_ISO[raw] ?? ISO_CURRENCIES.find((c) => c === upper)
+  return iso ? t(`currency.name.${iso}`) : raw
+}
+
+/** TR: "1.234,56 €", EN: "€1,234.56". null/undefined → '-'. */
 export function formatMoney(amount: number | null | undefined, currency?: string | null): string {
   if (amount == null || !Number.isFinite(amount)) return '-'
-  const num = amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const num = amount.toLocaleString(appLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   const sym = currencySymbolOf(currency)
-  return sym ? `${num} ${sym}` : num
+  if (!sym) return num
+  return appLang() === 'en' && ['€', '$', '₺', '£'].includes(sym) ? `${sym}${num}` : `${num} ${sym}`
 }

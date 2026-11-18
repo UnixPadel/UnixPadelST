@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestLine } from '@/api/purchase'
 
+import { unitLabel } from '@/lib/units'
 /**
  * Round-11 §9 — onay/detay ekranlarında ortak kalem tablosu.
  * Para birimi belge düzeyinde (paraBirimi). hideMoney true ise (Fabrika /
@@ -39,7 +40,7 @@ export function PurchaseLinesTable({
           {kalemler.map((k) => (
             <tr key={k.kalemID} className="border-t">
               <td className="px-2 py-1">{k.urunAdi}</td>
-              <td className="px-2 py-1">{k.birim}</td>
+              <td className="px-2 py-1">{unitLabel(t, k.birim)}</td>
               <td className="px-2 py-1 text-right tabular-nums">{k.miktar}</td>
               {!hideMoney && (
                 <td className="px-2 py-1 text-right tabular-nums">{k.birimFiyat != null ? money(k.birimFiyat) : '—'}</td>

@@ -14,6 +14,7 @@ import { hideMoneyFor } from '@/lib/visibility'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import type { PurchaseRequestListDto } from '@/types'
 
+import { currencyLabel } from '@/lib/currency'
 // Roles that can create a new purchase request (mirror /purchase/new gate).
 const CAN_CREATE_ROLES = new Set(['Yonetici', 'Lojistik', 'Fabrika', 'Gozlemci', 'Temsilci'])
 const FILTER_DEFAULTS = { talepNo: '' }
@@ -36,7 +37,7 @@ export function MyPurchaseRequestsPage() {
     { key: 'urunAdi',       header: t('purchase.cols.urun') },
     { key: 'urunTuru',      header: t('purchase.cols.tur') },
     ...(!hideMoney ? [
-      { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => (r.paraBirimi as string) ?? '—' },
+      { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => currencyLabel(t, r.paraBirimi) || '—' },
       { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
     ] satisfies Column<PurchaseRequestListDto & Record<string, unknown>>[] : []),
     { key: 'alinanYer',     header: t('purchase.cols.alinanYer') },

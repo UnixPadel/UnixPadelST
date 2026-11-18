@@ -12,6 +12,13 @@ import { setTableState, useTableState, type SortDir } from '@/lib/tableState'
 import { downloadCsv } from '@/lib/export'
 import { densityFor, usePreferences } from '@/lib/preferences'
 
+import { appLocale } from '@/lib/format'
+import { formatTime } from '@/lib/format'
+import { currencyLabel } from '@/lib/currency'
+import { statusLabel } from '@/lib/status'
+
+// Dışa aktarımda ham değer yerine ekrandaki adı yazılan sütunlar.
+const EXPORT_LABEL_COLUMNS = new Set(['paraTipi', 'paraBirimi', 'siparisMiTeklifMi', 'kontrol', 'odemeDurum', 'durum', 'muhasebeDurumu'])
 export type { RowAction }
 
 export interface Column<T> {
@@ -294,7 +301,8 @@ export function DataTable<T extends Record<string, unknown>>({
       cols.map((c) => c.header),
       sorted.map((r) => cols.map((c) => {
         const v = typeof c.exportValue === 'function' ? c.exportValue(r) : cellValue(r, c)
-        if (v instanceof Date) return v.toLocaleDateString('tr-TR')
+        if (v instanceof Date) return v.toLocaleDateString(appLocale())
+        if (typeof v === 'string' && EXPORT_LABEL_COLUMNS.has(String(c.key))) return currencyLabel(t, statusLabel(t, v))
         return v as string | number | null | undefined
       })),
     )
@@ -330,7 +338,7 @@ export function DataTable<T extends Record<string, unknown>>({
     const rank = (g: string) => { const i = order.indexOf(g); return i === -1 ? order.length : i }
     return [...groups.entries()]
       .sort(([a], [b]) => rank(a) - rank(b))
-      .map(([g, rows]) => ({ label: `${t('common.total')} · ${g}`, rows }))
+      .map(([g, rows]) => ({ label: `${t('common.total')} · ${currencyLabel(t, g)}`, rows }))
   }, [footerGroups, sorted, t])
   const footPad = compact ? 'px-2 py-1' : cellPad
 
@@ -341,7 +349,7 @@ export function DataTable<T extends Record<string, unknown>>({
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {toolbar}
             {!loading && <span>{t('table.rowCount', { count: sorted.length })}</span>}
-            {updatedAt ? <span>· {t('table.updatedAt', { time: new Date(updatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) })}</span> : null}
+            {updatedAt ? <span>· {t('table.updatedAt', { time: formatTime(updatedAt) })}</span> : null}
           </div>
           {onRefresh && (
             <Button size="xs" variant="outline" onClick={onRefresh} title="F5">

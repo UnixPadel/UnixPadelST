@@ -90,6 +90,7 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
         {
             hits.Add(new UnifiedSearchHitDto(
                 Kategori:    "Sipariş",
+                KategoriKodu: "order",
                 Id:          o.SiparisNo,
                 Baslik:      $"{o.BelgeNo} — {o.MusteriAd}",
                 AltMetin:    $"{o.Asama} • {o.ParaTipi} • {o.Tarih:dd.MM.yyyy}",
@@ -107,6 +108,7 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
             // Müşteri sonucu, o müşterinin teklif ve siparişlerini listeler.
             hits.Add(new UnifiedSearchHitDto(
                 Kategori:    "Müşteri",
+                KategoriKodu: "customer",
                 Id:          m.MusteriID.ToString(),
                 Baslik:      m.MusteriAd,
                 AltMetin:    string.IsNullOrEmpty(m.E_Mail) ? m.Telefon : m.E_Mail,
@@ -117,6 +119,7 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
         {
             hits.Add(new UnifiedSearchHitDto(
                 Kategori:    "Kullanıcı",
+                KategoriKodu: "user",
                 Id:          u.KullaniciID.ToString(),
                 Baslik:      $"{u.Ad} {u.Soyad}".Trim(),
                 AltMetin:    $"{u.KullaniciAdi} • {u.YetkiTuru}",
@@ -128,6 +131,7 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
         {
             hits.Add(new UnifiedSearchHitDto(
                 Kategori:    "Satın Alma Talep",
+                KategoriKodu: "purchase",
                 Id:          p.TalepID.ToString(),
                 Baslik:      p.UrunAdi,
                 AltMetin:    $"{p.Departman ?? "-"} • {p.Durum} • {p.TalepTarihi:dd.MM.yyyy}",

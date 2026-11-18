@@ -61,6 +61,8 @@ export function WarehouseStockPage() {
 
   const role = user?.yetkiTuru ?? ''
   const canMutate = role === 'Yonetici' || role === 'Lojistik' || isSuperAdmin(user)
+  const konumLabel = (value: string) =>
+    value === 'Antrepo' ? t('warehouse.location.antrepo') : value === 'Depo' ? t('warehouse.location.depo') : value
 
   // Filters
   const [konum, setKonum] = useState<string>('Tumu')
@@ -129,13 +131,13 @@ export function WarehouseStockPage() {
         : `${req.miktar} ${exitTarget.birim}`
 
       toast({
-        title: `${exitTarget.malAdi}: ${qtyDesc} araca yüklendi`,
-        description: 'Çıkış başarıyla kaydedildi.',
+        title: t('warehouse.toast.exitSavedTitle', { name: exitTarget.malAdi, quantity: qtyDesc }),
+        description: t('warehouse.toast.exitSaved'),
         variant: 'success',
       })
     } catch (err) {
       toast({
-        title: 'Çıkış kaydedilemedi',
+        title: t('warehouse.toast.exitSaveFailed'),
         description: describeApiError(err),
         variant: 'destructive',
       })
@@ -153,13 +155,13 @@ export function WarehouseStockPage() {
         void qc.invalidateQueries({ queryKey: ['warehouse-stock-detail', detailId] })
       }
       toast({
-        title: 'Çıkış işlemi geri alındı',
-        description: 'Miktar stoğa tekrar dahil edildi.',
+        title: t('warehouse.toast.exitUndone'),
+        description: t('warehouse.toast.exitUndoneDescription'),
         variant: 'success',
       })
     } catch (err) {
       toast({
-        title: 'Geri alma işlemi başarısız',
+        title: t('warehouse.toast.exitUndoFailed'),
         description: describeApiError(err),
         variant: 'destructive',
       })
@@ -200,12 +202,12 @@ export function WarehouseStockPage() {
       setAddModalOpen(false)
       void qc.invalidateQueries({ queryKey: ['warehouse-stock'] })
       toast({
-        title: 'Yeni stok girişi kaydedildi',
+        title: t('warehouse.toast.stockSaved'),
         variant: 'success',
       })
     } catch (err) {
       toast({
-        title: 'Stok kaydedilemedi',
+        title: t('warehouse.toast.stockSaveFailed'),
         description: describeApiError(err),
         variant: 'destructive',
       })
@@ -216,7 +218,7 @@ export function WarehouseStockPage() {
   const columns: Column<Row>[] = [
     {
       key: 'beyannameNo',
-      header: 'Beyanname No',
+      header: t('warehouse.columns.declarationNo'),
       sortable: true,
       className: 'w-40',
       render: (r) => (
@@ -227,21 +229,22 @@ export function WarehouseStockPage() {
     },
     {
       key: 'konum',
-      header: 'Konum',
+      header: t('warehouse.columns.location'),
       sortable: true,
+      exportValue: (r) => konumLabel(r.konum as string),
       className: 'w-28',
       render: (r) => (
         <Badge
           variant={r.konum === 'Antrepo' ? 'info' : 'secondary'}
           className="px-2 py-0.5 text-xs font-semibold"
         >
-          {r.konum as string}
+          {konumLabel(r.konum as string)}
         </Badge>
       ),
     },
     {
       key: 'malAdi',
-      header: 'Mal',
+      header: t('warehouse.columns.goods'),
       sortable: true,
       truncate: '20rem',
       render: (r) => (
@@ -257,7 +260,7 @@ export function WarehouseStockPage() {
     },
     {
       key: 'kalan',
-      header: 'Kalan / Toplam Miktar',
+      header: t('warehouse.columns.quantity'),
       sortable: true,
       className: 'w-48',
       render: (r) => {
@@ -292,22 +295,23 @@ export function WarehouseStockPage() {
     },
     {
       key: 'kapAdedi',
-      header: 'Kap',
+      header: t('warehouse.columns.packages'),
       sortable: true,
       className: 'w-28',
       render: (r) => {
         if (r.kapAdedi == null) return <span className="text-muted-foreground">—</span>
         return (
           <span className="text-xs tabular-nums text-foreground">
-            {r.kalanKap ?? 0} / {r.kapAdedi as number} {((r.kapCinsi as string) || 'kap').toLowerCase()}
+            {r.kalanKap ?? 0} / {r.kapAdedi as number} {((r.kapCinsi as string) || t('warehouse.packageUnit', { count: r.kapAdedi as number })).toLowerCase()}
           </span>
         )
       },
     },
     {
       key: 'durum',
-      header: 'Durum',
+      header: t('common.status'),
       sortable: true,
+      exportValue: (r) => t(r.durum === 'Tamam' ? 'warehouse.status.done' : r.durum === 'Kismen' ? 'warehouse.status.partial' : 'warehouse.status.waiting'),
       className: 'w-36',
       render: (r) => (
         <StockStatusBadge
@@ -336,7 +340,7 @@ export function WarehouseStockPage() {
               className="gap-1 font-semibold shadow-xs"
             >
               <Truck className="h-3.5 w-3.5" />
-              <span>Araca Yükle</span>
+              <span>{t('warehouse.actions.loadOntoVehicle')}</span>
             </Button>
           ) : (
             <Button
@@ -349,7 +353,7 @@ export function WarehouseStockPage() {
               className="gap-1 text-xs"
             >
               <Eye className="h-3.5 w-3.5" />
-              <span>Detay</span>
+              <span>{t('warehouse.actions.details')}</span>
             </Button>
           )}
 
@@ -358,13 +362,13 @@ export function WarehouseStockPage() {
             actions={[
               {
                 key: 'detail',
-                label: 'Detay & Çıkış Geçmişi',
+                label: t('warehouse.actions.detailsAndHistory'),
                 icon: <Eye className="h-3.5 w-3.5" />,
                 onSelect: (row) => handleOpenDetail(row.id as number),
               },
               {
                 key: 'exit',
-                label: 'Araca Yükle (Çıkış Yap)',
+                label: t('warehouse.actions.loadAndExit'),
                 icon: <Truck className="h-3.5 w-3.5" />,
                 hidden: !canMutate || (r.durum as string) === 'Tamam',
                 onSelect: (row) => handleOpenExit(row as StockItemListDto),
@@ -398,7 +402,7 @@ export function WarehouseStockPage() {
     <FillPage>
       <PageHeader
         density="compact"
-        title="Antrepo & Depo Stokları"
+        title={t('warehouse.page.title')}
         actions={
           canMutate ? (
             <div className="relative">
@@ -408,7 +412,7 @@ export function WarehouseStockPage() {
                 onClick={() => setAddMenuOpen(!addMenuOpen)}
               >
                 <Plus className="h-4 w-4" />
-                <span>Mal Ekle</span>
+                <span>{t('warehouse.page.addGoods')}</span>
                 <ChevronDown className="h-3.5 w-3.5 opacity-60" />
               </Button>
 
@@ -430,8 +434,8 @@ export function WarehouseStockPage() {
                     >
                       <UploadCloud className="h-4 w-4 text-primary" />
                       <div>
-                        <p className="font-semibold">Beyanname Yükle</p>
-                        <p className="text-2xs text-muted-foreground">Yapay zekâ ile otomatik oku</p>
+                        <p className="font-semibold">{t('warehouse.page.uploadDeclaration')}</p>
+                        <p className="text-2xs text-muted-foreground">{t('warehouse.page.uploadDeclarationHint')}</p>
                       </div>
                     </button>
 
@@ -446,8 +450,8 @@ export function WarehouseStockPage() {
                     >
                       <FileEdit className="h-4 w-4 text-muted-foreground" />
                       <div>
-                        <p className="font-semibold">Elle Bilgi Gir</p>
-                        <p className="text-2xs text-muted-foreground">Form üzerinden doğrudan ekle</p>
+                        <p className="font-semibold">{t('warehouse.page.manualEntry')}</p>
+                        <p className="text-2xs text-muted-foreground">{t('warehouse.page.manualEntryHint')}</p>
                       </div>
                     </button>
                   </div>
@@ -471,7 +475,7 @@ export function WarehouseStockPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Tümü ({sayac.tumu})
+            {t('warehouse.page.tabs.all', { count: sayac.tumu })}
           </button>
           <button
             type="button"
@@ -482,7 +486,7 @@ export function WarehouseStockPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Antrepo ({sayac.antrepo})
+            {t('warehouse.page.tabs.antrepo', { count: sayac.antrepo })}
           </button>
           <button
             type="button"
@@ -493,7 +497,7 @@ export function WarehouseStockPage() {
                 : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            Kendi Deposu ({sayac.depo})
+            {t('warehouse.page.tabs.depo', { count: sayac.depo })}
           </button>
         </div>
 
@@ -505,7 +509,7 @@ export function WarehouseStockPage() {
               inputSize="sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Mal veya beyanname no ara..."
+              placeholder={t('warehouse.page.searchPlaceholder')}
               className="pl-8 text-xs"
             />
           </div>
@@ -514,7 +518,7 @@ export function WarehouseStockPage() {
             id="show-finished"
             checked={tamamlananlar}
             onCheckedChange={(c) => setTamamlananlar(!!c)}
-            label="Tamamı çıkanları göster"
+            label={t('warehouse.page.showFullyExited')}
             labelClassName="text-xs font-medium text-muted-foreground whitespace-nowrap"
           />
           {canMutate && (
@@ -528,13 +532,13 @@ export function WarehouseStockPage() {
         <DataTable
           fill
           tableId="warehouse-stock-table"
-          exportFileName="antrepo-depo-stoklari"
+          exportFileName={t('warehouse.page.exportFileName')}
           columns={columns}
           data={items}
           keyField="id"
           loading={isLoading}
           error={isError}
-          emptyMessage="Antrepoda veya depoda bekleyen stok bulunamadı."
+          emptyMessage={t('warehouse.page.empty')}
           onRowClick={(r) => handleOpenDetail(r.id as number)}
         />
       </FillRegion>

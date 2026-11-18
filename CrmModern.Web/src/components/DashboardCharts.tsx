@@ -8,6 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { stageLabel } from '@/lib/status'
 import type { OrderTrendPoint, StageDistribution, TopCustomer } from '@/types'
 
+import { formatNumber } from '@/lib/number'
+import { currencyLabel } from '@/lib/currency'
 const STAGE_COLORS: Record<string, string> = {
   Teklif:      '#94a3b8',
   Siparis:     '#3b82f6',
@@ -100,7 +102,7 @@ export function TopCustomersChart({ data }: { data: TopCustomer[] }) {
               <YAxis type="category" dataKey="musteriAd" width={140} fontSize={11}
                 tickFormatter={(v: string) => (v.length > 22 ? v.slice(0, 21) + '…' : v)} />
               <Tooltip formatter={(v: number, _n, p: any) =>
-                [`${v.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ${p.payload.paraTipi}`, t('dashboard.charts.revenue')]
+                [`${formatNumber(v)} ${currencyLabel(t, p.payload.paraTipi)}`, t('dashboard.charts.revenue')]
               } />
               <Bar dataKey="toplamCiro" fill="#22c55e" radius={[0, 4, 4, 0]} />
             </BarChart>

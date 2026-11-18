@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { CheckCircle2, CircleAlert } from 'lucide-react'
 import { KeyValue } from '@/components/ui/key-value'
-import { formatNumberTR } from '@/lib/number'
+import { formatNumber } from '@/lib/number'
 import type { OrderIssue, OrderTotals } from '@/lib/orderForm'
 import { cn } from '@/lib/utils'
 
@@ -39,7 +39,7 @@ export function OrderSummaryRail({
   docNo?: string | null
 }) {
   const { t } = useTranslation()
-  const m = (n: number) => `${formatNumberTR(n)} ${sym}`
+  const m = (n: number) => `${formatNumber(n)} ${sym}`
   return (
     <aside aria-label={t('orders.summary.title')} className="space-y-3 rounded-md border bg-card p-3 shadow-sm">
       <div className="flex items-baseline justify-between">

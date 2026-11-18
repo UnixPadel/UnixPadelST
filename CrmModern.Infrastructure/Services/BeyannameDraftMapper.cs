@@ -85,7 +85,8 @@ internal static class BeyannameDraftMapper
             {
                 uyarilar.Add(new DraftWarningDto(
                     "notAnDeclaration",
-                    $"Beyanname numarası ({beyannameNo}) standart AN antrepo biçiminde değil. Kontrol edip devam edebilirsiniz."));
+                    $"Beyanname numarası ({beyannameNo}) standart AN antrepo biçiminde değil. Kontrol edip devam edebilirsiniz.",
+                    new { no = beyannameNo }));
             }
         }
 
@@ -93,7 +94,8 @@ internal static class BeyannameDraftMapper
         {
             uyarilar.Add(new DraftWarningDto(
                 "declarationItemCountMismatch",
-                $"Beyannamede {kalemSayisi.Value} kalem belirtilmiş, ancak {kalemlerList.Count} kalem okundu."));
+                $"Beyannamede {kalemSayisi.Value} kalem belirtilmiş, ancak {kalemlerList.Count} kalem okundu.",
+                new { declared = kalemSayisi.Value, read = kalemlerList.Count }));
         }
 
         if (faturaTutari.HasValue && faturaTutari.Value > 0)
@@ -103,7 +105,8 @@ internal static class BeyannameDraftMapper
             {
                 uyarilar.Add(new DraftWarningDto(
                     "invoiceAmountMismatch",
-                    $"Kalem fiyatları toplamı ({sumKalem:N2}) beyanname fatura bedelinden ({faturaTutari.Value:N2}) farklı."));
+                    $"Kalem fiyatları toplamı ({sumKalem:N2}) beyanname fatura bedelinden ({faturaTutari.Value:N2}) farklı.",
+                    new { sum = sumKalem, invoice = faturaTutari.Value }));
             }
         }
 

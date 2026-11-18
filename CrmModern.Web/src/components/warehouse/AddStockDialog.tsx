@@ -26,6 +26,7 @@ import {
   ArrowLeft,
 } from 'lucide-react'
 import { analyzeDeclaration } from '@/api/warehouseStock'
+import { messageFromEnvelope, messageFromResult } from '@/lib/axios'
 import { cn } from '@/lib/utils'
 import type { CreateStockRequest, CreateStockItemRequest } from '@/types'
 
@@ -181,11 +182,11 @@ export function AddStockDialog({
         }
 
         if (d.uyarilar && d.uyarilar.length > 0) {
-          setAnalysisWarnings(d.uyarilar.map((u) => u.mesaj))
+          setAnalysisWarnings(d.uyarilar.map((u) => messageFromEnvelope({ code: u.kod, message: u.mesaj, args: u.args }) ?? u.mesaj))
         }
       } else {
         setKaynak('Elle')
-        setAnalysisWarnings([res.hataMesaji || t('addStock.aiUnavailable')])
+        setAnalysisWarnings([messageFromResult(res) || t('addStock.aiUnavailable')])
       }
     } catch {
       setKaynak('Elle')

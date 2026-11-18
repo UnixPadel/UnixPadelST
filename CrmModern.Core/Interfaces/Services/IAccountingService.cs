@@ -31,7 +31,7 @@ public interface IAccountingService
     Task<CustomerBalanceDto>     GetCustomerBalanceAsync(int musteriId);
 
     /// <summary>ClosedXML fallback xlsx (ExcelIndir BLOB template Faz 8'e).</summary>
-    Task<byte[]> GenerateAccountingExcelAsync(TransactionFilterDto filter);
+    Task<byte[]> GenerateAccountingExcelAsync(TransactionFilterDto filter, string lang = "tr");
 
 
     // ── PROMPT.md ACCOUNTING #14 ─────────────────────────────────────────────

@@ -12,4 +12,5 @@ public sealed record UnifiedSearchHitDto(
     string  Baslik,
     string? AltMetin,
     string  NavigateUrl,
-    OrderHitSummaryDto? Siparis = null);
+    OrderHitSummaryDto? Siparis = null,
+    string? KategoriKodu = null);

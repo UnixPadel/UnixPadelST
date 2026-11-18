@@ -716,6 +716,7 @@ export interface RepDetail {
 
 export interface UnifiedSearchHit {
   kategori: string
+  kategoriKodu?: 'order' | 'customer' | 'part' | 'category' | 'user' | 'purchase'
   id: string
   baslik: string
   altMetin?: string | null
@@ -934,6 +935,7 @@ export interface AddStockExitRequest {
 export interface DraftWarningDto {
   kod: string
   mesaj: string
+  args?: Record<string, unknown> | null
 }
 
 export interface DraftItemDto {
@@ -974,6 +976,7 @@ export interface AnalyzeResultDto {
   basarili: boolean
   hataKodu: string | null
   hataMesaji: string | null
+  hataArgs?: Record<string, unknown> | null
   taslak: BeyannameDraftDto | null
   mevcutBeyannameId: number | null
 }
@@ -1002,6 +1005,7 @@ export interface GeminiTestResultDto {
   basarili: boolean
   hataKodu: string | null
   hataMesaji: string | null
+  hataArgs?: Record<string, unknown> | null
 }
 
 export interface ClaudeKeyStatusDto {
@@ -1029,6 +1033,7 @@ export interface ClaudeTestResultDto {
   basarili: boolean
   hataKodu: string | null
   hataMesaji: string | null
+  hataArgs?: Record<string, unknown> | null
 }
 
 export interface AiSettingsOverviewDto {

@@ -1,6 +1,7 @@
 import api from '@/lib/axios'
 import type { AccountingOrderListDto, AccountingTransactionDto, ApiResponse } from '@/types'
 
+import { appLang } from '@/lib/format'
 // ── Lists ───────────────────────────────────────────────────────────────────
 
 export const getAccountingOrders = async (): Promise<AccountingOrderListDto[]> => {
@@ -153,7 +154,7 @@ export const downloadAccountingExcel = async (filter: TransactionFilter = {}) =>
   //   3) Anchor and URL cleanup deferred so the download has time to start.
   const { page: _p, pageSize: _ps, ...exportFilter } = filter
   const res = await api.get('/api/accounting/excel', {
-    params: exportFilter,
+    params: { ...exportFilter, lang: appLang() },
     responseType: 'blob',
   })
   const blob = new Blob([res.data as BlobPart], {

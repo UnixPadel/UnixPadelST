@@ -20,6 +20,7 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import { purchaseStatusLabel } from '@/lib/status'
 import type { PurchaseRequestListDto } from '@/types'
 
+import { currencyLabel } from '@/lib/currency'
 // PROMPT-v7 §2: nihai durumdaki talepler override edilemez (buton gizli).
 const FINAL_DURUMLAR = ['Onaylandı', 'Reddedildi']
 
@@ -97,7 +98,7 @@ export function AllPurchaseRequestsPage() {
     { key: 'talepID', pin: 'left', header: t('purchase.cols.id'), sortable: true, type: 'number' },
     { key: 'urunAdi',               header: t('purchase.cols.urun'), sortable: true },
     ...(!hideMoney ? [
-      { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => (r.paraBirimi as string) ?? '—' },
+      { key: 'paraBirimi',   header: t('purchase.paraBirimi'), render: (r) => currencyLabel(t, r.paraBirimi) || '—' },
       { key: 'urunMaliyeti', header: t('purchase.cols.maliyet'), sortable: true, type: 'money', render: (r) => formatCurrency((r.urunMaliyeti as number) ?? 0, (r.paraBirimi as string) ?? '') },
     ] satisfies Column<PurchaseRequestListDto & Record<string, unknown>>[] : []),
     { key: 'talepEdenKullaniciAdi', header: t('purchase.cols.talepEden') },

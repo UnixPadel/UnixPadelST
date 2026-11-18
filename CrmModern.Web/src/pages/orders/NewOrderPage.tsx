@@ -51,7 +51,7 @@ import { usePreferences } from '@/lib/preferences'
 import { SaveStatus } from '@/components/SaveStatus'
 import { stepLabelKey } from '@/lib/workflow'
 import { readJSON, removeKey, userKey, writeJSON } from '@/lib/storage'
-import { formatNumberTR } from '@/lib/number'
+import { formatNumber } from '@/lib/number'
 import { INCOTERMS } from '@/lib/constants'
 // Round-8 §4/§5 — standart şartlar yapılandırılmış KOD olarak saklanır.
 import {
@@ -70,6 +70,10 @@ import { LoadOrderDialog } from './new-order/LoadOrderDialog'
 import { OrderPreviewDialog } from './new-order/OrderPreviewDialog'
 import type { CreateOrderDto, OrderDetail, OrderSetInput } from '@/types'
 
+import { formatDateTime } from '@/lib/format'
+import { formatTime } from '@/lib/format'
+import { formatDate } from '@/lib/utils'
+import { currencyLabel } from '@/lib/currency'
 /**
  * Sipariş/Teklif Oluştur (legacy SiparisForm). SR-1 ile parçalandı:
  *   lib/orderForm.ts            saf fonksiyonlar + computeTotals + orderIssues
@@ -192,7 +196,7 @@ export function NewOrderPage() {
     const hasPrices = setTabs.some((tb) => tb.kategoriFiyat > 0) || form.montajFiyat > 0 || form.teslimatFiyat > 0 || (form.extraCosts ?? []).some((e) => Number(e.tutar) > 0)
     if (hasPrices && !(await confirm({
       title: t('orders.confirm.currencyTitle'),
-      description: t('orders.confirm.currencyDesc', { from: form.paraTipi, to: p }),
+      description: t('orders.confirm.currencyDesc', { from: currencyLabel(t, form.paraTipi), to: currencyLabel(t, p) }),
       confirmLabel: t('orders.confirm.currencyOk'),
     }))) return
     setForm((f) => ({ ...f, paraTipi: p }))
@@ -869,7 +873,7 @@ export function NewOrderPage() {
           <div role="status" className="flex flex-wrap items-center gap-3 rounded-md border border-info/40 bg-info-soft px-4 py-2 text-sm text-info-soft-foreground">
             <History className="h-4 w-4 shrink-0" />
             <span className="flex-1">
-              {t('orders.draft.found', { time: new Date(draft.savedAt).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }), customer: draft.form.musteriAd || '—' })}
+              {t('orders.draft.found', { time: formatDateTime(draft.savedAt), customer: draft.form.musteriAd || '—' })}
             </span>
             <Button size="xs" onClick={restoreDraft} disabled={hydrating}>{t('orders.draft.restore')}</Button>
             <Button size="xs" variant="ghost" onClick={discardDraft}>{t('orders.draft.discard')}</Button>
@@ -1079,7 +1083,7 @@ export function NewOrderPage() {
                               <span className="h-2 w-2 rounded-full bg-success" aria-hidden />
                               <span className="max-w-[10rem] truncate">{tb.kategoriAdi || t('orders.form.siparisN', { n: i + 1 })}</span>
                               {tb.adet > 1 && <span className="text-muted-foreground">×{tb.adet}</span>}
-                              <span className="tabular-nums text-muted-foreground">{formatNumberTR(tb.kategoriFiyat * tb.adet, 0)} {sym}</span>
+                              <span className="tabular-nums text-muted-foreground">{formatNumber(tb.kategoriFiyat * tb.adet, 0)} {sym}</span>
                             </>
                           ) : (
                             <><Plus className="h-3 w-3" /> {t('orders.form.setAdd')}</>
@@ -1322,9 +1326,9 @@ export function NewOrderPage() {
                         onClick={() => changeCurrency(p)}
                         data-enter-skip
                       >
-                        <span className="text-xs font-medium">{isoSymbol(iso)} {p}</span>
+                        <span className="text-xs font-medium">{isoSymbol(iso)} {currencyLabel(t, p)}</span>
                         <span className={`text-2xs tabular-nums ${secili ? 'opacity-90' : 'text-muted-foreground'}`}>
-                          {iso === 'TRY' ? '—' : kur ? `${formatNumberTR(kur)} ₺` : '?'}
+                          {iso === 'TRY' ? '—' : kur ? `${formatNumber(kur)} ₺` : '?'}
                         </span>
                       </Button>
                     )
@@ -1332,8 +1336,8 @@ export function NewOrderPage() {
                 </div>
                 <div className="text-2xs tabular-nums text-muted-foreground">
                   {tcmb?.tarih
-                    ? <>{t('currency.source')}: TCMB {tcmb.tarih.split('-').reverse().join('.')}
-                        {kurZamani ? <span> · {t('currency.refreshed')} {new Date(kurZamani).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {t('currency.hourly')}</span> : null}</>
+                    ? <>{t('currency.source')}: TCMB {formatDate(tcmb.tarih)}
+                        {kurZamani ? <span> · {t('currency.refreshed')} {formatTime(kurZamani)} · {t('currency.hourly')}</span> : null}</>
                     : <span className="text-warning">{t('currency.sourceUnavailable')}</span>}
                 </div>
               </div>
@@ -1433,8 +1437,8 @@ export function NewOrderPage() {
         {/* ── Yapışkan aksiyon çubuğu (dar ekranda toplam burada görünür) ── */}
         <div className="sticky bottom-0 z-20 -mx-4 flex flex-wrap items-center gap-2 border-t bg-card/95 px-4 py-2.5 backdrop-blur lg:-mx-6 lg:px-6">
           <div className="mr-auto flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-            <span>{t('orders.form.toplamFiyatLabel')}: <strong className="tabular-nums">{formatNumberTR(totals.toplam)} {sym}</strong></span>
-            <span className="text-muted-foreground">{t('orders.form.kaporaMiktari')}: <span className="tabular-nums">{formatNumberTR(totals.kapora)} {sym}</span></span>
+            <span>{t('orders.form.toplamFiyatLabel')}: <strong className="tabular-nums">{formatNumber(totals.toplam)} {sym}</strong></span>
+            <span className="text-muted-foreground">{t('orders.form.kaporaMiktari')}: <span className="tabular-nums">{formatNumber(totals.kapora)} {sym}</span></span>
             {submitted && issues.length > 0 && (
               <button type="button" className="flex items-center gap-1 text-xs text-warning" onClick={() => focusIssue(issues[0])}>
                 <CircleAlert className="h-3.5 w-3.5" /> {t('orders.summary.missingCount', { count: issues.length })}

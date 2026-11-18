@@ -8,6 +8,7 @@ export type ZoomSetting = 'auto' | number
 export interface ZoomInfo { setting: ZoomSetting; factor: number }
 
 interface DesktopBridge {
+  setLanguage?: (language: 'tr' | 'en') => void
   getZoom: () => Promise<ZoomInfo>
   setZoom: (setting: ZoomSetting) => Promise<void>
   onZoomChange: (cb: (info: ZoomInfo) => void) => () => void

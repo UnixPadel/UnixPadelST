@@ -152,7 +152,7 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
   nodes.push({
     key: 'factory', at: reached('Uretim') && !factorySkipped ? order.sTarih : undefined, icon: <Factory className="h-3.5 w-3.5" />,
     title: factorySkipped
-      ? 'Üretim Atlandı (Erken Kapatıldı)'
+      ? t('docFlow.productionSkipped')
       : reached('Hazir') ? t('docFlow.productionDone') : reached('Uretim') ? t('docFlow.inProduction') : t('docFlow.awaitingProduction'),
     tone: factorySkipped ? 'neutral' : reached('Hazir') ? 'success' : reached('Uretim') ? 'progress' : 'neutral',
     body: order.fabrikaNot, link: '/factory', done: reached('Uretim') && !factorySkipped,
@@ -169,7 +169,7 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
   nodes.push({
     key: 'ship', icon: <Truck className="h-3.5 w-3.5" />,
     title: shipSkipped
-      ? 'Sevkiyat Atlandı (Erken Kapatıldı)'
+      ? t('docFlow.shipmentSkipped')
       : reached('Lojistik') ? t('docFlow.shipped') : t('docFlow.awaitingShipment'),
     tone: shipSkipped ? 'neutral' : reached('Lojistik') ? 'info' : 'neutral', body: order.lojistikNot,
     link: '/logistics/history', done: reached('Lojistik') && !shipSkipped,
@@ -183,8 +183,8 @@ export function DocumentFlow({ order }: { order: OrderDetail }) {
     icon: <CheckCircle2 className="h-3.5 w-3.5" />,
     title: stageLabel(t, reached('Tamamlandi') ? 'Tamamlandi' : 'TamamlanmaBekliyor'),
     tone: reached('Tamamlandi') ? 'success' : reached('TamamlanmaBekliyor') ? 'warning' : 'neutral',
-    meta: order.tamamlayanAdSoyad ? `Kapatan: ${order.tamamlayanAdSoyad}` : undefined,
-    body: order.tamamlanmaNotu || (order.tamamlanmaOncekiAsama && order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' ? `${order.tamamlanmaOncekiAsama} aşamasından doğrudan tamamlandı` : undefined),
+    meta: order.tamamlayanAdSoyad ? t('docFlow.closedBy', { name: order.tamamlayanAdSoyad }) : undefined,
+    body: order.tamamlanmaNotu || (order.tamamlanmaOncekiAsama && order.tamamlanmaOncekiAsama !== 'TamamlanmaBekliyor' ? t('docFlow.completedFromStage', { stage: stageLabel(t, order.tamamlanmaOncekiAsama) }) : undefined),
     done: reached('Tamamlandi') || reached('TamamlanmaBekliyor'),
   })
 

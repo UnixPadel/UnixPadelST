@@ -11,7 +11,8 @@
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:5173 && electron .\"",
     "electron:build": "npm run build && electron-builder",
     "dist": "npm run build && electron-builder",
-    "release": "node scripts/check-release-notes.mjs && npm run build && electron-builder --publish always"
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "release": "npm run check:i18n && node scripts/check-release-notes.mjs && npm run build && electron-builder --publish always"
   },
   "build": {
     "appId": "com.unixpadelst.app",

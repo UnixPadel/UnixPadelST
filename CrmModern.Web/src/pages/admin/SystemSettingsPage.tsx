@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useTranslation } from 'react-i18next'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   Sparkles,
   KeyRound,
@@ -32,13 +32,14 @@ import { Badge } from '@/components/ui/badge'
 import { FormField } from '@/components/ui/form-field'
 import { useToast } from '@/components/ToastProvider'
 import { formatDate } from '@/lib/utils'
+import { messageFromResult } from '@/lib/axios'
 
 const CLAUDE_MODELS = [
-  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5 (Önerilen — En Yüksek OCR Doğruluğu)', desc: 'Gümrük beyannameleri için en yüksek doğruluk ve stabilite' },
-  { id: 'claude-haiku-5-5', name: 'Claude Haiku 5.5 (Ultra Düşük Maliyet & Yüksek Hız)', desc: 'Ekonomik token tüketimi, hızlı okuma' },
-  { id: 'claude-opus-5-5', name: 'Claude Opus 5.5 (Maksimum Muhakeme)', desc: 'En karmaşık çok sayfalı belgeler' },
-  { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Standart)', desc: 'Standart Anthropic API modeli' },
-  { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku (Standart)', desc: 'Standart Anthropic Haiku modeli' },
+  { id: 'claude-sonnet-5-5', nameKey: 'systemSettings.models.sonnet55.name', descKey: 'systemSettings.models.sonnet55.description' },
+  { id: 'claude-haiku-5-5', nameKey: 'systemSettings.models.haiku55.name', descKey: 'systemSettings.models.haiku55.description' },
+  { id: 'claude-opus-5-5', nameKey: 'systemSettings.models.opus55.name', descKey: 'systemSettings.models.opus55.description' },
+  { id: 'claude-3-5-sonnet-20241022', nameKey: 'systemSettings.models.sonnet35.name', descKey: 'systemSettings.models.sonnet35.description' },
+  { id: 'claude-3-5-haiku-20241022', nameKey: 'systemSettings.models.haiku35.name', descKey: 'systemSettings.models.haiku35.description' },
 ]
 
 export function SystemSettingsPage() {
@@ -87,14 +88,14 @@ export function SystemSettingsPage() {
       await setActiveAiProvider(provider)
       void qc.invalidateQueries({ queryKey: ['system-settings-ai'] })
       toast({
-        title: 'Aktif Sağlayıcı Değiştirildi',
-        description: `Gümrük beyannameleri artık ${provider} motoru ile taranacak.`,
+        title: t('systemSettings.toast.providerChanged'),
+        description: t('systemSettings.toast.providerChangedDescription', { provider }),
         variant: 'success',
       })
     } catch {
       toast({
-        title: 'Değişiklik Başarısız',
-        description: 'Aktif sağlayıcı güncellenirken bir hata oluştu.',
+        title: t('systemSettings.toast.providerChangeFailed'),
+        description: t('systemSettings.toast.tryAgain'),
         variant: 'destructive',
       })
     } finally {
@@ -110,12 +111,12 @@ export function SystemSettingsPage() {
       const res = await testClaudeKey(claudeKey || undefined, claudeModel || undefined)
       setClaudeTestResult({
         success: res.basarili,
-        message: res.hataMesaji || 'Claude API bağlantısı başarılı! Model yanıt verdi.',
+        message: res.basarili ? t('systemSettings.claude.testSuccess') : messageFromResult(res) || t('systemSettings.test.failed'),
       })
     } catch {
       setClaudeTestResult({
         success: false,
-        message: 'Bağlantı testi sırasında beklenmeyen hata oluştu.',
+        message: t('systemSettings.test.failed'),
       })
     } finally {
       setClaudeTesting(false)
@@ -126,8 +127,8 @@ export function SystemSettingsPage() {
     e.preventDefault()
     if (!claudeKey.trim()) {
       toast({
-        title: 'API Anahtarı Gerekli',
-        description: 'Lütfen geçerli bir Claude API anahtarı giriniz.',
+        title: t('systemSettings.toast.keyRequired'),
+        description: t('systemSettings.toast.keyRequiredDescription', { provider: 'Claude' }),
         variant: 'destructive',
       })
       return
@@ -140,14 +141,14 @@ export function SystemSettingsPage() {
       setClaudeTestResult(null)
       void qc.invalidateQueries({ queryKey: ['system-settings-ai'] })
       toast({
-        title: 'Claude API Anahtarı Kaydedildi',
-        description: 'Anahtar şifrelendi ve tüm kullanıcı bilgisayarlarında anında aktifleşti.',
+        title: t('systemSettings.toast.keySaved', { provider: 'Claude' }),
+        description: t('systemSettings.claude.keySavedDescription'),
         variant: 'success',
       })
     } catch {
       toast({
-        title: 'Kaydetme Başarısız',
-        description: 'Claude anahtarı kaydedilirken bir hata oluştu.',
+        title: t('systemSettings.toast.keySaveFailed', { provider: 'Claude' }),
+        description: t('systemSettings.toast.tryAgain'),
         variant: 'destructive',
       })
     } finally {
@@ -163,12 +164,12 @@ export function SystemSettingsPage() {
       const res = await testGeminiKey(geminiKey || undefined)
       setGeminiTestResult({
         success: res.basarili,
-        message: res.hataMesaji || 'Gemini API bağlantısı başarılı!',
+        message: res.basarili ? t('systemSettings.gemini.testSuccess') : messageFromResult(res) || t('systemSettings.test.failed'),
       })
     } catch {
       setGeminiTestResult({
         success: false,
-        message: 'Bağlantı testi sırasında hata oluştu.',
+        message: t('systemSettings.test.failed'),
       })
     } finally {
       setGeminiTesting(false)
@@ -179,8 +180,8 @@ export function SystemSettingsPage() {
     e.preventDefault()
     if (!geminiKey.trim()) {
       toast({
-        title: 'API Anahtarı Gerekli',
-        description: 'Lütfen geçerli bir Gemini API anahtarı giriniz.',
+        title: t('systemSettings.toast.keyRequired'),
+        description: t('systemSettings.toast.keyRequiredDescription', { provider: 'Gemini' }),
         variant: 'destructive',
       })
       return
@@ -193,14 +194,14 @@ export function SystemSettingsPage() {
       setGeminiTestResult(null)
       void qc.invalidateQueries({ queryKey: ['system-settings-ai'] })
       toast({
-        title: 'Gemini API Anahtarı Kaydedildi',
-        description: 'Yeni anahtar kaydedildi ve tüm kullanıcılar için hemen aktifleşti.',
+        title: t('systemSettings.toast.keySaved', { provider: 'Gemini' }),
+        description: t('systemSettings.gemini.keySavedDescription'),
         variant: 'success',
       })
     } catch {
       toast({
-        title: 'Kaydetme Başarısız',
-        description: 'Gemini anahtarı kaydedilirken bir hata oluştu.',
+        title: t('systemSettings.toast.keySaveFailed', { provider: 'Gemini' }),
+        description: t('systemSettings.toast.tryAgain'),
         variant: 'destructive',
       })
     } finally {
@@ -216,7 +217,7 @@ export function SystemSettingsPage() {
     <FillPage>
       <PageHeader
         density="compact"
-        title="Sistem Ayarları"
+        title={t('nav.systemSettings')}
         actions={
           <Button
             variant="outline"
@@ -225,7 +226,7 @@ export function SystemSettingsPage() {
             className="gap-1 text-xs"
           >
             <RefreshCw className="h-3.5 w-3.5" />
-            <span>Yenile</span>
+            <span>{t('common.refresh')}</span>
           </Button>
         }
       />
@@ -240,16 +241,16 @@ export function SystemSettingsPage() {
               </div>
               <div>
                 <h2 className="text-base font-bold text-foreground flex items-center gap-2">
-                  Yapay Zekâ (AI) Belge Tarama Entegrasyonu
+                  {t('systemSettings.header.title')}
                 </h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  Antrepo modülünde gümrük beyannamelerinin (PDF / Görsel) taranıp otomatik doldurulmasını yönetir.
+                  {t('systemSettings.header.description')}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground font-medium">Aktif Motor:</span>
+              <span className="text-xs text-muted-foreground font-medium">{t('systemSettings.header.activeProviderLabel')}</span>
               <Badge variant="success" className="px-2.5 py-1 text-xs font-bold gap-1">
                 <CheckCircle className="h-3.5 w-3.5" />
                 <span>{currentProvider}</span>
@@ -271,10 +272,10 @@ export function SystemSettingsPage() {
               <Cpu className="h-4 w-4 text-primary" />
               <span>Claude (Anthropic)</span>
               <Badge variant="outline" className="text-2xs py-0 px-1.5 ml-1 bg-primary/5 text-primary border-primary/20">
-                Önerilen
+                {t('systemSettings.provider.recommended')}
               </Badge>
               {currentProvider === 'Claude' && (
-                <span className="h-2 w-2 rounded-full bg-emerald-500 ml-1" title="Aktif Sağlayıcı" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 ml-1" title={t('systemSettings.provider.active')} />
               )}
             </button>
 
@@ -290,7 +291,7 @@ export function SystemSettingsPage() {
               <Zap className="h-4 w-4 text-amber-500" />
               <span>Gemini (Google)</span>
               {currentProvider === 'Gemini' && (
-                <span className="h-2 w-2 rounded-full bg-emerald-500 ml-1" title="Aktif Sağlayıcı" />
+                <span className="h-2 w-2 rounded-full bg-emerald-500 ml-1" title={t('systemSettings.provider.active')} />
               )}
             </button>
           </div>
@@ -303,11 +304,11 @@ export function SystemSettingsPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-foreground">
-                    Anthropic Claude Ayarları
+                    {t('systemSettings.claude.title')}
                   </h3>
                   {currentProvider === 'Claude' ? (
                     <Badge variant="success" className="text-2xs">
-                      Şu Anda Kullanılan Motor
+                      {t('systemSettings.provider.inUse')}
                     </Badge>
                   ) : (
                     <Button
@@ -318,12 +319,12 @@ export function SystemSettingsPage() {
                       className="text-xs font-semibold gap-1 text-primary border-primary/40 hover:bg-primary/5"
                     >
                       <Check className="h-3.5 w-3.5" />
-                      Claude'u Aktif Motor Yap
+                      {t('systemSettings.claude.makeActive')}
                     </Button>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Sonnet 5.5 / Haiku modelleri ile Kutu 31, 41, 40 ve gümrük kalemlerini yüksek doğrulukla analiz eder.
+                  {t('systemSettings.claude.description')}
                 </p>
               </div>
 
@@ -332,7 +333,7 @@ export function SystemSettingsPage() {
                   variant={claudeStatus.tanimli ? 'success' : 'destructive'}
                   className="px-2.5 py-1 text-xs font-semibold"
                 >
-                  {claudeStatus.tanimli ? 'Anahtar Tanımlı' : 'Tanımlı Değil'}
+                  {claudeStatus.tanimli ? t('systemSettings.status.keySet') : t('systemSettings.status.keyNotSet')}
                 </Badge>
               )}
             </div>
@@ -340,21 +341,21 @@ export function SystemSettingsPage() {
             {/* Claude Durum Kartları */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Aktif Anahtar:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.activeKey')}</span>
                 <span className="font-mono font-bold text-foreground text-xs mt-1 block truncate">
-                  {claudeStatus?.maske || <span className="text-muted-foreground font-normal">Kayıtlı anahtar yok</span>}
+                  {claudeStatus?.maske || <span className="text-muted-foreground font-normal">{t('systemSettings.status.noKey')}</span>}
                 </span>
               </div>
 
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Model:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.model')}</span>
                 <span className="font-mono font-bold text-foreground text-xs mt-1 block truncate">
                   {claudeStatus?.model || 'claude-sonnet-5-5'}
                 </span>
               </div>
 
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Son Güncelleme:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.lastUpdated')}</span>
                 <span className="text-foreground font-medium text-xs mt-1 block">
                   {claudeStatus?.guncellemeZamani ? formatDate(claudeStatus.guncellemeZamani) : '—'}
                   {claudeStatus?.guncelleyenAd && (
@@ -366,9 +367,9 @@ export function SystemSettingsPage() {
               </div>
 
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Son Başarılı Tarama:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.lastScan')}</span>
                 <span className="text-foreground font-medium text-xs mt-1 block">
-                  {claudeStatus?.sonBasariliKullanim ? formatDate(claudeStatus.sonBasariliKullanim) : 'Henüz işlem yapılmadı'}
+                  {claudeStatus?.sonBasariliKullanim ? formatDate(claudeStatus.sonBasariliKullanim) : t('systemSettings.status.noScan')}
                 </span>
               </div>
             </div>
@@ -378,10 +379,10 @@ export function SystemSettingsPage() {
               <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3.5 text-xs text-danger flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold">Son İstek Hatası:</p>
+                  <p className="font-semibold">{t('systemSettings.status.lastError')}</p>
                   <p className="mt-0.5">{claudeStatus.sonHata}</p>
                   {claudeStatus.sonHataZamani && (
-                    <p className="text-2xs opacity-75 mt-1">Zaman: {formatDate(claudeStatus.sonHataZamani)}</p>
+                    <p className="text-2xs opacity-75 mt-1">{t('systemSettings.status.errorTime', { time: formatDate(claudeStatus.sonHataZamani) })}</p>
                   )}
                 </div>
               </div>
@@ -391,9 +392,8 @@ export function SystemSettingsPage() {
             <div className="rounded-lg bg-primary/[0.03] border border-primary/20 p-3.5 text-xs text-foreground flex items-start gap-2.5">
               <ShieldCheck className="h-4 w-4 shrink-0 mt-0.5 text-primary" />
               <div className="text-muted-foreground leading-relaxed">
-                <span className="font-semibold text-foreground">Merkezi ve Güvenli Yönetim: </span>
-                Claude API anahtarı Clever Cloud veritabanında AES-256 ile şifreli tutulur. Buradan kaydedildiğinde
-                şirketteki <strong>tüm kullanıcıların bilgisayarlarında anında aktifleşir</strong>. İstemci tarayıcılarında açık anahtar saklanmaz.
+                <span className="font-semibold text-foreground">{t('systemSettings.security.title')} </span>
+                <Trans i18nKey="systemSettings.security.body" components={{ strong: <strong /> }} />
               </div>
             </div>
 
@@ -402,8 +402,8 @@ export function SystemSettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-2">
                   <FormField
-                    label="Claude API Anahtarı"
-                    hint="sk-ant-usr-... veya sk-ant-api03-... ile başlayan Anthropic API anahtarınız"
+                    label={t('systemSettings.claude.apiKeyLabel')}
+                    hint={t('systemSettings.claude.apiKeyHint')}
                     required
                   >
                     <div className="relative">
@@ -414,7 +414,7 @@ export function SystemSettingsPage() {
                           setClaudeKey(e.target.value)
                           setClaudeTestResult(null)
                         }}
-                        placeholder={claudeStatus?.maske ? `Mevcut: ${claudeStatus.maske}` : 'sk-ant-usr-...'}
+                        placeholder={claudeStatus?.maske ? t('systemSettings.form.currentKey', { mask: claudeStatus.maske }) : 'sk-ant-usr-...'}
                         className="h-10 pr-10 font-mono text-xs"
                       />
                       <button
@@ -433,8 +433,8 @@ export function SystemSettingsPage() {
 
                 <div>
                   <FormField
-                    label="Model Seçimi"
-                    hint="Gümrük beyannameleri için Sonnet önerilir"
+                    label={t('systemSettings.claude.modelLabel')}
+                    hint={t('systemSettings.claude.modelHint')}
                     required
                   >
                     <select
@@ -447,7 +447,7 @@ export function SystemSettingsPage() {
                     >
                       {CLAUDE_MODELS.map((m) => (
                         <option key={m.id} value={m.id}>
-                          {m.name}
+                          {t(m.nameKey)}
                         </option>
                       ))}
                     </select>
@@ -486,12 +486,12 @@ export function SystemSettingsPage() {
                   {claudeTesting ? (
                     <>
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Bağlantı Test Ediliyor...</span>
+                      <span>{t('systemSettings.form.testing')}</span>
                     </>
                   ) : (
                     <>
                       <KeyRound className="h-3.5 w-3.5" />
-                      <span>{claudeKey.trim() ? 'Yeni Anahtarı Test Et' : 'Kayıtlı Anahtarı Test Et'}</span>
+                      <span>{claudeKey.trim() ? t('systemSettings.form.testNewKey') : t('systemSettings.form.testSavedKey')}</span>
                     </>
                   )}
                 </Button>
@@ -503,7 +503,7 @@ export function SystemSettingsPage() {
                   className="gap-1.5 text-xs font-semibold"
                 >
                   <Save className="h-3.5 w-3.5" />
-                  <span>{claudeSaving ? 'Kaydediliyor...' : 'Kaydet ve Aktifleştir'}</span>
+                  <span>{claudeSaving ? t('common.saving') : t('systemSettings.form.saveAndActivate')}</span>
                 </Button>
               </div>
             </form>
@@ -517,11 +517,11 @@ export function SystemSettingsPage() {
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-foreground">
-                    Google Gemini Ayarları
+                    {t('systemSettings.gemini.title')}
                   </h3>
                   {currentProvider === 'Gemini' ? (
                     <Badge variant="success" className="text-2xs">
-                      Şu Anda Kullanılan Motor
+                      {t('systemSettings.provider.inUse')}
                     </Badge>
                   ) : (
                     <Button
@@ -532,12 +532,12 @@ export function SystemSettingsPage() {
                       className="text-xs font-semibold gap-1 text-amber-600 border-amber-500/40 hover:bg-amber-500/5"
                     >
                       <Check className="h-3.5 w-3.5" />
-                      Gemini'yi Aktif Motor Yap
+                      {t('systemSettings.gemini.makeActive')}
                     </Button>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Google Gemini 3.8 Flash modeli ile beyanname belgelerini analiz eder.
+                  {t('systemSettings.gemini.description')}
                 </p>
               </div>
 
@@ -546,7 +546,7 @@ export function SystemSettingsPage() {
                   variant={geminiStatus.tanimli ? 'success' : 'destructive'}
                   className="px-2.5 py-1 text-xs font-semibold"
                 >
-                  {geminiStatus.tanimli ? 'Anahtar Tanımlı' : 'Tanımlı Değil'}
+                  {geminiStatus.tanimli ? t('systemSettings.status.keySet') : t('systemSettings.status.keyNotSet')}
                 </Badge>
               )}
             </div>
@@ -554,14 +554,14 @@ export function SystemSettingsPage() {
             {/* Gemini Durum Kartları */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Aktif Anahtar:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.activeKey')}</span>
                 <span className="font-mono font-bold text-foreground text-xs mt-1 block truncate">
-                  {geminiStatus?.maske || <span className="text-muted-foreground font-normal">Kayıtlı anahtar yok</span>}
+                  {geminiStatus?.maske || <span className="text-muted-foreground font-normal">{t('systemSettings.status.noKey')}</span>}
                 </span>
               </div>
 
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Son Güncelleme:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.lastUpdated')}</span>
                 <span className="text-foreground font-medium text-xs mt-1 block">
                   {geminiStatus?.guncellemeZamani ? formatDate(geminiStatus.guncellemeZamani) : '—'}
                   {geminiStatus?.guncelleyenAd && (
@@ -573,9 +573,9 @@ export function SystemSettingsPage() {
               </div>
 
               <div className="rounded-lg bg-muted/40 p-3 border">
-                <span className="text-muted-foreground font-medium block">Son Başarılı Tarama:</span>
+                <span className="text-muted-foreground font-medium block">{t('systemSettings.status.lastScan')}</span>
                 <span className="text-foreground font-medium text-xs mt-1 block">
-                  {geminiStatus?.sonBasariliKullanim ? formatDate(geminiStatus.sonBasariliKullanim) : 'Henüz işlem yapılmadı'}
+                  {geminiStatus?.sonBasariliKullanim ? formatDate(geminiStatus.sonBasariliKullanim) : t('systemSettings.status.noScan')}
                 </span>
               </div>
             </div>
@@ -585,10 +585,10 @@ export function SystemSettingsPage() {
               <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3.5 text-xs text-danger flex items-start gap-2.5">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-semibold">Son İstek Hatası:</p>
+                  <p className="font-semibold">{t('systemSettings.status.lastError')}</p>
                   <p className="mt-0.5">{geminiStatus.sonHata}</p>
                   {geminiStatus.sonHataZamani && (
-                    <p className="text-2xs opacity-75 mt-1">Zaman: {formatDate(geminiStatus.sonHataZamani)}</p>
+                    <p className="text-2xs opacity-75 mt-1">{t('systemSettings.status.errorTime', { time: formatDate(geminiStatus.sonHataZamani) })}</p>
                   )}
                 </div>
               </div>
@@ -597,8 +597,8 @@ export function SystemSettingsPage() {
             {/* Gemini Güncelleme Formu */}
             <form onSubmit={handleSaveGemini} className="space-y-4 pt-1">
               <FormField
-                label="Gemini API Anahtarı"
-                hint="Google AI Studio üzerinden temin ettiğiniz API anahtarınız"
+                label={t('systemSettings.gemini.apiKeyLabel')}
+                hint={t('systemSettings.gemini.apiKeyHint')}
                 required
               >
                 <div className="relative">
@@ -609,7 +609,7 @@ export function SystemSettingsPage() {
                       setGeminiKey(e.target.value)
                       setGeminiTestResult(null)
                     }}
-                    placeholder={geminiStatus?.maske ? `Mevcut: ${geminiStatus.maske}` : 'AIzaSy...'}
+                    placeholder={geminiStatus?.maske ? t('systemSettings.form.currentKey', { mask: geminiStatus.maske }) : 'AIzaSy...'}
                     className="h-10 pr-10 font-mono text-xs"
                   />
                   <button
@@ -656,12 +656,12 @@ export function SystemSettingsPage() {
                   {geminiTesting ? (
                     <>
                       <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-                      <span>Bağlantı Test Ediliyor...</span>
+                      <span>{t('systemSettings.form.testing')}</span>
                     </>
                   ) : (
                     <>
                       <KeyRound className="h-3.5 w-3.5" />
-                      <span>{geminiKey.trim() ? 'Yeni Anahtarı Test Et' : 'Kayıtlı Anahtarı Test Et'}</span>
+                      <span>{geminiKey.trim() ? t('systemSettings.form.testNewKey') : t('systemSettings.form.testSavedKey')}</span>
                     </>
                   )}
                 </Button>
@@ -673,7 +673,7 @@ export function SystemSettingsPage() {
                   className="gap-1.5 text-xs font-semibold"
                 >
                   <Save className="h-3.5 w-3.5" />
-                  <span>{geminiSaving ? 'Kaydediliyor...' : 'Kaydet ve Aktifleştir'}</span>
+                  <span>{geminiSaving ? t('common.saving') : t('systemSettings.form.saveAndActivate')}</span>
                 </Button>
               </div>
             </form>

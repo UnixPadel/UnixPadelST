@@ -47,13 +47,13 @@ public sealed class ReportingController(
     /// GET /api/reporting/accounting/export
     /// </summary>
     [HttpGet("accounting/export")]
-    public async Task<IActionResult> ExportAccounting()
+    public async Task<IActionResult> ExportAccounting([FromQuery] string lang = "tr")
     {
         // Rapor tüm siparişlerin tutarlarını içerir: /api/accounting/excel ile aynı kitle.
         if (User.HidesOrderMoney()) return Forbid();
         if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !User.IsOrderControlUser())
             return Forbid();
-        var bytes = await reportingService.ExportAccountingOrdersAsync();
+        var bytes = await reportingService.ExportAccountingOrdersAsync(lang);
         var filename = $"muhasebe_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(bytes, ContentType, filename);
     }
@@ -197,11 +197,12 @@ public sealed class ReportingController(
     [HttpGet("rep-performance/{kullaniciID:int}/export")]
     [Authorize(Roles = "Yonetici")]
     public async Task<IActionResult> ExportRepReport(int kullaniciID,
-        [FromQuery] DateTime? baslangic = null, [FromQuery] DateTime? bitis = null)
+        [FromQuery] DateTime? baslangic = null, [FromQuery] DateTime? bitis = null,
+        [FromQuery] string lang = "tr")
     {
         var end   = bitis ?? DateTime.Now;
         var start = baslangic ?? end.AddDays(-30);
-        var bytes = await reportingService.ExportRepReportAsync(kullaniciID, start, end);
+        var bytes = await reportingService.ExportRepReportAsync(kullaniciID, start, end, lang);
         var filename = $"temsilci_raporu_{kullaniciID}_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(bytes, ContentType, filename);
     }

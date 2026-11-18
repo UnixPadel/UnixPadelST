@@ -14,6 +14,8 @@ import { trLower } from '@/components/ui/combobox'
 import { cn } from '@/lib/utils'
 import type { OrderHitSummary, UnifiedSearchHit } from '@/types'
 
+import { statusLabel } from '@/lib/status'
+import { currencyLabel } from '@/lib/currency'
 /**
  * E-1 — Komut Paleti (Ctrl+K). GlobalSearch'ün yerini alır:
  *  • Kayıt araması (sipariş, müşteri, kullanıcı, talep) — 300 ms debounce, önceki istek iptal.
@@ -31,8 +33,13 @@ type PaletteItem =
 
 const RECENT_KEY = 'globalSearchRecent'
 const DOC_RE = /^(sp|rv|kp)\s+(\S+)$/i
-const ORDER_CATEGORY = 'Sipariş'
-const CUSTOMER_CATEGORY = 'Müşteri'
+type HitCategory = NonNullable<UnifiedSearchHit['kategoriKodu']>
+// Tarayıcıda kayıtlı eski "son aradıkların" kayıtlarında kategori kodu yoktur.
+const LEGACY_CATEGORY: Record<string, HitCategory> = {
+  'Sipariş': 'order', 'Müşteri': 'customer', 'Bileşen': 'part',
+  'Kategori': 'category', 'Kullanıcı': 'user', 'Satın Alma Talep': 'purchase',
+}
+const hitCategory = (hit: UnifiedSearchHit): HitCategory | undefined => hit.kategoriKodu ?? LEGACY_CATEGORY[hit.kategori]
 
 const searchUrl = (q: string, sel?: string) =>
   `/search?f.q=${encodeURIComponent(q)}${sel ? `&sel=${encodeURIComponent(sel)}` : ''}`
@@ -44,8 +51,8 @@ const searchUrl = (q: string, sel?: string) =>
 function hitUrl(hit: UnifiedSearchHit, canSeeAllPurchases: boolean): string | null {
   const url = hit.navigateUrl
   if (url.startsWith('/product-catalog/')) return null
-  if (hit.kategori === ORDER_CATEGORY && url.startsWith('/orders/')) return searchUrl(hit.id, hit.id)
-  if (hit.kategori === CUSTOMER_CATEGORY && url.startsWith('/customers/')) return searchUrl(hit.baslik)
+  if (hitCategory(hit) === 'order' && url.startsWith('/orders/')) return searchUrl(hit.id, hit.id)
+  if (hitCategory(hit) === 'customer' && url.startsWith('/customers/')) return searchUrl(hit.baslik)
   if (/^\/users\/\d+$/.test(url)) {
     return `/users?f.q=${encodeURIComponent(hit.altMetin?.split(' • ')[0] || hit.baslik)}`
   }
@@ -145,7 +152,7 @@ export function CommandPalette() {
     if (!q) {
       recents.forEach((h) => out.push({ kind: 'hit', id: `r-${h.kategori}-${h.id}`, hit: h, recent: true }))
     } else {
-      const lastOrder = hits.map((h) => h.kategori).lastIndexOf(ORDER_CATEGORY)
+      const lastOrder = hits.map(hitCategory).lastIndexOf('order')
       hits.forEach((h, i) => {
         out.push({ kind: 'hit', id: `h-${h.kategori}-${h.id}`, hit: h })
         if (i === lastOrder) out.push({ kind: 'all', id: 'all-orders', count: orderTotal })
@@ -181,12 +188,21 @@ export function CommandPalette() {
 
   const clearRecents = () => { setRecents([]); writeJSON(recentKey, []) }
 
+  const categoryLabel = (hit: UnifiedSearchHit) => {
+    const category = hitCategory(hit)
+    return category ? t(`palette.categories.${category}`) : hit.kategori
+  }
+  // Alt satır sunucudan "değer • değer" gelir; durum, rol ve para tipi değerleri çevrilir.
+  const hitDetail = (hit: UnifiedSearchHit) => (hit.altMetin ?? '').split(' • ')
+    .map((part) => currencyLabel(t, t(`roles.${part}`, { defaultValue: statusLabel(t, part) })))
+    .join(' • ')
+
   // Gruplu görünüm için başlıklar
   const section = (it: PaletteItem) => {
     if (it.kind === 'nav') return t('palette.screens')
     if (it.kind === 'doc') return t('palette.commands')
-    if (it.kind === 'all') return ORDER_CATEGORY
-    return it.recent ? t('palette.recent') : it.hit.kategori
+    if (it.kind === 'all') return t('palette.categories.order')
+    return it.recent ? t('palette.recent') : categoryLabel(it.hit)
   }
 
   return (
@@ -289,7 +305,7 @@ export function CommandPalette() {
                             ? <OrderHitLine order={it.hit.siparis} />
                             : (
                               <span className="truncate text-xs text-muted-foreground">
-                                {it.recent ? it.hit.kategori : ''}{it.recent && it.hit.altMetin ? ' • ' : ''}{it.hit.altMetin ?? ''}
+                                {it.recent ? categoryLabel(it.hit) : ''}{it.recent && it.hit.altMetin ? ' • ' : ''}{hitDetail(it.hit)}
                               </span>
                             )}
                         </span>

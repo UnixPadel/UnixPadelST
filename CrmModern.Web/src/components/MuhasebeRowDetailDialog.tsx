@@ -11,6 +11,7 @@ import { cn, formatCurrency, formatDate } from '@/lib/utils'
 import { statusLabel } from '@/lib/status'
 import type { AccountingOrderListDto } from '@/types'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * PROMPT.md ACCOUNTING #14: legacy Muhasebe.cs `siparisAlDataGrid_CellDoubleClick`
  * (lines 84-148) — MessageBox with a labeled dump of the row. Replaced here
@@ -78,7 +79,7 @@ export function MuhasebeRowDetailDialog({ row: rowProp, onClose }: Props) {
             <Row label={t('orders.form.sirket')}        value={row.sirket ?? '—'} />
             <Row label={t('common.stage')}              value={statusLabel(t, row.siparisMiTeklifMi)} />
             <Row label={t('common.date')}               value={formatDate(row.tarih)} />
-            <Row label={t('qc.grid.paraTipi')}          value={row.paraTipi} />
+            <Row label={t('qc.grid.paraTipi')}          value={currencyLabel(t, row.paraTipi)} />
             <div className="my-2 border-t" />
             <Row label={t('qc.grid.toplamSiparis')}     value={formatCurrency(row.toplamFiyat ?? 0, row.paraTipi)} />
             <Row label={t('qc.grid.kaparoBakiyesi')}    value={formatCurrency(row.kaparoFiyat ?? 0, row.paraTipi)} />

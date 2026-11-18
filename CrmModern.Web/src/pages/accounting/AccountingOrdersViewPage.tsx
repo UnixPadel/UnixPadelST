@@ -27,6 +27,7 @@ import { AccountingFolderButton, AccountingFolderDialog, useFolderCounts } from 
 import { canManageAccountingFolder } from '@/lib/permissions'
 import { useAuth } from '@/hooks/useAuth'
 
+import { currencyLabel } from '@/lib/currency'
 type Row = OrderListDto & Record<string, unknown>
 const FILTER_DEFAULTS = { q: '', asama: ALL, paraTipi: ALL, klasor: ALL }
 
@@ -91,7 +92,7 @@ export function AccountingOrdersViewPage() {
     { key: 'mUlke', header: t('common.country'), sortable: true, defaultHidden: true, render: (r) => (r.mUlke as string) ?? '—' },
     { key: 'siparisMiTeklifMi', header: t('accountingFull.cols.asama'), sortable: true, defaultHidden: true,
       render: (r) => <StatusBadge value={r.siparisMiTeklifMi} context="stage" /> },
-    { key: 'paraTipi', header: t('common.currency'), sortable: true, defaultHidden: true },
+    { key: 'paraTipi', header: t('common.currency'), sortable: true, defaultHidden: true, render: (r) => currencyLabel(t, r.paraTipi) },
     { key: 'toplamFiyat', header: t('common.totalAmount'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.toplamFiyat ?? 0, r.paraTipi),
       // Döviz başına ayrı alt toplam satırı (footerGroups).

@@ -195,7 +195,7 @@ export function MyOrdersPage() {
         <div className="flex flex-col gap-0.5">
           <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
           {r.siparisMiTeklifMi === 'Tamamlandi' && r.tamamlayanAdSoyad && (
-            <span className="text-2xs text-muted-foreground truncate" title={`${r.tamamlayanAdSoyad} tarafından tamamlandı${r.tamamlanmaTarihi ? ` (${formatDate(r.tamamlanmaTarihi)})` : ''}`}>
+            <span className="text-2xs text-muted-foreground truncate" title={r.tamamlanmaTarihi ? t('orderStage.completedByOn', { name: r.tamamlayanAdSoyad, date: formatDate(r.tamamlanmaTarihi) }) : t('orderStage.completedBy', { name: r.tamamlayanAdSoyad })}>
               {r.tamamlayanAdSoyad}
             </span>
           )}

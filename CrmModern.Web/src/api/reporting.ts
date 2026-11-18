@@ -5,6 +5,7 @@ import type {
   StageDistribution, TopCustomer, CurrencyDistribution, RepPerformance, RepDetail,
 } from '@/types'
 
+import { appLang } from '@/lib/format'
 // §18 — proforma dili canlı UI dilinden türetilir (export = görünen dil).
 const proformaLang = (): 'tr' | 'en' =>
   (i18n.language || localStorage.getItem('i18nextLng') || 'tr').toLowerCase().startsWith('en') ? 'en' : 'tr'
@@ -60,7 +61,7 @@ export async function exportRepReport(
 ): Promise<void> {
   const response = await axios.get(
     `/api/reporting/rep-performance/${kullaniciID}/export`,
-    { params: { baslangic, bitis }, responseType: 'blob' })
+    { params: { baslangic, bitis, lang: appLang() }, responseType: 'blob' })
   const url = URL.createObjectURL(new Blob([response.data]))
   const link = document.createElement('a')
   link.href = url
@@ -75,6 +76,7 @@ export async function exportRepReport(
 
 export async function exportAccountingOrders(): Promise<void> {
   const response = await axios.get('/api/reporting/accounting/export', {
+    params: { lang: appLang() },
     responseType: 'blob',
   })
   const url = URL.createObjectURL(new Blob([response.data]))

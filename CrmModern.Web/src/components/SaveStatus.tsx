@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Check, Loader2, CircleDot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+import { formatTime } from '@/lib/format'
 /**
  * 40+ ergonomi (K6) — "Kaydedildi mi?" şüphesini gidermek için işlemin yanında
  * duran, kaybolmayan kayıt durumu. Başarı toast'unun yerini alır: ekranda
@@ -19,7 +20,7 @@ export function SaveStatus({ savedAt, saving, dirty, kind = 'saved', className }
 }) {
   const { t } = useTranslation()
   if (!saving && !dirty && !savedAt) return null
-  const time = savedAt?.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+  const time = savedAt ? formatTime(savedAt) : undefined
 
   return (
     <span role="status" aria-live="polite"

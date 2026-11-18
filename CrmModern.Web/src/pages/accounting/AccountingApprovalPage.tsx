@@ -42,6 +42,7 @@ import {
   type FinalizeForm, type PesinatForm, type ViewId,
 } from './approval/views'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * Muhasebe · Onaylar (burcu.karaman). Bu ekranda tek iş yapılır: parayı kontrol
  * et, peşinatı gir, onayla. Düzen bu sırayı izler (40+ ergonomi, 2026-11):
@@ -337,7 +338,7 @@ export function AccountingApprovalPage() {
       render: (r) => formatCurrency((r.kalanBakiye as number) ?? 0, r.paraTipi as string), footer: moneyFooter('kalanBakiye') },
     { key: 'pesinYuzde', header: t('qc.grid.pesinYuzde'), sortable: true, type: 'number', defaultHidden: true,
       render: (r) => `%${r.pesinYuzde}` },
-    { key: 'paraTipi', header: t('qc.grid.paraTipi'), sortable: true, defaultHidden: true },
+    { key: 'paraTipi', header: t('qc.grid.paraTipi'), sortable: true, defaultHidden: true, render: (r) => currencyLabel(t, r.paraTipi) },
     { key: 'odemeDurum', header: t('qc.grid.odemeDurumu'), sortable: true, defaultHidden: true,
       render: (r) => <StatusBadge value={r.odemeDurum as string} context="odeme" /> },
     // Aşama ve Sıra yalnız "Tüm siparişler"de: iş sırasında tüm satırlar aynı değeri taşır.

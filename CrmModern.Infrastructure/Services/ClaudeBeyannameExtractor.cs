@@ -182,7 +182,7 @@ internal sealed class ClaudeBeyannameExtractor : IClaudeBeyannameExtractor
                 var (errCode, errMsg) = MapAnthropicError(response.StatusCode, content);
                 _logger.LogWarning("Claude API call failed: {Status} - {Content}", response.StatusCode, content);
                 await _settings.RecordClaudeUsageAsync(false, errMsg);
-                throw new BusinessException(errMsg, errCode);
+                throw new BusinessException(errMsg, errCode, ErrorArgs(response.StatusCode, content));
             }
 
             jsonResponse = content;
@@ -245,8 +245,25 @@ internal sealed class ClaudeBeyannameExtractor : IClaudeBeyannameExtractor
         if (!response.IsSuccessStatusCode)
         {
             var (errCode, errMsg) = MapAnthropicError(response.StatusCode, content);
-            throw new BusinessException($"Claude API testi başarısız: {errMsg}", errCode);
+            throw new BusinessException($"Claude API testi başarısız: {errMsg}", errCode, ErrorArgs(response.StatusCode, content));
         }
+    }
+
+    // İstemci metni dile göre kurar; sağlayıcının özgün açıklaması `detail` ile korunur.
+    private static object ErrorArgs(HttpStatusCode status, string responseJson)
+    {
+        string? apiMessage = null;
+        try
+        {
+            apiMessage = JsonNode.Parse(responseJson)?["error"]?["message"]?.GetValue<string>();
+        }
+        catch { }
+
+        return new
+        {
+            status = (int)status,
+            detail = string.IsNullOrWhiteSpace(apiMessage) ? string.Empty : $" ({apiMessage})",
+        };
     }
 
     private static (string Code, string Message) MapAnthropicError(HttpStatusCode status, string responseJson)
@@ -272,7 +289,7 @@ internal sealed class ClaudeBeyannameExtractor : IClaudeBeyannameExtractor
             HttpStatusCode.BadRequest =>
                 ("claudeBadRequest", $"Claude API geçersiz istek bildirdi{detail}."),
             _ =>
-                ("claudeFailed", $"Claude API hatası ({status}){detail}.")
+                ("claudeApiError", $"Claude API hatası ({status}){detail}.")
         };
     }
 

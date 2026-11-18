@@ -3,10 +3,12 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { KeyValue } from '@/components/ui/key-value'
 import { SectionTitle } from '@/components/ui/section-title'
 import { isStandardDetay, isFreeNote } from '@/lib/clauses'
-import { formatNumberTR } from '@/lib/number'
+import { formatNumber } from '@/lib/number'
 import type { OrderTotals, SetTabState } from '@/lib/orderForm'
 import type { CreateOrderDto } from '@/types'
 
+import { currencyLabel } from '@/lib/currency'
+import { unitLabel } from '@/lib/units'
 /**
  * Sipariş özeti önizlemesi — kaydetmeden önce nasıl oluştuğunu gösterir.
  * Ctrl+S bu pencereyi açar; kaydetme butonları alt çubuktadır (gözden geçir →
@@ -27,7 +29,7 @@ export function OrderPreviewDialog({
   nextStep?: string
 }) {
   const { t } = useTranslation()
-  const m = (n: number) => `${formatNumberTR(n)} ${sym}`
+  const m = (n: number) => `${formatNumber(n)} ${sym}`
   const sets = tabs.filter((tb) => tb.kategoriID)
   const sartlar = (form.details ?? []).filter((d) => isStandardDetay(d) || isFreeNote(d))
 
@@ -42,7 +44,7 @@ export function OrderPreviewDialog({
         <section className="space-y-1.5 rounded-md border p-3">
           <KeyValue label={t('orders.form.musteri')} value={<span className="font-medium">{form.musteriAd}</span>} />
           <KeyValue label={t('orders.form.sirket')} value={form.sirket} />
-          <KeyValue label={t('orders.form.paraTipi')} value={`${form.paraTipi} (${sym})`} />
+          <KeyValue label={t('orders.form.paraTipi')} value={`${currencyLabel(t, form.paraTipi)} (${sym})`} />
           {[
             [t('orders.form.telefon'), form.mTelefon],
             [t('orders.form.email'), form.mMail],
@@ -70,7 +72,7 @@ export function OrderPreviewDialog({
                   {tb.components.map((c, j) => (
                     <li key={j} className="flex justify-between gap-4">
                       <span>• {c.bilesenAdi}{c.oznitelikSecili ? ` (${c.oznitelikSecili})` : ''}</span>
-                      <span className="shrink-0 tabular-nums">{c.adet} {c.birim} × {m(c.birimFiyat)}</span>
+                      <span className="shrink-0 tabular-nums">{c.adet} {unitLabel(t, c.birim)} × {m(c.birimFiyat)}</span>
                     </li>
                   ))}
                 </ul>
@@ -82,7 +84,7 @@ export function OrderPreviewDialog({
               {(form.freeItems ?? []).map((fi, i) => (
                 <div key={i} className="flex justify-between gap-4">
                   <span>• {fi.bilesenAdi}{fi.oznitelikAdi ? ` (${fi.oznitelikAdi})` : ''}</span>
-                  <span className="tabular-nums">{fi.adet} {fi.birim ?? ''} × {m(fi.fiyat ?? 0)}</span>
+                  <span className="tabular-nums">{fi.adet} {unitLabel(t, fi.birim)} × {m(fi.fiyat ?? 0)}</span>
                 </div>
               ))}
             </div>

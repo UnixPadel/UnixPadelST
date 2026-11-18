@@ -44,6 +44,7 @@ import type { AccountingOrderListDto } from '@/types'
 import { localDateInput } from '@/lib/date'
 import { TahsilatPanel } from './tahsilat/TahsilatPanel'
 
+import { currencyLabel } from '@/lib/currency'
 /**
  * Muhasebe · Tahsilat (legacy Muhasebe.cs'in mantıksal karşılığı).
  *
@@ -212,7 +213,7 @@ export function AccountingPage() {
     { key: 'musteriAd', truncate: '10rem', header: t('common.customer'), sortable: true },
     { key: 'mUlke',         header: t('common.country'),  sortable: true, defaultHidden: true },
     { key: 'sirket',        header: t('accountingFull.cols.sirket'), sortable: true, defaultHidden: true, render: (r) => (r.sirket as string) ?? '—' },
-    { key: 'paraTipi',      header: t('common.currency'), sortable: true, defaultHidden: true },
+    { key: 'paraTipi',      header: t('common.currency'), sortable: true, defaultHidden: true, render: (r) => currencyLabel(t, r.paraTipi) },
     { key: 'toplamFiyat',   header: t('common.totalAmount'), sortable: true, type: 'money',
       render: (r) => formatCurrency(r.toplamFiyat ?? 0, r.paraTipi), footer: money('toplamFiyat') },
     { key: 'kaparoFiyat',   header: t('accountingFull.cols.kaparo'), sortable: true, type: 'money', defaultHidden: true,
@@ -232,7 +233,7 @@ export function AccountingPage() {
         <div className="flex flex-col gap-0.5">
           <StatusBadge value={r.siparisMiTeklifMi} context="stage" />
           {r.siparisMiTeklifMi === 'Tamamlandi' && r.tamamlayanAdSoyad && (
-            <span className="text-2xs text-muted-foreground truncate" title={`${r.tamamlayanAdSoyad} tarafından tamamlandı${r.tamamlanmaTarihi ? ` (${formatDate(r.tamamlanmaTarihi)})` : ''}`}>
+            <span className="text-2xs text-muted-foreground truncate" title={r.tamamlanmaTarihi ? t('orderStage.completedByOn', { name: r.tamamlayanAdSoyad, date: formatDate(r.tamamlanmaTarihi) }) : t('orderStage.completedBy', { name: r.tamamlayanAdSoyad })}>
               {r.tamamlayanAdSoyad}
             </span>
           )}

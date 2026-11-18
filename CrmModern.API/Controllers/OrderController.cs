@@ -3,6 +3,7 @@ using CrmModern.API.Authorization;
 using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Order;
+using CrmModern.Core.Exceptions;
 using CrmModern.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -42,6 +43,32 @@ public sealed class OrderController(
     // PROMPT-v5 §2: Fabrika rolü sipariş parasal değerlerini hiçbir endpoint'ten alamaz.
     private bool IsFabrika => User.IsInRole("Fabrika");
 
+    // Round-11 §3 — ad bazlı parasal gizleme (bkz. web lib/visibility.ts).
+    private static readonly string[] HideMoneyUsers = { "omur.caliskan" };
+
+    private bool HidesMoney => IsFabrika || HideMoneyUsers.Contains(CurrentUserName);
+
+    // PROMPT-v2 §6: Temsilci yalnız kendi siparişini okur (WorkflowController ile aynı
+    // kural); elshan.rasulov ve süper-admin muaftır. null = kısıt yok.
+    private int? OwnOrdersOnly =>
+        User.IsInRole("Temsilci") && !IsControlUser ? CurrentUserId : null;
+
+    /// <summary>Siparişi okur. Başkasının siparişini isteyen Temsilci, numara hiç
+    /// yokmuş gibi aynı 404'ü alır (sipariş numarasının varlığı da sızmaz).</summary>
+    private async Task<OrderDetailDto> GetReadableOrderAsync(string no)
+    {
+        var order = await orderService.GetByNoAsync(no);
+        if (OwnOrdersOnly is int ownerId && order.KullaniciID != ownerId)
+            throw new NotFoundException("Order", no);
+        return order;
+    }
+
+    private async Task EnsureOrderReadableAsync(string no)
+    {
+        if (OwnOrdersOnly is not null)
+            await GetReadableOrderAsync(no);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // List
     // ─────────────────────────────────────────────────────────────────────────
@@ -62,8 +89,8 @@ public sealed class OrderController(
 
         var result = await orderService.GetOrdersAsync(filter);
 
-        // PROMPT-v5 §2: Fabrika liste satırlarında da para göremez.
-        if (IsFabrika)
+        // PROMPT-v5 §2: Fabrika (ve ad bazlı gizlenen kullanıcı) liste satırlarında da para göremez.
+        if (HidesMoney)
             result = result with
             {
                 Items = result.Items.Select(OrderDtoSanitizer.StripPricesForFactory).ToList(),
@@ -82,8 +109,8 @@ public sealed class OrderController(
         // diğer herkes v2 §6 gereği kendi satırlarıyla sınırlı kalır.
         var result = await orderService.GetMyOrdersAsync(CurrentUserId, asama, allUsers: IsControlUser);
 
-        // PROMPT-v5 §2: kullanıcı bazlı scope yeterli değil — Fabrika satır parası da karartılır.
-        if (IsFabrika)
+        // PROMPT-v5 §2: kullanıcı bazlı scope yeterli değil — satır parası da karartılır.
+        if (HidesMoney)
             result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
 
         return Ok(ApiResponse<IReadOnlyList<OrderListDto>>.Ok(result));
@@ -94,8 +121,8 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<OrderTotalsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTotals([FromQuery] OrderFilterDto filter)
     {
-        // PROMPT-v5 §2: döviz toplamları sipariş parasıdır — Fabrika tamamen dışlanır.
-        if (IsFabrika) return Forbid();
+        // PROMPT-v5 §2: döviz toplamları sipariş parasıdır — para göremeyenler tamamen dışlanır.
+        if (HidesMoney) return Forbid();
 
         // PROMPT-v2 §6: Temsilci toplamları kendi siparişlerinden hesaplanır.
         // PROMPT-v4 §1: elshan rolünden bağımsız tümünü görür.
@@ -119,11 +146,11 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetByNo(string no)
     {
-        var result = await orderService.GetByNoAsync(no);
+        var result = await GetReadableOrderAsync(no);
 
-        // PROMPT-v5 §2: Fabrika için tüm parasal alanlar (kalem fiyatları dahil)
-        // kaynağında null'lanır — istemci gizlemesi ikinci katmandır.
-        if (IsFabrika)
+        // PROMPT-v5 §2: para göremeyenler için tüm parasal alanlar (kalem fiyatları
+        // dahil) kaynağında null'lanır — istemci gizlemesi ikinci katmandır.
+        if (HidesMoney)
             result = OrderDtoSanitizer.StripPricesForFactory(result);
 
         return Ok(ApiResponse<OrderDetailDto>.Ok(result));
@@ -132,9 +159,16 @@ public sealed class OrderController(
     /// <summary>Sipariş onay/red audit log (SiparisOnaylari).</summary>
     [HttpGet("{no}/approvals")]
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<OrderApprovalDto>>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetApprovals(string no)
     {
+        await EnsureOrderReadableAsync(no);
         var result = await orderService.GetApprovalHistoryAsync(no);
+
+        // Açıklamalar tutar taşıyabilir (peşinat, final maliyet, lojistik teklif fiyatı).
+        if (HidesMoney)
+            result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<OrderApprovalDto>>.Ok(result));
     }
 
@@ -145,6 +179,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<MaterialCostDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetMaterialCost(string no)
     {
+        if (HidesMoney) return Forbid();
         if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !IsControlUser)
             return Forbid();
         var result = await orderService.ComputeMaterialCostAsync(no);
@@ -160,7 +195,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> GetRejectionNote(string no)
     {
-        var detail = await orderService.GetByNoAsync(no);
+        var detail = await GetReadableOrderAsync(no);
         // WinForms NotButton: SELECT Red FROM SiparisAlTablo WHERE SiparisNo = @SiparisNo
         return Ok(ApiResponse<RejectionNoteDto>.Ok(
             new RejectionNoteDto(detail.Kontrol == "Reddet" ? (detail.Red ?? string.Empty) : string.Empty)));
@@ -332,6 +367,8 @@ public sealed class OrderController(
     public async Task<IActionResult> Clone(string sourceNo)
     {
         if (!CanCreateOrders) return Forbid();
+        // Klon kaynağın fiyat ve müşteri bilgisini kopyalar: okuma kuralı burada da geçerli.
+        await EnsureOrderReadableAsync(sourceNo);
         var newNo = await orderService.CloneFromExistingAsync(CurrentUserId, sourceNo);
         return Ok(ApiResponse<string>.Ok(newNo, "Sipariş klonlandı."));
     }
@@ -436,6 +473,11 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status404NotFound)]
     public async Task<IActionResult> DownloadAttachment(string no, string type)
     {
+        await EnsureOrderReadableAsync(no);
+        // Muhasebe eki Muhasebe Klasörü ile aynı kuralda: para göremeyen açamaz.
+        if (HidesMoney && string.Equals(type, "muhasebeek", StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
         var data = await orderService.GetAttachmentAsync(no, type);
         if (data is null || data.Length == 0)
             return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));
@@ -454,21 +496,17 @@ public sealed class OrderController(
 
     private static readonly string[] AccountingApprovers = { "burcu.karaman", "elshan.rasulov", "admin" };
 
-    // Round-11 §3 — ad bazlı parasal gizleme (bkz. web lib/visibility.ts).
-    private static readonly string[] HideMoneyUsers = { "omur.caliskan" };
-
     private bool CanManageFolder =>
         User.IsInRole("Yonetici") || User.IsInRole("Muhasebe")
         || AccountingApprovers.Contains(CurrentUserName) || User.IsSuperAdmin();
 
-    private bool HidesMoney => IsFabrika || HideMoneyUsers.Contains(CurrentUserName);
-
-    /// <summary>Klasörü görebilir mi? (Fabrika / ad bazlı gizleme hayır; Temsilci yalnız kendi siparişi.)</summary>
-    private bool CanSeeFolder(OrderFolderRef order)
+    /// <summary>Klasörü görebilir mi? (Fabrika / ad bazlı gizleme hayır; Temsilci yalnız
+    /// kendi siparişi — başkasınınki için sipariş detayıyla aynı 404.)</summary>
+    private bool CanSeeFolder(string no, OrderFolderRef order)
     {
         if (HidesMoney) return false;
-        if (User.IsInRole("Temsilci") && !IsControlUser && !CanManageFolder)
-            return order.KullaniciID == CurrentUserId;
+        if (OwnOrdersOnly is int ownerId && !CanManageFolder && order.KullaniciID != ownerId)
+            throw new NotFoundException("Order", no);
         return true;
     }
 
@@ -492,7 +530,7 @@ public sealed class OrderController(
     public async Task<IActionResult> GetFolder(string no, [FromQuery] bool includeDeleted = false)
     {
         var order = await folderService.ResolveAsync(no);
-        if (!CanSeeFolder(order)) return Forbid();
+        if (!CanSeeFolder(no, order)) return Forbid();
 
         var (dosyalar, onceki, satici) = await folderService.GetContentAsync(order, includeDeleted);
         var dto = new OrderFolderDto(
@@ -530,7 +568,7 @@ public sealed class OrderController(
     public async Task<IActionResult> DownloadFolderFile(string no, int ekId)
     {
         var order = await folderService.ResolveAsync(no);
-        if (!CanSeeFolder(order)) return Forbid();
+        if (!CanSeeFolder(no, order)) return Forbid();
         var data = await folderService.GetFileAsync(order, ekId);
         return data is null ? FolderFileNotFound() : File(data.Veri, data.Tip, data.Ad);
     }
@@ -541,7 +579,7 @@ public sealed class OrderController(
     public async Task<IActionResult> DownloadFolderLegacyFile(string no, string kind)
     {
         var order = await folderService.ResolveAsync(no);
-        if (!CanSeeFolder(order)) return Forbid();
+        if (!CanSeeFolder(no, order)) return Forbid();
         var data = await folderService.GetLegacyFileAsync(order, kind);
         return data is null ? FolderFileNotFound() : File(data.Veri, data.Tip, data.Ad);
     }
@@ -593,6 +631,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Excel(string no, [FromQuery] string lang = "tr")
     {
+        await EnsureOrderReadableAsync(no);
         if (!await CanDownloadProformaAsync(no)) return Forbid();
         var bytes = await reportingService.ExportOrderProformaAsync(no, lang);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.xlsx";
@@ -610,6 +649,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
     public async Task<IActionResult> Pdf(string no, [FromQuery] string lang = "tr")
     {
+        await EnsureOrderReadableAsync(no);
         if (!await CanDownloadProformaAsync(no)) return Forbid();
         var bytes = await reportingService.ExportOrderProformaPdfAsync(no, lang);
         var fileName = $"Proforma_{no}_{DateTime.Now:yyyyMMdd}.pdf";
@@ -622,6 +662,7 @@ public sealed class OrderController(
     //   Fabrika (parasal değer göremez) + diğer roller → erişemez.
     private async Task<bool> CanDownloadProformaAsync(string no)
     {
+        if (HidesMoney) return false;
         if (User.IsInRole("Yonetici") || User.IsInRole("Muhasebe")
             || User.IsInRole("Lojistik") || IsControlUser)
             return true;

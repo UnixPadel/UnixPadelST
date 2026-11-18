@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
+using CrmModern.API.Security;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Logistics;
 using CrmModern.Core.Interfaces.Services;
@@ -107,6 +109,11 @@ public sealed class LogisticsController(ILogisticsService logisticsService) : Co
     {
         if (!CanReadLogistics()) return Forbid();
         var result = await logisticsService.GetHistoryAsync(siparisNo, firmaAdi);
+
+        // Round-11 §3: ad bazlı gizlenen kullanıcı sevk fiyatını almaz.
+        if (User.HidesOrderMoney())
+            result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<LogisticsHistoryDto>>.Ok(result));
     }
 

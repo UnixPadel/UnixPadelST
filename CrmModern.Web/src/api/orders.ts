@@ -60,7 +60,7 @@ export const getOrderDetail = (no: string) =>
   api.get<ApiResponse<OrderDetail>>(`/api/orders/${no}`).then((r) => r.data.data)
 
 export const getRejectionNote = (no: string) =>
-  api.get<ApiResponse<{ red: string }>>(`/api/orders/${no}/rejection-note`).then((r) => r.data.data)
+  api.get<ApiResponse<{ redNotu: string }>>(`/api/orders/${no}/rejection-note`).then((r) => r.data.data)
 
 export interface OrderApproval {
   onayID: number

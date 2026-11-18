@@ -20,12 +20,6 @@ public sealed class OrderController(
 {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // PROMPT-v3 §1 create-path Temsilci-only; istisna: elshan.rasulov.
-    // PROMPT-v4 §1: aynı kullanıcı Kontrol ekranının tek yetkilisi (ControlUser) —
-    // approve/reject/paid-amount/stage mutasyonları ve excel/material-cost
-    // okumaları için kullanıcı adı bazlı kalıp (PurchaseController gibi).
-    private const string ControlUser = "elshan.rasulov";
-
     private int CurrentUserId =>
         int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)
             ?? throw new InvalidOperationException("KullaniciID claim missing."));
@@ -34,24 +28,17 @@ public sealed class OrderController(
         User.FindFirstValue(ClaimTypes.Name)
             ?? throw new InvalidOperationException("Kullanıcı adı claim eksik.");
 
-    // §24 — Admin Kontrol ekranının tüm mutasyon/okumalarına erişir (tam erişim).
-    private bool IsControlUser => CurrentUserName == ControlUser || User.IsSuperAdmin();
+    // PROMPT-v4 §1: elshan.rasulov Kontrol ekranının tek yetkilisi (approve/reject/
+    // paid-amount/stage ve excel/material-cost). §24 — Admin de tam erişimlidir.
+    private bool IsControlUser => User.IsOrderControlUser();
 
+    // PROMPT-v3 §1 create-path Temsilci-only; istisna: elshan.rasulov.
     private bool CanCreateOrders =>
         User.IsInRole("Temsilci") || IsControlUser;
 
-    // PROMPT-v5 §2: Fabrika rolü sipariş parasal değerlerini hiçbir endpoint'ten alamaz.
-    private bool IsFabrika => User.IsInRole("Fabrika");
+    private bool HidesMoney => User.HidesOrderMoney();
 
-    // Round-11 §3 — ad bazlı parasal gizleme (bkz. web lib/visibility.ts).
-    private static readonly string[] HideMoneyUsers = { "omur.caliskan" };
-
-    private bool HidesMoney => IsFabrika || HideMoneyUsers.Contains(CurrentUserName);
-
-    // PROMPT-v2 §6: Temsilci yalnız kendi siparişini okur (WorkflowController ile aynı
-    // kural); elshan.rasulov ve süper-admin muaftır. null = kısıt yok.
-    private int? OwnOrdersOnly =>
-        User.IsInRole("Temsilci") && !IsControlUser ? CurrentUserId : null;
+    private int? OwnOrdersOnly => User.OwnOrdersOnlyId();
 
     /// <summary>Siparişi okur. Başkasının siparişini isteyen Temsilci, numara hiç
     /// yokmuş gibi aynı 404'ü alır (sipariş numarasının varlığı da sızmaz).</summary>
@@ -256,6 +243,7 @@ public sealed class OrderController(
     public async Task<IActionResult> Revise(string eskiNo, [FromBody] CreateOrderDto dto)
     {
         if (!CanCreateOrders) return Forbid();
+        await EnsureOrderReadableAsync(eskiNo);
         var newNo = await orderService.ReviseAsync(CurrentUserId, eskiNo, dto);
         return Ok(ApiResponse<string>.Ok(newNo, "Revize başarıyla tamamlandı."));
     }
@@ -313,6 +301,7 @@ public sealed class OrderController(
     public async Task<IActionResult> ConvertToOrder(string teklifNo)
     {
         if (!CanCreateOrders) return Forbid();
+        await EnsureOrderReadableAsync(teklifNo);
         await orderService.ConvertToOrderAsync(teklifNo);
         return Ok(ApiResponse<object>.Ok(null!, "Teklif siparişe çevrildi."));
     }
@@ -378,6 +367,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> Submit(string no)
     {
+        await EnsureOrderReadableAsync(no);
         await orderService.SubmitForApprovalAsync(no, CurrentUserId);
         return Ok(ApiResponse<object>.Ok(null!, "Onaya gönderildi."));
     }
@@ -444,6 +434,7 @@ public sealed class OrderController(
     public async Task<IActionResult> ExpandRecipe(string no, [FromBody] ExpandRecipeRequest dto)
     {
         if (!CanCreateOrders) return Forbid();
+        await EnsureOrderReadableAsync(no);
         await orderService.ExpandRecipeAsync(no, dto.KategoriID, dto.Adet);
         return Ok(ApiResponse<object>.Ok(null!, "Reçete açıldı."));
     }
@@ -454,6 +445,7 @@ public sealed class OrderController(
     [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
     public async Task<IActionResult> UploadAttachment(string no, [FromQuery] string type, IFormFile file)
     {
+        await EnsureOrderReadableAsync(no);
         if (file is null || file.Length == 0)
             return BadRequest(ApiResponse<object>.FailCode("fileEmpty", "Dosya boş.", null));
 

@@ -1,6 +1,8 @@
 using System.Security.Claims;
+using CrmModern.API.Authorization;
 using CrmModern.Core.DTOs.Common;
 using CrmModern.Core.DTOs.Dashboard;
+using CrmModern.Core.Exceptions;
 using CrmModern.Core.Interfaces.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -15,7 +17,9 @@ namespace CrmModern.API.Controllers;
 [ApiController]
 [Route("api/reporting")]
 [Authorize]
-public sealed class ReportingController(IReportingService reportingService) : ControllerBase
+public sealed class ReportingController(
+    IReportingService reportingService,
+    IOrderService orderService) : ControllerBase
 {
     private const string ContentType =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -45,8 +49,10 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     [HttpGet("accounting/export")]
     public async Task<IActionResult> ExportAccounting()
     {
-        // PROMPT-v5 §2: rapor sipariş tutarları içerir — Fabrika alamaz.
-        if (User.IsInRole("Fabrika")) return Forbid();
+        // Rapor tüm siparişlerin tutarlarını içerir: /api/accounting/excel ile aynı kitle.
+        if (User.HidesOrderMoney()) return Forbid();
+        if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe") && !User.IsOrderControlUser())
+            return Forbid();
         var bytes = await reportingService.ExportAccountingOrdersAsync();
         var filename = $"muhasebe_{DateTime.Now:yyyyMMdd_HHmm}.xlsx";
         return File(bytes, ContentType, filename);
@@ -60,8 +66,20 @@ public sealed class ReportingController(IReportingService reportingService) : Co
     [HttpGet("orders/{siparisNo}/proforma")]
     public async Task<IActionResult> ExportProforma(string siparisNo, [FromQuery] string lang = "tr")
     {
-        // PROMPT-v5 §2: proforma fiyat içerir — Fabrika alamaz.
-        if (User.IsInRole("Fabrika")) return Forbid();
+        // Proforma fiyat içerir: /api/orders/{no}/excel ile aynı kural (§32).
+        if (User.HidesOrderMoney()) return Forbid();
+        if (User.OwnOrdersOnlyId() is int ownerId)
+        {
+            var order = await orderService.GetByNoAsync(siparisNo);
+            if (order.KullaniciID != ownerId)
+                throw new NotFoundException("Order", siparisNo);
+        }
+        else if (!User.IsInRole("Yonetici") && !User.IsInRole("Muhasebe")
+                 && !User.IsInRole("Lojistik") && !User.IsOrderControlUser())
+        {
+            return Forbid();
+        }
+
         var bytes = await reportingService.ExportOrderProformaAsync(siparisNo, lang);
         var filename = $"proforma_{siparisNo}_{DateTime.Now:yyyyMMdd}.xlsx";
         return File(bytes, ContentType, filename);

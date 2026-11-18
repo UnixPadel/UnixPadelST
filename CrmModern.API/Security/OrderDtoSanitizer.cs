@@ -1,4 +1,6 @@
 using System.Text.RegularExpressions;
+using CrmModern.Core.DTOs.Accounting;
+using CrmModern.Core.DTOs.Logistics;
 using CrmModern.Core.DTOs.Order;
 using CrmModern.Core.DTOs.Search;
 
@@ -42,6 +44,21 @@ public static class OrderDtoSanitizer
         dto.Aciklama is not null && MoneyInNote.IsMatch(dto.Aciklama)
             ? dto with { Aciklama = null }
             : dto;
+
+    public static AccountingTransactionDto StripPricesForFactory(AccountingTransactionDto dto) =>
+        dto with { OdenenMiktar = null };
+
+    public static TransactionListItemDto StripPricesForFactory(TransactionListItemDto dto) =>
+        dto with { OdenenMiktar = null, Maliyet = null };
+
+    public static TransactionPageDto StripPricesForFactory(TransactionPageDto dto) => dto with
+    {
+        Items          = dto.Items.Select(StripPricesForFactory).ToList(),
+        CurrencyTotals = new Dictionary<string, decimal>(),
+    };
+
+    public static LogisticsHistoryDto StripPricesForFactory(LogisticsHistoryDto dto) =>
+        dto with { Fiyat = 0m };
 
     public static OrderListDto StripPricesForFactory(OrderListDto dto) => dto with
     {

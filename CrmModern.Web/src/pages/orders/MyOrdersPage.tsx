@@ -228,7 +228,7 @@ export function MyOrdersPage() {
             <MessageSquareWarning className="h-4 w-4" aria-hidden /> {t('myOrders.redNote.title')}
           </p>
           <p className="mt-1 max-h-24 overflow-y-auto whitespace-pre-wrap text-sm text-danger-soft-foreground">
-            {redLoading ? t('common.loading') : redData?.red || t('myOrders.redNote.empty')}
+            {redLoading ? t('common.loading') : redData?.redNotu || t('myOrders.redNote.empty')}
           </p>
         </div>
         {canRevise(activeRow) && (

@@ -65,6 +65,11 @@ public sealed class AccountingController(
             !User.IsInRole("Gozlemci") && CurrentUserName != ControlUser && !User.IsSuperAdmin())
             return Forbid();
         var result = await accountingService.GetTransactionsForOrderAsync(siparisNo, includeCancelled);
+
+        // Round-11 §3: ad bazlı gizlenen kullanıcı tahsilat satırını görür, tutarını değil.
+        if (User.HidesOrderMoney())
+            result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<AccountingTransactionDto>>.Ok(result));
     }
 
@@ -105,6 +110,10 @@ public sealed class AccountingController(
     public async Task<IActionResult> GetTransactions()
     {
         var result = await accountingService.GetTransactionHistoryAsync();
+
+        if (User.HidesOrderMoney())
+            result = result.Select(OrderDtoSanitizer.StripPricesForFactory).ToList();
+
         return Ok(ApiResponse<IReadOnlyList<AccountingTransactionDto>>.Ok(result));
     }
 
@@ -113,7 +122,15 @@ public sealed class AccountingController(
     [ProducesResponseType(typeof(ApiResponse<TransactionPageDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTransactionHistory([FromQuery] TransactionFilterDto filter)
     {
+        // Tutar süzgeci de kapatılır: yoksa denemeyle tutar öğrenilebilir.
+        var hideMoney = User.HidesOrderMoney();
+        if (hideMoney)
+            filter = filter with { OdenenMiktar = null };
+
         var result = await accountingService.GetTransactionHistoryPagedAsync(filter);
+        if (hideMoney)
+            result = OrderDtoSanitizer.StripPricesForFactory(result);
+
         return Ok(ApiResponse<TransactionPageDto>.Ok(result));
     }
 

@@ -39,6 +39,10 @@ public sealed class FactoryController(
     [ProducesResponseType(typeof(ApiResponse<IReadOnlyList<FactoryOrderListDto>>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetOrders([FromQuery] OrderFilterDto filter)
     {
+        // PROMPT-v2 §6: Temsilci üretim listesinde de yalnız kendi siparişlerini görür.
+        if (User.OwnOrdersOnlyId() is int ownerId)
+            filter = filter with { KullaniciID = ownerId };
+
         var result = await factoryService.GetProductionOrdersAsync(filter);
         return Ok(ApiResponse<IReadOnlyList<FactoryOrderListDto>>.Ok(result));
     }
@@ -83,6 +87,7 @@ public sealed class FactoryController(
     [ProducesResponseType(typeof(ApiResponse<OrderTotalsDto>), StatusCodes.Status200OK)]
     public async Task<IActionResult> GetTotals([FromQuery] OrderFilterDto filter)
     {
+        if (User.HidesOrderMoney()) return Forbid();
         var result = await orderService.GetTotalsByCurrencyAsync(filter);
         return Ok(ApiResponse<OrderTotalsDto>.Ok(result));
     }
@@ -106,6 +111,10 @@ public sealed class FactoryController(
     [Authorize(Roles = "Yonetici,Fabrika,Muhasebe,Gozlemci")]
     public async Task<IActionResult> DownloadAttachment(string siparisNo, string type)
     {
+        // Muhasebe eki Muhasebe Klasörü ile aynı kuralda: para göremeyen açamaz.
+        if (User.HidesOrderMoney() && string.Equals(type, "muhasebeek", StringComparison.OrdinalIgnoreCase))
+            return Forbid();
+
         var data = await orderService.GetAttachmentAsync(siparisNo, type);
         if (data is null || data.Length == 0)
             return NotFound(ApiResponse<object>.FailCode("attachmentNotFound", "Ek dosya yok.", null));

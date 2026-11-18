@@ -10,7 +10,8 @@ public sealed record PurchaseRequestFilterDto(
     DateTime? BaslangicTarih,
     DateTime? BitisTarih,
     int       Page     = 1,
-    int       PageSize = 50);
+    int       PageSize = 50,
+    int?      TalepNo  = null);
 
 public sealed record PurchaseRequestPageDto(
     IReadOnlyList<PurchaseRequestListDto> Items,

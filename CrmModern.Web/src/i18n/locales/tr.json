@@ -681,6 +681,7 @@
   "users": {
     "title": "Kullanıcılar",
     "subtitle": "Kullanıcıları ekle, düzenle, şifre değiştir",
+    "searchLabel": "Ad, kullanıcı adı veya e-posta",
     "newUser": "Yeni Kullanıcı",
     "editUser": "Kullanıcıyı Düzenle",
     "changePassword": "Şifre Değiştir",
@@ -1268,6 +1269,7 @@
       "tamamlandi": "Tamamlandı"
     },
     "filter": {
+      "talepNo": "Talep no",
       "talepEden": "Talep eden",
       "departman": "Departman",
       "durum": "Durum",

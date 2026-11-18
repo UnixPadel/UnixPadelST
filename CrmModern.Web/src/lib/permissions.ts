@@ -28,6 +28,13 @@ export function isAccountingApprover(
   return (!!u && ACCOUNTING_APPROVERS.includes(u)) || isSuperAdmin(user)
 }
 
+// Tüm Talepler verisi — backend ClaimsPrincipalExtensions.CanSeeAllPurchaseRequests ile aynı küme.
+export function canSeeAllPurchaseRequests(
+  user: { yetkiTuru?: string | null; kullaniciAdi?: string | null } | null | undefined,
+): boolean {
+  return user?.yetkiTuru === 'Yonetici' || user?.yetkiTuru === 'Gozlemci' || user?.kullaniciAdi === 'elshan.rasulov'
+}
+
 // Muhasebe Klasörü — backend OrderController.CanManageFolder ile aynı küme.
 // Görme kuralı parasal görünürlüğe bağlıdır (lib/visibility.ts hideMoneyFor);
 // ekleme/silme: Yönetici, Muhasebe, Muhasebe Onay kullanıcıları. Sunucu ayrıca

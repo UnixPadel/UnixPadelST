@@ -7,6 +7,7 @@ import { OrderStatusBadge } from '@/components/order/OrderStatusBadge'
 import { StatusBadge } from '@/components/StatusBadge'
 import { useAuth } from '@/hooks/useAuth'
 import { visibleNavItems, type NavItem } from '@/lib/navigation'
+import { canSeeAllPurchaseRequests } from '@/lib/permissions'
 import { readJSON, userKey, writeJSON } from '@/lib/storage'
 import { stepLabelKey } from '@/lib/workflow'
 import { trLower } from '@/components/ui/combobox'
@@ -15,7 +16,7 @@ import type { OrderHitSummary, UnifiedSearchHit } from '@/types'
 
 /**
  * E-1 — Komut Paleti (Ctrl+K). GlobalSearch'ün yerini alır:
- *  • Kayıt araması (sipariş, müşteri, bileşen…) — 300 ms debounce, önceki istek iptal.
+ *  • Kayıt araması (sipariş, müşteri, kullanıcı, talep) — 300 ms debounce, önceki istek iptal.
  *    Sipariş satırı tür, aşama ve bekleyen adımı gösterir; seçince Sipariş Ara açılır.
  *  • SAP işlem kodu mantığı: "YS" → Yeni Sipariş, "KK" → Kontrol … (menüdeki kodlar).
  *  • Belge komutları: "SP 2025-0123" sipariş detayını açar, "RV …" revize, "KP …"
@@ -36,11 +37,21 @@ const CUSTOMER_CATEGORY = 'Müşteri'
 const searchUrl = (q: string, sel?: string) =>
   `/search?f.q=${encodeURIComponent(q)}${sel ? `&sel=${encodeURIComponent(sel)}` : ''}`
 
-/** Tarayıcıda kayıtlı eski "son aradıkların" adresleri artık olmayan sayfalara gidiyordu. */
-function hitUrl(hit: UnifiedSearchHit): string {
-  if (hit.kategori === ORDER_CATEGORY && hit.navigateUrl.startsWith('/orders/')) return searchUrl(hit.id, hit.id)
-  if (hit.kategori === CUSTOMER_CATEGORY && hit.navigateUrl.startsWith('/customers/')) return searchUrl(hit.baslik)
-  return hit.navigateUrl
+/**
+ * Tarayıcıda kayıtlı eski "son aradıkların" adresleri artık olmayan sayfalara gidiyordu.
+ * Karşılığı olan ekrana çevrilir; açılabilecek ekranı olmayan kayıt için null döner.
+ */
+function hitUrl(hit: UnifiedSearchHit, canSeeAllPurchases: boolean): string | null {
+  const url = hit.navigateUrl
+  if (url.startsWith('/product-catalog/')) return null
+  if (hit.kategori === ORDER_CATEGORY && url.startsWith('/orders/')) return searchUrl(hit.id, hit.id)
+  if (hit.kategori === CUSTOMER_CATEGORY && url.startsWith('/customers/')) return searchUrl(hit.baslik)
+  if (/^\/users\/\d+$/.test(url)) {
+    return `/users?f.q=${encodeURIComponent(hit.altMetin?.split(' • ')[0] || hit.baslik)}`
+  }
+  // Eski kayıtta talebin kime ait olduğu yok; Taleplerim'de bulunacağı bilinemez.
+  if (/^\/purchase\/\d+$/.test(url)) return canSeeAllPurchases ? `/purchase/all?f.talepNo=${hit.id}` : null
+  return url
 }
 
 function OrderHitLine({ order }: { order: OrderHitSummary }) {
@@ -64,6 +75,7 @@ export function CommandPalette() {
   const user = getUser()
   const navItems = useMemo(() => visibleNavItems(user), [user])
   const canCreate = !!user && (user.yetkiTuru === 'Temsilci' || navItems.some((n) => n.path === '/orders/new'))
+  const canSeeAllPurchases = canSeeAllPurchaseRequests(user)
 
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -72,7 +84,9 @@ export function CommandPalette() {
   const [orderTotal, setOrderTotal] = useState(0)
   const [active, setActive] = useState(0)
   const recentKey = userKey(RECENT_KEY)
-  const [recents, setRecents] = useState<UnifiedSearchHit[]>(() => readJSON(recentKey, readJSON(RECENT_KEY, [])))
+  const [recents, setRecents] = useState<UnifiedSearchHit[]>(() =>
+    readJSON<UnifiedSearchHit[]>(recentKey, readJSON<UnifiedSearchHit[]>(RECENT_KEY, []))
+      .filter((h) => hitUrl(h, canSeeAllPurchases) !== null))
   const inputRef = useRef<HTMLInputElement>(null)
 
   const openPalette = () => { setOpen(true); setTimeout(() => inputRef.current?.focus(), 0) }
@@ -101,7 +115,8 @@ export function CommandPalette() {
     const h = setTimeout(async () => {
       try {
         const result = await unifiedSearch(q, ctrl.signal)
-        setHits(result.sonuclar)
+        // Sunucu henüz güncellenmemişse eski adresli sonuçlar da ölü bağlantı olmaz.
+        setHits(result.sonuclar.filter((h) => hitUrl(h, canSeeAllPurchases) !== null))
         setOrderTotal(result.siparisToplam ?? 0)
       } catch {
         if (!ctrl.signal.aborted) { setHits([]); setOrderTotal(0) }
@@ -110,7 +125,7 @@ export function CommandPalette() {
       }
     }, 300)
     return () => { clearTimeout(h); ctrl.abort() }
-  }, [query])
+  }, [query, canSeeAllPurchases])
 
   const items: PaletteItem[] = useMemo(() => {
     const q = query.trim().replace(/^>\s*/, '')
@@ -158,7 +173,8 @@ export function CommandPalette() {
       const next = [saved, ...recents.filter((r) => !(r.kategori === h.kategori && r.id === h.id))].slice(0, 6)
       setRecents(next)
       writeJSON(recentKey, next)
-      navigate(hitUrl(h))
+      const url = hitUrl(h, canSeeAllPurchases)
+      if (url) navigate(url)
     }
     close()
   }

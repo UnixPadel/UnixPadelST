@@ -39,7 +39,7 @@ internal sealed class PurchaseService(IUnitOfWork uow) : IPurchaseService
     public async Task<PurchaseRequestPageDto> GetAllAsync(PurchaseRequestFilterDto f)
     {
         var rows = await uow.PurchaseRequests.SearchAsync(
-            f.TalepEden, f.Departman, f.Durum, f.TalepTipi, f.BaslangicTarih, f.BitisTarih);
+            f.TalepEden, f.Departman, f.Durum, f.TalepTipi, f.BaslangicTarih, f.BitisTarih, f.TalepNo);
 
         int total = rows.Count;
         int page  = Math.Max(1, f.Page);

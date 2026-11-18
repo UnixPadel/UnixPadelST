@@ -25,15 +25,4 @@ internal sealed class ProductCategoryRepository(AppDbContext context)
                     // vaat eder — eksik Include Öznitelik'lerin boş gelmesine yol açıyordu.
                     .ThenInclude(c => c!.Attributes)
             .FirstOrDefaultAsync(c => c.KategoriID == kategoriID);
-
-    public async Task<IReadOnlyList<ProductCategory>> QuickFindAsync(string query, int limit)
-    {
-        var q = $"%{query}%";
-        return await _context.UrunKategorileri
-            .AsNoTracking()
-            .Where(c => EF.Functions.Like(c.KategoriAdi, q))
-            .OrderBy(c => c.KategoriAdi)
-            .Take(limit)
-            .ToListAsync();
-    }
 }

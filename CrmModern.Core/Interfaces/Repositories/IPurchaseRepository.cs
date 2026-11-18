@@ -24,7 +24,8 @@ public interface IPurchaseRepository : IBaseRepository<PurchaseRequest>
         string?   durum,
         string?   talepTipi,
         DateTime? baslangic,
-        DateTime? bitis);
+        DateTime? bitis,
+        int?      talepNo = null);
 
     Task<int> ApproveAsync(int talepId, string islemYapanKullanici, DateTime islemTarihi);
     Task<int> RejectAsync(int talepId, string redNotu, string islemYapanKullanici, DateTime islemTarihi);
@@ -42,8 +43,11 @@ public interface IPurchaseRepository : IBaseRepository<PurchaseRequest>
     /// <summary>Onay Bekliyor durumundaki toplam talep sayısı (dashboard KPI).</summary>
     Task<int> CountPendingAsync();
 
-    /// <summary>Faz 7 — Topbar global arama. UrunAdi/TalepEdenKullaniciAdi/Departman üzerinde LIKE.</summary>
-    Task<IReadOnlyList<PurchaseRequest>> QuickFindAsync(string query, int limit);
+    /// <summary>
+    /// Faz 7 — Topbar global arama. UrunAdi/TalepEdenKullaniciAdi/Departman üzerinde LIKE.
+    /// <paramref name="onlyTalepEden"/> doluysa yalnız o kullanıcının talepleri aranır.
+    /// </summary>
+    Task<IReadOnlyList<PurchaseRequest>> QuickFindAsync(string query, int limit, string? onlyTalepEden = null);
 
     // ── Round-9 §9 — çok kalemli talep satırları (SatinAlmaTalepKalem) ───────
     Task AddLinesAsync(IEnumerable<PurchaseRequestLine> lines);

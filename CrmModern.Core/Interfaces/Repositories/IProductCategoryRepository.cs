@@ -18,7 +18,4 @@ public interface IProductCategoryRepository : IBaseRepository<ProductCategory>
     /// fully loaded — used when the user selects a category in the order form.
     /// </summary>
     Task<ProductCategory?> GetWithComponentsAsync(int kategoriID);
-
-    /// <summary>Faz 7 — Topbar global arama. KategoriAdi üzerinde LIKE.</summary>
-    Task<IReadOnlyList<ProductCategory>> QuickFindAsync(string query, int limit);
 }

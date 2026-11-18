@@ -97,7 +97,7 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
     }
 
     /// <summary>
-    /// Faz 7 — Topbar global arama. Tek query → Sipariş/Müşteri/Bileşen/Kategori/Kullanıcı/Satın Alma.
+    /// Faz 7 — Topbar global arama. Tek query → Sipariş/Müşteri/Kullanıcı/Satın Alma.
     /// Rol bazlı filtre uygulanır; en az 2 karakter gerekir.
     /// </summary>
     [HttpGet("unified")]
@@ -110,7 +110,9 @@ public sealed class SearchController(ISearchService searchService) : ControllerB
             q ?? string.Empty,
             CurrentRole,
             OwnOrdersOnly,
-            !HidesMoney);
+            !HidesMoney,
+            CurrentUserName,
+            User.CanSeeAllPurchaseRequests());
         return Ok(ApiResponse<UnifiedSearchResultDto>.Ok(result));
     }
 }

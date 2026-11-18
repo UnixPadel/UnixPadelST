@@ -21,15 +21,4 @@ internal sealed class ComponentRepository(AppDbContext context)
             .Where(c => c.Fiyat != null)
             .OrderBy(c => c.BilesenAdi)
             .ToListAsync();
-
-    public async Task<IReadOnlyList<Component>> QuickFindAsync(string query, int limit)
-    {
-        var q = $"%{query}%";
-        return await _context.BilesenBilgileri
-            .AsNoTracking()
-            .Where(c => EF.Functions.Like(c.BilesenAdi, q))
-            .OrderBy(c => c.BilesenAdi)
-            .Take(limit)
-            .ToListAsync();
-    }
 }

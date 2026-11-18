@@ -5,6 +5,7 @@ import { getUsers, getUsersIncludingDeleted, createUser, updateUser, deleteUser,
 import { useUndoableDelete } from '@/hooks/useUndoableDelete'
 import { PageHeader } from '@/components/PageHeader'
 import { FillPage, FillRegion } from '@/components/FillPage'
+import { FilterBar, FilterField, useFilterState } from '@/components/FilterBar'
 import { DataTable, type Column } from '@/components/DataTable'
 import { StatusBadge } from '@/components/StatusBadge'
 import { RowActionsMenu } from '@/components/RowActionsMenu'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormField } from '@/components/ui/form-field'
 import { Checkbox } from '@/components/ui/checkbox'
+import { trLower } from '@/components/ui/combobox'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -21,6 +23,8 @@ import { useConfirm } from '@/components/ui/confirm-dialog'
 import type { UserListDto, CreateUserDto, UpdateUserDto } from '@/types'
 
 const YETKI_TURLERI = ['Yonetici', 'Muhasebe', 'Fabrika', 'Gozlemci', 'Temsilci', 'Lojistik']
+
+const FILTER_DEFAULTS = { q: '' }
 
 const emptyCreate = (): CreateUserDto => ({
   kullaniciAdi: '', sifre: '', ad: '', soyad: '',
@@ -61,7 +65,12 @@ export function UsersPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['users'] }); toast({ title: t('undo.restored'), variant: 'success' }) },
     onError: (e) => toastApiError(toast, t('undo.failed'), e),
   })
-  const visibleData = showPassive ? data : data.filter((u) => u.durum !== 'Pasif')
+  // Üst arama kutusundan gelen kullanıcı f.q ile açılır; "Sıfırla" tüm listeye döner.
+  const { values: f, set, reset } = useFilterState(FILTER_DEFAULTS)
+  const q = trLower(f.q.trim())
+  const visibleData = data.filter((u) =>
+    (showPassive || u.durum !== 'Pasif')
+    && (!q || trLower(`${u.kullaniciAdi} ${u.ad} ${u.soyad} ${u.email}`).includes(q)))
 
   const createMut = useMutation({
     mutationFn: () => createUser(createForm),
@@ -178,6 +187,13 @@ export function UsersPage() {
           </div>
         }
       />
+      <div className="px-4 pt-2">
+        <FilterBar onReset={reset}>
+          <FilterField label={t('users.searchLabel')} className="col-span-2">
+            <Input inputSize="sm" value={f.q} onChange={(e) => set('q', e.target.value)} />
+          </FilterField>
+        </FilterBar>
+      </div>
       <FillRegion className="pt-2">
         <DataTable fill columns={columns} data={visibleData as (UserListDto & Record<string, unknown>)[]} keyField="kullaniciID" loading={isLoading} />
       </FillRegion>

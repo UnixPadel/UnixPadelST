@@ -13,6 +13,14 @@ public static class ClaimsPrincipalExtensions
 {
     public const string SuperAdminClaim = "is_super_admin";
 
+    private const string AllPurchasesUser = "elshan.rasulov";
+
     public static bool IsSuperAdmin(this ClaimsPrincipal? user) =>
         user?.HasClaim(SuperAdminClaim, "true") ?? false;
+
+    /// <summary>Tüm Talepler verisini görme kuralı (web: lib/permissions.ts ile aynı).</summary>
+    public static bool CanSeeAllPurchaseRequests(this ClaimsPrincipal user) =>
+        user.FindFirstValue(ClaimTypes.Name) == AllPurchasesUser
+        || user.IsInRole("Yonetici")
+        || user.IsInRole("Gozlemci");
 }

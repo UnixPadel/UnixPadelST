@@ -19,7 +19,4 @@ public interface IComponentRepository : IBaseRepository<Component>
     /// Used by the product catalog to list priceable components.
     /// </summary>
     Task<IReadOnlyList<Component>> GetAllPricedAsync();
-
-    /// <summary>Faz 7 — Topbar global arama. BilesenAdi üzerinde LIKE.</summary>
-    Task<IReadOnlyList<Component>> QuickFindAsync(string query, int limit);
 }

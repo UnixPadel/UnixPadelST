@@ -54,8 +54,7 @@ public sealed class PurchaseController(IPurchaseService purchaseService) : Contr
     [HttpGet("all")]
     public async Task<IActionResult> GetAll([FromQuery] PurchaseRequestFilterDto filter)
     {
-        // Yetki: elshan kullanıcısı, Yonetici veya Gozlemci
-        if (CurrentUserName != FinalApproverUser && !IsRole("Yonetici") && !IsRole("Gozlemci"))
+        if (!User.CanSeeAllPurchaseRequests())
             return Forbid();
         var result = await purchaseService.GetAllAsync(filter);
         return Ok(ApiResponse<PurchaseRequestPageDto>.Ok(result));

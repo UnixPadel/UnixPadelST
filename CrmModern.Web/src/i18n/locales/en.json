@@ -681,6 +681,7 @@
   "users": {
     "title": "Users",
     "subtitle": "Add and edit users, change passwords",
+    "searchLabel": "Name, username or email",
     "newUser": "New User",
     "editUser": "Edit User",
     "changePassword": "Change Password",
@@ -1267,6 +1268,7 @@
       "tamamlandi": "Completed"
     },
     "filter": {
+      "talepNo": "Request no.",
       "talepEden": "Requested by",
       "departman": "Department",
       "durum": "Status",

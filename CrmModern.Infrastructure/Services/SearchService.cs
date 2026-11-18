@@ -56,31 +56,31 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
     // ─────────────────────────────────────────────────────────────────────────────
 
     public async Task<UnifiedSearchResultDto> UnifiedSearchAsync(
-        string query, string role, int? onlyKullaniciId = null, bool canSeeMoney = true)
+        string query, string role, int? onlyKullaniciId = null, bool canSeeMoney = true,
+        string? userName = null, bool canSeeAllPurchases = false)
     {
         var trimmed = (query ?? string.Empty).Trim();
         if (trimmed.Length < OrderSearchMatcher.MinQueryLength)
             return new UnifiedSearchResultDto(trimmed, 0, Array.Empty<UnifiedSearchHitDto>());
 
         // ── Rol bazlı kategori yetkileri ──────────────────────────────────────
-        bool canSeeBilesen    = role is "Yonetici" or "Muhasebe" or "Fabrika";
-        bool canSeeKategori   = role is "Yonetici" or "Muhasebe" or "Fabrika";
+        // Bileşen ve kategorinin ekranı yok; ürün adları sipariş sonuçlarında aranır.
         bool canSeeKullanici  = role == "Yonetici";
-        bool canSeeSatinAlma  = role is "Yonetici" or "Muhasebe" or "Gozlemci" or "Fabrika" or "Lojistik";
+        // Tüm Talepler'i göremeyen kullanıcı yalnız Taleplerim'deki kayıtlarını bulur.
+        bool canSeeSatinAlma  = role is "Yonetici" or "Muhasebe" or "Gozlemci" or "Fabrika" or "Lojistik"
+                                && (canSeeAllPurchases || !string.IsNullOrEmpty(userName));
 
         // Sorgular sırayla çalışır: tüm depolar aynı istek kapsamlı DbContext'i paylaşır.
         // Sahiplik filtresi eşleştirmeden önce uygulanır; ilk N sonuca sonradan kesilmez.
         var orders = await FindOrdersAsync(new OrderSearchRequest(
             trimmed, OnlyKullaniciId: onlyKullaniciId, CanSeeMoney: canSeeMoney, Limit: CategoryLimit));
         var musteriler = await uow.Musteriler.QuickFindAsync(trimmed, CategoryLimit);
-        IReadOnlyList<Core.Entities.Component> bilesenler = canSeeBilesen
-            ? await uow.Components.QuickFindAsync(trimmed, CategoryLimit) : [];
-        IReadOnlyList<Core.Entities.ProductCategory> kategoriler = canSeeKategori
-            ? await uow.ProductCategories.QuickFindAsync(trimmed, CategoryLimit) : [];
         IReadOnlyList<Core.Entities.Kullanici> kullanicilar = canSeeKullanici
             ? await uow.Kullanicilar.QuickFindAsync(trimmed, CategoryLimit) : [];
         IReadOnlyList<Core.Entities.PurchaseRequest> talepler = canSeeSatinAlma
-            ? await uow.PurchaseRequests.QuickFindAsync(trimmed, CategoryLimit) : [];
+            ? await uow.PurchaseRequests.QuickFindAsync(
+                trimmed, CategoryLimit, canSeeAllPurchases ? null : userName)
+            : [];
 
         // ── Map → DTO ─────────────────────────────────────────────────────────
         var hits = new List<UnifiedSearchHitDto>();
@@ -113,26 +113,6 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
                 NavigateUrl: $"/search?f.q={Uri.EscapeDataString(m.MusteriAd)}"));
         }
 
-        foreach (var b in bilesenler)
-        {
-            hits.Add(new UnifiedSearchHitDto(
-                Kategori:    "Bileşen",
-                Id:          b.BilesenID.ToString(),
-                Baslik:      b.BilesenAdi,
-                AltMetin:    b.Birim,
-                NavigateUrl: $"/product-catalog/components/{b.BilesenID}"));
-        }
-
-        foreach (var k in kategoriler)
-        {
-            hits.Add(new UnifiedSearchHitDto(
-                Kategori:    "Kategori",
-                Id:          k.KategoriID.ToString(),
-                Baslik:      k.KategoriAdi,
-                AltMetin:    $"Fiyat: {k.Fiyat}",
-                NavigateUrl: $"/product-catalog/categories/{k.KategoriID}"));
-        }
-
         foreach (var u in kullanicilar)
         {
             hits.Add(new UnifiedSearchHitDto(
@@ -140,9 +120,10 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
                 Id:          u.KullaniciID.ToString(),
                 Baslik:      $"{u.Ad} {u.Soyad}".Trim(),
                 AltMetin:    $"{u.KullaniciAdi} • {u.YetkiTuru}",
-                NavigateUrl: $"/users/{u.KullaniciID}"));
+                NavigateUrl: $"/users?f.q={Uri.EscapeDataString(u.KullaniciAdi)}"));
         }
 
+        var talepEkrani = canSeeAllPurchases ? "/purchase/all" : "/purchase/mine";
         foreach (var p in talepler)
         {
             hits.Add(new UnifiedSearchHitDto(
@@ -150,7 +131,7 @@ internal sealed class SearchService(IUnitOfWork uow) : ISearchService
                 Id:          p.TalepID.ToString(),
                 Baslik:      p.UrunAdi,
                 AltMetin:    $"{p.Departman ?? "-"} • {p.Durum} • {p.TalepTarihi:dd.MM.yyyy}",
-                NavigateUrl: $"/purchase/{p.TalepID}"));
+                NavigateUrl: $"{talepEkrani}?f.talepNo={p.TalepID}"));
         }
 
         return new UnifiedSearchResultDto(trimmed, hits.Count, hits, orders.Toplam);

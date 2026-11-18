@@ -4,9 +4,11 @@ import { useTranslation } from 'react-i18next'
 import { getMyPurchaseRequests } from '@/api/purchase'
 import { PageHeader } from '@/components/PageHeader'
 import { FillPage, FillRegion } from '@/components/FillPage'
+import { FilterBar, FilterField, useFilterState } from '@/components/FilterBar'
 import { DataTable, type Column } from '@/components/DataTable'
 import { PurchaseStatusBadge } from '@/components/PurchaseStatusBadge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
 import { hideMoneyFor } from '@/lib/visibility'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -14,6 +16,7 @@ import type { PurchaseRequestListDto } from '@/types'
 
 // Roles that can create a new purchase request (mirror /purchase/new gate).
 const CAN_CREATE_ROLES = new Set(['Yonetici', 'Lojistik', 'Fabrika', 'Gozlemci', 'Temsilci'])
+const FILTER_DEFAULTS = { talepNo: '' }
 
 export function MyPurchaseRequestsPage() {
   const nav = useNavigate()
@@ -24,6 +27,9 @@ export function MyPurchaseRequestsPage() {
   // Round-11 §3 — omur.caliskan (Gozlemci) parasal değer görmez.
   const hideMoney = hideMoneyFor(user)
   const { data = [], isLoading } = useQuery({ queryKey: ['purchase-mine'], queryFn: getMyPurchaseRequests })
+  // Üst arama kutusundan gelen talep f.talepNo ile açılır; "Sıfırla" tüm listeye döner.
+  const { values: f, set, reset } = useFilterState(FILTER_DEFAULTS)
+  const rows = f.talepNo ? data.filter((r) => String(r.talepID) === f.talepNo) : data
 
   const cols: Column<PurchaseRequestListDto & Record<string, unknown>>[] = [
     { key: 'talepID',       header: t('purchase.cols.id'), sortable: true },
@@ -48,8 +54,15 @@ export function MyPurchaseRequestsPage() {
         title={t('purchase.mineTitle')}
         actions={canCreate ? <Button onClick={() => nav('/purchase/new')}>{t('common.add')}</Button> : undefined}
       />
+      <div className="px-4 pt-2">
+        <FilterBar onReset={reset}>
+          <FilterField label={t('purchase.filter.talepNo')}>
+            <Input inputSize="sm" inputMode="numeric" value={f.talepNo} onChange={(e) => set('talepNo', e.target.value.replace(/\D/g, '').slice(0, 9))} />
+          </FilterField>
+        </FilterBar>
+      </div>
       <FillRegion className="pt-2">
-        <DataTable fill columns={cols} data={data as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
+        <DataTable fill columns={cols} data={rows as (PurchaseRequestListDto & Record<string, unknown>)[]} keyField="talepID" loading={isLoading} />
       </FillRegion>
     </FillPage>
   )

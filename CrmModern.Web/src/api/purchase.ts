@@ -14,6 +14,7 @@ export const getMyPurchaseRequests = async (): Promise<PurchaseRequestListDto[]>
 }
 
 export interface PurchaseFilter {
+  talepNo?: number
   talepEden?: string
   departman?: string
   durum?: string

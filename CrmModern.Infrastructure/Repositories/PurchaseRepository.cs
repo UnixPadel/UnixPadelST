@@ -94,11 +94,12 @@ internal sealed class PurchaseRepository(AppDbContext context)
     public Task<int> CountPendingAsync() =>
         _context.SatinAlmaTalep.AsNoTracking().CountAsync(p => p.Durum == "Onay Bekliyor");
 
-    public async Task<IReadOnlyList<PurchaseRequest>> QuickFindAsync(string query, int limit)
+    public async Task<IReadOnlyList<PurchaseRequest>> QuickFindAsync(string query, int limit, string? onlyTalepEden = null)
     {
         var q = $"%{query}%";
         return await _context.SatinAlmaTalep
             .AsNoTracking()
+            .Where(p => onlyTalepEden == null || p.TalepEdenKullaniciAdi == onlyTalepEden)
             .Where(p => EF.Functions.Like(p.UrunAdi, q)
                      || (p.TalepEdenKullaniciAdi != null && EF.Functions.Like(p.TalepEdenKullaniciAdi, q))
                      || (p.Departman != null && EF.Functions.Like(p.Departman, q)))
@@ -121,9 +122,11 @@ internal sealed class PurchaseRepository(AppDbContext context)
 
     public async Task<IReadOnlyList<PurchaseRequest>> SearchAsync(
         string? talepEden, string? departman, string? durum, string? talepTipi,
-        DateTime? baslangic, DateTime? bitis)
+        DateTime? baslangic, DateTime? bitis, int? talepNo = null)
     {
         var q = _context.SatinAlmaTalep.AsNoTracking().AsQueryable();
+        if (talepNo.HasValue)
+            q = q.Where(p => p.TalepID == talepNo.Value);
         if (!string.IsNullOrWhiteSpace(talepEden))
             q = q.Where(p => p.TalepEdenKullaniciAdi != null && p.TalepEdenKullaniciAdi.Contains(talepEden));
         if (!string.IsNullOrWhiteSpace(departman))

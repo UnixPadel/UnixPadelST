@@ -2047,6 +2047,7 @@
     "quoteNotApproved": "Nakliye teklifi onaylı değil; geri alınacak onay yok.",
     "rejectReasonRequired": "Red sebebi gerekli.",
     "customerExists": "Bu müşteri adı zaten var.",
+    "customerNameTooLong": "Müşteri adı en çok {{max}} karakter olabilir (şu an {{length}}).",
     "customerHasOrders": "Bu müşterinin sipariş ya da teklifleri var, silinemez.",
     "countryExists": "Bu ülke zaten var.",
     "orderAlreadyDeleted": "Bu sipariş zaten silinmiş.",

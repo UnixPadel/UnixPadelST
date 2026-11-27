@@ -167,7 +167,8 @@ export function CustomerFormPage() {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1 col-span-2">
             <Label>{t('customers.fields.musteriAd')} *</Label>
-            <Input value={form.musteriAd} onChange={(e) => setForm((f) => ({ ...f, musteriAd: e.target.value }))} />
+            {/* Veritabanı sınırı 200 (MusteriService.MusteriAdMaxLength); fazlası yazılamaz. */}
+            <Input maxLength={200} value={form.musteriAd} onChange={(e) => setForm((f) => ({ ...f, musteriAd: e.target.value }))} />
             {submitted && errors.musteriAd && <FieldError message={t('validation.required')} />}
           </div>
 

@@ -2047,6 +2047,7 @@
     "quoteNotApproved": "The shipping quote isn't approved, so there's no approval to undo.",
     "rejectReasonRequired": "A reason for rejecting is needed.",
     "customerExists": "A customer with this name already exists.",
+    "customerNameTooLong": "Customer name can be at most {{max}} characters (now {{length}}).",
     "customerHasOrders": "This customer has orders or quotes, so it can't be deleted.",
     "countryExists": "This country already exists.",
     "orderAlreadyDeleted": "This order is already deleted.",

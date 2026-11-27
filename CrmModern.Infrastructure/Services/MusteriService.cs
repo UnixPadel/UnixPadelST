@@ -9,6 +9,16 @@ namespace CrmModern.Infrastructure.Services;
 internal sealed class MusteriService(IUnitOfWork unitOfWork, IAuditService audit) : IMusteriService
 {
     private const string AuditEntity = "Musteri";
+    /// <summary>MusteriBilgileri.MusteriAd ve SiparisAlTablo.MusteriAd varchar(200) (DatabaseSchemaMigrator 4b).</summary>
+    public const int MusteriAdMaxLength = 200;
+
+    private static void EnsureNameLength(string musteriAd)
+    {
+        if (musteriAd.Length > MusteriAdMaxLength)
+            throw new BusinessException(
+                $"Müşteri adı en çok {MusteriAdMaxLength} karakter olabilir (şu an {musteriAd.Length}).",
+                "customerNameTooLong", new { max = MusteriAdMaxLength, length = musteriAd.Length });
+    }
 
     public async Task<IEnumerable<MusteriDto>> GetAllAsync(int currentUserId, string role, bool includeDeleted = false)
     {
@@ -33,6 +43,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork, IAuditService audit
 
     public async Task<MusteriDto> CreateAsync(CreateMusteriDto dto, int currentUserId)
     {
+        EnsureNameLength(dto.MusteriAd);
         // Replicates: SELECT COUNT(*) FROM MusteriBilgileri WHERE MusteriAd = @MusteriAd
         var ayniAd = await unitOfWork.Musteriler.GetByMusteriAdAsync(dto.MusteriAd);
         // 40+ ergonomi K5 — ad silinmiş bir müşteriye aitse yenisi açılmaz; geri yüklenmeli.
@@ -71,6 +82,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork, IAuditService audit
         var musteri = await unitOfWork.Musteriler.GetByIdAsync(id)
             ?? throw new NotFoundException(nameof(Musteri), id);
 
+        EnsureNameLength(dto.MusteriAd);
         // İsim değiştiyse uniqueness kontrolü (WinForms davranışıyla aynı çatı altında)
         if (!string.Equals(musteri.MusteriAd, dto.MusteriAd, StringComparison.Ordinal)
             && await unitOfWork.Musteriler.MusteriAdExistsAsync(dto.MusteriAd))

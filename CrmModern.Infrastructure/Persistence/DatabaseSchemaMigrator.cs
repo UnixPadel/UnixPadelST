@@ -56,6 +56,19 @@ public static class DatabaseSchemaMigrator
         await EnsureMusteriCreatedByColumnAsync(ctx, logger);
         // 40+ ergonomi K5 — yumuşak silme (müşteri). Liste/arama/seçim silineni dışlar.
         await EnsureSoftDeleteColumnsAsync(ctx, logger, "MusteriBilgileri");
+        // 4b) 2026-11-27: müşteri adı varchar(50) uzun firma unvanlarına yetmiyordu ("Data too long" → 500).
+        // Sipariş de adı kendi tablosunda tutar; ikisi birlikte 200'e büyür. Karakter seti, sıralama ve
+        // NULL kuralı korunur; zaten ≥200 ise dokunulmaz.
+        // Hata verirse yalnız loglanır; sonraki adımlar yine çalışır.
+        try
+        {
+            await EnsureVarcharAtLeastAsync(ctx, logger, "MusteriBilgileri", "MusteriAd", 200);
+            await EnsureVarcharAtLeastAsync(ctx, logger, "SiparisAlTablo", "MusteriAd", 200);
+        }
+        catch (Exception ex)
+        {
+            logger?.LogError(ex, "MusteriAd genişletilemedi; uzun müşteri adları kaydedilemez.");
+        }
 
         // 5) PROMPT-v4 §5.5: SiparisAlTablo.KontrolNot — legacy Kontrol formu yazıyor,
         // canlı DB'de büyük ihtimalle var; yoksa eklenir (idempotent).
@@ -1027,6 +1040,56 @@ public static class DatabaseSchemaMigrator
         await ctx.Database.ExecuteSqlRawAsync(ddl);
         logger?.LogInformation("{Table}.{Column} kolonu eklendi.", table, column);
     }
+
+    /// <summary>
+    /// VARCHAR kolonu en az <paramref name="minLength"/> karaktere büyütür; karakter seti, sıralama ve
+    /// NULL kuralı aynen korunur. Kolon yoksa ya da varchar değilse ya da zaten yeterliyse hiçbir şey yapmaz.
+    /// Yalnız bu dosyadan sabit tablo/kolon adlarıyla çağrılır.
+    /// </summary>
+#pragma warning disable EF1002
+    private static async Task EnsureVarcharAtLeastAsync(AppDbContext ctx, ILogger? logger,
+        string table, string column, int minLength)
+    {
+        var conn = ctx.Database.GetDbConnection();
+        string dataType, nullable;
+        string? charset, collation;
+        long maxLen;
+        await using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = @"SELECT DATA_TYPE, COALESCE(CHARACTER_MAXIMUM_LENGTH, 0), CHARACTER_SET_NAME,
+                                       COLLATION_NAME, IS_NULLABLE
+                                FROM INFORMATION_SCHEMA.COLUMNS
+                                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = @t AND COLUMN_NAME = @c
+                                LIMIT 1";
+            var pT = cmd.CreateParameter(); pT.ParameterName = "@t"; pT.Value = table;  cmd.Parameters.Add(pT);
+            var pC = cmd.CreateParameter(); pC.ParameterName = "@c"; pC.Value = column; cmd.Parameters.Add(pC);
+            await using var r = await cmd.ExecuteReaderAsync();
+            if (!await r.ReadAsync())
+            {
+                logger?.LogWarning("{Table}.{Column} kolonu bulunamadı; genişletme atlandı.", table, column);
+                return;
+            }
+            dataType  = r.GetValue(0)?.ToString()?.ToLowerInvariant() ?? "";
+            maxLen    = Convert.ToInt64(r.GetValue(1));
+            charset   = r.IsDBNull(2) ? null : r.GetString(2);
+            collation = r.IsDBNull(3) ? null : r.GetString(3);
+            nullable  = r.GetValue(4)?.ToString() ?? "YES";
+        }
+
+        if (dataType != "varchar" || maxLen >= minLength)
+        {
+            logger?.LogInformation("{Table}.{Column} {Type}({Len}); genişletme gerekmedi.", table, column, dataType, maxLen);
+            return;
+        }
+
+        var cs   = charset   is null ? "" : $" CHARACTER SET {charset}";
+        var coll = collation is null ? "" : $" COLLATE {collation}";
+        var nul  = nullable.Equals("NO", StringComparison.OrdinalIgnoreCase) ? " NOT NULL" : " NULL";
+        await ctx.Database.ExecuteSqlRawAsync(
+            $"ALTER TABLE {table} MODIFY COLUMN {column} VARCHAR({minLength}){cs}{coll}{nul}");
+        logger?.LogInformation("{Table}.{Column} varchar({Old}) → varchar({New}) yapıldı.", table, column, maxLen, minLength);
+    }
+#pragma warning restore EF1002
 
     // table/column geliyor — bu metot sadece bu dosya içinden, sabit string'lerle çağrılıyor;
     // SQL injection riski yok. Identifier'larda backtick whitelisting yapsak da sabit

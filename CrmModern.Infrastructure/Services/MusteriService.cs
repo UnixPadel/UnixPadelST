@@ -167,7 +167,7 @@ internal sealed class MusteriService(IUnitOfWork unitOfWork, IAuditService audit
         E_Mail      : m.E_Mail,
         Adres       : m.Adres,
         VATNumarasi : m.VATNumarasi,
-        UlkelerID   : m.UlkelerID,
+        UlkelerID   : m.UlkelerID ?? 0,
         UlkeAdi     : m.Ulke?.UlkeAdi     ?? string.Empty,
         Bolge       : m.Ulke?.Bolge,
         Silindi       : m.Silindi,

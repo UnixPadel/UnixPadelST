@@ -64,6 +64,7 @@ internal sealed class MusteriConfiguration : IEntityTypeConfiguration<Musteri>
         builder.HasOne(m => m.Ulke)
                .WithMany(u => u.Musteriler)
                .HasForeignKey(m => m.UlkelerID)
+               .IsRequired(false)
                .OnDelete(DeleteBehavior.Restrict);
     }
 }

@@ -14,7 +14,12 @@ public sealed class Musteri
     public string E_Mail       { get; set; } = string.Empty;
     public string Adres        { get; set; } = string.Empty;
     public string VATNumarasi  { get; set; } = string.Empty;
-    public int    UlkelerID    { get; set; }
+    /// <summary>
+    /// Ülke boş olabilir: eski bir kayıt (MusteriID 42) ve SalesCRM'in aktardığı bazı müşteriler ülkesiz.
+    /// Formlar ülkeyi yine zorunlu tutar (Create/UpdateMusteriDto); boş ülke yalnız okumada kabul edilir,
+    /// yoksa bu satırlar adla arama, detay ve ekleme sırasında 500 hatası verir (2026-11-27).
+    /// </summary>
+    public int?   UlkelerID    { get; set; }
 
     /// <summary>
     /// Müşteriyi sisteme ekleyen kullanıcının id'si (PROMPT-v2 §7).
